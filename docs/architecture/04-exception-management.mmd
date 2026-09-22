@@ -1,0 +1,25 @@
+flowchart LR
+    A["ERP Operational State / Event"]
+    B["Deterministic Rule / Anomaly Check"]
+    C{"Exception?"}
+    D["Create / Update Exception"]
+    E["Trusted Facts<br/>Age • Deadline • Value • Status • Owner"]
+    F["Intelligence Enrichment<br/>Context • Why it matters • Prior actions"]
+    G["Exception Action Brief"]
+    H{"Escalation required?"}
+    I["Reminder / Owner Action"]
+    J["Manager / Internal Escalation"]
+    K["Human Approval<br/>before external/client message when required"]
+    L["In-App / WhatsApp / Email"]
+    M["Track action + ERP state"]
+    N{"Resolved?"}
+    O["Close Exception"]
+
+    A --> B --> C
+    C -->|"No"| A
+    C -->|"Yes"| D --> E --> F --> G --> H
+    H -->|"Normal"| I --> L
+    H -->|"Escalate"| J --> K --> L
+    L --> M --> N
+    N -->|"No"| G
+    N -->|"Yes"| O

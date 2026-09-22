@@ -1,0 +1,31 @@
+flowchart LR
+    U["User Browser"]
+
+    subgraph HOST["Single Development / POC Host — Docker Compose"]
+        direction TB
+        WEB["React Web"]
+        API["FastAPI Intelligence API"]
+        WORKER["Python Integration Worker"]
+        PG["PostgreSQL + pgvector"]
+        OBJ["MinIO"]
+        REDIS["Redis — optional if used"]
+        LLM["LiteLLM — optional local profile"]
+        N8N["n8n — optional profile"]
+    end
+
+    ERP["Existing Celerates ERP<br/>or Demo ERP Adapter"]
+    PROVIDERS["OpenAI • Anthropic • Gemini • Local/OSS"]
+    LF["Langfuse<br/>optional hosted/self-hosted integration"]
+
+    U --> WEB --> API
+    API <--> PG
+    API <--> OBJ
+    API <--> REDIS
+    API <--> ERP
+    WORKER --> PG
+    WORKER --> OBJ
+    WORKER --> ERP
+    API <--> LLM --> PROVIDERS
+    N8N --> API
+    API -.-> LF
+    LLM -.-> LF

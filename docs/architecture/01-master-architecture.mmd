@@ -1,0 +1,21 @@
+flowchart TB
+    A["RAW SOURCES<br/>Excel • Jira • Databases • Documents • Forms • APIs"]
+    B["CELERATES ERP<br/><b>Digital Operational Core</b><br/>Master Data • Workflow • Approval • Operational Status • Audit"]
+
+    subgraph IL["CELERATES INTELLIGENCE LAYER"]
+        direction LR
+        C["CONTEXT & KNOWLEDGE<br/>Structured Context • Documents<br/>Retrieval • Metadata • Provenance"]
+        D["INTELLIGENCE CORE<br/>Rules • Tools • Retrieval<br/>Reasoning • Orchestration • Guardrails"]
+        E["MODEL GATEWAY<br/>OpenAI • Anthropic • Gemini • Open-source<br/>Routing • Selection • Fallback"]
+        C <--> D
+        D <--> E
+    end
+
+    F["CELERATES INTELLIGENCE APPLICATIONS<br/>Pre-Sales • Exception Management • Human Services • Management Intelligence"]
+    G["HUMAN / WORKFLOW ACTION<br/>Review • Approval • Follow-up • Controlled Automation"]
+
+    A -->|"Python Intake • Validate • Reconcile<br/>n8n supporting automation"| B
+    B --> IL
+    IL --> F
+    F --> G
+    G -->|"Status & outcome"| B

@@ -1,0 +1,19 @@
+flowchart LR
+    A["Talent / Employee needs help"]
+    B["Resolve Identity + Authorized Context"]
+    C["Understand Intent / Domain"]
+    D["Retrieve ERP Facts + Policy / Knowledge"]
+    E{"Routine & safe to answer directly?"}
+    F["Concise Answer + Source"]
+    G["Create Human Service Case"]
+    H["Context Pack<br/>Profile • Project • Transaction • Policy • Evidence"]
+    I["Suggested PIC + Draft Response / Next Action"]
+    J["Human PIC Review & Action"]
+    K["User receives final help"]
+    L["Record outcome / resolution"]
+
+    A --> B --> C --> D --> E
+    E -->|"Yes"| F --> K
+    E -->|"No"| G --> H --> I --> J --> K
+    J --> L
+    F --> L

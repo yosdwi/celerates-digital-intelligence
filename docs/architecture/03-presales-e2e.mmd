@@ -1,0 +1,49 @@
+flowchart TB
+    A["Opportunity + TOR / RFP / Sales Notes"]
+    B["CELERATES ERP<br/>Customer • Opportunity • Owner • Timeline • Status"]
+    C["Document Intake<br/>Store source • Parse structure • Preserve provenance"]
+
+    subgraph INT["CELERATES INTELLIGENCE LAYER — PRE-SALES"]
+        direction TB
+        D["Understand Requirements<br/>Functional • NFR • Integration • Scope • Timeline"]
+        E["Find Missing / Ambiguous Information"]
+        F["Retrieve Relevant Experience<br/>Projects • Proposals • Architecture • Lessons"]
+        G["Query ERP Live Context<br/>Capability • Talent • Allocation • Capacity • Trusted pricing source"]
+        H["Assess Fit • Gaps • Risks • Assumptions"]
+        I["MODEL GATEWAY<br/>Selected model for reasoning / synthesis"]
+        J["Generate Structured Artifacts"]
+    end
+
+    subgraph PACK["PRE-SALES INTELLIGENCE PACK"]
+        direction LR
+        P1["Opportunity Brief"]
+        P2["Requirement Matrix"]
+        P3["Clarification List"]
+        P4["Relevant Experience"]
+        P5["Capability & Capacity Fit"]
+        P6["Risk & Assumptions"]
+        P7["Solution Outline"]
+        P8["Scope Draft"]
+        P9["BOQ / Effort Draft"]
+        P10["Proposal Draft"]
+        P11["Next Actions"]
+    end
+
+    K["Human Pre-Sales Review<br/>Edit • Validate • Approve • Request Revision"]
+    L{"Information sufficient?"}
+    M["Clarification Required<br/>Return to Sales / Customer"]
+    N["Ready for Sales<br/>Solution / Proposal Discussion"]
+    O["Approved outcome & artifact references<br/>recorded to ERP + curated knowledge"]
+
+    A --> B
+    B --> C --> D
+    B --> G
+    D --> E
+    D --> F
+    E --> H
+    F --> H
+    G --> H
+    H --> I --> J --> PACK
+    PACK --> K --> L
+    L -->|"No"| M --> B
+    L -->|"Yes"| N --> O --> B

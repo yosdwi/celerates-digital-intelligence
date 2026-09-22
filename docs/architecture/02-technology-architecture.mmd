@@ -1,0 +1,98 @@
+flowchart LR
+    subgraph S["RAW SOURCES"]
+        direction TB
+        S1["Excel / CSV"]
+        S2["Jira / REST APIs"]
+        S3["PostgreSQL / SQL Server / Legacy DB"]
+        S4["PDF / Word / Documents"]
+        S5["Forms / Manual Input"]
+    end
+
+    subgraph I["CELERATES DATA INTAKE"]
+        direction TB
+        I1["Python Integration Core<br/>Extract • Normalize • Validate • Reconcile"]
+        I2["n8n — supporting low-code<br/>Triggers • SaaS connectors • Notification fan-out"]
+        I3["Docling<br/>Document structure extraction"]
+    end
+
+    ERP["CELERATES ERP<br/><b>Digital Operational Core</b><br/>Existing Web Apps • Backend Services • Business Modules<br/>Master Data • Workflow • Approval • RBAC • Audit"]
+
+    subgraph L["CELERATES INTELLIGENCE LAYER"]
+        direction TB
+
+        subgraph K["Context & Knowledge"]
+            direction LR
+            K1["PostgreSQL<br/>Intelligence metadata / structured context"]
+            K2["pgvector + PostgreSQL FTS<br/>Hybrid retrieval"]
+            K3["MinIO / S3<br/>Documents & generated files"]
+            K4["Redis<br/>Cache / transient state"]
+        end
+
+        subgraph C["Intelligence Core"]
+            direction LR
+            C1["FastAPI<br/>Typed Intelligence API"]
+            C2["LangGraph<br/>Stateful workflows / HITL"]
+            C3["ERP Adapter / Tools<br/>Controlled Read • Event • Action"]
+            C4["Business Rules<br/>Deterministic checks / policy"]
+        end
+
+        subgraph M["Model Gateway"]
+            direction LR
+            M1["LiteLLM"]
+            M2["OpenAI"]
+            M3["Anthropic"]
+            M4["Gemini"]
+            M5["Open-source / Local"]
+        end
+
+        O["Langfuse Integration<br/>Trace • Cost • Quality • Evaluation"]
+    end
+
+    subgraph A["CELERATES INTELLIGENCE APPLICATIONS"]
+        direction TB
+        A1["Pre-Sales Workspace"]
+        A2["Exception Action Center"]
+        A3["Human Service Inbox"]
+        A4["Management Intelligence"]
+        A5["Contextual Copilot"]
+        A6["In-App / WhatsApp / Email Notifications"]
+        A7["Generated Documents"]
+        A8["Background Automation"]
+    end
+
+    S1 --> I1
+    S2 --> I1
+    S3 --> I1
+    S4 --> I3 --> I1
+    S5 --> I2 --> I1
+    I1 --> ERP
+
+    ERP <--> C3
+    C3 <--> C1
+    C1 <--> C2
+    C2 <--> C4
+    C1 <--> K1
+    C1 <--> K2
+    C1 <--> K3
+    C1 <--> K4
+    C2 <--> M1
+    M1 --> M2
+    M1 --> M3
+    M1 --> M4
+    M1 --> M5
+    C1 --> O
+    C2 --> O
+    M1 --> O
+
+    C1 --> A1
+    C1 --> A2
+    C1 --> A3
+    C1 --> A4
+    C1 --> A5
+    C2 --> A8
+    A2 --> A6
+    A3 --> A6
+    A1 --> A7
+    A1 -->|"approved state"| ERP
+    A2 -->|"action / resolution"| ERP
+    A3 -->|"case outcome"| ERP

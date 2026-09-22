@@ -1,0 +1,26 @@
+flowchart LR
+    A["Sales & Pipeline"]
+    B["Talent & Capacity"]
+    C["Project • Timesheet • BAST"]
+    D["Revenue • Invoice • Cash"]
+    E["Deterministic Business Metrics"]
+    F["Exception / Trend Engine"]
+    G["Intelligence Context<br/>Explain change • impact • relationship"]
+    H["Executive Action Brief"]
+    I["What happened?"]
+    J["Why does it matter?"]
+    K["Who owns it?"]
+    L["What action / decision is needed?"]
+    M["Management View + Drill-down"]
+    N["Contextual Copilot"]
+
+    A --> E
+    B --> E
+    C --> E
+    D --> E
+    E --> F --> G --> H
+    H --> I --> M
+    H --> J --> M
+    H --> K --> M
+    H --> L --> M
+    M --> N

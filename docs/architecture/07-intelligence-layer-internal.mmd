@@ -1,0 +1,41 @@
+flowchart TB
+    ERP["CELERATES ERP<br/>Trusted Operational Context"]
+    DOC["Documents / Knowledge Sources"]
+
+    subgraph IL["CELERATES INTELLIGENCE LAYER"]
+        direction LR
+        subgraph CK["CONTEXT & KNOWLEDGE"]
+            direction TB
+            C1["Structured Business Context"]
+            C2["Knowledge / Document Metadata"]
+            C3["Vector + Full-text Retrieval"]
+            C4["Entity Links • Provenance • Access"]
+        end
+
+        subgraph CORE["INTELLIGENCE CORE"]
+            direction TB
+            R1["Context Retrieval"]
+            R2["Business Rules"]
+            R3["ERP / Business Tools"]
+            R4["Stateful Reasoning Workflow"]
+            R5["Human Review Checkpoints"]
+            R6["Structured Artifact / Action Preparation"]
+        end
+
+        subgraph MG["MODEL GATEWAY"]
+            direction TB
+            M1["Logical Model Alias"]
+            M2["Provider Routing"]
+            M3["OpenAI • Anthropic • Gemini • OSS"]
+            M4["Retry • Fallback • Cost / Quality Signals"]
+        end
+
+        CK <--> CORE
+        CORE <--> MG
+    end
+
+    ERP <--> CORE
+    DOC --> CK
+    APPS["CELERATES INTELLIGENCE APPLICATIONS"]
+    IL --> APPS
+    APPS -->|"approved action / status"| ERP
