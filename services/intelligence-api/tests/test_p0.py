@@ -4,6 +4,8 @@ import hashlib
 from uuid import uuid4
 
 import pytest
+from fastapi.testclient import TestClient
+
 from cdi.api import app
 from cdi.config import settings
 from cdi.db import connect, one
@@ -13,7 +15,6 @@ from cdi.intake import FileSource, ingest_source
 from cdi.migrate import migrate
 from cdi.worker import tick
 from cdi.workflow import execute
-from fastapi.testclient import TestClient
 
 
 @pytest.fixture(scope="session", autouse=True)
