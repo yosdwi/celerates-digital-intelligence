@@ -65,7 +65,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if git diff --quiet -- docs/architecture/rendered; then
+          if [ -z "$(git status --porcelain -- docs/architecture/rendered)" ]; then
             echo 'Rendered diagrams are already up to date.'
             exit 0
           fi
