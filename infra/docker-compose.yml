@@ -1,0 +1,89 @@
+name: celerates-intelligence
+x-api: &api
+  build:
+    context: ..
+    dockerfile: services/intelligence-api/Dockerfile
+  env_file: ../.env
+  restart: unless-stopped
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-celerates}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-celerates}
+      POSTGRES_DB: ${POSTGRES_DB:-celerates}
+    ports: ["127.0.0.1:5432:5432"]
+    volumes: ["postgres-data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    command: server /data --console-address :9001
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-celerates}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-celerates-local-only}
+    ports: ["127.0.0.1:9000:9000", "127.0.0.1:9001:9001"]
+    volumes: ["minio-data:/data"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  migrate:
+    <<: *api
+    restart: "no"
+    command: python -m cdi.migrate
+    depends_on:
+      postgres: {condition: service_healthy}
+  seed:
+    <<: *api
+    restart: "no"
+    command: ["python", "-c", "from cdi.config import settings; from cdi.seed import seed; seed() if settings().erp_mode == 'demo' else print('Connected ERP: demo seed skipped')"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      minio: {condition: service_healthy}
+  intelligence-api:
+    <<: *api
+    ports: ["127.0.0.1:8000:8000"]
+    depends_on:
+      seed: {condition: service_completed_successfully}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/ready')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  integration-worker:
+    <<: *api
+    command: python -m cdi.worker
+    depends_on:
+      seed: {condition: service_completed_successfully}
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+    ports: ["127.0.0.1:5173:80"]
+    depends_on:
+      intelligence-api: {condition: service_healthy}
+  n8n:
+    profiles: [automation]
+    image: docker.n8n.io/n8nio/n8n:1.112.6
+    ports: ["127.0.0.1:5678:5678"]
+    volumes: ["n8n-data:/home/node/.n8n"]
+    environment:
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_SECURE_COOKIE: "false"
+      GENERIC_TIMEZONE: Asia/Jakarta
+  litellm:
+    profiles: [models]
+    image: ghcr.io/berriai/litellm:main-stable
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    env_file: ../.env
+    volumes: ["./litellm/config.yaml:/app/config.yaml:ro"]
+    ports: ["127.0.0.1:4000:4000"]
+volumes:
+  postgres-data:
+  minio-data:
+  n8n-data:

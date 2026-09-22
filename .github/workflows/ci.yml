@@ -1,0 +1,66 @@
+name: P0 verification
+on: [push, pull_request]
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: celerates
+          POSTGRES_PASSWORD: celerates
+          POSTGRES_DB: celerates
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U celerates -d celerates"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://celerates:celerates@localhost:5432/celerates
+      STORAGE_BACKEND: filesystem
+      ERP_MODE: demo
+      MODEL_MODE: demo
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with: {version: "0.12.17"}
+      - run: uv sync --project services/intelligence-api --extra test --frozen
+      - run: uv run --project services/intelligence-api python -m cdi.migrate
+      - run: uv run --project services/intelligence-api python -m cdi.seed
+      - run: uv run --project services/intelligence-api --extra test pytest services/intelligence-api/tests
+      - run: uv run --extra test ruff check cdi tests --config pyproject.toml
+        working-directory: services/intelligence-api
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: 22, cache: npm, cache-dependency-path: apps/web/package-lock.json}
+      - run: npm ci && npm run build
+        working-directory: apps/web
+  compose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - run: cp .env.example .env && docker compose --env-file .env -f infra/docker-compose.yml config --quiet
+      - uses: actions/setup-node@v4
+        with: {node-version: 22, cache: npm, cache-dependency-path: apps/web/package-lock.json}
+      - run: docker compose --env-file .env -f infra/docker-compose.yml up --build -d
+      - name: Wait for functional API
+        run: timeout 180 bash -c 'until curl -fsS http://localhost:8000/ready; do sleep 3; done'
+      - run: python scripts/check-api.py
+      - run: npm ci && npx playwright install --with-deps chromium && npm run test:e2e
+        working-directory: apps/web
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: p0-browser-evidence
+          path: |
+            apps/web/playwright-report
+            docs/implementation/exports
+      - name: Capture Compose logs
+        if: always()
+        run: docker compose --env-file .env -f infra/docker-compose.yml logs --no-color --tail=100
+      - name: Stop local test stack
+        if: always()
+        run: docker compose --env-file .env -f infra/docker-compose.yml down
