@@ -1,0 +1,130 @@
+FAIL docs/architecture/01-master-architecture.mmd
+  
+  Error: Failed to launch the browser process:  Code: null
+  
+  stderr:
+  [0922/135621.244947:FATAL:content/browser/zygote_host/zygote_host_impl_linux.cc:128] No usable sandbox! If you are running on Ubuntu 23.10+ or another Linux distro that has disabled unprivileged user namespaces with AppArmor, see https://chromium.googlesource.com/chromium/src/+/main/docs/security/apparmor-userns-restrictions.md. Otherwise see https://chromium.googlesource.com/chromium/src/+/main/docs/linux/suid_sandbox_development.md for more information on developing with the (older) SUID sandbox. If you want to live dangerously and need an immediate workaround, you can try using --no-sandbox.
+  
+  TROUBLESHOOTING: https://pptr.dev/troubleshooting
+  
+      at ChildProcess.onClose (file:///opt/hostedtoolcache/node/20.20.2/x64/lib/node_modules/@mermaid-js/mermaid-cli/node_modules/@puppeteer/browsers/lib/esm/launch.js:339:24)
+      at ChildProcess.emit (node:events:536:35)
+      at ChildProcess._handle.onexit (node:internal/child_process:293:12)
+  
+FAIL docs/architecture/02-technology-architecture.mmd
+  
+  Error: Failed to launch the browser process:  Code: null
+  
+  stderr:
+  [0922/135621.708222:FATAL:content/browser/zygote_host/zygote_host_impl_linux.cc:128] No usable sandbox! If you are running on Ubuntu 23.10+ or another Linux distro that has disabled unprivileged user namespaces with AppArmor, see https://chromium.googlesource.com/chromium/src/+/main/docs/security/apparmor-userns-restrictions.md. Otherwise see https://chromium.googlesource.com/chromium/src/+/main/docs/linux/suid_sandbox_development.md for more information on developing with the (older) SUID sandbox. If you want to live dangerously and need an immediate workaround, you can try using --no-sandbox.
+  
+  TROUBLESHOOTING: https://pptr.dev/troubleshooting
+  
+      at ChildProcess.onClose (file:///opt/hostedtoolcache/node/20.20.2/x64/lib/node_modules/@mermaid-js/mermaid-cli/node_modules/@puppeteer/browsers/lib/esm/launch.js:339:24)
+      at ChildProcess.emit (node:events:536:35)
+      at ChildProcess._handle.onexit (node:internal/child_process:293:12)
+  
+FAIL docs/architecture/03-presales-e2e.mmd
+  
+  Error: Failed to launch the browser process:  Code: null
+  
+  stderr:
+  [0922/135622.151588:FATAL:content/browser/zygote_host/zygote_host_impl_linux.cc:128] No usable sandbox! If you are running on Ubuntu 23.10+ or another Linux distro that has disabled unprivileged user namespaces with AppArmor, see https://chromium.googlesource.com/chromium/src/+/main/docs/security/apparmor-userns-restrictions.md. Otherwise see https://chromium.googlesource.com/chromium/src/+/main/docs/linux/suid_sandbox_development.md for more information on developing with the (older) SUID sandbox. If you want to live dangerously and need an immediate workaround, you can try using --no-sandbox.
+  
+  TROUBLESHOOTING: https://pptr.dev/troubleshooting
+  
+      at ChildProcess.onClose (file:///opt/hostedtoolcache/node/20.20.2/x64/lib/node_modules/@mermaid-js/mermaid-cli/node_modules/@puppeteer/browsers/lib/esm/launch.js:339:24)
+      at ChildProcess.emit (node:events:536:35)
+      at ChildProcess._handle.onexit (node:internal/child_process:293:12)
+  
+FAIL docs/architecture/04-exception-management.mmd
+  
+  Error: Failed to launch the browser process:  Code: null
+  
+  stderr:
+  [0922/135622.578511:FATAL:content/browser/zygote_host/zygote_host_impl_linux.cc:128] No usable sandbox! If you are running on Ubuntu 23.10+ or another Linux distro that has disabled unprivileged user namespaces with AppArmor, see https://chromium.googlesource.com/chromium/src/+/main/docs/security/apparmor-userns-restrictions.md. Otherwise see https://chromium.googlesource.com/chromium/src/+/main/docs/linux/suid_sandbox_development.md for more information on developing with the (older) SUID sandbox. If you want to live dangerously and need an immediate workaround, you can try using --no-sandbox.
+  
+  TROUBLESHOOTING: https://pptr.dev/troubleshooting
+  
+      at ChildProcess.onClose (file:///opt/hostedtoolcache/node/20.20.2/x64/lib/node_modules/@mermaid-js/mermaid-cli/node_modules/@puppeteer/browsers/lib/esm/launch.js:339:24)
+      at ChildProcess.emit (node:events:536:35)
+      at ChildProcess._handle.onexit (node:internal/child_process:293:12)
+  
+FAIL docs/architecture/05-human-services.mmd
+  
+  Error: Failed to launch the browser process:  Code: null
+  
+  stderr:
+  [0922/135623.000715:FATAL:content/browser/zygote_host/zygote_host_impl_linux.cc:128] No usable sandbox! If you are running on Ubuntu 23.10+ or another Linux distro that has disabled unprivileged user namespaces with AppArmor, see https://chromium.googlesource.com/chromium/src/+/main/docs/security/apparmor-userns-restrictions.md. Otherwise see https://chromium.googlesource.com/chromium/src/+/main/docs/linux/suid_sandbox_development.md for more information on developing with the (older) SUID sandbox. If you want to live dangerously and need an immediate workaround, you can try using --no-sandbox.
+  
+  TROUBLESHOOTING: https://pptr.dev/troubleshooting
+  
+      at ChildProcess.onClose (file:///opt/hostedtoolcache/node/20.20.2/x64/lib/node_modules/@mermaid-js/mermaid-cli/node_modules/@puppeteer/browsers/lib/esm/launch.js:339:24)
+      at ChildProcess.emit (node:events:536:35)
+      at ChildProcess._handle.onexit (node:internal/child_process:293:12)
+  
+FAIL docs/architecture/06-management-intelligence.mmd
+  
+  Error: Failed to launch the browser process:  Code: null
+  
+  stderr:
+  [0922/135623.417963:FATAL:content/browser/zygote_host/zygote_host_impl_linux.cc:128] No usable sandbox! If you are running on Ubuntu 23.10+ or another Linux distro that has disabled unprivileged user namespaces with AppArmor, see https://chromium.googlesource.com/chromium/src/+/main/docs/security/apparmor-userns-restrictions.md. Otherwise see https://chromium.googlesource.com/chromium/src/+/main/docs/linux/suid_sandbox_development.md for more information on developing with the (older) SUID sandbox. If you want to live dangerously and need an immediate workaround, you can try using --no-sandbox.
+  
+  TROUBLESHOOTING: https://pptr.dev/troubleshooting
+  
+      at ChildProcess.onClose (file:///opt/hostedtoolcache/node/20.20.2/x64/lib/node_modules/@mermaid-js/mermaid-cli/node_modules/@puppeteer/browsers/lib/esm/launch.js:339:24)
+      at ChildProcess.emit (node:events:536:35)
+      at ChildProcess._handle.onexit (node:internal/child_process:293:12)
+  
+FAIL docs/architecture/07-intelligence-layer-internal.mmd
+  
+  Error: Failed to launch the browser process:  Code: null
+  
+  stderr:
+  [0922/135623.844207:FATAL:content/browser/zygote_host/zygote_host_impl_linux.cc:128] No usable sandbox! If you are running on Ubuntu 23.10+ or another Linux distro that has disabled unprivileged user namespaces with AppArmor, see https://chromium.googlesource.com/chromium/src/+/main/docs/security/apparmor-userns-restrictions.md. Otherwise see https://chromium.googlesource.com/chromium/src/+/main/docs/linux/suid_sandbox_development.md for more information on developing with the (older) SUID sandbox. If you want to live dangerously and need an immediate workaround, you can try using --no-sandbox.
+  
+  TROUBLESHOOTING: https://pptr.dev/troubleshooting
+  
+      at ChildProcess.onClose (file:///opt/hostedtoolcache/node/20.20.2/x64/lib/node_modules/@mermaid-js/mermaid-cli/node_modules/@puppeteer/browsers/lib/esm/launch.js:339:24)
+      at ChildProcess.emit (node:events:536:35)
+      at ChildProcess._handle.onexit (node:internal/child_process:293:12)
+  
+FAIL docs/architecture/08-poc-deployment.mmd
+  
+  Error: Failed to launch the browser process:  Code: null
+  
+  stderr:
+  [0922/135624.270777:FATAL:content/browser/zygote_host/zygote_host_impl_linux.cc:128] No usable sandbox! If you are running on Ubuntu 23.10+ or another Linux distro that has disabled unprivileged user namespaces with AppArmor, see https://chromium.googlesource.com/chromium/src/+/main/docs/security/apparmor-userns-restrictions.md. Otherwise see https://chromium.googlesource.com/chromium/src/+/main/docs/linux/suid_sandbox_development.md for more information on developing with the (older) SUID sandbox. If you want to live dangerously and need an immediate workaround, you can try using --no-sandbox.
+  
+  TROUBLESHOOTING: https://pptr.dev/troubleshooting
+  
+      at ChildProcess.onClose (file:///opt/hostedtoolcache/node/20.20.2/x64/lib/node_modules/@mermaid-js/mermaid-cli/node_modules/@puppeteer/browsers/lib/esm/launch.js:339:24)
+      at ChildProcess.emit (node:events:536:35)
+      at ChildProcess._handle.onexit (node:internal/child_process:293:12)
+  
+FAIL docs/architecture/09-p0-runtime.mmd
+  
+  Error: Failed to launch the browser process:  Code: null
+  
+  stderr:
+  [0922/135624.698653:FATAL:content/browser/zygote_host/zygote_host_impl_linux.cc:128] No usable sandbox! If you are running on Ubuntu 23.10+ or another Linux distro that has disabled unprivileged user namespaces with AppArmor, see https://chromium.googlesource.com/chromium/src/+/main/docs/security/apparmor-userns-restrictions.md. Otherwise see https://chromium.googlesource.com/chromium/src/+/main/docs/linux/suid_sandbox_development.md for more information on developing with the (older) SUID sandbox. If you want to live dangerously and need an immediate workaround, you can try using --no-sandbox.
+  
+  TROUBLESHOOTING: https://pptr.dev/troubleshooting
+  
+      at ChildProcess.onClose (file:///opt/hostedtoolcache/node/20.20.2/x64/lib/node_modules/@mermaid-js/mermaid-cli/node_modules/@puppeteer/browsers/lib/esm/launch.js:339:24)
+      at ChildProcess.emit (node:events:536:35)
+      at ChildProcess._handle.onexit (node:internal/child_process:293:12)
+  
+FAIL docs/architecture/10-p0-review-lifecycle.mmd
+  
+  Error: Failed to launch the browser process:  Code: null
+  
+  stderr:
+  [0922/135625.116022:FATAL:content/browser/zygote_host/zygote_host_impl_linux.cc:128] No usable sandbox! If you are running on Ubuntu 23.10+ or another Linux distro that has disabled unprivileged user namespaces with AppArmor, see https://chromium.googlesource.com/chromium/src/+/main/docs/security/apparmor-userns-restrictions.md. Otherwise see https://chromium.googlesource.com/chromium/src/+/main/docs/linux/suid_sandbox_development.md for more information on developing with the (older) SUID sandbox. If you want to live dangerously and need an immediate workaround, you can try using --no-sandbox.
+  
+  TROUBLESHOOTING: https://pptr.dev/troubleshooting
+  
+      at ChildProcess.onClose (file:///opt/hostedtoolcache/node/20.20.2/x64/lib/node_modules/@mermaid-js/mermaid-cli/node_modules/@puppeteer/browsers/lib/esm/launch.js:339:24)
+      at ChildProcess.emit (node:events:536:35)
+      at ChildProcess._handle.onexit (node:internal/child_process:293:12)
+  
