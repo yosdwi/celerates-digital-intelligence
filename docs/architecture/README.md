@@ -62,6 +62,16 @@ Source: [`09-p0-runtime.mmd`](./09-p0-runtime.mmd)
 
 Source: [`10-p0-review-lifecycle.mmd`](./10-p0-review-lifecycle.mmd)
 
+## 11 — Intelligence Runtime Components
+
+This diagram explains the responsibility boundaries between **LangGraph, PostgreSQL, pgvector, PostgreSQL FTS, LiteLLM, model providers, and Langfuse**.
+
+![Intelligence Runtime Components](./rendered/11-intelligence-runtime-components.svg)
+
+Source: [`11-intelligence-runtime-components.mmd`](./11-intelligence-runtime-components.mmd)
+
+Detailed explanation: [`../06-intelligence-stack-explained.md`](../06-intelligence-stack-explained.md)
+
 ## Workflow
 
 ```text
