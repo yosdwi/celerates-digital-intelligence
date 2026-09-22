@@ -6,6 +6,7 @@ on:
     paths:
       - 'docs/architecture/**/*.mmd'
       - '.github/workflows/render-diagrams.yml'
+      - '.github/puppeteer-config.json'
 
 permissions:
   contents: write
@@ -48,7 +49,7 @@ jobs:
             out="docs/architecture/rendered/$base.svg"
             tmp="$(mktemp)"
             echo "Rendering $src -> $out"
-            if mmdc -i "$src" -o "$out" -b transparent 2>"$tmp"; then
+            if mmdc -p .github/puppeteer-config.json -i "$src" -o "$out" -b transparent 2>"$tmp"; then
               echo "PASS $src" >> docs/architecture/rendered/render-report.txt
             else
               failed=1
