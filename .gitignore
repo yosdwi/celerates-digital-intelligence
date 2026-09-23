@@ -12,3 +12,9 @@ test-results/
 
 *.tsbuildinfo
 *.egg-info/
+
+apps/erp/.next/
+.env.*
+!.env.example
+!**/.env.example
+backups/

@@ -1,0 +1,16 @@
+export const TARGET_FIELDS = [
+    { key: "lead_no", label: "Leads ID" },
+    { key: "lead_source_code", label: "Lead Source" },
+    { key: "client_name", label: "Client Name", required: true },
+    { key: "contact_name", label: "Contact Name" },
+    { key: "company_size", label: "Company Size" },
+    { key: "industry_code", label: "Industry" },
+    { key: "contact_email", label: "Email" },
+    { key: "contact_phone", label: "Phone" },
+    { key: "service_type_code", label: "Service Type", required: true },
+    { key: "category_code", label: "Category", required: true },
+    { key: "notes", label: "Detail" },
+    { key: "sales_pic_name", label: "Sales PIC" },
+    { key: "is_qualified", label: "Qualified By MKT" },
+    { key: "disqualify_reason", label: "Notes (If No, Give a Reason)" },
+  ];

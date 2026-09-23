@@ -101,3 +101,7 @@ All eight requested audit files, evidence manifests/probes and proposed contract
 ### Implementation continuation checkpoint
 
 The user subsequently requested implementation to continue. A read-only access check on 2026-09-23 against the stakeholder-specified `abirohmattest/celerates-erp` returned GitHub API **404** through the configured connection; unauthenticated Git also could not retrieve it. This does not establish whether the repository is private, missing, renamed or outside the connection's access. No permission workaround, fork, deployment or ERP code mutation was attempted. D01 remains a blocking input: connect/authorize the canonical repository, supply its correct accessible location, or explicitly designate an alternative implementation repository and approve the ZIP as its starting baseline. Never silently promote the read-only audit snapshot into canonical production source.
+
+## Implementation checkpoint — 2026-09-23
+
+The user explicitly selected implementation in this Intelligence repository using the audited ZIP; the canonical-source gate is resolved by [ADR-006](../adr/ADR-006-erp-monorepo-portable-pilot.md), not by an invented upstream comparison. The portable Owner pilot implements foundation and contextual-feedback work. See [09](09-implementation-verification.md) for file/function evidence, tests and remaining gates. Human BA acceptance, full workflow hardening, source cutover and live Intelligence binding remain open.

@@ -1,0 +1,58 @@
+{
+  "name": "celerates-erp",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "next dev -p 3001",
+    "build": "next build",
+    "start": "next start -p ${PORT:-3000}",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "db:migrate": "node scripts/migrate.mjs",
+    "storage:init": "node scripts/init-storage.mjs",
+    "test:http": "node tests/http-smoke.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@aws-sdk/client-s3": "3.1139.0",
+    "@tailwindcss/postcss": "^4.3.3",
+    "bcryptjs": "^3.0.3",
+    "docxtemplater": "^3.69.3",
+    "dotenv": "^17.4.2",
+    "drizzle-orm": "^0.45.2",
+    "exceljs": "^4.4.0",
+    "lucide-react": "^1.28.0",
+    "mammoth": "^1.12.1",
+    "next": "15.5.24",
+    "next-auth": "^4.24.15",
+    "next-intl": "^4.13.7",
+    "pizzip": "^3.2.0",
+    "postcss": "^8.5.25",
+    "postgres": "^3.4.9",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "resend": "^6.22.0",
+    "tailwindcss": "^4.3.3"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
+    "@electric-sql/pglite-socket": "0.2.11",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^26.1.2",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "drizzle-kit": "^0.31.10",
+    "s3rver": "3.7.1",
+    "tsx": "4.23.15",
+    "typescript": "^5.7.2"
+  },
+  "overrides": {
+    "postcss": "$postcss",
+    "nanoid": "3.3.18",
+    "sharp": "0.35.4"
+  }
+}
