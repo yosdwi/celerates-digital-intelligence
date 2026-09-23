@@ -1,0 +1,27 @@
+flowchart TB
+    USER["Browser: React workspace"]
+    WEB["Vite development or Nginx production"]
+    API["FastAPI: typed actions and reviewer access"]
+    ERP["ERP adapter: demo or HTTP"]
+    PG["PostgreSQL: documents, artifacts, jobs and audit"]
+    WORKER["Python Integration Worker"]
+    GRAPH["LangGraph: PostgreSQL checkpoints"]
+    PARSER["UTF-8 text or Docling parser"]
+    OBJ["MinIO or explicit filesystem adapter"]
+    RET["pgvector plus full-text retrieval"]
+    MODEL["Model Gateway: deterministic demo or LiteLLM"]
+    REVIEW{"Human review checkpoint"}
+    OUTCOME["Idempotent ERP outcome action"]
+    USER --> WEB --> API
+    API --> ERP
+    API --> PG
+    API --> OBJ
+    PG --> WORKER --> GRAPH
+    GRAPH --> PARSER --> OBJ
+    GRAPH --> RET --> PG
+    GRAPH --> ERP
+    GRAPH --> MODEL
+    GRAPH --> REVIEW
+    REVIEW -->|"Clarification or approved pack"| OUTCOME --> ERP
+    OUTCOME -->|"Acknowledged status"| PG
+    API -->|"Read persistent progress"| USER

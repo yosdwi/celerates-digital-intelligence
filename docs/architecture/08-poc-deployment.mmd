@@ -29,3 +29,8 @@ flowchart LR
     N8N --> API
     API -.-> LF
     LLM -.-> LF
+
+    %% P0 runtime: Redis omitted because not needed. API/worker share cdi package.
+    %% Default model adapter is deterministic demo; LiteLLM proxy is optional.
+    %% LangGraph checkpoints and durable queue both use PostgreSQL.
+    %% Concrete P0 boundaries are detailed in 09-p0-runtime.mmd.

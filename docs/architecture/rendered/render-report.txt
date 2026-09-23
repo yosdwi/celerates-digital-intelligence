@@ -1,0 +1,10 @@
+PASS docs/architecture/01-master-architecture.mmd
+PASS docs/architecture/02-technology-architecture.mmd
+PASS docs/architecture/03-presales-e2e.mmd
+PASS docs/architecture/04-exception-management.mmd
+PASS docs/architecture/05-human-services.mmd
+PASS docs/architecture/06-management-intelligence.mmd
+PASS docs/architecture/07-intelligence-layer-internal.mmd
+PASS docs/architecture/08-poc-deployment.mmd
+PASS docs/architecture/09-p0-runtime.mmd
+PASS docs/architecture/10-p0-review-lifecycle.mmd
