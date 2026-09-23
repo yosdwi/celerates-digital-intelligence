@@ -82,6 +82,16 @@ Source: [`12-current-transition-target.mmd`](./12-current-transition-target.mmd)
 
 Meeting alignment: [`../07-meeting-alignment-mas-abi-2026-09-23.md`](../07-meeting-alignment-mas-abi-2026-09-23.md)
 
+## 13–15 — ERP independent audit
+
+These diagrams distinguish observed ERP behavior from proposed deployment and feedback designs. The existing architecture decisions remain unchanged.
+
+- Observed topology: [`13-erp-as-is.mmd`](./13-erp-as-is.mmd)
+- Proposed Railway target: [`14-erp-railway-target.mmd`](./14-erp-railway-target.mmd)
+- Proposed contextual feedback loop: [`15-erp-feedback-loop.mmd`](./15-erp-feedback-loop.mmd)
+
+Evidence, scope, findings and implementation gates: [`../erp-audit/README.md`](../erp-audit/README.md).
+
 ## Workflow
 
 ```text

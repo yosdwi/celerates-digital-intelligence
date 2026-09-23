@@ -1,0 +1,22 @@
+{
+  "scope": "Proposed common envelopes only; no provider or authorization proof",
+  "checks_passed": 16,
+  "checks": [
+    "valid event envelope",
+    "valid command envelope",
+    "valid read envelope",
+    "rejects forbidden command kind",
+    "rejects missing approval reference",
+    "rejects invalid approval UUID",
+    "rejects model-supplied actor",
+    "rejects zero expected version",
+    "rejects missing target on update",
+    "rejects existing target on create",
+    "rejects unknown event",
+    "rejects invalid event timestamp",
+    "rejects untyped aggregate",
+    "rejects missing provenance",
+    "rejects unsupported schema version",
+    "valid create envelope"
+  ]
+}

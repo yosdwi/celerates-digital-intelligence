@@ -1,0 +1,25 @@
+{
+  "scope": "Unmodified direct Next build; placeholder credentials; no authenticated business or external-service smoke",
+  "checks": [
+    {
+      "path": "/login",
+      "status": 200,
+      "location": null
+    },
+    {
+      "path": "/api/auth/providers",
+      "status": 200,
+      "location": null
+    },
+    {
+      "path": "/api/cron/reminders",
+      "status": 307,
+      "location": "http://localhost:3121/login"
+    },
+    {
+      "path": "/api/health",
+      "status": 307,
+      "location": "http://localhost:3121/login"
+    }
+  ]
+}
