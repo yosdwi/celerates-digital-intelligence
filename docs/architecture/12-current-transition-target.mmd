@@ -1,0 +1,48 @@
+flowchart LR
+    subgraph CURRENT["CURRENT — Fragmented Operations"]
+        direction TB
+        C1["Google Sheets / Excel"]
+        C2["Jira / Existing Databases"]
+        C3["Documents / Forms / Manual Process"]
+        C4["Existing ERP Base Case"]
+    end
+
+    subgraph TRANSITION["TRANSITION — ERP Maturity & User Review"]
+        direction TB
+        T1["Deploy ERP to production-like environment"]
+        T2["Users run real service workflows"]
+        T3["Business Analyst captures requirement deltas"]
+        T4["Web team improves workflow / forms / UX / data model"]
+        T5["Migrate & reconcile siloed operational data"]
+        T6["Cut-over process by process"]
+    end
+
+    subgraph TARGET["TARGET — Celerates Digital Intelligence"]
+        direction TB
+        E["CELERATES ERP\nDigital Operational Core\nCanonical business state"]
+        I["CELERATES INTELLIGENCE LAYER\nContext & Knowledge • Intelligence Core • Model Gateway"]
+        A["CELERATES INTELLIGENCE APPLICATIONS\nPre-Sales • Exceptions • Human Services • Management Intelligence"]
+        H["Human / Controlled Action"]
+    end
+
+    C1 --> T5
+    C2 --> T5
+    C3 --> T5
+    C4 --> T1
+
+    T1 --> T2
+    T2 --> T3
+    T3 --> T4
+    T4 --> T2
+    T4 --> T5
+    T5 --> T6
+    T6 --> E
+
+    E --> I
+    I --> A
+    A --> H
+    H -->|"status / outcome"| E
+
+    P["Parallel delivery allowed where contracts are stable\nERP remains the dependency; not a rigid waterfall"]
+    P -.-> T4
+    P -.-> I
