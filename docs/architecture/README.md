@@ -72,6 +72,16 @@ Source: [`11-intelligence-runtime-components.mmd`](./11-intelligence-runtime-com
 
 Detailed explanation: [`../06-intelligence-stack-explained.md`](../06-intelligence-stack-explained.md)
 
+## 12 — Current → Transition → Target
+
+This diagram explains the transformation sequence clarified in the 2026-09-23 stakeholder discussion: fragmented operational sources are transitional, ERP maturity/user review is the critical foundation, and Intelligence builds on top of the Digital Operational Core.
+
+![Current Transition Target](./rendered/12-current-transition-target.svg)
+
+Source: [`12-current-transition-target.mmd`](./12-current-transition-target.mmd)
+
+Meeting alignment: [`../07-meeting-alignment-mas-abi-2026-09-23.md`](../07-meeting-alignment-mas-abi-2026-09-23.md)
+
 ## Workflow
 
 ```text
