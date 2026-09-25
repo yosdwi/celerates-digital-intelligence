@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import { requirePilotActor } from "@/lib/actor";
 import "./globals.css";
-import { getLocale, getMessages } from "next-intl/server";
+import { getLocale, getMessages, getTimeZone } from "next-intl/server";
 import { Sidebar } from "@/components/sidebar";
 import { Providers } from "./providers";
 import { UserMenu } from "@/components/user-menu";
@@ -21,11 +21,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   if ((await headers()).get("x-erp-protected") === "1") await requirePilotActor();
   const locale = await getLocale();
   const messages = await getMessages();
+  const timeZone = await getTimeZone();
 
   return (
     <html lang={locale}>
       <body className="text-slate-900" suppressHydrationWarning>
-      <Providers locale={locale} messages={messages}>
+      <Providers locale={locale} messages={messages} timeZone={timeZone}>
   <SidebarCollapseProvider>
     <Sidebar />
     <ActivityLogLink />
