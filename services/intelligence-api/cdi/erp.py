@@ -83,32 +83,132 @@ class DemoERP:
             return {"acknowledged": True, "replayed": False}
 
 
-class HttpERP:
-    """Expected remote contract is documented in packages/contracts/erp-http.md."""
+class ERPReviewPending(RuntimeError):
+    pass
 
-    def request(self, method, path, payload=None, key=None):
+
+class HttpERP:
+    """Narrow live ADR-006 contract. No generic ERP upsert or implicit approval."""
+
+    def request(self, method, path, payload=None, key=None, action=False):
         cfg = settings()
-        headers = {"Authorization": f"Bearer {cfg.erp_token}"}
+        headers = {
+            "Authorization": f"Bearer {cfg.erp_action_token if action else cfg.erp_token}",
+            "X-ERP-Audience": "celerates-intelligence",
+            "X-ERP-Environment": cfg.erp_environment,
+        }
         if key:
             headers["Idempotency-Key"] = key
         with httpx.Client(base_url=cfg.erp_base_url.rstrip("/") + "/", timeout=20, headers=headers) as client:
             response = client.request(method, path, json=payload)
-            response.raise_for_status()
-            return response.json()
+        if response.is_error:
+            # Fixed codes, never remote payload/credential-bearing transport URLs.
+            try:
+                code = response.json().get("error", {}).get("code", "UNAVAILABLE")
+            except Exception:
+                code = "UNAVAILABLE"
+            raise RuntimeError(f"ERP contract rejected operation ({response.status_code}/{code})")
+        return response.json()
+
+    @staticmethod
+    def normalize(envelope):
+        d = envelope["data"]
+        return {
+            "id": d["id"],
+            "title": d.get("requirement_summary") or d.get("position_name") or d["opty_no"],
+            "customer": d.get("client_name") or "Unconfirmed",
+            "owner": d.get("sales_pic_name") or "Unassigned",
+            "stage": d.get("opty_status_code") or "Unconfirmed",
+            "status": "ERP_RECORD",
+            "notes": d.get("detail_requirement") or "",
+            "source": "Celerates ERP",
+            "timeline": "Unconfirmed",
+            "record_version": envelope["record_version"],
+            "as_of": envelope["as_of"],
+            "source_refs": envelope["source_refs"],
+            "quality": envelope["quality"],
+            "artifact_references": d["artifact_references"],
+        }
 
     def list(self, kind):
-        return self.request("GET", f"read/{kind}")["items"]
+        if kind != "opportunity":
+            return []  # Explicitly reported as unsupported, never inferred availability.
+        items = []
+        cursor = ""
+        for _ in range(100):
+            page = self.request(
+                "GET", "resources/sales_opportunity?limit=100" + ("&cursor=" + cursor if cursor else "")
+            )
+            items.extend(self.normalize(x) for x in page["items"])
+            cursor = page["next_cursor"]
+            if not cursor:
+                return items
+        raise RuntimeError("ERP pagination limit exceeded; narrow pilot grants")
 
     def get(self, kind, object_id):
-        from urllib.parse import quote
+        from uuid import UUID
 
-        return self.request("GET", f"read/{kind}/{quote(object_id, safe='')}")
+        if kind != "opportunity":
+            raise ValueError("Resource is outside the live ERP contract")
+        return self.normalize(self.request("GET", "resources/sales_opportunity/" + str(UUID(object_id))))
 
     def create_opportunity(self, data, key):
-        return self.request("POST", "opportunities", data, key)
+        raise ValueError("Create the Sales Opportunity in ERP, then grant access in Intelligence Review")
 
     def action(self, kind, object_id, payload, key):
-        return self.request("POST", "actions", {"kind": kind, "object_id": object_id, "payload": payload}, key)
+        if kind != "opportunity.outcome":
+            raise ValueError("Unsupported live ERP command")
+        from .context import WORKFLOW_VERSION, run_context, validate_knowledge
+
+        run_id = key.removesuffix(":outcome")
+        run, snapshot, actor = run_context(run_id)
+        with connect() as conn:
+            artifacts = all_rows(
+                conn,
+                "SELECT id,kind,title,version,content,review_state FROM artifacts WHERE run_id=%s ORDER BY kind",
+                (run_id,),
+            )
+        if len(artifacts) != 11 or any(a.pop("review_state") != "APPROVED" for a in artifacts):
+            raise ValueError("All current artifacts must be reviewed before an ERP action")
+        manifest = {
+            "run_id": run_id,
+            "outcome": payload["status"],
+            "note": payload["note"],
+            "artifacts": artifacts,
+            "context_id": snapshot["id"],
+            "context_sha256": snapshot["sha256"],
+            "workflow_version": WORKFLOW_VERSION,
+        }
+        review_body = {
+            "resource_type": "sales_opportunity",
+            "resource_id": object_id,
+            "expected_version": snapshot["body"]["operational"]["record_version"],
+            "manifest": manifest,
+        }
+        review = self.request("POST", "review-requests", review_body, key + ":review", action=True)
+        with connect() as conn:
+            conn.execute("UPDATE runs SET erp_review=%s WHERE id=%s", (json(review), run_id))
+        if review["state"] == "pending":
+            raise ERPReviewPending(
+                "Open ERP /intelligence and review the exact artifact package, then check approval here"
+            )
+        if review["state"] not in {"approved", "consumed"}:
+            raise ValueError("ERP review rejected; start a new analysis with the required corrections")
+        if review["state"] != "consumed":
+            validate_knowledge(snapshot, actor)
+        command = {
+            "kind": "artifact.persist_approved_reference",
+            "review_id": review["id"],
+            "resource_type": "sales_opportunity",
+            "resource_id": object_id,
+            "expected_version": review_body["expected_version"],
+            "manifest_sha256": review["manifest_sha256"],
+        }
+        receipt = self.request("POST", "commands", command, key, action=True)
+        verified = self.request("GET", "commands/" + receipt["command_id"])
+        if verified != receipt:
+            raise RuntimeError("ERP read-back receipt mismatch")
+        return receipt
 
 
 def erp() -> ERPAdapter:

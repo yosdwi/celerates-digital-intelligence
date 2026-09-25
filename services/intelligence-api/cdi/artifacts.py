@@ -64,7 +64,9 @@ def build_pack(opportunity, documents, capabilities, projects, retrieved):
                     "answer": "",
                 }
             )
-    narrative, generation = ModelGateway().narrative(opportunity, requirements)
+    narrative, generation = ModelGateway().narrative(
+        opportunity, requirements, [r for r in retrieved if r.get("source_id")]
+    )
     timestamp = datetime.now(timezone.utc).isoformat()
     # Matching is conservative and explicitly explained; no invented historical projects.
     tokens = set(re.findall(r"\w+", (opportunity["title"] + " " + combined).lower()))
@@ -269,7 +271,34 @@ def build_pack(opportunity, documents, capabilities, projects, retrieved):
             ],
         },
     }
+    knowledge = [r for r in retrieved if r.get("source_id")]
+    for ref in knowledge:
+        content["solution"]["rows"].append(
+            {
+                "area": "Approved reference guidance",
+                "approach": ref["text"],
+                "basis": f"{ref['name']} · v{ref['source_version']} · chunk {ref['id']} (guidance; not a customer requirement)",
+            }
+        )
+    if opportunity.get("source") != "Demo ERP":
+        content["capability"]["summary"] = (
+            "Capacity is outside the current ERP contract. Delivery must validate allocation; no availability claim is made."
+        )
+        content["experience"]["summary"] = (
+            "Project history is outside the current ERP contract. Approved knowledge is reference guidance, not a verified delivery claim."
+        )
+        content["experience"]["rows"] = []
     provenance = [{"type": "document", "id": d["id"], "name": d["name"], "sha256": d["sha256"]} for d in documents]
+    provenance += [
+        {
+            "type": "knowledge",
+            "id": r["document_id"],
+            "name": r["name"],
+            "sha256": r["sha256"],
+            "source_version": r["source_version"],
+        }
+        for r in knowledge
+    ]
     provenance += [
         {
             "type": "erp",

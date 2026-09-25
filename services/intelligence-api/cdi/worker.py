@@ -19,7 +19,9 @@ def tick():
             ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1""",
         )
         if not run:
-            return False
+            from .knowledge import tick as knowledge_tick
+
+            return knowledge_tick()
         conn.execute(
             "UPDATE runs SET lease_until=now()+(%s * interval '1 second'),attempt=attempt+1 WHERE id=%s",
             (settings().lease_seconds, run["id"]),

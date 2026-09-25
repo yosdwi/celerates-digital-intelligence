@@ -5,9 +5,11 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command, interrupt
 
 from .artifacts import build_pack
+from .context import build_context
 from .db import all_rows, checkpointer, connect, json, one
-from .documents import ingest, retrieve
-from .erp import erp
+from .documents import ingest
+from .erp import ERPReviewPending, erp
+from .identity import resolve
 
 
 class State(TypedDict, total=False):
@@ -48,7 +50,13 @@ def analyze(state):
             conn, "SELECT * FROM documents WHERE opportunity_id=%s ORDER BY created_at", (state["opportunity_id"],)
         )
     capabilities, projects = adapter.list("capability"), adapter.list("project")
-    retrieved = retrieve(state["opportunity_id"], opportunity["title"])
+    with connect() as conn:
+        run = one(conn, "SELECT * FROM runs WHERE id=%s", (state["run_id"],))
+    snapshot = build_context(
+        state["opportunity_id"], opportunity["title"], resolve(run["requested_by"]), state["run_id"]
+    )
+    opportunity = snapshot["body"]["operational"]
+    retrieved = snapshot["body"]["source_evidence"] + snapshot["body"]["knowledge"]
     pack = build_pack(opportunity, documents, capabilities, projects, retrieved)
     with connect() as conn:
         # Node replay is idempotent. Existing human edits are never overwritten.
@@ -82,6 +90,7 @@ def analyze(state):
                         "capabilities": capabilities,
                         "projects": projects,
                         "retrieved": retrieved,
+                        "context_id": snapshot["id"],
                     }
                 ),
                 state["run_id"],
@@ -104,6 +113,12 @@ def review(state):
 
 def close_loop(state):
     decision = state["decision"]
+    from .config import settings
+    from .context import run_context, validate_knowledge
+
+    if settings().erp_mode == "demo":
+        _, snapshot, reviewer = run_context(state["run_id"])
+        validate_knowledge(snapshot, reviewer)
     acknowledgement = erp().action(
         "opportunity.outcome", state["opportunity_id"], decision["payload"], state["run_id"] + ":outcome"
     )
@@ -114,6 +129,25 @@ def close_loop(state):
             conn,
             "UPDATE runs SET state=%s,step=%s,error=NULL,lease_until=NULL,updated_at=now() WHERE id=%s RETURNING *",
             (decision["payload"]["status"], "Outcome acknowledged by ERP", state["run_id"]),
+        )
+        conn.execute("UPDATE runs SET erp_receipt=%s WHERE id=%s", (json(acknowledgement), state["run_id"]))
+        conn.execute(
+            "INSERT INTO workflow_outcomes(id,run_id,context_id,outcome,receipt,checks) VALUES (%s,%s,%s,%s,%s,%s) ON CONFLICT(run_id) DO NOTHING",
+            (
+                str(uuid4()),
+                run["id"],
+                run["context_id"],
+                decision["payload"]["status"],
+                json(acknowledgement),
+                json(
+                    {
+                        "erp_acknowledged": True,
+                        "receipt_readback": bool(acknowledgement.get("command_id")),
+                        "human_review": True,
+                        "workflow_version": "presales-closed-loop-v2",
+                    }
+                ),
+            ),
         )
         event(
             conn, run, "ERP_ACKNOWLEDGED", "Reviewed outcome and artifact references recorded in ERP", decision["actor"]
@@ -154,6 +188,10 @@ def execute(run_id):
                 progress({"run_id": run_id}, "REVIEW_REQUIRED", "11 artifacts ready for human review")
                 with connect() as conn:
                     conn.execute("UPDATE runs SET lease_until=NULL WHERE id=%s", (run_id,))
+    except ERPReviewPending as exc:
+        progress({"run_id": run_id}, "ERP_REVIEW_REQUIRED", str(exc))
+        with connect() as conn:
+            conn.execute("UPDATE runs SET lease_until=NULL WHERE id=%s", (run_id,))
     except Exception as exc:
         import logging
 
@@ -173,14 +211,14 @@ def execute(run_id):
             event(conn, run, "FAILED", message)
 
 
-def enqueue(opportunity_id):
+def enqueue(opportunity_id, actor="local-demo"):
     erp().get("opportunity", opportunity_id)
     with connect() as conn:
         conn.execute("INSERT INTO workspaces(opportunity_id) VALUES (%s) ON CONFLICT DO NOTHING", (opportunity_id,))
         one(conn, "SELECT * FROM workspaces WHERE opportunity_id=%s FOR UPDATE", (opportunity_id,))
         active = one(
             conn,
-            "SELECT * FROM runs WHERE opportunity_id=%s AND state IN ('QUEUED','INGESTING','ANALYZING','REVIEW_REQUIRED','RESUMING')",
+            "SELECT * FROM runs WHERE opportunity_id=%s AND state IN ('QUEUED','INGESTING','ANALYZING','REVIEW_REQUIRED','RESUMING','ERP_REVIEW_REQUIRED')",
             (opportunity_id,),
         )
         if active:
@@ -189,8 +227,8 @@ def enqueue(opportunity_id):
             raise ValueError("Attach a document before starting analysis")
         run = one(
             conn,
-            "INSERT INTO runs(id,opportunity_id,state) VALUES (%s,%s,'QUEUED') RETURNING *",
-            (str(uuid4()), opportunity_id),
+            "INSERT INTO runs(id,opportunity_id,state,requested_by) VALUES (%s,%s,'QUEUED',%s) RETURNING *",
+            (str(uuid4()), opportunity_id, str(actor)),
         )
         event(conn, run, "QUEUED", "Analysis requested", "Pre-Sales reviewer")
         return run

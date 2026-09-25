@@ -1,4 +1,3 @@
-import hmac
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated
@@ -8,10 +7,13 @@ from fastapi.responses import Response
 
 from .artifacts import KINDS
 from .config import settings
+from .context import authorize_run
 from .contracts import ArtifactEdit, ContextQuery, Decision, DocumentRegister, OpportunityCreate, ReviewPack
 from .db import all_rows, connect, json, one
 from .documents import register, retrieve
 from .erp import erp
+from .foundation_api import router as foundation_router
+from .identity import actor
 from .storage import storage
 from .workflow import enqueue, event
 
@@ -25,11 +27,7 @@ async def lifespan(app):
 app = FastAPI(title="Celerates Digital Intelligence", version="0.1.0", lifespan=lifespan)
 
 
-def actor(authorization: Annotated[str | None, Header()] = None):
-    token = settings().api_access_token
-    if token and not hmac.compare_digest(authorization or "", "Bearer " + token):
-        raise HTTPException(401, "A valid workspace access token is required")
-    return "Workspace reviewer" if token else "Demo Pre-Sales reviewer"
+app.include_router(foundation_router)
 
 
 @app.exception_handler(KeyError)
@@ -108,10 +106,12 @@ def create_opportunity(
 
 
 @app.get("/api/opportunities/{oid}", dependencies=[Depends(actor)])
-def detail(oid: str):
+def detail(oid: str, user=Depends(actor)):
     opportunity = erp().get("opportunity", oid)
     with connect() as conn:
         run = one(conn, "SELECT * FROM runs WHERE opportunity_id=%s ORDER BY created_at DESC LIMIT 1", (oid,))
+        if run:
+            authorize_run(conn, run, user)
         artifacts = all_rows(conn, "SELECT * FROM artifacts WHERE run_id=%s", (run["id"],)) if run else []
         ordering = {kind: i for i, (kind, _) in enumerate(KINDS)}
         artifacts.sort(key=lambda a: ordering[a["kind"]])
@@ -152,11 +152,19 @@ async def upload_document(oid: str, file: UploadFile = File(...)):
 
 
 @app.get("/api/documents/{document_id}/download", dependencies=[Depends(actor)])
-def download_document(document_id: str):
+def download_document(document_id: str, user=Depends(actor)):
     with connect() as conn:
         doc = one(conn, "SELECT * FROM documents WHERE id=%s", (document_id,))
     if not doc:
         raise HTTPException(404, "Document not found")
+    if doc["source_id"]:
+        from .knowledge import source_access
+
+        with connect() as conn:
+            source = one(conn, "SELECT * FROM knowledge_sources WHERE id=%s", (doc["source_id"],))
+        source_access(source, user)
+    else:
+        erp().get("opportunity", doc["opportunity_id"])
     from urllib.parse import quote
 
     return Response(
@@ -170,23 +178,24 @@ def download_document(document_id: str):
 
 
 @app.post("/api/opportunities/{oid}/analyze", status_code=202, dependencies=[Depends(actor)])
-def start_analysis(oid: str):
-    return enqueue(oid)
+def start_analysis(oid: str, user=Depends(actor)):
+    return enqueue(oid, user)
 
 
-def locked_run(conn, run_id):
+def locked_run(conn, run_id, user):
     run = one(conn, "SELECT * FROM runs WHERE id=%s FOR UPDATE", (run_id,))
     if not run:
         raise HTTPException(404, "Run not found")
+    authorize_run(conn, run, user)
     return run
 
 
 @app.post("/api/runs/{run_id}/retry", status_code=202)
 def retry(run_id: str, user=Depends(actor)):
     with connect() as conn:
-        run = locked_run(conn, run_id)
-        if run["state"] != "FAILED":
-            raise ValueError("Only a failed run can be retried")
+        run = locked_run(conn, run_id, user)
+        if run["state"] not in {"FAILED", "ERP_REVIEW_REQUIRED"}:
+            raise ValueError("Only failed runs or pending ERP approvals can be retried")
         # A newer run invalidates retry of this historical run.
         latest = one(
             conn,
@@ -209,7 +218,7 @@ def edit_artifact(aid: str, body: ArtifactEdit, user=Depends(actor)):
         artifact = one(conn, "SELECT * FROM artifacts WHERE id=%s", (aid,))
         if not artifact:
             raise HTTPException(404, "Artifact not found")
-        run = locked_run(conn, artifact["run_id"])
+        run = locked_run(conn, artifact["run_id"], user)
         artifact = one(conn, "SELECT * FROM artifacts WHERE id=%s FOR UPDATE", (aid,))
         if run["state"] != "REVIEW_REQUIRED":
             raise ValueError("Artifacts are editable only during human review")
@@ -252,7 +261,7 @@ def edit_artifact(aid: str, body: ArtifactEdit, user=Depends(actor)):
 @app.post("/api/runs/{run_id}/review")
 def review_pack(run_id: str, body: ReviewPack, user=Depends(actor)):
     with connect() as conn:
-        run = locked_run(conn, run_id)
+        run = locked_run(conn, run_id, user)
         if run["state"] != "REVIEW_REQUIRED":
             raise ValueError("Run is not awaiting review")
         artifacts = all_rows(conn, "SELECT * FROM artifacts WHERE run_id=%s", (run_id,))
@@ -274,10 +283,14 @@ def review_pack(run_id: str, body: ReviewPack, user=Depends(actor)):
 @app.post("/api/runs/{run_id}/decision", status_code=202)
 def decide(run_id: str, body: Decision, user=Depends(actor)):
     with connect() as conn:
-        run = locked_run(conn, run_id)
+        run = locked_run(conn, run_id, user)
         if run["state"] != "REVIEW_REQUIRED":
             raise ValueError("Run is not awaiting a decision")
         artifacts = all_rows(conn, "SELECT * FROM artifacts WHERE run_id=%s", (run_id,))
+        if settings().erp_mode == "http" and (
+            len(artifacts) != 11 or any(a["review_state"] != "APPROVED" for a in artifacts)
+        ):
+            raise ValueError("Review all current artifacts before requesting an ERP action")
         if body.outcome == "READY_FOR_SALES":
             if len(artifacts) != 11 or any(a["review_state"] != "APPROVED" for a in artifacts):
                 raise ValueError("Explicitly review and approve all current artifact versions first")
@@ -316,6 +329,9 @@ def support():
     opportunities = adapter.list("opportunity")
     blocked = [e for e in exceptions if e["state"] != "Resolved"]
     return {
+        "availability": "demo fixtures"
+        if settings().erp_mode == "demo"
+        else "Exceptions and service cases are outside the live ERP contract",
         "exceptions": exceptions,
         "cases": cases,
         "metrics": {
@@ -384,5 +400,10 @@ def system():
         "queued_runs": queue["n"],
         "langfuse": "Configured" if cfg.langfuse_enabled else "Optional / not configured",
         "n8n": "Configured" if cfg.n8n_enabled else "Optional / not configured",
-        "access": "Token protected" if cfg.api_access_token else "Local demo reviewer",
+        "access": "Named token protected"
+        if cfg.api_access_token or cfg.intelligence_principals_json != "[]"
+        else "Local demo reviewer",
+        "erp_review_url": cfg.erp_base_url.split("/api/")[0] + "/intelligence" if cfg.erp_mode == "http" else None,
+        "contract_resources": ["sales_opportunity"] if cfg.erp_mode == "http" else ["demo fixtures"],
+        "unsupported_live_resources": ["capacity", "project_history", "exceptions", "service_cases"],
     }

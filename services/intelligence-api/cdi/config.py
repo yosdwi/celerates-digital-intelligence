@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     erp_mode: str = "demo"
     erp_base_url: str = ""
     erp_token: str = ""
+    erp_action_token: str = ""
+    erp_environment: str = "erp-pilot"
+    intelligence_principals_json: str = "[]"
+    api_principal_name: str = "pilot-owner"
     model_mode: str = "demo"
     reasoning_model: str = "openai/reasoning-strong"
     fallback_model: str = ""
@@ -39,8 +43,15 @@ class Settings(BaseSettings):
             raise ValueError("Unsupported ERP/model mode")
         if self.storage_backend not in {"s3", "filesystem"}:
             raise ValueError("Unsupported storage backend")
-        if self.erp_mode == "http" and (not self.erp_base_url or not self.api_access_token):
-            raise ValueError("Connected ERP requires ERP_BASE_URL and API_ACCESS_TOKEN")
+        if self.erp_mode == "http" and (
+            not self.erp_base_url
+            or not self.erp_token
+            or not self.erp_action_token
+            or not (self.api_access_token or self.intelligence_principals_json != "[]")
+        ):
+            raise ValueError(
+                "Connected ERP requires endpoint, separate read/action credentials and named workspace access"
+            )
 
 
 @lru_cache

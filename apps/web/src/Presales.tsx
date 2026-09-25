@@ -62,6 +62,8 @@ const displayDate = (date: string) =>
 export function Presales() {
   const [searchParams, setSearchParams] = useSearchParams();
   const oid = searchParams.get("opportunity");
+  const [system,setSystem]=useState<{demo:boolean;erp_review_url:string|null}>();
+  useEffect(()=>{api<{demo:boolean;erp_review_url:string|null}>("/system").then(setSystem).catch(()=>{});},[]);
   const [items, setItems] = useState<Opportunity[]>([]);
   const [detail, setDetail] = useState<Detail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -167,12 +169,13 @@ export function Presales() {
             title="Make the next move clearer."
             description="Turn opportunity context into a structured, evidence-backed first proposal."
             action={
-              <button className="button" onClick={() => setModal("create")}>
+              <button className="button" disabled={!system?.demo} title={system?.demo ? "Create demo opportunity" : "Create opportunity in ERP and grant access in Intelligence Review"} onClick={() => setModal("create")}>
                 <Plus size={17} />
                 New opportunity
               </button>
             }
           />
+          {system&&!system.demo&&<p className="muted">Live ERP: only explicitly granted Sales Opportunities are visible. <a className="text-link" href={system.erp_review_url||undefined} target="_blank" rel="noreferrer">Manage ERP access and reviews →</a></p>}
           <div className="metrics-grid">
             <Metric
               label="Opportunities"
@@ -401,6 +404,7 @@ export function Presales() {
               </div>
             </div>
           )}
+          {run?.state === "ERP_REVIEW_REQUIRED" && <div className="run-banner"><div><strong>ERP approval required</strong><p>The exact reviewed package is waiting for an Owner in ERP. Saving its reference does not send a proposal or change commercial status.</p>{system?.erp_review_url&&<a className="text-link" href={system.erp_review_url} target="_blank" rel="noreferrer">Open ERP review →</a>}</div><button className="button secondary" disabled={busy} onClick={()=>act(()=>post(`/runs/${run.id}/retry`),"Checking ERP approval…")}>Check approval</button></div>}
           {run?.state === "FAILED" && (
             <div className="run-failed">
               <div>

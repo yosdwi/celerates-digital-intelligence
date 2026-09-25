@@ -6,6 +6,7 @@ from .db import checkpointer, connect
 def migrate():
     root = Path(__file__).resolve().parents[3]
     with connect() as conn:
+        conn.execute("SELECT pg_advisory_xact_lock(738912)")
         conn.execute(
             "CREATE TABLE IF NOT EXISTS schema_migrations (name text PRIMARY KEY, applied_at timestamptz DEFAULT now())"
         )

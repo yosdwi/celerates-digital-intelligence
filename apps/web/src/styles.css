@@ -3520,3 +3520,6 @@ code {
     scroll-behavior: auto !important;
   }
 }
+
+/* Shared foundation uses the existing workspace type, colors and controls. */
+.foundation-card{background:white;border:1px solid var(--line,#e2e7e6);border-radius:14px;padding:24px;margin:20px 0;display:grid;gap:16px}.foundation-card h2{font-size:20px;margin:0}.foundation-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.foundation-version{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 0;border-top:1px solid #e2e7e6}.foundation-actions{display:flex;gap:10px;align-items:end;flex-wrap:wrap}.foundation-json{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;background:#f5f7f6;padding:16px;border-radius:8px}.foundation-card details summary{cursor:pointer}.foundation-card input[type=file]{max-width:100%}@media(max-width:700px){.foundation-grid{grid-template-columns:1fr}.foundation-version{align-items:start;flex-direction:column}.foundation-card{padding:18px}}

@@ -352,6 +352,7 @@ export function OperationalAssistance() {
             </button>
           </nav>
           <div className="overflow-y-auto overscroll-contain p-5">
+            {context.module === 'sales' && <Link href="/intelligence" onClick={()=>setOpen(false)} className="mb-4 block rounded-lg border border-brand-100 bg-brand-50 px-3 py-2 text-xs font-semibold text-brand-700">Review paket & akses Intelligence →</Link>}
             {feedback ? (
               <ContextualFeedback context={context} />
             ) : (

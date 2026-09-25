@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import S3rver from 's3rver';
 import postgres from 'postgres';
@@ -12,6 +12,9 @@ import { migrate } from '../scripts/migrate.mjs';
 const require = createRequire(import.meta.url);
 const { encodeReply } = require('next/dist/compiled/react-server-dom-webpack/client.node');
 const base='http://127.0.0.1:3310';
+const readToken=randomBytes(32).toString('hex'),actionToken=randomBytes(32).toString('hex');
+process.env.INTELLIGENCE_READ_TOKEN_SHA256=createHash('sha256').update(readToken).digest('hex');
+process.env.INTELLIGENCE_ACTION_TOKEN_SHA256=createHash('sha256').update(actionToken).digest('hex');
 const dir=await mkdtemp(tmpdir()+'/erp-http-');
 Object.assign(process.env,{ DATABASE_URL:'postgres://postgres:postgres@127.0.0.1:55440/postgres', DB_POOL_MAX:'1', NEXTAUTH_URL:base, NEXTAUTH_SECRET:randomBytes(32).toString('hex'), PII_ENCRYPTION_KEY:randomBytes(32).toString('hex'), SETUP_TOKEN:randomBytes(32).toString('hex'), S3_ENDPOINT:'http://127.0.0.1:59000', S3_ACCESS_KEY_ID:'S3RVER', S3_SECRET_ACCESS_KEY:'S3RVER', S3_BUCKET_PREFIX:'erp-test', APP_ENV:'local-test',RELEASE_SHA:'http-smoke',NEXT_TELEMETRY_DISABLED:'1' });
 const pg=spawn(process.execPath,['node_modules/@electric-sql/pglite-socket/dist/scripts/server.js','-p','55440','-m','10'],{stdio:['ignore','ignore','pipe']});
@@ -105,7 +108,14 @@ try {
   assert.equal((await db`SELECT status_code FROM feature_requests WHERE id=${item.id}`)[0].status_code,'new','premature Done rejected');
   await action('/feature-requests','app/feature-requests/actions.ts','updateFeatureRequestStatus',[item.id,form({status_code:'done',acceptance_criteria:'All fields carry forward',delivered_release:'http-smoke',validation_notes:'Synthetic journey passed',backlog_url:'https://github.com/yosdwi/celerates-digital-intelligence/issues/3'})]);
   assert.equal((await db`SELECT status_code FROM feature_requests WHERE id=${item.id}`)[0].status_code,'done');
-  await db`UPDATE users SET status='rejected' WHERE email='owner@example.test'`;
+  const {contractJourney}=await import('./intelligence-contract.mjs');
+  await contractJourney({base,request,db,tracker,readToken,actionToken});
+  if(process.env.INTELLIGENCE_DATABASE_URL){
+    const python=process.env.INTELLIGENCE_PYTHON||'../../services/intelligence-api/.venv/bin/python';
+    const child=spawn(python,['../../services/intelligence-api/tests/live_closed_loop.py'],{env:{...process.env,DATABASE_URL:process.env.INTELLIGENCE_DATABASE_URL,ERP_MODE:'http',ERP_BASE_URL:base+'/api/integration/v1',ERP_TOKEN:readToken,ERP_ACTION_TOKEN:actionToken,ERP_ENVIRONMENT:'local-test',API_ACCESS_TOKEN:randomBytes(32).toString('hex'),API_PRINCIPAL_NAME:'synthetic-owner',MODEL_MODE:'demo',STORAGE_BACKEND:'filesystem',STORAGE_PATH:dir+'/intelligence',ERP_TEST_OPPORTUNITY:tracker.id,ERP_TEST_COOKIE:[...jar].map(([k,v])=>k+'='+v).join('; ')},stdio:['ignore','inherit','inherit']});
+    await new Promise((resolve,reject)=>{child.on('exit',code=>code===0?resolve():reject(Error('Closed-loop verification failed: '+code)));child.on('error',reject);});
+  }
+  await db`UPDATE users SET status='rejected'  WHERE email='owner@example.test'`;
   assert.equal((await request('/api/operations/context?path=/finance')).status,403,'revoked session cannot read operational context');
   const before=(await db`SELECT count(*)::int AS n FROM leads`)[0].n;
   const body=await encodeReply([form({client_name:'MUST NOT WRITE'})]);

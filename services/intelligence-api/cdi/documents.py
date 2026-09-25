@@ -22,7 +22,7 @@ def register(opportunity_id, name, body, media_type, source_url=None):
         one(conn, "SELECT * FROM workspaces WHERE opportunity_id=%s FOR UPDATE", (opportunity_id,))
         if one(
             conn,
-            "SELECT 1 FROM runs WHERE opportunity_id=%s AND state IN ('QUEUED','INGESTING','ANALYZING','REVIEW_REQUIRED','RESUMING')",
+            "SELECT 1 FROM runs WHERE opportunity_id=%s AND state IN ('QUEUED','INGESTING','ANALYZING','REVIEW_REQUIRED','RESUMING','ERP_REVIEW_REQUIRED')",
             (opportunity_id,),
         ):
             raise ValueError("Complete the current review or request clarification before adding evidence")
@@ -66,10 +66,12 @@ def parse_document(document):
         return result.document.export_to_markdown(), "docling-v2"
 
 
-def ingest(opportunity_id):
+def ingest(opportunity_id, document_id=None):
     with connect() as conn:
         documents = all_rows(
-            conn, "SELECT * FROM documents WHERE opportunity_id=%s ORDER BY created_at", (opportunity_id,)
+            conn,
+            "SELECT * FROM documents WHERE (opportunity_id=%s AND source_id IS NULL) OR id=%s ORDER BY created_at",
+            (opportunity_id, document_id),
         )
     if not documents:
         raise ValueError("Attach at least one source document before analysis")

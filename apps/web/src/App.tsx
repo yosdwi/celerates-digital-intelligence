@@ -21,6 +21,7 @@ import {
   Users,
   PanelLeftClose,
 } from "lucide-react";
+import { Knowledge, Outcomes } from "./Foundation";
 import { Presales } from "./Presales";
 import {
   Overview,
@@ -38,6 +39,8 @@ const nav = [
   ["/app/exceptions", "Exceptions", ShieldAlert],
   ["/app/human-service", "Human Service", MessagesSquare],
   ["/app/management", "Management", ChartNoAxesCombined],
+  ["/app/knowledge", "Knowledge", FileCheck2],
+  ["/app/outcomes", "Outcomes & feedback", Check],
   ["/app/sources", "Sources & Integrations", Database],
   ["/app/system", "System", Workflow],
 ] as const;
@@ -442,6 +445,8 @@ function Shell() {
             <Route path="exceptions" element={<Exceptions />} />
             <Route path="human-service" element={<HumanService />} />
             <Route path="management" element={<Management />} />
+            <Route path="knowledge" element={<Knowledge />} />
+            <Route path="outcomes" element={<Outcomes />} />
             <Route path="sources" element={<Sources />} />
             <Route path="system" element={<System />} />
             <Route

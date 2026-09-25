@@ -310,15 +310,19 @@ def test_intake_validation_approval_and_replay(tmp_path):
 def test_http_erp_adapter_contract(monkeypatch):
     calls = []
 
-    def request(self, method, path, payload=None, key=None):
-        calls.append((method, path, payload, key))
-        return {"items": []} if path.startswith("read/") else {"acknowledged": True}
+    def request(self, method, path, payload=None, key=None, action=False):
+        calls.append(path)
+        return {"items": [], "next_cursor": None}
 
     monkeypatch.setattr(HttpERP, "request", request)
     adapter = HttpERP()
     assert adapter.list("capability") == []
-    adapter.action("opportunity.outcome", "OPP-1", {"status": "READY_FOR_SALES"}, "key-1")
-    assert calls[-1][1] == "actions" and calls[-1][-1] == "key-1"
+    assert adapter.list("opportunity") == []
+    assert calls == ["resources/sales_opportunity?limit=100"]
+    with pytest.raises(ValueError):
+        adapter.create_opportunity({}, "not-allowed")
+    with pytest.raises(ValueError):
+        adapter.action("intake.upsert", "x", {}, "not-allowed")
 
 
 def test_workspace_access_token(client, monkeypatch):

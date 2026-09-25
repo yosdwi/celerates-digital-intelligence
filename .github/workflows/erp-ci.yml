@@ -1,9 +1,9 @@
 name: ERP pilot checks
 on:
   push:
-    paths: ['apps/erp/**', 'infra/erp-compose.yml', '.github/workflows/erp-ci.yml']
+    paths: ['apps/erp/**', 'services/intelligence-api/**', 'infra/postgres/migrations/**', 'infra/erp-compose.yml', '.github/workflows/erp-ci.yml']
   pull_request:
-    paths: ['apps/erp/**', 'infra/erp-compose.yml', '.github/workflows/erp-ci.yml']
+    paths: ['apps/erp/**', 'services/intelligence-api/**', 'infra/postgres/migrations/**', 'infra/erp-compose.yml', '.github/workflows/erp-ci.yml']
 permissions:
   contents: read
 jobs:
@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16-bookworm
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: erp
           POSTGRES_PASSWORD: ci-only-password
@@ -30,8 +30,14 @@ jobs:
           node-version: '24'
           cache: npm
           cache-dependency-path: apps/erp/package-lock.json
+      - uses: astral-sh/setup-uv@v6
+        with: {version: "0.12.17"}
+      - run: uv sync --project ../../services/intelligence-api --extra test --frozen
       - run: npm ci
       - run: psql "$TEST_DATABASE_URL" -c "CREATE DATABASE erp_operations_test"
+        env:
+          TEST_DATABASE_URL: postgres://erp:ci-only-password@127.0.0.1:5432/erp_test
+      - run: psql "$TEST_DATABASE_URL" -c "CREATE DATABASE intelligence_contract_test"
         env:
           TEST_DATABASE_URL: postgres://erp:ci-only-password@127.0.0.1:5432/erp_test
       - run: npm test
@@ -44,4 +50,5 @@ jobs:
       - run: node tests/http-smoke.mjs
         env:
           ERP_BROWSER_TEST: "1"
+          INTELLIGENCE_DATABASE_URL: postgres://erp:ci-only-password@127.0.0.1:5432/intelligence_contract_test
       - run: docker build -t celerates-erp:ci .

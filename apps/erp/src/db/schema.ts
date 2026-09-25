@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, uuid, text, boolean, integer, smallint, date, timestamp, check, uniqueIndex, index, doublePrecision, AnyPgColumn } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, boolean, integer, bigint, smallint, date, timestamp, check, uniqueIndex, index, doublePrecision, AnyPgColumn } from "drizzle-orm/pg-core";
 
 
 export const leads = pgTable("leads", {
@@ -40,6 +40,7 @@ export const leads = pgTable("leads", {
 }));
 
 export const salesOpportunityTrackers = pgTable("sales_opportunity_trackers", {
+  intelligence_version: bigint("intelligence_version", { mode: "number" }).notNull().default(1),
   id: uuid("id").defaultRandom().primaryKey(),
   lead_id: uuid("lead_id").references(() => leads.id),
   opty_no: text("opty_no").notNull(),
