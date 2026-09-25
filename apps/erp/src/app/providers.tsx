@@ -8,14 +8,16 @@ export function Providers({
   children,
   locale,
   messages,
+  timeZone,
 }: {
   children: React.ReactNode;
   locale: string;
   messages: Record<string, unknown>;
+  timeZone: string;
 }) {
   return (
     <SessionProvider>
-      <NextIntlClientProvider locale={locale} messages={messages}>
+      <NextIntlClientProvider locale={locale} messages={messages} timeZone={timeZone}>
         <ToastProvider>
           <SavedRedirectToast />
           {children}
