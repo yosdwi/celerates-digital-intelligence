@@ -13,7 +13,7 @@ export function authenticateMachine(headers: Headers, scope: 'read'|'action') {
   if (!configured || !/^[a-f0-9]{64}$/.test(configured) || !token) fail(401,'UNAUTHORIZED','Valid service credential required.');
   const actual=createHash('sha256').update(token).digest();
   if (!timingSafeEqual(actual,Buffer.from(configured,'hex'))) fail(401,'UNAUTHORIZED','Valid service credential required.');
-  if (headers.get('x-erp-audience')!=='celerates-intelligence' || headers.get('x-erp-environment')!==(process.env.APP_ENV||'erp-pilot')) fail(403,'AUDIENCE','Service audience/environment mismatch.');
+  if (headers.get('x-erp-audience')!=='celerates-intelligence' || headers.get('x-erp-environment')!==(process.env.INTELLIGENCE_ENVIRONMENT||process.env.APP_ENV||'erp-pilot')) fail(403,'AUDIENCE','Service audience/environment mismatch.');
   return 'intelligence-pilot';
 }
 export function object(value: unknown, keys: string[]): Record<string,unknown> {

@@ -16,9 +16,10 @@ const readToken=randomBytes(32).toString('hex'),actionToken=randomBytes(32).toSt
 process.env.INTELLIGENCE_READ_TOKEN_SHA256=createHash('sha256').update(readToken).digest('hex');
 process.env.INTELLIGENCE_ACTION_TOKEN_SHA256=createHash('sha256').update(actionToken).digest('hex');
 const dir=await mkdtemp(tmpdir()+'/erp-http-');
-Object.assign(process.env,{ DATABASE_URL:'postgres://postgres:postgres@127.0.0.1:55440/postgres', DB_POOL_MAX:'1', NEXTAUTH_URL:base, NEXTAUTH_SECRET:randomBytes(32).toString('hex'), PII_ENCRYPTION_KEY:randomBytes(32).toString('hex'), SETUP_TOKEN:randomBytes(32).toString('hex'), S3_ENDPOINT:'http://127.0.0.1:59000', S3_ACCESS_KEY_ID:'S3RVER', S3_SECRET_ACCESS_KEY:'S3RVER', S3_BUCKET_PREFIX:'erp-test', APP_ENV:'local-test',RELEASE_SHA:'http-smoke',NEXT_TELEMETRY_DISABLED:'1' });
-const pg=spawn(process.execPath,['node_modules/@electric-sql/pglite-socket/dist/scripts/server.js','-p','55440','-m','10'],{stdio:['ignore','ignore','pipe']});
-pg.stderr.on('data',d=>process.stderr.write(d));
+Object.assign(process.env,{ DATABASE_URL:process.env.ERP_HTTP_DATABASE_URL||'postgres://postgres:postgres@127.0.0.1:55440/postgres', DB_POOL_MAX:process.env.ERP_HTTP_DATABASE_URL?'4':'1', NEXTAUTH_URL:base, NEXTAUTH_SECRET:randomBytes(32).toString('hex'), PII_ENCRYPTION_KEY:randomBytes(32).toString('hex'), SETUP_TOKEN:randomBytes(32).toString('hex'), S3_ENDPOINT:'http://127.0.0.1:59000', S3_ACCESS_KEY_ID:'S3RVER', S3_SECRET_ACCESS_KEY:'S3RVER', S3_BUCKET_PREFIX:'erp-test', APP_ENV:'local-test',RELEASE_SHA:'http-smoke',NEXT_TELEMETRY_DISABLED:'1' });
+if(process.env.ERP_HTTP_DATABASE_URL)assert.equal(new URL(process.env.ERP_HTTP_DATABASE_URL).hostname,'127.0.0.1','Disposable localhost database only');
+const pg=process.env.ERP_HTTP_DATABASE_URL?null:spawn(process.execPath,['node_modules/@electric-sql/pglite-socket/dist/scripts/server.js','-p','55440','-m','10'],{stdio:['ignore','ignore','pipe']});
+pg?.stderr.on('data',d=>process.stderr.write(d));
 const s3=new S3rver({ port:59000,address:'127.0.0.1',silent:true,directory:dir });
 const sql=postgres(process.env.DATABASE_URL,{max:1,prepare:false,connect_timeout:2});
 let app;
@@ -32,7 +33,7 @@ try {
  app=spawn(process.execPath,['node_modules/next/dist/bin/next','start','--hostname','127.0.0.1','-p','3310'],{env:process.env,stdio:['ignore','ignore','pipe']});
  let errors='';app.stderr.on('data',d=>{errors+=d.toString();});
  await until(async()=> (await fetch(base+'/api/health/ready')).ok,'Next readiness');
- const db=postgres(process.env.DATABASE_URL,{max:1,prepare:false});
+ const db=postgres(process.env.DATABASE_URL,{max:process.env.ERP_HTTP_DATABASE_URL?4:1,prepare:false});
  try {
   const manifest=JSON.parse(await readFile('.next/server/server-reference-manifest.json','utf8')).node;
   function actionId(name,file) {const found=Object.entries(manifest).find(([,v])=>v.exportedName===name&&v.filename===file);assert.ok(found,'missing action '+name);return found[0];}
@@ -112,8 +113,10 @@ try {
   await contractJourney({base,request,db,tracker,readToken,actionToken});
   if(process.env.INTELLIGENCE_DATABASE_URL){
     const python=process.env.INTELLIGENCE_PYTHON||'../../services/intelligence-api/.venv/bin/python';
-    const child=spawn(python,['../../services/intelligence-api/tests/live_closed_loop.py'],{env:{...process.env,DATABASE_URL:process.env.INTELLIGENCE_DATABASE_URL,ERP_MODE:'http',ERP_BASE_URL:base+'/api/integration/v1',ERP_TOKEN:readToken,ERP_ACTION_TOKEN:actionToken,ERP_ENVIRONMENT:'local-test',API_ACCESS_TOKEN:randomBytes(32).toString('hex'),API_PRINCIPAL_NAME:'synthetic-owner',MODEL_MODE:'demo',STORAGE_BACKEND:'filesystem',STORAGE_PATH:dir+'/intelligence',ERP_TEST_OPPORTUNITY:tracker.id,ERP_TEST_COOKIE:[...jar].map(([k,v])=>k+'='+v).join('; ')},stdio:['ignore','inherit','inherit']});
+    const intelligenceEnv={...process.env,DATABASE_URL:process.env.INTELLIGENCE_DATABASE_URL,ERP_MODE:'http',ERP_BASE_URL:base+'/api/integration/v1',ERP_TOKEN:readToken,ERP_ACTION_TOKEN:actionToken,ERP_ENVIRONMENT:'local-test',API_ACCESS_TOKEN:randomBytes(32).toString('hex'),API_PRINCIPAL_NAME:'synthetic-owner',MODEL_MODE:'demo',STORAGE_BACKEND:'filesystem',STORAGE_PATH:dir+'/intelligence',ERP_TEST_OPPORTUNITY:tracker.id,ERP_TEST_COOKIE:[...jar].map(([k,v])=>k+'='+v).join('; ')};
+    const child=spawn(python,['../../services/intelligence-api/tests/live_closed_loop.py'],{env:intelligenceEnv,stdio:['ignore','inherit','inherit']});
     await new Promise((resolve,reject)=>{child.on('exit',code=>code===0?resolve():reject(Error('Closed-loop verification failed: '+code)));child.on('error',reject);});
+    if(process.env.FOUNDATION_BROWSER_TEST==='1'){const {foundationBrowser}=await import('./foundation-browser.mjs');await foundationBrowser({env:intelligenceEnv,python,base,cookies:[...jar]});}
   }
   await db`UPDATE users SET status='rejected'  WHERE email='owner@example.test'`;
   assert.equal((await request('/api/operations/context?path=/finance')).status,403,'revoked session cannot read operational context');
@@ -123,4 +126,4 @@ try {
   assert.equal((await db`SELECT count(*)::int AS n FROM leads`)[0].n,before,'revoked stale JWT cannot mutate');
   console.log('PASS: bootstrap, login, guarded pages, lead→opportunity→requisition, retry, mapping, contextual feedback, private attachment, BA completion gate, revoked session');
  } finally { await db.end(); }
-} finally { app?.kill();pg.kill();await s3.close();await rm(dir,{recursive:true,force:true}); }
+} finally { app?.kill();pg?.kill();await s3.close();await rm(dir,{recursive:true,force:true}); }

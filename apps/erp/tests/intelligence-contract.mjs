@@ -42,5 +42,17 @@ export async function contractJourney({base,request,db,tracker,readToken,actionT
  assert.equal((await post('commands',command,'synthetic-command')).status,404,'revocation prevents even receipt replay disclosure');
  // Restore this synthetic fixture for the Python cross-stack journey.
  await request('/api/intelligence/reviews',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'grant',resource_id:id,enabled:true})});
+ if(process.env.ERP_HTTP_DATABASE_URL) {
+   let release,allocated;const held=new Promise(r=>release=r),ready=new Promise(r=>allocated=r);
+   const first=db.begin(async tx=>{const [row]=await tx`INSERT INTO intelligence_outbox(event_type,resource_id,resource_version) VALUES ('test.first',${id},3) RETURNING sequence`;allocated();await held;return Number(row.sequence);});
+   await ready;
+   let secondDone=false;
+   const second=db.begin(async tx=>{const [row]=await tx`INSERT INTO intelligence_outbox(event_type,resource_id,resource_version) VALUES ('test.second',${id},3) RETURNING sequence`;secondDone=true;return Number(row.sequence);});
+   await new Promise(r=>setTimeout(r,100));
+   assert.equal(secondDone,false,'later publication cannot allocate before earlier commit');
+   const visible=await machine('events?cursor=0');assert.equal(visible.status,200);
+   assert.ok(!(await visible.json()).items.some(e=>e.event_type==='test.first'||e.event_type==='test.second'));
+   release();const [a,b]=await Promise.all([first,second]);assert.ok(a<b);
+ }
  console.log('PASS: live machine scopes, explicit grants, exact human approval, concurrent idempotency, receipt read-back, outbox, stale source and revocation');
 }
