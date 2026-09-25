@@ -13,3 +13,4 @@ PASS docs/architecture/12-current-transition-target.mmd
 PASS docs/architecture/13-erp-as-is.mmd
 PASS docs/architecture/14-erp-railway-target.mmd
 PASS docs/architecture/15-erp-feedback-loop.mmd
+PASS docs/architecture/16-erp-operational-assistance.mmd
