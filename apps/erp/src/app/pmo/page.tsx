@@ -23,7 +23,6 @@ const STATUS_OPTIONS = [
 ] as const;
 export default async function PMOPage() {
   const t = await getTranslations("pmo");
-  await syncDocumentTrackerFromContracts();
   const [data, opportunityOptions] = await Promise.all([
     db
       .select({
@@ -105,6 +104,9 @@ export default async function PMOPage() {
           <RefreshCw className="h-3.5 w-3.5" />
           {t("googleSheetSync")}
         </Link>
+        <AddRecordModal buttonLabel="Siapkan dari A.Contract" title="Siapkan Document Tracker" action={syncDocumentTrackerFromContracts}>
+          <p className="sm:col-span-3 text-sm text-slate-600">Tambahkan PQ dari A.Contract yang belum ada di Document Tracker. Dokumen yang sudah ada tidak diubah. Hasil pembuatan tercatat di Activity Log.</p>
+        </AddRecordModal>
       </PageHeader>
 
       <main className="px-8 py-8 space-y-8 max-w-7xl mx-auto">

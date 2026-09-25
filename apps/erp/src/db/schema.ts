@@ -585,6 +585,7 @@ export const projectInvoices = pgTable("project_invoices", {
   submit_bast_date: date("submit_bast_date"),
 }, (t) => ({
   idxOpportunity: index("idx_project_invoices_opportunity").on(t.opportunity_id),
+  idxOpportunityMonth: index("idx_project_invoices_opportunity_month").on(t.opportunity_id, t.services_month_start),
 }));
 
 /**
@@ -606,6 +607,7 @@ export const financeDocumentHandoffs = pgTable("finance_document_handoffs", {
   created_at: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({
   uqOpportunity: uniqueIndex("uq_finance_document_handoffs_opportunity").on(t.opportunity_id),
+  idxPending: index("idx_finance_handoffs_pending").on(t.status_code, t.opportunity_id).where(sql`${t.status_code} IN ('notified','needs_revision')`),
 }));
 
 export const projectMonthlyBillings = pgTable("project_monthly_billings", {

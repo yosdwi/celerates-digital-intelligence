@@ -25,3 +25,7 @@ Date: 2026-09-23. Baseline and authorization: [ADR-006](../adr/ADR-006-erp-monor
 This release is an **Owner review pilot**. Broader role/record authorization, real-user onboarding, financial/payroll invariant fixes, transition/outbox recovery, source cutover reconciliation, least-privilege runtime DB/S3 credentials, offsite scheduled backups and a demonstrated restore drill remain required before real production use. Upload AV/content scanning and measured scale testing remain open. Human BA validation has not been fabricated. The controlled READ/EVENT/ACTION contract remains specified in document 07; real Intelligence binding is not enabled by this deployment.
 
 Use `apps/erp/README.md` for Docker, VPS migration, backups and rollback. Preserve the PII encryption key alongside coordinated database/object backups. App image rollback alone is not a data rollback.
+
+## Railway configuration correction
+
+The current Railway connector rejects `railwayConfigFile` as deprecated. The deployment uses explicit source/build/deploy service settings with the same Dockerfile instead; the unused `apps/erp/railway.toml` has been removed. This is a provider configuration correction, not a change to ADR-006 or runtime portability.

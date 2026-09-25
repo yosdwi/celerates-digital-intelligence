@@ -1,6 +1,7 @@
 "use server";
 import { requirePilotActor } from "@/lib/actor";
-import { db } from "@/db";
+import { db, sql as pg } from "@/db";
+import { materializePmo } from "@/lib/operations/materialize";
 import { projectDocuments, projectContracts, projectInvoices, projectMonthlyBillings, financeDocumentHandoffs, opportunities } from "@/db/schema";
 import { revalidatePath } from "next/cache";
 import { eq, sql } from "drizzle-orm";
@@ -17,69 +18,18 @@ import { PROJECT_DOC_SOURCES, INVOICE_BAST_DOC_SOURCE } from "./constants";
 import { requireDivisionAccess } from "@/lib/require-division-access";
 import { formatMonthNameYear } from "@/lib/month-format";
 
-// ---------- Invoice: auto-overdue ----------
-
-/**
- * Invoice yang belum Submitted (masih Planned/kosong) dan udah lewat 2 minggu
- * dari akhir bulan Services Month-nya otomatis ditandai Overdue. Dipanggil
- * tiap kali halaman TM Invoice dibuka -- bukan cron, tapi cukup buat data
- * yang selalu ke-refresh saat dilihat.
- */
-export async function syncOverdueInvoices() {
-  await requirePilotActor();
-
-  await db.execute(sql`
-    UPDATE project_invoices
-    SET status_code = 'overdue'
-    WHERE (status_code IS NULL OR status_code = 'planned')
-      AND services_month_start IS NOT NULL
-      AND (date_trunc('month', services_month_start::date) + interval '1 month' + interval '14 days') < now()
-  `);
-}
-
-/**
- * Setiap bulan di Billing Schedule (dari A.Contract) yang belum punya baris
- * TM Invoice otomatis dibuatkan satu (status Planned), jadi PMO nggak perlu
- * input manual tiap bulan lagi -- tinggal update status/BAST-nya.
- * Dipanggil tiap kali halaman TM Invoice dibuka, sama seperti syncOverdueInvoices.
- */
+// Explicit, authorized commands. Opening pages never materializes business state.
 export async function syncBillingScheduleToInvoices() {
   await requirePilotActor();
-
-  await db.execute(sql`
-    INSERT INTO project_invoices (opportunity_id, services_month_start, price_per_month, status_code, invoice_plan_date)
-    SELECT pc.opportunity_id, pmb.month, pmb.amount, 'planned', pmb.month
-    FROM project_monthly_billings pmb
-    JOIN project_contracts pc ON pc.id = pmb.contract_id
-    WHERE NOT EXISTS (
-      SELECT 1 FROM project_invoices pi
-      WHERE pi.opportunity_id = pc.opportunity_id
-        AND pi.services_month_start = pmb.month
-    )
-  `);
+  const actor = await requireDivisionAccess("pmo");
+  await materializePmo(pg, "invoices", { userId: actor.userId!, userName: actor.userName });
+  revalidatePath("/pmo/invoices");
 }
-
-/**
- * Setiap Opportunity yang sudah punya A.Contract tapi belum punya baris
- * Document Tracker otomatis dibuatkan satu (kosong, tinggal diisi PKS/PO/CR),
- * supaya daftar Document Tracker & A.Contract selalu menampilkan project yang
- * sama persis -- nggak ada project yang "kelewat" nyantol cuma di satu sisi.
- * Dipanggil tiap kali halaman Document Tracker dibuka, sama seperti
- * syncBillingScheduleToInvoices di atas.
- */
 export async function syncDocumentTrackerFromContracts() {
   await requirePilotActor();
-
-  await db.execute(sql`
-    INSERT INTO project_documents (opportunity_id, po_start_date, po_end_date, pq_price)
-    SELECT DISTINCT pc.opportunity_id, o.start_date, o.end_date, o.price_amount
-    FROM project_contracts pc
-    JOIN opportunities o ON o.id = pc.opportunity_id
-    WHERE NOT EXISTS (
-      SELECT 1 FROM project_documents pd
-      WHERE pd.opportunity_id = pc.opportunity_id
-    )
-  `);
+  const actor = await requireDivisionAccess("pmo");
+  await materializePmo(pg, "documents", { userId: actor.userId!, userName: actor.userName });
+  revalidatePath("/pmo");
 }
 
 async function clientNameOf(opportunityId: string): Promise<string> {

@@ -105,3 +105,10 @@ GitHub docs / Slides / Figma / presentation
 ```
 
 Do not edit generated SVG files manually. Change the `.mmd` source and let CI regenerate the presentation artifact.
+
+## 16 — Embedded operational assistance (implemented)
+
+[`16-erp-operational-assistance.mmd`](./16-erp-operational-assistance.mmd) shows the
+session-bound ERP read boundary, explicit PMO commands and reused feedback flow.
+This human-facing endpoint is not the proposed ERP-to-Intelligence machine API.
+See [implementation and verification](../implementation/operational-assistance.md).

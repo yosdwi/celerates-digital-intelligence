@@ -16,7 +16,7 @@ The image runs as a non-root user. It needs `DATABASE_URL`, `NEXTAUTH_URL`, `NEX
 
 ## Railway
 
-Build root `/apps/erp`, Dockerfile `Dockerfile`, config `/apps/erp/railway.toml`, one replica, readiness `/api/health/ready`. PostgreSQL 16 volume `/var/lib/postgresql/data`; pinned MinIO volume `/data`. Private names `erp-postgres.railway.internal:5432` and `erp-objects.railway.internal:9000`. The web domain is the only public endpoint. Set `NEXTAUTH_URL` to it. Persist credentials as Railway variables, never Git. Database and object volumes must be verified before use.
+Set service build root `/apps/erp`, builder `DOCKERFILE`, Dockerfile `Dockerfile`, start command `node scripts/start.mjs`, one replica, readiness `/api/health/ready` (180-second timeout), restart on failure and sleeping disabled. Set these in the service configuration; the current Railway API rejects the deprecated `railway.toml`/`railway.json` config-file field. Docker and Compose remain the portable runtime specification. PostgreSQL 16 volume `/var/lib/postgresql/data`; pinned MinIO volume `/data`. Private names `erp-postgres.railway.internal:5432` and `erp-objects.railway.internal:9000`. The web domain is the only public endpoint. Set `NEXTAUTH_URL` to it. Persist credentials as Railway variables, never Git. Database and object volumes must be verified before use.
 
 Liveness tests only the web process; readiness checks migration ledger and both private buckets. Startup applies `drizzle/*.sql` transactionally with an advisory lock and SHA-256 ledger, then seeds nine divisions idempotently. Never run `drizzle-kit push` in a shared environment. Nonempty databases without the ledger are deliberately refused. New generated migrations must include reviewed data transitions; inspect existing rows before adding uniqueness constraints.
 
@@ -49,3 +49,12 @@ Rollback application image only if its schema is compatible. For incompatible mi
 ## Remaining release gates
 
 The original 24 findings remain traceable in the audit. Owner-only gates reduce pilot exposure; they do not close all record authorization, financial invariants, transition races, legacy ID reconciliation or outbox work. Contextual feedback is ready to capture BA review, but no human approval is fabricated. Intelligence contract READ/EVENT/ACTION implementation and real binding are subsequent work; this deployment does not connect Intelligence directly to ERP tables.
+
+### Bantuan Operasional
+
+The floating panel reads deterministic module conditions and reuses contextual
+Feature Request. PMO invoice/document preparation is now an explicit reviewed action;
+GET pages do not materialize business records. See
+[`operational-assistance.md`](../../docs/implementation/operational-assistance.md)
+for rules, authorization, verification and the management demo. Migration 0003 adds
+supporting indexes; no additional service or model key is required.

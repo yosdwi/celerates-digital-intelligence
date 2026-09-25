@@ -48,6 +48,12 @@ try {
   console.log('PASS: bootstrap and authenticated page');
   await action('/marketing','app/marketing/actions.ts','createLead',[form({client_name:'Synthetic Client',contact_name:'Reviewer',service_type_code:'outsourcing',lead_source_code:'inbound',category_code:'new',sales_pic_name:'Owner',is_qualified:'true',project_name:'Synthetic ERP journey',position_name:'Engineer',headcount_target:2,level_code:'senior',price_amount:20000000,price_period_code:'monthly',estimated_duration_months:6})]);
   console.log('Lead create request complete');
+  let contextRes=await request('/api/operations/context?path=/marketing%3Ftoken%3Dsecret');
+  assert.equal(contextRes.status,200);assert.match(contextRes.headers.get('cache-control'),/no-store/);
+  let context=await contextRes.json();assert.equal(context.context.path,'/marketing');
+  assert.equal(context.groups.find(g=>g.key==='qualified-leads').count,1);
+  assert.doesNotMatch(JSON.stringify(context),/Synthetic Client|price_amount|contact_email|20000000/);
+
   const [lead]=await db`SELECT * FROM leads WHERE client_name='Synthetic Client'`;assert.ok(lead,'lead saved');
   await action('/marketing','app/marketing/actions.ts','convertLeadToOpportunity',[lead.id]);
   await action('/marketing','app/marketing/actions.ts','convertLeadToOpportunity',[lead.id]);
@@ -58,6 +64,38 @@ try {
   console.log('Requisition conversion request complete');
   const [req]=await db`SELECT * FROM requisitions WHERE opportunity_id=${tracker.id}`;assert.ok(req,'requisition created');assert.equal(req.headcount_target,2);
   const [opty]=await db`SELECT * FROM opportunities WHERE opportunity_tracker_id=${tracker.id}`;assert.equal(opty.opty_no,tracker.opty_no,'shared business key');
+  context=await (await request('/api/operations/context?path=/sales')).json();
+  assert.equal(context.groups.find(g=>g.key==='unassigned-requisitions').count,1);
+  assert.equal(context.groups.find(g=>g.key==='qualified-trackers').count,0);
+  const [contract]=await db`INSERT INTO project_contracts(opportunity_id) VALUES (${opty.id}) RETURNING id`;
+  await db`INSERT INTO project_monthly_billings(contract_id,month,amount) VALUES (${contract.id},'2025-01-01',20000000)`;
+  for(const page of ['/pmo','/pmo/invoices']) assert.equal((await request(page)).status,200,'PMO page renders');
+  assert.equal((await db`SELECT count(*)::int n FROM project_invoices`)[0].n,0,'GET cannot create invoice');
+  assert.equal((await db`SELECT count(*)::int n FROM project_documents`)[0].n,0,'GET cannot create document tracker');
+  context=await (await request('/api/operations/context?path=/pmo/invoices')).json();
+  assert.equal(context.groups.find(g=>g.key==='missing-invoices').count,1);
+  assert.equal(context.groups.find(g=>g.key==='missing-documents').count,1);
+  for(let i=0;i<2;i++) {
+    await action('/pmo/invoices','app/pmo/actions.ts','syncBillingScheduleToInvoices',[]);
+    await action('/pmo','app/pmo/actions.ts','syncDocumentTrackerFromContracts',[]);
+  }
+  assert.equal((await db`SELECT count(*)::int n FROM project_invoices`)[0].n,1,'explicit retry creates one invoice');
+  assert.equal((await db`SELECT count(*)::int n FROM project_documents`)[0].n,1,'explicit retry creates one document');
+  await request('/pmo/invoices');
+  assert.equal((await db`SELECT status_code FROM project_invoices`)[0].status_code,'planned','GET cannot persist overdue');
+  context=await (await request('/api/operations/context?path=/pmo/invoices')).json();
+  assert.equal(context.groups.find(g=>g.key==='invoice-submission').count,1,'derived submission attention');
+  assert.equal(context.groups.find(g=>g.key==='missing-invoices').count,0);
+  for (const page of ['/finance','/pmo/dashboard','/executive-dashboard']) assert.equal((await request(page)).status,200,'derived invoice projection renders '+page);
+  console.log('PASS: contextual API, read-only PMO pages, explicit repeatable preparation, live derived submission rule');
+  if(process.env.ERP_BROWSER_TEST==='1') {
+    const { runBrowserJourney }=await import('./browser-journey.mjs');
+    await runBrowserJourney({base,cookies:[...jar]});
+    const [floating]=await db`SELECT * FROM feature_requests WHERE title='Synthetic floating feedback'`;
+    assert.ok(floating);assert.match(floating.context_path,/^\/pmo\/invoices\/[0-9a-f-]+\/edit$/);
+    assert.equal(floating.release_sha,'http-smoke');assert.equal(floating.module_area_code,'pmo');
+    assert.equal((await db`SELECT count(*)::int n FROM notifications WHERE title='Feature Request Baru'`)[0].n,1);
+  }
   const feedback=form({title:'Synthetic BA acceptance',description:'Verify carry-forward',context_path:'/sales?token=must-not-persist',expected_behavior:'Keep staffing fields'});feedback.set('attachments',new File(['%PDF-1.4 synthetic'],'evidence.pdf',{type:'application/pdf'}));
   await action('/feature-requests','app/feature-requests/actions.ts','createFeatureRequest',[feedback]);
   const [item]=await db`SELECT * FROM feature_requests WHERE title='Synthetic BA acceptance'`;assert.equal(item.context_path,'/sales');assert.equal(item.release_sha,'http-smoke');
@@ -68,6 +106,7 @@ try {
   await action('/feature-requests','app/feature-requests/actions.ts','updateFeatureRequestStatus',[item.id,form({status_code:'done',acceptance_criteria:'All fields carry forward',delivered_release:'http-smoke',validation_notes:'Synthetic journey passed',backlog_url:'https://github.com/yosdwi/celerates-digital-intelligence/issues/3'})]);
   assert.equal((await db`SELECT status_code FROM feature_requests WHERE id=${item.id}`)[0].status_code,'done');
   await db`UPDATE users SET status='rejected' WHERE email='owner@example.test'`;
+  assert.equal((await request('/api/operations/context?path=/finance')).status,403,'revoked session cannot read operational context');
   const before=(await db`SELECT count(*)::int AS n FROM leads`)[0].n;
   const body=await encodeReply([form({client_name:'MUST NOT WRITE'})]);
   await request('/marketing',{method:'POST',headers:{'Next-Action':actionId('createLead','app/marketing/actions.ts')},body});

@@ -1,3 +1,5 @@
+import { getTableColumns } from "drizzle-orm";
+import { invoiceStatusExpression } from "@/lib/invoice-status";
 import { db } from "@/db";
 import { projectContracts, projectInvoices, projectDocuments } from "@/db/schema";
 import { getTranslations } from "next-intl/server";
@@ -11,7 +13,7 @@ export default async function PmoDashboardPage() {
   const t = await getTranslations("pmo");
   const [contractRows, invoiceRows, documentRows] = await Promise.all([
     db.select().from(projectContracts),
-    db.select().from(projectInvoices),
+    db.select({ ...getTableColumns(projectInvoices), status_code: invoiceStatusExpression() }).from(projectInvoices),
     db.select().from(projectDocuments),
   ]);
 

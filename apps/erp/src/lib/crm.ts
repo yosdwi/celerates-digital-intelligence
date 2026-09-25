@@ -1,3 +1,5 @@
+import { getTableColumns } from "drizzle-orm";
+import { invoiceStatusExpression } from "@/lib/invoice-status";
 import { db } from "@/db";
 import { leads, opportunities, projectContracts, projectInvoices } from "@/db/schema";
 import { inArray } from "drizzle-orm";
@@ -51,7 +53,7 @@ export async function getAccountStatsMap(clientNames: string[]): Promise<Map<str
   if (optyIds.length > 0) {
     const [contractRows, invoiceRows] = await Promise.all([
       db.select().from(projectContracts).where(inArray(projectContracts.opportunity_id, optyIds)),
-      db.select().from(projectInvoices).where(inArray(projectInvoices.opportunity_id, optyIds)),
+      db.select({ ...getTableColumns(projectInvoices), status_code: invoiceStatusExpression() }).from(projectInvoices).where(inArray(projectInvoices.opportunity_id, optyIds)),
     ]);
     for (const c of contractRows) {
       const clientName = optyIdToClient.get(c.opportunity_id);
@@ -92,7 +94,7 @@ export async function getAccountHistory(clientName: string): Promise<RelatedHist
   const [contractRows, invoiceRows] = optyIds.length > 0
     ? await Promise.all([
         db.select().from(projectContracts).where(inArray(projectContracts.opportunity_id, optyIds)),
-        db.select().from(projectInvoices).where(inArray(projectInvoices.opportunity_id, optyIds)),
+        db.select({ ...getTableColumns(projectInvoices), status_code: invoiceStatusExpression() }).from(projectInvoices).where(inArray(projectInvoices.opportunity_id, optyIds)),
       ])
     : [[], []];
 

@@ -46,6 +46,7 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "drizzle-kit": "^0.31.10",
+    "playwright": "1.55.0",
     "s3rver": "3.7.1",
     "tsx": "4.23.15",
     "typescript": "^5.7.2"

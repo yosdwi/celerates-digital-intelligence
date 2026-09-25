@@ -1,7 +1,8 @@
 "use server";
 import { requirePilotActor } from "@/lib/actor";
-import { safeContextPath, safeExternalLink } from "@/lib/access-policy";
+import { safeExternalLink } from "@/lib/access-policy";
 import { db } from "@/db";
+import { operationalContext } from "@/lib/operations/policy";
 import { featureRequests, users } from "@/db/schema";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -47,9 +48,9 @@ export async function createFeatureRequest(formData: FormData): Promise<void> {
 
   const { id: userId, name: userName, email } = await currentUser();
 
-  const title = formData.get("title") as string;
-  const description = formData.get("description") as string;
-  if (!title || !description) throw new Error("Judul dan Deskripsi wajib diisi");
+  const title = String(formData.get("title") || "").trim();
+  const description = String(formData.get("description") || "").trim();
+  if (!title || !description || title.length > 200 || description.length > 5000) throw new Error("Judul (maks. 200) dan Deskripsi (maks. 5000) wajib diisi");
 
   const module_area_code = (formData.get("module_area_code") as string) || null;
   const request_type_code = (formData.get("request_type_code") as string) || "new_feature";
@@ -71,7 +72,7 @@ export async function createFeatureRequest(formData: FormData): Promise<void> {
     current_behavior,
     expected_behavior,
     business_impact,
-    context_path: safeContextPath(formData.get("context_path")),
+    context_path: operationalContext(formData.get("context_path")).path,
     release_sha: process.env.RAILWAY_GIT_COMMIT_SHA || process.env.RELEASE_SHA || "local",
     environment: process.env.APP_ENV || "erp-pilot",
     requested_by_user_id: userId ?? null,
@@ -101,9 +102,9 @@ export async function updateFeatureRequest(id: string, formData: FormData): Prom
 
   const { name: userName } = await currentUser();
 
-  const title = formData.get("title") as string;
-  const description = formData.get("description") as string;
-  if (!title || !description) throw new Error("Judul dan Deskripsi wajib diisi");
+  const title = String(formData.get("title") || "").trim();
+  const description = String(formData.get("description") || "").trim();
+  if (!title || !description || title.length > 200 || description.length > 5000) throw new Error("Judul (maks. 200) dan Deskripsi (maks. 5000) wajib diisi");
 
   await db.update(featureRequests).set({
     title,

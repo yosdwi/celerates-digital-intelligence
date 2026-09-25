@@ -1,8 +1,9 @@
+import { invoiceStatusExpression } from "@/lib/invoice-status";
 import { db } from "@/db";
 import { projectInvoices, opportunities, financeDocumentHandoffs, projectContracts, projectMonthlyBillings } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { getTranslations } from "next-intl/server";
-import { createProjectInvoice, syncOverdueInvoices, syncBillingScheduleToInvoices } from "../actions";
+import { createProjectInvoice, syncBillingScheduleToInvoices } from "../actions";
 import { INVOICE_BAST_DOC_SOURCE, INVOICE_ISSUES } from "../constants";
 import { OpportunityPicker } from "@/components/opportunity-picker";
 import { InvoicesTable } from "./invoices-table";
@@ -20,8 +21,6 @@ const STATUS_OPTIONS = [["overdue", "Overdue"], ["submitted", "Submitted"], ["pl
 
 export default async function InvoicesPage() {
   const t = await getTranslations("pmo.invoices");
-  await syncBillingScheduleToInvoices();
-  await syncOverdueInvoices();
 
   const [data, opportunityOptions] = await Promise.all([
     db
@@ -35,7 +34,7 @@ export default async function InvoicesPage() {
         group_name: projectInvoices.group_name,
         services_month_start: projectInvoices.services_month_start,
         price_per_month: projectInvoices.price_per_month,
-        status_code: projectInvoices.status_code,
+        status_code: invoiceStatusExpression(),
         bast_support_doc_url: projectInvoices.bast_support_doc_url,
         notes: projectInvoices.notes,
         issue_code: projectInvoices.issue_code,
@@ -134,12 +133,15 @@ export default async function InvoicesPage() {
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
           <StatCard label="Total Invoice" value={data.length} sublabel={rp(nominalOf(data))} color="navy" />
           <StatCard label="Submitted" value={submittedRows.length} sublabel={rp(nominalOf(submittedRows))} color="green" />
-          <StatCard label="Overdue" value={overdueRows.length} sublabel={rp(nominalOf(overdueRows))} color="red" />
+          <StatCard label="Overdue · Submission" value={overdueRows.length} sublabel={rp(nominalOf(overdueRows))} color="red" />
           <StatCard label="Invoice Plan" value={plannedRows.length} sublabel={rp(nominalOf(plannedRows))} color="amber" />
           <StatCard label={t("otherLabel")} value={otherRows.length} sublabel={rp(nominalOf(otherRows))} color="purple" />
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex flex-wrap justify-end gap-3">
+          <AddRecordModal buttonLabel="Siapkan dari Billing Schedule" title="Siapkan TM Invoice" action={syncBillingScheduleToInvoices}>
+            <p className="sm:col-span-3 text-sm text-slate-600">Buat invoice Planned untuk jadwal yang belum memiliki invoice. Jadwal ganda pada PQ dan bulan yang sama dilewati; periksa A.Contract terlebih dahulu. Data invoice yang sudah ada tidak diubah. Hasil pembuatan tercatat di Activity Log.</p>
+          </AddRecordModal>
           <AddRecordModal buttonLabel={t("addInvoice")} title={t("addInvoice")} action={createProjectInvoice}>
             <OpportunityPicker opportunities={opportunityOptions} withInvoiceFields billingMonthsByOpportunity={billingMonthsByOpportunity} />
 

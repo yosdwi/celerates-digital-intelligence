@@ -1,3 +1,4 @@
+import { invoiceStatusExpression } from "@/lib/invoice-status";
 import { db } from "@/db";
 import { financeDocumentHandoffs, opportunities, projectInvoices } from "@/db/schema";
 import { eq, ne, sql } from "drizzle-orm";
@@ -20,7 +21,7 @@ export default async function FinancePage() {
   const invoiceCounts = await db
     .select({
       opportunity_id: projectInvoices.opportunity_id,
-      overdue_count: sql<number>`count(*) filter (where ${projectInvoices.status_code} = 'overdue')`,
+      overdue_count: sql<number>`count(*) filter (where ${invoiceStatusExpression()} = 'overdue')`,
       total_count: sql<number>`count(*)`,
     })
     .from(projectInvoices)

@@ -10,7 +10,7 @@ import { LanguageSwitcher } from "@/components/language-switcher";
 import { ActivityLogLink } from "@/components/activity-log-link";
 import { AppShell } from "@/components/app-shell";
 import { SidebarCollapseProvider } from "@/components/sidebar-context";
-import { FeatureRequestFab } from "@/components/feature-request-fab";
+import { OperationalAssistance } from "@/components/operational-assistance";
 export const dynamic = 'force-dynamic';
 
 export const metadata = {
@@ -33,7 +33,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <NotificationBell />
     <UserMenu />
     <AppShell>{children}</AppShell>
-    <FeatureRequestFab />
+    <OperationalAssistance />
   </SidebarCollapseProvider>
 </Providers>
       </body>

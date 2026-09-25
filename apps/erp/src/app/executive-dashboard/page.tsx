@@ -1,3 +1,5 @@
+import { getTableColumns } from "drizzle-orm";
+import { invoiceStatusExpression } from "@/lib/invoice-status";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
@@ -36,7 +38,7 @@ export default async function ExecutiveDashboardPage() {
     db.select().from(employees),
     db.select().from(talentAssignments),
     db.select().from(projectContracts),
-    db.select().from(projectInvoices),
+    db.select({ ...getTableColumns(projectInvoices), status_code: invoiceStatusExpression() }).from(projectInvoices),
     db.select().from(financeDocumentHandoffs),
     db.select().from(requisitions).orderBy(desc(requisitions.opty_request_date)).limit(6),
   ]);
