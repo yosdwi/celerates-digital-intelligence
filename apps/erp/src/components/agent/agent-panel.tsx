@@ -126,7 +126,7 @@ export function AgentPanel() {
   useEffect(() => () => inflight.current?.abort(), []);
 
   const startRun = useCallback(
-    (skill: RunRequest["skill"], args: Record<string, string>, text: string) => {
+    (skill: RunRequest["skill"], args: Record<string, unknown>, text: string) => {
       if (running) return;
       const runId = uuid();
       setTab("ask");

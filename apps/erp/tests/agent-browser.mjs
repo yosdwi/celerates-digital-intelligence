@@ -91,6 +91,19 @@ export async function agentBrowser({ base, cookies }) {
     await imported.getByRole('button', { name: /^Konfirmasi 1 perubahan/ }).click();
     await panel.locator('[data-proposal][data-proposal-state="applied"]').last().getByText('dibuat', { exact: false }).waitFor({ timeout: 30000 });
 
+    // Journey B with a correction: unknown headers → mapping card → user maps a column → proposal.
+    await panel.locator('[data-agent-file]').setInputFiles({ name: 'catatan-browser.csv', mimeType: 'text/csv', buffer: Buffer.from('Nama Kandidat,Nilai\nFollow up kandidat A,90\n') });
+    const mapping = panel.locator('[data-mapping-card][open]').last();
+    await mapping.waitFor({ timeout: 30000 });
+    await mapping.getByLabel('Impor sebagai').selectOption({ label: 'Buat task tindak lanjut' });
+    await mapping.getByLabel(/^Judul/).selectOption('Nama Kandidat');
+    await mapping.getByRole('button', { name: 'Siapkan usulan' }).click();
+    const corrected = panel.locator('[data-proposal][data-proposal-state="pending"]').last();
+    await corrected.getByText('Task: Follow up kandidat A', { exact: false }).waitFor({ timeout: 30000 });
+    await corrected.getByRole('button', { name: /^Konfirmasi 1 perubahan/ }).click();
+    await panel.locator('[data-proposal][data-proposal-state="applied"]').last().getByText(/TASK-\d+ dibuat/).waitFor({ timeout: 30000 });
+    await page.screenshot({ path: evidenceDir + '/agent-import-mapping.png' });
+
     // Keyboard and mobile.
     await page.keyboard.press('Escape');
     assert.equal(await panel.count(), 0);

@@ -13,8 +13,9 @@ import {
   type ThreadMessageLike,
 } from "@assistant-ui/react";
 import { Loader2, Paperclip, SendHorizontal, Sparkles } from "lucide-react";
-import { toThreadMessages, type AgentAction, type AgentRun, type Evidence } from "@/lib/agent/run-state";
+import { toThreadMessages, type AgentAction, type AgentRun, type Evidence, type MappingCardData } from "@/lib/agent/run-state";
 import { EvidenceCard, RunError, RunProgress, ToolTrace } from "./evidence";
+import { MappingCard } from "./mapping";
 import { ProposalCard } from "./proposal";
 
 export type Suggestion = { label: string; run: () => void };
@@ -52,6 +53,10 @@ function Actions({ items }: { items: AgentAction[] }) {
   );
 }
 
+function Mapping({ data }: { data: MappingCardData }) {
+  return <MappingCard data={data} onRun={useContext(ActionContext)} />;
+}
+
 type DataPart = { data: Record<string, unknown> };
 const PARTS = {
   Text: ({ text }: { text: string }) => <p className="whitespace-pre-line text-sm leading-relaxed text-slate-800">{text}</p>,
@@ -62,6 +67,7 @@ const PARTS = {
       error: ({ data }: DataPart) => <RunError message={String(data.message)} />,
       proposal: ({ data }: DataPart) => <ProposalCard id={String(data.id)} title={String(data.title)} />,
       actions: ({ data }: DataPart) => <Actions items={data.items as AgentAction[]} />,
+      mapping: ({ data }: DataPart) => <Mapping data={data as unknown as MappingCardData} />,
     },
   },
   tools: {

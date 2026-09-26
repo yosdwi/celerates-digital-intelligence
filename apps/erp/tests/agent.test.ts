@@ -128,8 +128,11 @@ test("AG-UI conformance of the event shapes the panel consumes, and the pure run
   ] } });
   assert.deepEqual(asked.actions.map((a) => a.label), ["Tindak lanjuti: X"]);
   assert.ok(!(toThreadMessages([asked])[1].content as { type: string }[]).some((p) => p.type === "data-actions"), "not while running");
+  asked = applyEvent(asked, { type: "CUSTOM", name: "celerates.mapping", value: { dataset_id: proposalId, command: "task.create", columns: ["A"], mapping: {}, commands: [], open: true } });
+  asked = applyEvent(asked, { type: "CUSTOM", name: "celerates.mapping", value: { dataset_id: "x", columns: [], commands: [] } });
+  assert.equal(asked.mapping?.dataset_id, proposalId, "malformed mapping cards ignored");
   asked = applyEvent(asked, { type: "RUN_FINISHED", threadId: "t", runId: "r4" });
-  assert.ok((toThreadMessages([asked])[1].content as { type: string }[]).some((p) => p.type === "data-actions"));
+  assert.deepEqual((toThreadMessages([asked])[1].content as { type: string }[]).map((p) => p.type).slice(-2), ["data-mapping", "data-actions"]);
   assert.equal(parts[2].data?.id, proposalId);
   let failed = applyEvent(newRun("r2", "x"), { type: "RUN_ERROR", message: "Tidak boleh", code: "ERP_403" });
   failed = applyEvent(failed, { type: "TEXT_MESSAGE_CONTENT", delta: "late" });

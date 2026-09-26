@@ -12,7 +12,18 @@ export type Evidence = {
   withheld?: string[];
   match?: string;
 };
-export type AgentAction = { label: string; skill: "follow_up_signal"; args: { signal_key: string } };
+export type AgentAction =
+  | { label: string; skill: "follow_up_signal"; args: { signal_key: string } }
+  | { label: string; skill: "import_dataset"; args: { dataset_id: string; command: string; mapping: Record<string, string> } };
+/** The column mapping behind an import (ADR-011), shown so the user can inspect or correct it. */
+export type MappingCardData = {
+  dataset_id: string;
+  command: string;
+  columns: string[];
+  mapping: Record<string, string>;
+  commands: { kind: string; label: string; params: { name: string; label: string; required: boolean }[] }[];
+  open: boolean;
+};
 export type ToolTrace = { id: string; name: string; args: string; result?: string; done: boolean };
 export type AgentRun = {
   runId: string;
@@ -26,6 +37,7 @@ export type AgentRun = {
   proposals: { id: string; title: string }[];
   /** Next steps offered by the playbook. Only allowlisted skills; running one is a new run, never an approval. */
   actions: AgentAction[];
+  mapping?: MappingCardData;
   text: string;
   error?: { message: string; code?: string };
 };
@@ -65,12 +77,19 @@ export function applyEvent(run: AgentRun, event: AgUiEvent, id: string | null = 
         if (typeof value?.id !== "string" || !UUID.test(value.id) || run.proposals.some((p) => p.id === value.id)) return run;
         return { ...run, proposals: [...run.proposals, { id: value.id, title: String(value.title ?? "Usulan") }] };
       }
+      if (event.name === "celerates.mapping") {
+        const v = event.value as MappingCardData | undefined;
+        if (!v || !UUID.test(String(v.dataset_id)) || !Array.isArray(v.columns) || !Array.isArray(v.commands)) return run;
+        return { ...run, mapping: v };
+      }
       if (event.name === "celerates.actions") {
+        // Server-offered actions are limited to follow-ups on a rule; imports are started only from the mapping card.
+        type Offered = { label?: unknown; skill?: unknown; args?: { signal_key?: unknown } };
         const items = ((event.value as { items?: unknown[] })?.items ?? []).filter(
-          (a): a is AgentAction =>
-            !!a && typeof a === "object" && (a as AgentAction).skill === "follow_up_signal" && /^[a-z0-9-]{2,60}$/.test(String((a as AgentAction).args?.signal_key)),
+          (a): a is Offered => !!a && typeof a === "object" && (a as Offered).skill === "follow_up_signal" && /^[a-z0-9-]{2,60}$/.test(String((a as Offered).args?.signal_key)),
         );
-        return { ...run, actions: [...run.actions, ...items.map((a) => ({ label: String(a.label).slice(0, 120), skill: a.skill, args: { signal_key: a.args.signal_key } }))].slice(0, 4) };
+        const offered: AgentAction[] = items.map((a) => ({ label: String(a.label).slice(0, 120), skill: "follow_up_signal", args: { signal_key: String(a.args!.signal_key) } }));
+        return { ...run, actions: [...run.actions, ...offered].slice(0, 4) };
       }
       if (event.name !== "celerates.evidence") return run;
       const items = ((event.value as { items?: unknown[] })?.items ?? []).filter(
@@ -109,6 +128,7 @@ export function toThreadMessages(runs: AgentRun[]) {
     // The conclusion sits last, where the auto-scrolling viewport lands; evidence is directly above it.
     if (run.text) content.push({ type: "text", text: run.text });
     for (const proposal of run.proposals) content.push({ type: "data-proposal", data: proposal });
+    if (run.mapping && run.status === "succeeded") content.push({ type: "data-mapping", data: run.mapping });
     if (run.actions.length && run.status === "succeeded") content.push({ type: "data-actions", data: { items: run.actions } });
     for (const tool of run.tools)
       content.push({

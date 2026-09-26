@@ -156,6 +156,10 @@ class Recorder:
         """An ERP-held proposal the UI renders as a first-class card (it fetches the live proposal from ERP)."""
         self.emit(CustomEvent(name="celerates.proposal", value=value))
 
+    def mapping(self, value):
+        """The column mapping behind an import, for the user to inspect or correct (a correction is a new run)."""
+        self.emit(CustomEvent(name="celerates.mapping", value=value))
+
     def actions(self, items):
         """Next steps the UI may offer as buttons. Each is a skill the ERP BFF re-validates; none is an approval."""
         self.emit(CustomEvent(name="celerates.actions", value={"items": items}))

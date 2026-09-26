@@ -41,7 +41,7 @@ export type RunRequest = {
   runId: string;
   threadId: string;
   skill: "explain_signal" | "explain_entity" | "search" | "ask" | "follow_up_signal" | "import_dataset";
-  args: Record<string, string>;
+  args: Record<string, unknown>;
   path: string;
   text: string;
 };

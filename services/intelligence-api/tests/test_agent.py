@@ -515,6 +515,35 @@ def test_dataset_import_without_required_columns_proposes_nothing(monkeypatch):
         assert stream[-1][1]["type"] == "RUN_FINISHED" and not ProposingERP.proposed
         text = "".join(e["delta"] for _, e in stream if e["type"] == "TEXT_MESSAGE_CONTENT")
         assert "kolom wajib belum ditemukan" in text
+        card = next(e["value"] for _, e in stream if e["type"] == "CUSTOM" and e["name"] == "celerates.mapping")
+        assert card["open"] is True and card["columns"] == ["Nama Kandidat", "Nilai"]
+        assert {c["kind"] for c in card["commands"]} == {"task.create", "requisition.create"}, (
+            "targeted commands excluded"
+        )
+
+        # The user corrects the mapping in the card: a new run, validated against ERP specs and the file's headers.
+        fixed = {"dataset_id": dataset_id, "command": "task.create", "mapping": {"title": "Nama Kandidat"}}
+        _, stream = run_skill(monkeypatch, c, token, "import_dataset", fixed)
+        assert stream[-1][1]["result"]["mapping"] == {"title": "Nama Kandidat"}
+        assert ProposingERP.proposed[-1]["items"][0] == {"kind": "task.create", "params": {"title": "A"}}
+        evidence = [
+            i
+            for _, e in stream
+            if e["type"] == "CUSTOM" and e["name"] == "celerates.evidence"
+            for i in e["value"]["items"]
+        ]
+        assert evidence[1]["type"] == "observation" and "dipilih Anda" in evidence[1]["title"]
+        for bad in (
+            {"dataset_id": dataset_id, "command": "task.create", "mapping": {"title": "Kolom Palsu"}},
+            {
+                "dataset_id": dataset_id,
+                "command": "requisition.assign_ta_pic",
+                "mapping": {"ta_pic_name": "Nama Kandidat"},
+            },
+            {"dataset_id": dataset_id, "command": "task.create", "mapping": {"title": "Nilai", "due_date": "Nilai"}},
+        ):
+            _, stream = run_skill(monkeypatch, c, token, "import_dataset", bad)
+            assert stream[-1][1]["type"] == "RUN_ERROR" and stream[-1][1]["code"] == "POLICY"
 
 
 SIGNALS = [

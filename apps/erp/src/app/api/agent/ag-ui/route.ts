@@ -36,6 +36,16 @@ export async function POST(request: NextRequest) {
       // The dataset is owned by this user in Intelligence; a foreign id fails there under this user's delegation.
       if (typeof given.dataset_id !== "string" || !UUID.test(given.dataset_id)) throw new BffError(422, "Berkas tidak dikenali.");
       args = { dataset_id: given.dataset_id.toLowerCase() };
+      // A user-corrected mapping from the mapping card. Intelligence re-validates it against ERP specs and the file.
+      if (typeof given.command === "string" && /^[a-z_]{2,40}\.[a-z_]{2,40}$/.test(given.command)) {
+        const raw = given.mapping && typeof given.mapping === "object" && !Array.isArray(given.mapping) ? (given.mapping as Record<string, unknown>) : {};
+        const mapping = Object.fromEntries(
+          Object.entries(raw)
+            .filter(([k, v]) => /^[a-z_]{2,40}$/.test(k) && typeof v === "string" && v.length > 0 && v.length <= 80)
+            .slice(0, 30),
+        );
+        args = { ...args, command: given.command, mapping };
+      }
     }
     else if (skill === "search") args = { query: String(given.query ?? lastUserText(input.messages)).trim().slice(0, 100) };
     else if (skill === "ask") args = { query: String(given.query ?? lastUserText(input.messages)).trim().slice(0, 300) };

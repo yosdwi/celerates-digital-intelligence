@@ -407,6 +407,7 @@ def follow_up_signal(ctx, signal_key):
 
 
 BASIS = {
+    "user": "dipilih Anda",
     "template": "sama seperti impor sebelumnya yang diterapkan",
     "name": "nama kolom",
     "similar": "nama mirip",
@@ -414,8 +415,22 @@ BASIS = {
 }
 
 
-def import_dataset(ctx, dataset_id):
-    """File → ERP command rows. The target command is the one whose ERP param specs the columns fit best."""
+def _user_mapping(commands, headers, command, mapping):
+    """A mapping the user chose in the mapping card. Validated against ERP specs and this file's headers only."""
+    spec = next((c for c in commands if c["kind"] == command and not c.get("target")), None)
+    chosen = {p: c for p, c in (mapping or {}).items() if c}
+    params = {p["name"] for p in spec["params"]} if spec else set()
+    if not spec or not set(chosen) <= params or not set(chosen.values()) <= set(headers):
+        raise PolicyError("Pemetaan kolom tidak valid untuk berkas ini")
+    if len(set(chosen.values())) != len(chosen):
+        raise PolicyError("Satu kolom hanya dapat dipakai untuk satu field")
+    resolved = {p: {"column": c, "basis": "user", "score": 1.0} for p, c in chosen.items()}
+    return spec, resolved, [p["name"] for p in spec["params"] if p["required"] and p["name"] not in resolved]
+
+
+def import_dataset(ctx, dataset_id, command=None, mapping=None):
+    """File → ERP command rows. The target command is the one whose ERP param specs the columns fit best, unless the
+    user chose a command and mapping in the mapping card; either way ERP validates every row before anything applies."""
     with ctx.recorder.step("Membaca berkas"):
         data = invoke(ctx, "dataset_read", dataset_id=dataset_id)
     prof = data["profile"]
@@ -435,30 +450,54 @@ def import_dataset(ctx, dataset_id):
     with ctx.recorder.step("Mencocokkan kolom dengan perintah ERP"):
         commands = invoke(ctx, "erp_catalog")["commands"]
         headers = [c["name"] for c in prof["columns"]]
-        command, mapping, missing = datasets.best_command(
-            headers, data["rows"], commands, datasets.templates(prof["fingerprint"])
-        )
+        if command is not None or mapping:
+            command, mapping, missing = _user_mapping(commands, headers, command, mapping)
+        else:
+            command, mapping, missing = datasets.best_command(
+                headers, data["rows"], commands, datasets.templates(prof["fingerprint"])
+            )
     if not command:
         ctx.recorder.message("Belum ada perintah ERP yang dapat menerima berkas ini.")
         return {"skill": "import_dataset", "dataset_id": dataset_id, "proposal": None}
     labels = {p["name"]: p["label"] for p in command["params"]}
     learned = all(m["basis"] == "template" for m in mapping.values()) and bool(mapping)
+    chosen = all(m["basis"] == "user" for m in mapping.values()) and bool(mapping)
     ctx.recorder.evidence(
         [
             {
-                "type": "observation" if learned else "inference",
-                "title": f"Pemetaan kolom → {command['label']}",
+                "type": "observation" if learned or chosen else "inference",
+                "title": f"Pemetaan kolom → {command['label']}" + (" (dipilih Anda)" if chosen else ""),
                 "detail": [f"{m['column']} → {labels[p]} ({BASIS[m['basis']]})" for p, m in mapping.items()]
                 + [f"Tidak dipakai: {h}" for h in headers if h not in {m["column"] for m in mapping.values()}],
                 "source": {"kind": "mapping", "ref": prof["fingerprint"], "command": command["kind"]},
             }
         ]
     )
+    ctx.recorder.mapping(
+        {
+            "dataset_id": data["id"],
+            "command": command["kind"],
+            "columns": headers,
+            "mapping": {p: m["column"] for p, m in mapping.items()},
+            "commands": [
+                {
+                    "kind": c["kind"],
+                    "label": c["label"],
+                    "params": [
+                        {"name": p["name"], "label": p["label"], "required": p["required"]} for p in c["params"]
+                    ],
+                }
+                for c in commands
+                if not c.get("target")
+            ],
+            "open": bool(missing),
+        }
+    )
     if missing:
         need = ", ".join(labels[m] for m in missing)
         ctx.recorder.message(
             f"Berkas {data['name']} paling cocok dengan “{command['label']}”, tetapi kolom wajib belum ditemukan: {need}.\n"
-            "Tambahkan atau ganti nama kolom tersebut, lalu unggah ulang. Tidak ada usulan yang dibuat."
+            "Pilih kolomnya di kartu pemetaan, atau ganti nama kolom lalu unggah ulang. Tidak ada usulan yang dibuat."
         )
         return {
             "skill": "import_dataset",
@@ -478,7 +517,7 @@ def import_dataset(ctx, dataset_id):
     ctx.recorder.proposal({"id": proposal["id"], "title": proposal["title"]})
     lines = [
         f"Berkas {data['name']}: {prof['rows']} baris dipetakan ke “{command['label']}”"
-        + (" dengan pemetaan yang pernah Anda terapkan." if learned else ".")
+        + (" dengan pemetaan yang pernah Anda terapkan." if learned else " sesuai pilihan Anda." if chosen else ".")
     ]
     if prof["rows"] > len(rows) or prof.get("truncated"):
         lines.append(f"Usulan mencakup {len(rows)} baris pertama (batas satu usulan).")

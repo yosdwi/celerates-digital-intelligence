@@ -47,6 +47,10 @@ class AskArgs(Strict):
 
 class DatasetArgs(Strict):
     dataset_id: UUID
+    command: str | None = Field(default=None, pattern=r"^[a-z_]{2,40}\.[a-z_]{2,40}$")
+    mapping: dict[Annotated[str, Field(pattern=r"^[a-z_]{2,40}$")], Annotated[str, Field(max_length=80)]] | None = (
+        Field(default=None, max_length=30)
+    )
 
 
 ARGS = {
