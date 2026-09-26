@@ -1,7 +1,8 @@
 # P0 implementation map
 
-**Latest increment:** [Operating Substrate M2 — Ask, Drop, Act](operating-substrate-m2.md)
-(ask anything, CSV/XLSX import, `Tindak lanjuti` → ERP-held proposals → receipts → outcomes).
+**Latest increment:** [Operating Substrate M3 — understanding, documents, voice, Brain Console](operating-substrate-m3.md)
+(optional grounded model reasoning, PDF/DOCX drop, Indonesian + English retrieval, name resolution, push-to-talk, Agent & learning console, lead import).
+Before that: [M2 — Ask, Drop, Act](operating-substrate-m2.md) (ask anything, CSV/XLSX import, `Tindak lanjuti` → ERP-held proposals → receipts → outcomes).
 Before that: [M1 — Celerates Agent shell](operating-substrate-m1.md) (ERP delegation, Entity Catalog v1, persisted AG-UI runs, `Tanyakan`).
 
 **Previous extension:** [closed-loop foundation](closed-loop-foundation.md) and

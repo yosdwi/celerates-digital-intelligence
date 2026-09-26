@@ -2,7 +2,7 @@
 
 Date: 2026-09-26
 Companion to [doc 15](15-operating-substrate-assessment-and-next-increment.md). Also relies on [doc 13](13-celerates-agent-audit-and-recommendation.md) and [ADR-003](adr/ADR-003-model-gateway-litellm.md) / [ADR-004](adr/ADR-004-langgraph-workflows.md).
-Status: **recommendation for review. No dependency has been added.** External facts were checked against vendor documentation on 2026-09-26 (sources in §7). Each adoption is gated by a timeboxed spike (§5).
+Status: **recommendation for review**, partly superseded by implementation: assistant-ui and AG-UI were adopted (ADR-013); the bounded model loop was built over LiteLLM without PydanticAI (ADR-014); voice uses push-to-talk through the Model Gateway without LiveKit (ADR-012). External facts were checked against vendor documentation on 2026-09-26 (sources in §7). Each adoption is gated by a timeboxed spike (§5).
 
 Candidates evaluated:
 - `assistant-ui`
