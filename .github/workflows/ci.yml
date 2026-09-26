@@ -37,6 +37,8 @@ jobs:
         with: {node-version: 22, cache: npm, cache-dependency-path: apps/web/package-lock.json}
       - run: npm ci && npm run build
         working-directory: apps/web
+      - name: Verify web proxy survives API address replacement
+        run: sh scripts/check-web-proxy.sh
   compose:
     runs-on: ubuntu-latest
     timeout-minutes: 30

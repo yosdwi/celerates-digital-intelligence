@@ -1,0 +1,9 @@
+#!/bin/sh
+# Sourced by the official nginx entrypoint before template substitution.
+# Use the container's DNS (Railway private network or Docker/VPS), not public DNS.
+export CDI_DNS_RESOLVERS="$(awk '/^nameserver/ { if ($2 ~ /:/) printf "[%s] ", $2; else printf "%s ", $2 }' /etc/resolv.conf)"
+if [ -z "$CDI_DNS_RESOLVERS" ]; then
+  echo 'No container DNS resolver available' >&2
+  exit 1
+fi
+export API_UPSTREAM="${API_UPSTREAM%/}"
