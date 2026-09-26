@@ -1,0 +1,1 @@
+Image snapshot is intentionally documented as a visual reference in docs/11. Binary screenshot attachment remains user-provided and should be added to repo by the implementation agent if persistent binary evidence is desired.
