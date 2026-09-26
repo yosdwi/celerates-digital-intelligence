@@ -11,7 +11,11 @@ export type Evidence = {
   source?: Record<string, unknown>;
   withheld?: string[];
   match?: string;
+  /** Evidence id the answer cites, e.g. "E1" or "S2" (model-composed answers only). */
+  cite?: string;
 };
+/** How the answer text was produced. `model` text is inference over the cited evidence, never a fact source. */
+export type Provenance = { mode: "model"; model: string; cited: string[]; rounds: number; tokens: number } | { mode: "deterministic"; fallback: boolean };
 export type AgentAction =
   | { label: string; skill: "follow_up_signal"; args: { signal_key: string } }
   | { label: string; skill: "import_dataset"; args: { dataset_id: string; command: string; mapping: Record<string, string> } };
@@ -38,6 +42,7 @@ export type AgentRun = {
   /** Next steps offered by the playbook. Only allowlisted skills; running one is a new run, never an approval. */
   actions: AgentAction[];
   mapping?: MappingCardData;
+  provenance?: Provenance;
   text: string;
   error?: { message: string; code?: string };
 };
@@ -76,6 +81,22 @@ export function applyEvent(run: AgentRun, event: AgUiEvent, id: string | null = 
         const value = event.value as { id?: unknown; title?: unknown } | undefined;
         if (typeof value?.id !== "string" || !UUID.test(value.id) || run.proposals.some((p) => p.id === value.id)) return run;
         return { ...run, proposals: [...run.proposals, { id: value.id, title: String(value.title ?? "Usulan") }] };
+      }
+      if (event.name === "celerates.provenance") {
+        const v = event.value as Record<string, unknown> | undefined;
+        if (v?.mode === "model")
+          return {
+            ...run,
+            provenance: {
+              mode: "model",
+              model: String(v.model ?? "model").slice(0, 80),
+              cited: Array.isArray(v.cited) ? v.cited.filter((c): c is string => typeof c === "string" && /^[ES]\d{1,3}$/.test(c)) : [],
+              rounds: Number(v.rounds) || 0,
+              tokens: Number(v.tokens) || 0,
+            },
+          };
+        if (v?.mode === "deterministic") return { ...run, provenance: { mode: "deterministic", fallback: v.fallback === true } };
+        return run;
       }
       if (event.name === "celerates.mapping") {
         const v = event.value as MappingCardData | undefined;
@@ -127,6 +148,7 @@ export function toThreadMessages(runs: AgentRun[]) {
     if (run.error) content.push({ type: "data-error", data: run.error });
     // The conclusion sits last, where the auto-scrolling viewport lands; evidence is directly above it.
     if (run.text) content.push({ type: "text", text: run.text });
+    if (run.text && run.provenance) content.push({ type: "data-provenance", data: run.provenance });
     for (const proposal of run.proposals) content.push({ type: "data-proposal", data: proposal });
     if (run.mapping && run.status === "succeeded") content.push({ type: "data-mapping", data: run.mapping });
     if (run.actions.length && run.status === "succeeded") content.push({ type: "data-actions", data: { items: run.actions } });

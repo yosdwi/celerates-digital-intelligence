@@ -23,7 +23,7 @@ Status: accepted for Operating Substrate M1 (2026-09-26), based on spikes S1 and
    - It runs as `ExternalStoreRuntime` over our run state, and is lazy-loaded when the tab opens.
    - Evidence, proposal, progress and error render as our components through data parts.
    - assistant-cloud, its AG-UI runtime (`@assistant-ui/react-ag-ui`) and its browser dictation adapter are not used.
-7. **Not adopted in M1:**
+7. **Not adopted in M1** (*amended by ADR-014:* the model loop is our own plan → read → answer loop over LiteLLM, and PydanticAI is not adopted):
    - PydanticAI, LiteLLM Proxy and model calls (M2 evaluation track);
    - CopilotKit;
    - LiveKit.

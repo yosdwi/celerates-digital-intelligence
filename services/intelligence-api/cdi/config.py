@@ -21,6 +21,12 @@ class Settings(BaseSettings):
     intelligence_principals_json: str = "[]"
     api_principal_name: str = "pilot-owner"
     model_mode: str = "demo"
+    # Split switches (default: follow model_mode). Generation can be enabled without re-embedding knowledge.
+    generation_mode: str = ""
+    embedding_mode: str = ""
+    # Agent reasoning model alias (LiteLLM model string). Empty: the Agent stays deterministic.
+    agent_model: str = ""
+    agent_fast_model: str = ""
     reasoning_model: str = "openai/reasoning-strong"
     fallback_model: str = ""
     embedding_model: str = "openai/embedding-default"
@@ -46,6 +52,10 @@ class Settings(BaseSettings):
     def validate_modes(self):
         if self.erp_mode not in {"demo", "http"} or self.model_mode not in {"demo", "litellm"}:
             raise ValueError("Unsupported ERP/model mode")
+        self.generation_mode = self.generation_mode or self.model_mode
+        self.embedding_mode = self.embedding_mode or self.model_mode
+        if self.generation_mode not in {"demo", "litellm"} or self.embedding_mode not in {"demo", "litellm"}:
+            raise ValueError("Unsupported generation/embedding mode")
         if self.storage_backend not in {"s3", "filesystem"}:
             raise ValueError("Unsupported storage backend")
         if self.erp_mode == "http" and (

@@ -160,6 +160,11 @@ class Recorder:
         """The column mapping behind an import, for the user to inspect or correct (a correction is a new run)."""
         self.emit(CustomEvent(name="celerates.mapping", value=value))
 
+    def provenance(self, value):
+        """How the answer text was produced: `deterministic` (assembled from tool results) or `model` (inference,
+        with model, rounds, tokens and cited evidence ids). The UI labels the text accordingly."""
+        self.emit(CustomEvent(name="celerates.provenance", value=value))
+
     def actions(self, items):
         """Next steps the UI may offer as buttons. Each is a skill the ERP BFF re-validates; none is an approval."""
         self.emit(CustomEvent(name="celerates.actions", value={"items": items}))

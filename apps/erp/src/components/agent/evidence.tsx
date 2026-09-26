@@ -2,7 +2,7 @@
 // Evidence and run-part renderers. The evidence badge makes the three kinds of truth visible (doc 14 §3, doc 15 §8).
 import Link from "next/link";
 import { AlertCircle, CheckCircle2, Circle, FileSearch, Loader2 } from "lucide-react";
-import type { Evidence, EvidenceType } from "@/lib/agent/run-state";
+import type { Evidence, EvidenceType, Provenance } from "@/lib/agent/run-state";
 
 const BADGE: Record<EvidenceType, { label: string; className: string }> = {
   erp_fact: { label: "Fakta ERP", className: "bg-emerald-50 text-emerald-800 ring-emerald-200" },
@@ -32,7 +32,10 @@ export function EvidenceCard({ item }: { item: Evidence }) {
   return (
     <article className="rounded-xl border border-slate-200 bg-white p-3" data-evidence-type={item.type}>
       <div className="flex items-start justify-between gap-2">
-        <h4 className="text-xs font-semibold text-slate-900">{item.title}</h4>
+        <h4 className="text-xs font-semibold text-slate-900">
+          {item.cite && <span className="mr-1.5 rounded bg-slate-100 px-1 font-mono text-[10px] text-slate-600">{item.cite}</span>}
+          {item.title}
+        </h4>
         <EvidenceBadge type={item.type} />
       </div>
       {item.detail.length > 0 && (
@@ -89,5 +92,21 @@ export function ToolTrace({ toolName, result }: { toolName: string; result?: unk
       {result === undefined ? <Circle className="h-3 w-3" /> : <FileSearch className="h-3 w-3 text-slate-400" />}
       {toolName}
     </li>
+  );
+}
+
+/** Keeps the three kinds of truth visible for the answer text itself (doc 14 §3): model text is inference. */
+export function ProvenanceLine({ value }: { value: Provenance }) {
+  if (value.mode === "model")
+    return (
+      <p className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500" data-provenance="model">
+        <EvidenceBadge type="inference" />
+        Disusun model dari {value.cited.length} bukti yang dikutip{value.cited.length ? ` (${value.cited.join(", ")})` : ""}. Fakta ada di kartu bukti; periksa sebelum bertindak.
+      </p>
+    );
+  return (
+    <p className="text-[11px] text-slate-500" data-provenance="deterministic">
+      Disusun tanpa model dari aturan, record ERP, dan pengetahuan disetujui.
+    </p>
   );
 }

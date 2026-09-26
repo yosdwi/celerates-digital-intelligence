@@ -21,7 +21,8 @@ function parseSse(text) {
 export async function agentJourney({ base, request, db, env, python, publicKey, tracker, requisition, readToken, cookies }) {
   const intelligence = 'http://127.0.0.1:8010';
   const agentEnv = { ...env, ERP_DELEGATION_PUBLIC_KEYS: JSON.stringify({ 'test-k1': publicKey }) };
-  const api = spawn(python, ['-m', 'uvicorn', 'cdi.api:app', '--host', '127.0.0.1', '--port', '8010'], { env: agentEnv, stdio: ['ignore', 'ignore', 'inherit'] });
+  let api = spawn(python, ['-m', 'uvicorn', 'cdi.api:app', '--host', '127.0.0.1', '--port', '8010'], { env: agentEnv, stdio: ['ignore', 'ignore', 'inherit'] });
+  let fakeModel = null;
   try {
     await until(async () => (await fetch(intelligence + '/ready')).ok, 'Intelligence API');
     // Approved company knowledge relevant to the TA rule, through the governed curator path.
@@ -107,8 +108,53 @@ export async function agentJourney({ base, request, db, env, python, publicKey, 
       const { agentBrowser } = await import('./agent-browser.mjs');
       await agentBrowser({ base, cookies: cookies.split('; ').map((pair) => [pair.slice(0, pair.indexOf('=')), pair.slice(pair.indexOf('=') + 1)]) });
     }
+    // Same runtime with an Agent model configured (ADR-014). The provider is a local OpenAI-compatible stand-in, so the
+    // real LiteLLM → HTTP → validation → tools → ERP path runs without credentials.
+    api.kill();
+    await new Promise((r) => api.once('exit', r));
+    fakeModel = spawn(python, ['../../services/intelligence-api/tests/fake_model_server.py', '8011'], { stdio: ['ignore', 'ignore', 'inherit'] });
+    const modelEnv = { ...agentEnv, GENERATION_MODE: 'litellm', EMBEDDING_MODE: 'demo', AGENT_MODEL: 'openai/fake-agent', MODEL_API_BASE: 'http://127.0.0.1:8011/v1', MODEL_API_KEY: 'test-only', LITELLM_LOCAL_MODEL_COST_MAP: 'True' };
+    api = spawn(python, ['-m', 'uvicorn', 'cdi.api:app', '--host', '127.0.0.1', '--port', '8010'], { env: modelEnv, stdio: ['ignore', 'ignore', 'inherit'] });
+    await until(async () => (await fetch(intelligence + '/ready')).ok, 'Intelligence API with model');
+    await modelJourneys({ request, db });
+    if (process.env.ERP_BROWSER_TEST === '1') {
+      const { agentModelBrowser } = await import('./agent-browser.mjs');
+      await agentModelBrowser({ base, cookies: cookies.split('; ').map((pair) => [pair.slice(0, pair.indexOf('=')), pair.slice(pair.indexOf('=') + 1)]) });
+    }
     console.log('PASS: Agent — catalog page context, ERP-signed delegation, delegated reads with sensitivity filter, persisted AG-UI stream + resume, standard AG-UI client, forged approval inert, no ERP writes without the user; follow-up and import proposals confirmed in ERP with receipts, outcomes and mapping memory');
-  } finally { api.kill(); }
+  } finally { api.kill(); fakeModel?.kill(); }
+}
+
+async function modelJourneys({ request, db }) {
+  // A paraphrase with no word in common with the rule ("recruiter", "ditugasi" vs "TA PIC"): the model plans reads,
+  // answers citing the rule and the SOP, and the answer is labelled as model inference.
+  const para = await run(request, 'ask', { query: 'Siapa saja yang belum ditugasi recruiter?' });
+  const prov = para.stream.find(s => s.event.type === 'CUSTOM' && s.event.name === 'celerates.provenance').event.value;
+  assert.equal(prov.mode, 'model', JSON.stringify(prov));
+  assert.equal(prov.model, 'openai/fake-agent');
+  assert.match(para.text, /requisition yang belum punya TA PIC \(recruiter\) \[S\d+\]/);
+  assert.ok(para.evidence.some(e => e.type === 'signal' && /^S\d+$/.test(e.cite)), 'cited rule shown as a Sinyal card');
+  assert.ok(para.evidence.some(e => e.type === 'knowledge' && /^E\d+$/.test(e.cite)), 'cited SOP shown as knowledge');
+  assert.ok(para.stream.some(s => s.event.type === 'CUSTOM' && s.event.name === 'celerates.actions'), 'follow-up offered');
+
+  // An ungrounded number is never shown: the run falls back to the deterministic router and says so.
+  const ungrounded = await run(request, 'ask', { query: 'berapa angka requisition?' });
+  assert.doesNotMatch(ungrounded.text, /987654/);
+  assert.match(ungrounded.text, /disusun tanpa model/);
+
+  // Natural-language action → ERP-held proposal → the user confirms in ERP → a task linked to the record.
+  const [req] = await db`SELECT id, requisition_no FROM requisitions ORDER BY created_at LIMIT 1`;
+  const before = (await db`SELECT count(*)::int AS n FROM kanban_tasks`)[0].n;
+  const act = await run(request, 'ask', { query: `Tolong buatkan task follow up ${req.requisition_no} hari ini` });
+  assert.ok(act.proposal?.id, act.text);
+  assert.equal((await db`SELECT count(*)::int AS n FROM kanban_tasks`)[0].n, before, 'the model changed nothing');
+  const proposal = await (await request(`/api/agent/proposals/${act.proposal.id}`)).json();
+  assert.equal(proposal.items[0].target.id, req.id);
+  const done = await (await request(`/api/agent/proposals/${act.proposal.id}/confirm`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sha256: proposal.sha256 }) })).json();
+  assert.equal(done.state, 'applied');
+  const [task] = await db`SELECT source_type, source_id FROM kanban_tasks WHERE title=${'Follow up ' + req.requisition_no.toUpperCase()}`;
+  assert.deepEqual({ ...task }, { source_type: 'requisition', source_id: req.id });
+  console.log('PASS: Agent model path — paraphrase understood with cited rule/SOP as inference, ungrounded answer rejected, natural-language action → ERP proposal → confirmed task');
 }
 
 async function run(request, skill, args, path = '/ta') {

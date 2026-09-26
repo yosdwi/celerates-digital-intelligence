@@ -13,8 +13,8 @@ import {
   type ThreadMessageLike,
 } from "@assistant-ui/react";
 import { Loader2, Paperclip, SendHorizontal, Sparkles } from "lucide-react";
-import { toThreadMessages, type AgentAction, type AgentRun, type Evidence, type MappingCardData } from "@/lib/agent/run-state";
-import { EvidenceCard, RunError, RunProgress, ToolTrace } from "./evidence";
+import { toThreadMessages, type AgentAction, type AgentRun, type Evidence, type MappingCardData, type Provenance } from "@/lib/agent/run-state";
+import { EvidenceCard, ProvenanceLine, RunError, RunProgress, ToolTrace } from "./evidence";
 import { MappingCard } from "./mapping";
 import { ProposalCard } from "./proposal";
 
@@ -68,6 +68,7 @@ const PARTS = {
       proposal: ({ data }: DataPart) => <ProposalCard id={String(data.id)} title={String(data.title)} />,
       actions: ({ data }: DataPart) => <Actions items={data.items as AgentAction[]} />,
       mapping: ({ data }: DataPart) => <Mapping data={data as unknown as MappingCardData} />,
+      provenance: ({ data }: DataPart) => <ProvenanceLine value={data as unknown as Provenance} />,
     },
   },
   tools: {

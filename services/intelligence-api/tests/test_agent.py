@@ -582,6 +582,7 @@ class AskingERP(ProposingERP):
 
     def search(self, query, mode="all"):
         AskingERP.searches.append((query, mode))
+        query = query.lower()
         rows = [
             {"type": "requisition", "type_label": "Requisition", "id": REQUISITIONS[0], "label": "REQ-7 · Engineer"},
             {"type": "requisition", "type_label": "Requisition", "id": REQUISITIONS[1], "label": "REQ-8 · Analyst"},
@@ -662,3 +663,124 @@ def test_dataset_retention_purges_rows_and_files(monkeypatch):
     assert datasets.load(principal, old["id"]) is None and datasets.load(principal, fresh["id"]) is not None
     with pytest.raises(FileNotFoundError):
         storage().get(key)
+
+
+class ScriptedModel:
+    """Stands in for `litellm` (sys.modules) so the real gateway code path runs without a provider."""
+
+    def __init__(self, replies):
+        self.replies, self.calls = list(replies), []
+
+    def completion(self, model, messages, **kwargs):
+        import types
+
+        self.calls.append({"model": model, "messages": [dict(m) for m in messages], **kwargs})
+        if not self.replies:
+            raise RuntimeError("provider down")
+        reply = self.replies.pop(0)
+        if isinstance(reply, Exception):
+            raise reply
+        message = types.SimpleNamespace(content=json.dumps(reply) if not isinstance(reply, str) else reply)
+        return types.SimpleNamespace(
+            choices=[types.SimpleNamespace(message=message)], usage=types.SimpleNamespace(total_tokens=42)
+        )
+
+
+def test_model_reasoning_is_bounded_grounded_and_falls_back(monkeypatch):
+    token = mint(ctx={"path": "/ta", "module": "ta"})
+    original = playbooks.DelegatedERP
+    monkeypatch.setattr(playbooks, "DelegatedERP", AskingERP)
+    with TestClient(app) as c:
+
+        def run(query, replies):
+            monkeypatch.setattr(settings(), "erp_mode", "http")
+            monkeypatch.setattr(playbooks, "start", lambda r, u, a: playbooks.execute(r, u, a))
+            import sys
+            import types
+
+            model = ScriptedModel(replies)
+            monkeypatch.setitem(sys.modules, "litellm", types.SimpleNamespace(completion=model.completion))
+            monkeypatch.setattr(settings(), "generation_mode", "litellm")
+            monkeypatch.setattr(settings(), "agent_model", "openai/scripted")
+            run_id = str(uuid4())
+            c.post(
+                "/api/agent/runs",
+                json={"run_id": run_id, "skill": "ask", "args": {"query": query}},
+                headers={"X-ERP-Delegation": token},
+            )
+            stream = events(c, run_id, token)
+            text = "".join(e["delta"] for _, e in stream if e["type"] == "TEXT_MESSAGE_CONTENT")
+            custom = {}
+            for _, e in stream:
+                if e["type"] == "CUSTOM":
+                    custom.setdefault(e["name"], []).append(e["value"])
+            return stream[-1][1], text, custom, model
+
+        # 1. Plan → read → grounded answer. The prompt carries rules and commands; evidence follows the reads.
+        end, text, custom, model = run(
+            "siapa yang memegang REQ-7 dan apa aturannya?",
+            [
+                {"calls": [{"tool": "erp_search", "args": {"query": "REQ-7"}}]},
+                {
+                    "answer": "REQ-7 · Engineer ada di ERP [E1]; 2 requisition belum punya TA PIC [S2].",
+                    "cite": ["E1", "S2"],
+                },
+            ],
+        )
+        assert end["type"] == "RUN_FINISHED" and end["result"]["reasoning"] == "model", end
+        assert text == "REQ-7 · Engineer ada di ERP [E1]; 2 requisition belum punya TA PIC [S2]."
+        prov = custom["celerates.provenance"][0]
+        assert prov["mode"] == "model" and prov["model"] == "openai/scripted" and prov["cited"] == ["E1", "S2"]
+        assert prov["rounds"] == 2 and prov["tokens"] == 84
+        cards = [i for v in custom["celerates.evidence"] for i in v["items"]]
+        assert [c["type"] for c in cards] == ["erp_fact", "signal"], "facts from tools; cited rule card"
+        assert custom["celerates.actions"][0]["items"][0]["args"] == {"signal_key": "unassigned-requisitions"}
+        first = json.loads(model.calls[0]["messages"][1]["content"])
+        assert "S2: rule unassigned-requisitions" in first["rules"] and first["commands"][0]["kind"] == "task.create"
+        assert model.calls[0]["response_format"] == {"type": "json_object"} and model.calls[0]["temperature"] == 0
+        assert "search hit: requisition id=" in model.calls[1]["messages"][-1]["content"]
+
+        # 2. An ungrounded number is rejected, repaired once, then the run falls back to the deterministic router.
+        end, text, custom, _ = run(
+            "berapa requisition tanpa TA PIC?",
+            [{"answer": "Ada 17 requisition [S2].", "cite": ["S2"]}, {"answer": "Ada 17 requisition.", "cite": []}],
+        )
+        assert end["result"]["reasoning"] == "fallback" and end["result"]["fallback_reason"] == "ReasoningFailed"
+        assert "17" not in text and "2 requisition saat ini" in text and "disusun tanpa model" in text
+        assert custom["celerates.provenance"][-1] == {"mode": "deterministic", "fallback": True}
+
+        # 3. The model cannot reach tools outside the planner allowlist (e.g. proposals, datasets) through calls.
+        for bad in ({"tool": "erp_propose", "args": {"title": "x", "items": []}}, {"tool": "dataset_read", "args": {}}):
+            end, _, _, _ = run("apa saja?", [{"calls": [bad]}])
+            assert end["result"]["reasoning"] == "fallback", bad
+
+        # 4. Provider down → deterministic, never a fabricated answer.
+        end, text, _, _ = run("requisition belum ada PIC", [RuntimeError("503")])
+        assert end["result"]["reasoning"] == "fallback" and end["result"]["fallback_reason"] == "ModelUnavailable"
+
+        # 5. Natural-language action → ERP-held proposal (pending), never an applied change.
+        ProposingERP.proposed.clear()
+        end, text, custom, _ = run(
+            "buatkan task follow up REQ-7 besok",
+            [
+                {"calls": [{"tool": "erp_search", "args": {"query": "REQ-7"}}]},
+                {
+                    "proposal": {
+                        "title": "Follow up REQ-7",
+                        "items": [
+                            {
+                                "kind": "task.create",
+                                "target": {"type": "requisition", "id": REQUISITIONS[0]},
+                                "params": {"title": "Follow up REQ-7", "due_date": "2026-09-27"},
+                            }
+                        ],
+                    }
+                },
+            ],
+        )
+        assert end["result"]["reasoning"] == "model" and end["result"]["proposal"]
+        assert ProposingERP.proposed[-1]["items"][0]["target"]["id"] == REQUISITIONS[0]
+        assert custom["celerates.proposal"] and "Belum ada data yang berubah" in text
+        end, _, _, _ = run("hapus semua", [{"proposal": {"title": "x", "items": [{"kind": "requisition.delete"}]}}])
+        assert end["result"]["reasoning"] == "fallback", "unknown commands never reach ERP"
+    monkeypatch.setattr(playbooks, "DelegatedERP", original)

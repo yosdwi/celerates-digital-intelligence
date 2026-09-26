@@ -123,3 +123,33 @@ export async function agentBrowser({ base, cookies }) {
     await browser.close();
   }
 }
+
+/** With an Agent model configured: the answer text is labelled as inference and its citations match evidence cards. */
+export async function agentModelBrowser({ base, cookies }) {
+  assert.equal(new URL(base).hostname, '127.0.0.1');
+  const browser = await chromium.launch({ headless: true, executablePath: process.env.ERP_BROWSER_EXECUTABLE || undefined, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
+  const evidenceDir = process.env.ERP_SCREENSHOT_DIR || '../../docs/implementation/evidence';
+  try {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+    await context.addCookies(cookies.map(([name, value]) => ({ name, value, url: base })));
+    const page = await context.newPage();
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    await page.goto(base + '/ta');
+    await page.getByRole('button', { name: /^Celerates Agent/ }).click();
+    const panel = page.getByRole('dialog', { name: 'Celerates Agent' });
+    await panel.getByRole('button', { name: 'Tanya', exact: true }).click();
+    await panel.getByLabel('Pesan untuk Agent').fill('Siapa saja yang belum ditugasi recruiter?');
+    await panel.getByRole('button', { name: 'Kirim' }).click();
+    const line = panel.locator('[data-provenance="model"]');
+    await line.waitFor({ timeout: 30000 });
+    await line.getByText('Inferensi', { exact: true }).waitFor();
+    const cited = (await line.textContent()).match(/\(([^)]*)\)/)[1].split(', ');
+    for (const id of cited) await panel.locator('[data-evidence-type]').filter({ hasText: id }).first().waitFor();
+    await page.screenshot({ path: evidenceDir + '/agent-model-inference.png' });
+    assert.deepEqual(errors, []);
+    console.log('PASS: Agent browser (model) — answer labelled Inferensi, every cited id has an evidence card');
+  } finally {
+    await browser.close();
+  }
+}

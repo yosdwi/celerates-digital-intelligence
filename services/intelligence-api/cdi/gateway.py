@@ -12,7 +12,7 @@ from .config import settings
 class ModelGateway:
     def embed(self, text):
         cfg = settings()
-        if cfg.model_mode == "demo":
+        if cfg.embedding_mode == "demo":
             values = [0.0] * 64
             for word in re.findall(r"\w+", text.lower()):
                 values[int(hashlib.sha256(word.encode()).hexdigest()[:8], 16) % 64] += 1
@@ -27,7 +27,7 @@ class ModelGateway:
 
     def narrative(self, opportunity, requirements, knowledge=None):
         cfg = settings()
-        if cfg.model_mode == "demo":
+        if cfg.generation_mode == "demo":
             return {
                 "solution": f"Deliver {opportunity['title'].lower()} through discovery, an integrated pilot, and an acceptance-led rollout. Validate each requirement with the customer before committing delivery scope.",
                 "proposal": f"For {opportunity['customer']}, Celerates proposes a phased engagement around {opportunity['title'].lower()}. This discussion draft is subject to scope, capacity and commercial confirmation.",
@@ -91,3 +91,56 @@ class ModelGateway:
                 last_error = exc
         # Never silently masquerade demo artifacts as connected-model output.
         raise RuntimeError("Model gateway unavailable or returned invalid structured output") from last_error
+
+
+class ModelUnavailable(RuntimeError):
+    pass
+
+
+def agent_model_enabled():
+    cfg = settings()
+    return cfg.generation_mode == "litellm" and bool(cfg.agent_model)
+
+
+def structured(messages, *, use_case, fast=False, max_tokens=1200, timeout=30):
+    """One JSON-object completion through LiteLLM for the Agent (ADR-014). Returns (dict, usage metadata).
+
+    The model only ever returns data for validation by the caller; it never receives credentials or ERP authority.
+    Tries the configured Agent model, then the fallback model. Raises ModelUnavailable on any failure."""
+    cfg = settings()
+    if not agent_model_enabled():
+        raise ModelUnavailable("Agent model is not configured")
+    import litellm
+
+    if cfg.langfuse_enabled:
+        litellm.success_callback = ["langfuse"]
+        litellm.failure_callback = ["langfuse"]
+    candidates = [cfg.agent_fast_model if fast and cfg.agent_fast_model else cfg.agent_model, cfg.fallback_model]
+    last_error = None
+    for model in [m for m in dict.fromkeys(candidates) if m]:
+        start = time.monotonic()
+        try:
+            result = litellm.completion(
+                model=model,
+                messages=messages,
+                api_base=cfg.model_api_base,
+                api_key=cfg.model_api_key,
+                timeout=timeout,
+                num_retries=1,
+                response_format={"type": "json_object"},
+                temperature=0,
+                max_tokens=max_tokens,
+                metadata={"use_case": use_case},
+            )
+            content = json.loads(result.choices[0].message.content)
+            if not isinstance(content, dict):
+                raise ValueError("Model did not return a JSON object")
+            usage = getattr(result, "usage", None)
+            return content, {
+                "model": model,
+                "tokens": getattr(usage, "total_tokens", 0) or 0,
+                "latency_ms": round((time.monotonic() - start) * 1000),
+            }
+        except Exception as exc:  # provider errors must never leak payloads or keys into run state
+            last_error = exc
+    raise ModelUnavailable("Model call failed") from last_error

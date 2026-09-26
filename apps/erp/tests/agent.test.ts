@@ -133,6 +133,14 @@ test("AG-UI conformance of the event shapes the panel consumes, and the pure run
   assert.equal(asked.mapping?.dataset_id, proposalId, "malformed mapping cards ignored");
   asked = applyEvent(asked, { type: "RUN_FINISHED", threadId: "t", runId: "r4" });
   assert.deepEqual((toThreadMessages([asked])[1].content as { type: string }[]).map((p) => p.type).slice(-2), ["data-mapping", "data-actions"]);
+  // Provenance: model text is labelled inference with its citations; malformed citation ids are dropped.
+  let modelRun = newRun("r5", "q");
+  modelRun = applyEvent(modelRun, { type: "CUSTOM", name: "celerates.provenance", value: { mode: "model", model: "openai/x", cited: ["E1", "S2", "<b>"], rounds: 2, tokens: 10 } });
+  modelRun = applyEvent(modelRun, { type: "TEXT_MESSAGE_CONTENT", delta: "Jawaban [E1]" });
+  modelRun = applyEvent(modelRun, { type: "RUN_FINISHED", threadId: "t", runId: "r5" });
+  assert.deepEqual(modelRun.provenance, { mode: "model", model: "openai/x", cited: ["E1", "S2"], rounds: 2, tokens: 10 });
+  const modelParts = toThreadMessages([modelRun])[1].content as { type: string }[];
+  assert.deepEqual(modelParts.map((p) => p.type).slice(-2), ["text", "data-provenance"]);
   assert.equal(parts[2].data?.id, proposalId);
   let failed = applyEvent(newRun("r2", "x"), { type: "RUN_ERROR", message: "Tidak boleh", code: "ERP_403" });
   failed = applyEvent(failed, { type: "TEXT_MESSAGE_CONTENT", delta: "late" });

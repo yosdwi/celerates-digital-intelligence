@@ -13,11 +13,12 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from ..config import settings
-from . import datasets, runs
+from ..gateway import agent_model_enabled
+from . import datasets, reasoning, runs
 from .erp_client import DelegatedERP, ERPAgentError
 from .tools import PolicyError, RunContext, invoke
 
-PLAYBOOK_VERSION = "m2-playbooks-v1"
+PLAYBOOK_VERSION = "m3-playbooks-v1"
 MAX_EXAMPLES = 3
 FOLLOW_UP_ITEMS = 10
 IMPORT_ITEMS = 200  # ERP's proposal limit
@@ -249,6 +250,21 @@ def _matching_signals(terms, signals):
 
 
 def ask(ctx, query):
+    """`Ask anything`. With an Agent model configured, a bounded plan → read → answer loop (reasoning.py) over the same
+    tools; otherwise, or whenever the model path fails validation, the deterministic router below."""
+    if agent_model_enabled():
+        try:
+            return reasoning.ask_with_model(ctx, query)
+        except (reasoning.ModelUnavailable, reasoning.ReasoningFailed, TimeoutError) as exc:
+            log.warning("Agent model path fell back to deterministic: %s", type(exc).__name__)
+            ctx.calls = 0
+            ctx.deadline = max(ctx.deadline, time.monotonic() + reasoning.FALLBACK_RESERVE)
+            result = ask_deterministic(ctx, query, fallback=True)
+            return {**result, "reasoning": "fallback", "fallback_reason": type(exc).__name__}
+    return ask_deterministic(ctx, query)
+
+
+def ask_deterministic(ctx, query, fallback=False):
     """`Ask anything`, without a model: route a free-text question to ERP rules, records and approved knowledge.
 
     1. rules whose wording matches the question (exact counts, examples, and a follow-up action);
@@ -332,9 +348,13 @@ def ask(ctx, query):
         )
     if actions:
         ctx.recorder.actions(actions)
+    if fallback:
+        lines.append("(Model tidak menghasilkan jawaban yang dapat dibuktikan; jawaban ini disusun tanpa model.)")
+    ctx.recorder.provenance({"mode": "deterministic", "fallback": fallback})
     ctx.recorder.message("\n".join(lines))
     return {
         "skill": "ask",
+        "reasoning": "deterministic",
         "terms": terms,
         "signals": [g["key"] for g in found_signals],
         "erp_results": len(results),

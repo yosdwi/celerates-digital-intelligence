@@ -397,8 +397,12 @@ def system():
         "model_mode": cfg.model_mode,
         "model_alias": "reasoning-strong",
         "embedding": "demo-hash-64-v1 (deterministic token similarity)"
-        if cfg.model_mode == "demo"
+        if cfg.embedding_mode == "demo"
         else cfg.embedding_model,
+        "generation_mode": cfg.generation_mode,
+        "agent_reasoning": "model (" + cfg.agent_model + ")"
+        if cfg.generation_mode == "litellm" and cfg.agent_model
+        else "deterministic",
         "langgraph": "PostgreSQL checkpoints + human interrupt",
         "queued_runs": queue["n"],
         "langfuse": "Configured" if cfg.langfuse_enabled else "Optional / not configured",
