@@ -1,10 +1,13 @@
 """Models may draft narrative; ERP facts and commercial values never come from a model."""
 
+import base64
 import hashlib
 import json
 import math
 import re
 import time
+
+import httpx
 
 from .config import settings
 
@@ -151,25 +154,57 @@ def voice_enabled():
     return cfg.generation_mode == "litellm" and bool(cfg.agent_transcribe_model)
 
 
+def _cloudflare_transcribe(cfg, audio):
+    """Cloudflare Workers AI exposes ASR through /ai/run rather than OpenAI's /audio/transcriptions."""
+    base = (cfg.model_api_base or "").rstrip("/")
+    if not (cfg.agent_transcribe_model.startswith("@cf/") and base.endswith("/ai/v1")):
+        return None
+    endpoint = f"{base[:-3]}/run/{cfg.agent_transcribe_model}"
+    response = httpx.post(
+        endpoint,
+        headers={"Authorization": f"Bearer {cfg.model_api_key}"},
+        json={
+            "audio": base64.b64encode(audio).decode("ascii"),
+            "task": "transcribe",
+            "language": cfg.agent_transcribe_language or None,
+        },
+        timeout=30,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    if payload.get("success") is False:
+        raise RuntimeError("Cloudflare transcription failed")
+    result = payload.get("result", payload)
+    text = result.get("text") if isinstance(result, dict) else None
+    if not text and isinstance(result, dict):
+        info = result.get("transcription_info")
+        if isinstance(info, dict):
+            text = info.get("text")
+    return " ".join(str(text or "").split())
+
+
 def transcribe(audio, filename):
     """Speech → text for push-to-talk (ADR-012). Audio is passed through and never stored; only text returns."""
     cfg = settings()
     if not voice_enabled():
         raise ModelUnavailable("Voice is not configured")
-    import litellm
 
     start = time.monotonic()
     try:
-        result = litellm.transcription(
-            model=cfg.agent_transcribe_model,
-            file=(filename, audio),
-            language=cfg.agent_transcribe_language or None,
-            api_base=cfg.model_api_base,
-            api_key=cfg.model_api_key,
-            timeout=30,
-            max_retries=1,
-        )
-        text = " ".join(str(getattr(result, "text", "") or "").split())
+        text = _cloudflare_transcribe(cfg, audio)
+        if text is None:
+            import litellm
+
+            result = litellm.transcription(
+                model=cfg.agent_transcribe_model,
+                file=(filename, audio),
+                language=cfg.agent_transcribe_language or None,
+                api_base=cfg.model_api_base,
+                api_key=cfg.model_api_key,
+                timeout=30,
+                max_retries=1,
+            )
+            text = " ".join(str(getattr(result, "text", "") or "").split())
     except Exception as exc:
         raise ModelUnavailable("Transcription failed") from exc
     return text, {"model": cfg.agent_transcribe_model, "latency_ms": round((time.monotonic() - start) * 1000)}
