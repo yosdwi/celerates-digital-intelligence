@@ -1,0 +1,1 @@
+Visual references for Celerates Agent are maintained in docs/11-celerates-agent-direction-and-exploration-handoff.md. The intended reference is the compact launcher-to-side-panel interaction shown in user-provided screenshots; these are product interaction references, not pixel-perfect clone requirements.

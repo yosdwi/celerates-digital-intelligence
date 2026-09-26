@@ -1,0 +1,13 @@
+   ▲ Next.js 15.5.22
+   - Local:        http://127.0.0.1:3121
+   - Network:      http://127.0.0.1:3121
+
+ ✓ Starting...
+ ✓ Ready in 633ms
+Error: ENVIRONMENT_FALLBACK
+    at <unknown> (.next/server/chunks/5225.js:52:5235)
+    at ai (.next/server/chunks/5225.js:52:6814)
+    at <unknown> (.next/server/chunks/5225.js:5:116936)
+    at F (.next/server/chunks/7869.js:1:77550) {
+  code: 'ENVIRONMENT_FALLBACK'
+}

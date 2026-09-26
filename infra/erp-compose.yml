@@ -1,0 +1,59 @@
+name: celerates-erp
+services:
+  postgres:
+    image: postgres:16-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: celerates_erp
+      POSTGRES_USER: erp
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes:
+      - erp_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U erp -d celerates_erp"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    command: ["postgres", "-c", "max_connections=50", "-c", "shared_buffers=128MB", "-c", "log_min_duration_statement=1000"]
+    networks: [erp]
+  objects:
+    image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID:?Set S3_ACCESS_KEY_ID}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY:?Set S3_SECRET_ACCESS_KEY}
+    volumes:
+      - erp_objects:/data
+    networks: [erp]
+  web:
+    build: ../apps/erp
+    restart: unless-stopped
+    init: true
+    ports: ["127.0.0.1:${ERP_PORT:-3001}:3000"]
+    environment:
+      DATABASE_URL: postgres://erp:${POSTGRES_PASSWORD}@postgres:5432/celerates_erp
+      DB_POOL_MAX: "5"
+      NEXTAUTH_URL: ${NEXTAUTH_URL:?Set NEXTAUTH_URL}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?Set NEXTAUTH_SECRET}
+      PII_ENCRYPTION_KEY: ${PII_ENCRYPTION_KEY:?Set PII_ENCRYPTION_KEY}
+      SETUP_TOKEN: ${SETUP_TOKEN:-}
+      S3_ENDPOINT: http://objects:9000
+      S3_REGION: us-east-1
+      S3_BUCKET_PREFIX: erp
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
+      APP_ENV: ${APP_ENV:-erp-pilot}
+      RELEASE_SHA: ${RELEASE_SHA:-local}
+    depends_on:
+      postgres: { condition: service_healthy }
+      objects: { condition: service_started }
+    networks: [erp]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    mem_limit: 1g
+networks:
+  erp:
+volumes:
+  erp_postgres:
+  erp_objects:

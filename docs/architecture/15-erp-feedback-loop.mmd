@@ -1,0 +1,11 @@
+flowchart TD
+  User[User submits contextual feedback] --> BA[BA reproduces and triages]
+  BA --> Clarify[Reporter clarifies]
+  Clarify --> BA
+  BA --> Delta[Business owner accepts requirement delta]
+  BA --> Deferred[Reasoned defer or reject]
+  Delta --> Backlog[Linked issue and acceptance criteria]
+  Backlog --> Release[Reviewed implementation and release]
+  Release --> Validate[Reporter validates release]
+  Validate -->|Pass| Closed[Closure evidence]
+  Validate -->|Fail| BA

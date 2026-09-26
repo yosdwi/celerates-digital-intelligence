@@ -1,0 +1,83 @@
+name: Render Mermaid diagrams
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'docs/architecture/**/*.mmd'
+      - '.github/workflows/render-diagrams.yml'
+      - '.github/puppeteer-config.json'
+
+permissions:
+  contents: write
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Mermaid CLI
+        run: npm install --global @mermaid-js/mermaid-cli
+
+      - name: Render SVG diagrams
+        id: render
+        shell: bash
+        run: |
+          set -u
+          mkdir -p docs/architecture/rendered
+          : > docs/architecture/rendered/render-report.txt
+          shopt -s nullglob
+          files=(docs/architecture/*.mmd)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo 'No Mermaid sources found.' | tee -a docs/architecture/rendered/render-report.txt
+            echo 'failed=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          failed=0
+          for src in "${files[@]}"; do
+            base="$(basename "${src%.mmd}")"
+            out="docs/architecture/rendered/$base.svg"
+            tmp="$(mktemp)"
+            echo "Rendering $src -> $out"
+            if mmdc -p .github/puppeteer-config.json -i "$src" -o "$out" -b transparent 2>"$tmp"; then
+              echo "PASS $src" >> docs/architecture/rendered/render-report.txt
+            else
+              failed=1
+              rm -f "$out"
+              echo "FAIL $src" >> docs/architecture/rendered/render-report.txt
+              sed 's/^/  /' "$tmp" >> docs/architecture/rendered/render-report.txt
+            fi
+            rm -f "$tmp"
+          done
+          echo "failed=$([ "$failed" -eq 1 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          cat docs/architecture/rendered/render-report.txt
+
+      - name: Commit generated SVGs and render report
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "$(git status --porcelain -- docs/architecture/rendered)" ]; then
+            echo 'Rendered diagrams are already up to date.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/architecture/rendered
+          git commit -m 'docs: render Mermaid diagrams [skip ci]'
+          git push
+
+      - name: Fail when any diagram cannot render
+        if: steps.render.outputs.failed == 'true'
+        run: |
+          echo 'One or more Mermaid diagrams failed to render. See docs/architecture/rendered/render-report.txt.'
+          exit 1

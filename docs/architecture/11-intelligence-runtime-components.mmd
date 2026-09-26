@@ -1,0 +1,71 @@
+flowchart TB
+    U["BUSINESS / USER WORKFLOW<br/>Pre-Sales • Human Service • Exceptions • Management"]
+
+    LG["LANGGRAPH<br/><b>Workflow & State Orchestration</b><br/>Branching • Tool Calls • Human Review • Retry / Resume"]
+
+    subgraph DATA["DATA & RETRIEVAL"]
+        direction LR
+        PG["POSTGRESQL / ERP TOOLS<br/>Structured & Exact Business Facts"]
+        PV["pgvector<br/>Semantic Retrieval"]
+        FTS["PostgreSQL FTS<br/>Keyword / Lexical Retrieval"]
+    end
+
+    HYB["HYBRID EVIDENCE SET<br/>Structured facts + semantic knowledge + exact keyword matches"]
+
+    LL["LiteLLM<br/><b>Celerates Model Gateway</b><br/>Logical Model Alias • Routing • Fallback"]
+
+    subgraph MODELS["MODEL PROVIDERS"]
+        direction LR
+        OAI["OpenAI"]
+        ANT["Anthropic"]
+        GEM["Gemini"]
+        OR["OpenRouter<br/>(optional upstream aggregator)"]
+        OSS["Open-source / Local"]
+    end
+
+    LF["LANGFUSE<br/><b>Observability & Evaluation</b><br/>Trace • Retrieval Evidence • Model Usage • Latency • Cost • Feedback"]
+
+    OUT["STRUCTURED INTELLIGENCE OUTPUT<br/>Requirement Matrix • Action Brief • Case Pack • Executive Brief"]
+
+    HR["HUMAN / WORKFLOW ACTION<br/>Review • Approve • Revise • Controlled Action"]
+
+    ERP["CELERATES ERP<br/>Status & outcome recorded back to operational core"]
+
+    U --> LG
+
+    LG --> PG
+    LG --> PV
+    LG --> FTS
+
+    PG --> HYB
+    PV --> HYB
+    FTS --> HYB
+    HYB --> LG
+
+    LG <--> LL
+
+    LL --> OAI
+    LL --> ANT
+    LL --> GEM
+    LL --> OR
+    LL --> OSS
+
+    LG -. trace .-> LF
+    PG -. trace .-> LF
+    PV -. trace .-> LF
+    FTS -. trace .-> LF
+    LL -. trace .-> LF
+
+    LG --> OUT
+    OUT --> HR
+    HR --> ERP
+
+    classDef primary fill:#111827,color:#ffffff,stroke:#111827,stroke-width:2px;
+    classDef supporting fill:#f8fafc,color:#111827,stroke:#94a3b8,stroke-width:1.5px;
+    classDef evidence fill:#eef2ff,color:#1e1b4b,stroke:#818cf8,stroke-width:1.5px;
+    classDef observe fill:#ecfeff,color:#164e63,stroke:#22d3ee,stroke-width:1.5px;
+
+    class LG,LL primary;
+    class PG,PV,FTS,OAI,ANT,GEM,OR,OSS supporting;
+    class HYB,OUT evidence;
+    class LF observe;
