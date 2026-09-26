@@ -6,6 +6,7 @@ proposal, and the user confirms it in ERP (ADR-010). Which command remedies a si
 command a file maps to is chosen from ERP's command specs, so neither is a per-workflow branch here."""
 
 import logging
+import re
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
@@ -136,7 +137,8 @@ def explain_signal(ctx, signal_key):
     }
 
 
-def explain_entity(ctx, entity_type, entity_id):
+def _read_record(ctx, entity_type, entity_id):
+    """Entity + relations + matching signals, emitted as evidence. Returns (entity, summary lines, matching)."""
     with ctx.recorder.step("Membaca record dari ERP"):
         entity = invoke(ctx, "erp_read_entity", entity_type=entity_type, entity_id=entity_id)["entity"]
         edges = invoke(ctx, "erp_entity_neighbours", entity_type=entity_type, entity_id=entity_id)["edges"]
@@ -155,9 +157,6 @@ def explain_entity(ctx, entity_type, entity_id):
         for s in matching
     ]
     ctx.recorder.evidence(evidence)
-    with ctx.recorder.step("Mencari pengetahuan yang disetujui"):
-        passages = invoke(ctx, "knowledge_search", query=f"{entity['type_label']} {entity['label']}")["passages"]
-    ctx.recorder.evidence(_knowledge_evidence(passages))
     lines = [f"{entity['type_label']} {entity['label']}", f"Relasi: {_relations_line(edges)}"]
     lines.append(
         "Sinyal perhatian yang cocok: " + "; ".join(s["title"] for s in matching)
@@ -166,6 +165,14 @@ def explain_entity(ctx, entity_type, entity_id):
     )
     if entity.get("withheld"):
         lines.append(f"{len(entity['withheld'])} field sensitif tidak dibagikan ke Agent.")
+    return entity, lines, matching
+
+
+def explain_entity(ctx, entity_type, entity_id):
+    entity, lines, matching = _read_record(ctx, entity_type, entity_id)
+    with ctx.recorder.step("Mencari pengetahuan yang disetujui"):
+        passages = invoke(ctx, "knowledge_search", query=f"{entity['type_label']} {entity['label']}")["passages"]
+    ctx.recorder.evidence(_knowledge_evidence(passages))
     lines.append(
         f"Pengetahuan disetujui yang relevan: {len(passages)} sumber."
         if passages
@@ -204,6 +211,137 @@ def search(ctx, query):
     lines.append("Pencarian ini berbasis kata kunci tanpa model bahasa; pencarian semantik menyusul (M2).")
     ctx.recorder.message("\n".join(lines))
     return {"skill": "search", "query": found["query"], "erp_results": total, "knowledge": len(passages)}
+
+
+STOPWORDS = set(
+    """apa siapa berapa bagaimana gimana kenapa mengapa kapan dimana mana yang di ke dari untuk dan atau dengan ini itu
+    ada adakah saja aja saya kami kita tolong mohon cari carikan tampilkan tunjukkan lihat jelaskan tentang soal info
+    informasi semua daftar list berapakah apakah sudah masih punya the a an of for to in on is are was with and or what
+    who which how many much show find list me my please about any all does do there""".split()
+)
+RECORD_NO = re.compile(r"^(req|opty|task|fr|lead|pq|inv|crm)[-\w]*\d", re.I)
+MAX_RESULT_LINES = 4
+
+
+def _words(text):
+    return [w for w in re.findall(r"[0-9a-z%_-]+", str(text).lower()) if len(w) >= 2]
+
+
+def _terms(query):
+    return list(dict.fromkeys(w for w in _words(query) if w not in STOPWORDS))[:6]
+
+
+def _overlap(terms, text):
+    words = set(_words(text))
+    return sum(
+        1
+        for t in terms
+        if t in words or (len(t) >= 4 and any(w.startswith(t) or t.startswith(w) for w in words if len(w) >= 4))
+    )
+
+
+def _matching_signals(terms, signals):
+    """Rules whose own title/rule/unit wording covers the question. Deterministic; ties keep ERP order."""
+    need = 1 if len(terms) == 1 else 2
+    scored = [(_overlap(terms, f"{g['title']} {g['rule']} {g['unit']}"), i, g) for i, g in enumerate(signals)]
+    best = max((sc for sc, _, _ in scored), default=0)
+    return [g for sc, _, g in sorted(scored, key=lambda x: (-x[0], x[1])) if sc >= need and sc == best][:2]
+
+
+def ask(ctx, query):
+    """`Ask anything`, without a model: route a free-text question to ERP rules, records and approved knowledge.
+
+    1. rules whose wording matches the question (exact counts, examples, and a follow-up action);
+    2. records matching all content terms (one record, or a record number → read it fully with relations);
+    3. approved knowledge. Nothing is guessed: if no source matches, the answer says so."""
+    terms = _terms(query)
+    if not terms:
+        ctx.recorder.message(
+            "Pertanyaannya belum memuat kata kunci. Sebutkan nomor record, client, posisi, atau kondisi."
+        )
+        return {"skill": "ask", "terms": []}
+    lines, actions, found_signals = [], [], []
+    with ctx.recorder.step("Mencocokkan dengan aturan perhatian ERP"):
+        signals = invoke(ctx, "erp_signals")["signals"]
+        found_signals = _matching_signals(terms, signals)
+    for g in found_signals:
+        ctx.recorder.evidence([_signal_evidence(g)])
+        examples = ", ".join(i["label"] for i in g["items"][:3])
+        lines.append(f"{g['title']}: {g['count']} {g['unit']} saat ini" + (f" — mis. {examples}." if examples else "."))
+        if g["count"]:
+            actions.append(
+                {
+                    "label": f"Tindak lanjuti: {g['title']}",
+                    "skill": "follow_up_signal",
+                    "args": {"signal_key": g["key"]},
+                }
+            )
+    with ctx.recorder.step("Mencari record ERP"):
+        found = invoke(ctx, "erp_search", query=" ".join(terms))
+        partial = False
+        if not found["results"] and len(terms) > 1 and not found_signals:
+            found, partial = invoke(ctx, "erp_search", query=" ".join(terms), mode="any"), True
+    results = found["results"]
+    exact = [r for r in results if any(RECORD_NO.match(t) and t in r["label"].lower() for t in terms)]
+    focus = exact[0] if len(exact) == 1 else results[0] if len(results) == 1 and not partial else None
+    examined = None
+    if focus:
+        _, record_lines, _ = _read_record(ctx, focus["type"], focus["id"])
+        lines += record_lines
+        examined = f"{focus['type']}/{focus['id']}"
+    elif results:
+        ctx.recorder.evidence(
+            [
+                {
+                    "type": "erp_fact",
+                    "title": f"{r['type_label']} {r['label']}",
+                    "detail": [
+                        f"Cocok pada {r['matched_field']}"
+                        + (f" · {r['score']} dari {len(terms)} kata" if partial else "")
+                    ],
+                    "href": r.get("href"),
+                    "source": {"kind": "erp", "ref": f"{r['type']}/{r['id']}", "as_of": found.get("as_of")},
+                }
+                for r in results
+            ]
+        )
+        groups = {}
+        for r in results:
+            groups.setdefault(r["type_label"], []).append(r["label"])
+        head = (
+            f"{len(results)} record ERP "
+            + ("cocok sebagian dengan" if partial else "cocok dengan")
+            + f" “{' '.join(terms)}”"
+        )
+        lines.append(head + (" (dibatasi)." if found.get("truncated") else "."))
+        lines += [
+            f"• {label} ({len(labels)}): "
+            + ", ".join(labels[:MAX_RESULT_LINES])
+            + ("…" if len(labels) > MAX_RESULT_LINES else "")
+            for label, labels in groups.items()
+        ]
+    with ctx.recorder.step("Mencari pengetahuan yang disetujui"):
+        passages = invoke(ctx, "knowledge_search", query=query)["passages"]
+    ctx.recorder.evidence(_knowledge_evidence(passages))
+    if passages:
+        lines.append(f"Pengetahuan disetujui: {', '.join(p['title'] for p in passages[:3])}.")
+    if not lines:
+        lines.append(
+            f"Belum ada aturan ERP, record, atau pengetahuan disetujui yang cocok dengan “{' '.join(terms)}”. "
+            "Coba nomor record, nama client, posisi, atau nama kondisi."
+        )
+    if actions:
+        ctx.recorder.actions(actions)
+    ctx.recorder.message("\n".join(lines))
+    return {
+        "skill": "ask",
+        "terms": terms,
+        "signals": [g["key"] for g in found_signals],
+        "erp_results": len(results),
+        "partial": partial,
+        "examined": examined,
+        "knowledge": len(passages),
+    }
 
 
 def _proposal_lines(proposal):
@@ -360,6 +498,7 @@ PLAYBOOKS = {
     "explain_signal": explain_signal,
     "explain_entity": explain_entity,
     "search": search,
+    "ask": ask,
     "follow_up_signal": follow_up_signal,
     "import_dataset": import_dataset,
 }

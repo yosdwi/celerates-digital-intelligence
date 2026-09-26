@@ -3,7 +3,7 @@
 import type { NextRequest } from "next/server";
 import type { Sql } from "postgres";
 import { fail } from "@/lib/integration/contract";
-import { readSignal } from "@/lib/operations/reader";
+import { readOperationalContext, readSignal, SIGNAL_ENTITY, SIGNAL_REMEDY } from "@/lib/operations/reader";
 import { publicCatalog } from "./catalog";
 import { DelegationError, verifyDelegation } from "./delegation";
 import { AgentReadError, loadActor, readEntity, readEntitySignals, readNeighbours, search } from "./reads";
@@ -45,7 +45,13 @@ export async function handleAgent(request: NextRequest, path: string[], sql: Sql
       if (!signal) fail(404, "NOT_FOUND", "Signal not available.");
       return { schema_version: "1.0", as_of: signal.as_of, signal };
     }
-    if (a === "search" && path.length === 2) return await search(sql, actor, request.nextUrl.searchParams.get("q") || "");
+    if (a === "search" && path.length === 2)
+      return await search(sql, actor, request.nextUrl.searchParams.get("q") || "", request.nextUrl.searchParams.get("mode") === "any" ? "any" : "all");
+    if (a === "signals" && path.length === 2) {
+      // Every rule this user may read (all modules), with exact counts: what `Perlu perhatian` would show anywhere.
+      const all = await readOperationalContext(sql, actor, "/");
+      return { schema_version: "1.0", as_of: all.asOf, signals: all.groups.map((g) => ({ ...g, entity_type: SIGNAL_ENTITY[g.key] ?? null, remedy: SIGNAL_REMEDY[g.key] ?? "task.create" })) };
+    }
     if (a === "entities" && b && TYPE.test(b) && c && UUID.test(c)) {
       const id = c.toLowerCase();
       if (path.length === 4) return await readEntity(sql, actor, b, id);

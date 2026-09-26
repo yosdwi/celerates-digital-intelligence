@@ -2,7 +2,7 @@
 // `Tanya` thread (spike S1): assistant-ui primitives over our own run store via ExternalStoreRuntime.
 // assistant-ui renders messages/composer only. Run state, transport (AG-UI via ERP BFF) and authority stay ours.
 // Loaded lazily by the Agent panel so pages that never open this tab pay nothing for it.
-import { useRef, useState, type DragEvent, type ReactNode } from "react";
+import { createContext, useContext, useRef, useState, type DragEvent, type ReactNode } from "react";
 import {
   AssistantRuntimeProvider,
   ComposerPrimitive,
@@ -13,7 +13,7 @@ import {
   type ThreadMessageLike,
 } from "@assistant-ui/react";
 import { Loader2, Paperclip, SendHorizontal, Sparkles } from "lucide-react";
-import { toThreadMessages, type AgentRun, type Evidence } from "@/lib/agent/run-state";
+import { toThreadMessages, type AgentAction, type AgentRun, type Evidence } from "@/lib/agent/run-state";
 import { EvidenceCard, RunError, RunProgress, ToolTrace } from "./evidence";
 import { ProposalCard } from "./proposal";
 
@@ -29,31 +29,56 @@ function UserMessage() {
   );
 }
 
+// Part renderers are module-level so their component identity is stable. Inline renderers would be new component
+// types on every render, remounting parts and resetting an open proposal card's selections.
+const ActionContext = createContext<(action: AgentAction) => void>(() => undefined);
+
+function Actions({ items }: { items: AgentAction[] }) {
+  const onAction = useContext(ActionContext);
+  return (
+    <div className="flex flex-wrap gap-2" aria-label="Langkah berikutnya">
+      {items.map((action) => (
+        <button
+          key={action.label}
+          type="button"
+          onClick={() => onAction(action)}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-brand-100 bg-brand-50 px-2.5 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-100"
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+          {action.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+type DataPart = { data: Record<string, unknown> };
+const PARTS = {
+  Text: ({ text }: { text: string }) => <p className="whitespace-pre-line text-sm leading-relaxed text-slate-800">{text}</p>,
+  data: {
+    by_name: {
+      progress: ({ data }: DataPart) => <RunProgress steps={data.steps as { name: string; done: boolean }[]} running={data.running === true} />,
+      evidence: ({ data }: DataPart) => <EvidenceCard item={data as unknown as Evidence} />,
+      error: ({ data }: DataPart) => <RunError message={String(data.message)} />,
+      proposal: ({ data }: DataPart) => <ProposalCard id={String(data.id)} title={String(data.title)} />,
+      actions: ({ data }: DataPart) => <Actions items={data.items as AgentAction[]} />,
+    },
+  },
+  tools: {
+    Fallback: ({ toolName, result }: { toolName: string; result?: unknown }) => <ToolTrace toolName={toolName} result={result} />,
+  },
+  ToolGroup: ({ children }: { children?: ReactNode }) => (
+    <details className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
+      <summary className="cursor-pointer">Jejak alat Agent</summary>
+      <ul className="mt-2 space-y-1">{children}</ul>
+    </details>
+  ),
+};
+
 function AssistantMessage() {
   return (
     <MessagePrimitive.Root className="space-y-2" data-agent-message>
-      <MessagePrimitive.Parts
-        components={{
-          Text: ({ text }) => <p className="whitespace-pre-line text-sm leading-relaxed text-slate-800">{text}</p>,
-          data: {
-            by_name: {
-              progress: ({ data }) => <RunProgress steps={data.steps} running={data.running} />,
-              evidence: ({ data }) => <EvidenceCard item={data as Evidence} />,
-              error: ({ data }) => <RunError message={String(data.message)} />,
-              proposal: ({ data }) => <ProposalCard id={String(data.id)} title={String(data.title)} />,
-            },
-          },
-          tools: {
-            Fallback: ({ toolName, result }) => <ToolTrace toolName={toolName} result={result} />,
-          },
-          ToolGroup: ({ children }: { children?: ReactNode }) => (
-            <details className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
-              <summary className="cursor-pointer">Jejak alat Agent</summary>
-              <ul className="mt-2 space-y-1">{children}</ul>
-            </details>
-          ),
-        }}
-      />
+      <MessagePrimitive.Parts components={PARTS} />
     </MessagePrimitive.Root>
   );
 }
@@ -65,6 +90,7 @@ export default function AgentThread({
   suggestions,
   onSearch,
   onFile,
+  onAction,
 }: {
   runs: AgentRun[];
   running: boolean;
@@ -73,6 +99,7 @@ export default function AgentThread({
   onSearch: (text: string) => void;
   /** `Drop anything`: a CSV/XLSX becomes a dataset, then a proposal the user confirms in ERP. */
   onFile: (file: File) => Promise<string | null>;
+  onAction: (action: AgentAction) => void;
 }) {
   const picker = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -116,7 +143,7 @@ export default function AgentThread({
             <div className="space-y-3">
               <p className="text-sm text-slate-600">
                 {enabled
-                  ? "Tanyakan kondisi halaman ini, cari record, atau jatuhkan berkas CSV/XLSX untuk diimpor. Jawaban disusun dari fakta ERP dan pengetahuan yang disetujui, dengan buktinya; perubahan data selalu menunggu konfirmasi Anda."
+                  ? "Tanyakan apa saja tentang kondisi, record, atau aturan kerja — misalnya “requisition mana yang belum punya TA PIC?” — atau jatuhkan berkas CSV/XLSX untuk diimpor. Jawaban disusun dari fakta ERP dan pengetahuan yang disetujui, dengan buktinya; perubahan data selalu menunggu konfirmasi Anda."
                   : "Agent belum dikonfigurasi di lingkungan ini. Perlu perhatian dan Masukan tetap dapat digunakan."}
               </p>
               {enabled && suggestions.length > 0 && (
@@ -136,7 +163,9 @@ export default function AgentThread({
               )}
             </div>
           </ThreadPrimitive.Empty>
-          <ThreadPrimitive.Messages components={{ UserMessage, AssistantMessage }} />
+          <ActionContext.Provider value={onAction}>
+            <ThreadPrimitive.Messages components={{ UserMessage, AssistantMessage }} />
+          </ActionContext.Provider>
         </ThreadPrimitive.Viewport>
         {fileError && (
           <p role="alert" className="mx-3 mb-0 mt-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-900">
@@ -167,9 +196,9 @@ export default function AgentThread({
           </button>
           <ComposerPrimitive.Input
             aria-label="Pesan untuk Agent"
-            placeholder="Cari nomor, client, atau posisi…"
+            placeholder="Tanya kondisi, nomor, client, atau posisi…"
             rows={1}
-            maxLength={100}
+            maxLength={300}
             className="min-h-10 flex-1 resize-none rounded-xl border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 disabled:bg-slate-50"
           />
           {/* Voice (M2) will sit here as push-to-talk feeding the same run; it can never confirm a write. */}

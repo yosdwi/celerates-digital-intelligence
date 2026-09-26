@@ -75,11 +75,14 @@ class DelegatedERP:
         self._check(entity_type, entity_id)
         return self._get(f"entities/{entity_type}/{entity_id}/signals")
 
-    def search(self, query):
+    def search(self, query, mode="all"):
         query = " ".join(str(query).split())[:100]
         if len(query) < 2:
             raise ValueError("Search needs at least two characters")
-        return self._get("search", {"q": query})
+        return self._get("search", {"q": query, "mode": "any" if mode == "any" else "all"})
+
+    def signals(self):
+        return self._get("signals")
 
     @staticmethod
     def _check(entity_type, entity_id):

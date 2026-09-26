@@ -96,9 +96,14 @@ def entity_signals(ctx, entity_type, entity_id):
     return ctx.erp.entity_signals(entity_type, entity_id)
 
 
-@register("erp_search", "1", "Case-insensitive search over catalog-declared, non-sensitive ERP fields")
-def erp_search(ctx, query):
-    return ctx.erp.search(query)
+@register("erp_search", "2", "Multi-term search over catalog-declared, non-sensitive ERP fields (all or any terms)")
+def erp_search(ctx, query, mode="all"):
+    return ctx.erp.search(query, mode)
+
+
+@register("erp_signals", "1", "All deterministic attention rules this user may read, with exact counts")
+def erp_signals(ctx):
+    return ctx.erp.signals()
 
 
 @register("knowledge_search", "1", "Approved, active governed knowledge the user may read")

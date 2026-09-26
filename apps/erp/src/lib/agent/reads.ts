@@ -140,31 +140,48 @@ export async function readEntitySignals(sql: Sql, actor: OperationalActor, type:
   };
 }
 
-export async function search(sql: Sql, actor: OperationalActor, raw: string) {
+/** Search terms: whitespace-separated, edge punctuation stripped, de-duplicated, at most six. */
+export function searchTerms(query: string): string[] {
+  const terms = query
+    .toLowerCase()
+    .split(" ")
+    .map((t) => t.replace(/^[^\p{L}\p{N}%_]+|[^\p{L}\p{N}%_]+$/gu, ""))
+    .filter((t) => t.length >= 2);
+  return [...new Set(terms)].slice(0, 6);
+}
+
+/**
+ * Catalog search over non-sensitive fields. `all` (default): every term must match some field of the record.
+ * `any`: records matching at least one term, ranked by how many terms matched (for questions phrased loosely).
+ */
+export async function search(sql: Sql, actor: OperationalActor, raw: string, mode: "all" | "any" = "all") {
   const query = raw.replace(/\s+/g, " ").trim().slice(0, 100);
   if (query.length < 2) throw new AgentReadError(422, "QUERY_TOO_SHORT");
-  const pattern = "%" + query.replace(/[\\%_]/g, (c) => "\\" + c) + "%";
+  const terms = searchTerms(query);
+  if (!terms.length) throw new AgentReadError(422, "QUERY_TOO_SHORT");
+  const patterns = terms.map((t) => "%" + t.replace(/[\\%_]/g, (c) => "\\" + c) + "%");
   const readable = [...CATALOG.values()].filter((d) => canReadEntityModule(actor, d.module));
-  const results: { type: string; type_label: string; id: string; label: string; href: string; module: string; matched_field: string }[] = [];
+  type Result = { type: string; type_label: string; id: string; label: string; href: string; module: string; matched_field: string; score: number };
+  const results: Result[] = [];
   let truncated = false;
   await sql.begin("isolation level repeatable read read only", async (tx) => {
     for (const def of readable) {
       const fields = def.search.filter((name) => def.fields.find((f) => f.name === name)?.sensitivity === "internal");
       if (!fields.length) continue;
-      const matched = `CASE ${fields.map((name) => `WHEN ${def.alias}.${name} ILIKE $1 THEN '${def.fields.find((f) => f.name === name)!.label.replace(/'/g, "")}'`).join(" ")} END`;
-      const rows = await tx.unsafe<{ id: string; label: string; matched: string }[]>(
-        `SELECT ${def.alias}.id::text AS id, ${def.display} AS label, ${matched} AS matched FROM ${def.table} ${def.alias} WHERE ${fields.map((name) => `${def.alias}.${name} ILIKE $1`).join(" OR ")} ORDER BY 2, 1 LIMIT ${SEARCH_PER_TYPE + 1}`,
-        [pattern],
+      const hit = (i: number) => "(" + fields.map((name) => `${def.alias}.${name} ILIKE $${i + 1}`).join(" OR ") + ")";
+      const score = terms.map((_, i) => `(CASE WHEN ${hit(i)} THEN 1 ELSE 0 END)`).join("+");
+      const where = terms.map((_, i) => hit(i)).join(mode === "all" ? " AND " : " OR ");
+      const matched = `CASE ${terms.flatMap((_, i) => fields.map((name) => `WHEN ${def.alias}.${name} ILIKE $${i + 1} THEN '${def.fields.find((f) => f.name === name)!.label.replace(/'/g, "")}'`)).join(" ")} END`;
+      const rows = await tx.unsafe<{ id: string; label: string; matched: string; score: number }[]>(
+        `SELECT ${def.alias}.id::text AS id, ${def.display} AS label, ${matched} AS matched, (${score})::int AS score FROM ${def.table} ${def.alias} WHERE ${where} ORDER BY 4 DESC, 2, 1 LIMIT ${SEARCH_PER_TYPE + 1}`,
+        patterns,
       );
       if (rows.length > SEARCH_PER_TYPE) truncated = true;
-      for (const row of rows.slice(0, SEARCH_PER_TYPE)) {
-        if (results.length >= SEARCH_TOTAL) {
-          truncated = true;
-          break;
-        }
-        results.push({ type: def.type, type_label: def.label, id: row.id, label: row.label, href: hrefFor(def.type, row.id), module: def.module, matched_field: row.matched });
-      }
+      for (const row of rows.slice(0, SEARCH_PER_TYPE))
+        results.push({ type: def.type, type_label: def.label, id: row.id, label: row.label, href: hrefFor(def.type, row.id), module: def.module, matched_field: row.matched, score: row.score });
     }
   });
-  return { schema_version: "1.0", as_of: new Date().toISOString(), query, results, truncated, types_searched: readable.map((d) => d.type) };
+  results.sort((a, b) => b.score - a.score);
+  if (results.length > SEARCH_TOTAL) truncated = true;
+  return { schema_version: "1.0", as_of: new Date().toISOString(), query, terms, mode, results: results.slice(0, SEARCH_TOTAL), truncated, types_searched: readable.map((d) => d.type) };
 }

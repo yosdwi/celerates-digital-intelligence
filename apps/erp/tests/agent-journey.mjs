@@ -132,6 +132,17 @@ async function proposalJourneys({ base, request, db, env, intelligence, requisit
     const json = async (path, init) => { const r = await request(path, init); return { status: r.status, body: await r.json() }; };
     const post = (path, body) => json(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
+    // Journey A — ask anything: rules, records and knowledge, deterministically routed; next step offered.
+    const question = await run(request, 'ask', { query: 'Requisition mana yang belum punya TA PIC?' });
+    assert.match(question.text, /Requisition belum memiliki TA PIC: 1 requisition saat ini/);
+    assert.ok(question.evidence.some(e => e.type === 'signal'));
+    assert.ok(question.evidence.some(e => e.type === 'knowledge' && e.title.startsWith('SOP Requisition TA PIC')), 'approved SOP cited');
+    const offered = question.stream.find(s => s.event.type === 'CUSTOM' && s.event.name === 'celerates.actions');
+    assert.deepEqual(offered.event.value.items.map(a => a.args.signal_key), ['unassigned-requisitions']);
+    const byNumber = await run(request, 'ask', { query: `status ${requisition.requisition_no}` });
+    assert.ok(byNumber.evidence.some(e => e.source?.ref === `requisition/${requisition.id}`), 'a record number resolves to that record');
+    assert.match(byNumber.text, /Relasi:/);
+
     // Journey C — signal → proposal → confirm → receipt → outcome.
     const [original] = await db`SELECT ta_pic_name FROM requisitions WHERE id=${requisition.id}`;
     const follow = await run(request, 'follow_up_signal', { signal_key: 'unassigned-requisitions' });

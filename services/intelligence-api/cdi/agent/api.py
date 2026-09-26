@@ -41,6 +41,10 @@ class SearchArgs(Strict):
     query: str = Field(min_length=2, max_length=100)
 
 
+class AskArgs(Strict):
+    query: str = Field(min_length=2, max_length=300)
+
+
 class DatasetArgs(Strict):
     dataset_id: UUID
 
@@ -49,6 +53,7 @@ ARGS = {
     "explain_signal": SignalArgs,
     "explain_entity": EntityArgs,
     "search": SearchArgs,
+    "ask": AskArgs,
     "follow_up_signal": SignalArgs,
     "import_dataset": DatasetArgs,
 }
@@ -57,7 +62,7 @@ ARGS = {
 class RunRequest(Strict):
     run_id: UUID | None = None
     thread_id: str | None = Field(default=None, pattern=r"^[A-Za-z0-9_-]{8,100}$")
-    skill: Literal["explain_signal", "explain_entity", "search", "follow_up_signal", "import_dataset"]
+    skill: Literal["explain_signal", "explain_entity", "search", "ask", "follow_up_signal", "import_dataset"]
     args: dict
     modality: Literal["text"] = "text"  # voice arrives with M2 through the same run model
 

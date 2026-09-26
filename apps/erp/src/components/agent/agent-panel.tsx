@@ -224,7 +224,7 @@ export function AgentPanel() {
           </nav>
           {tab === "ask" ? (
             <div className="min-h-0 flex-1">
-              <AgentThread runs={runs} running={running} enabled={agentReady} suggestions={suggestions} onSearch={(text) => startRun("search", { query: text }, text)} onFile={importFile} />
+              <AgentThread runs={runs} running={running} enabled={agentReady} suggestions={suggestions} onSearch={(text) => startRun("ask", { query: text }, text)} onFile={importFile} onAction={(a) => startRun(a.skill, a.args, a.label)} />
             </div>
           ) : (
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5">

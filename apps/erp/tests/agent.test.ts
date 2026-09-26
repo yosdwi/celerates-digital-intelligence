@@ -119,6 +119,17 @@ test("AG-UI conformance of the event shapes the panel consumes, and the pure run
   assert.deepEqual(proposed.proposals, [{ id: proposalId, title: "Usulan" }]);
   const parts = (toThreadMessages([proposed])[1].content as { type: string; data?: { id?: string } }[]);
   assert.deepEqual(parts.map((p) => p.type), ["data-progress", "data-evidence", "data-proposal"]);
+  // Next-step actions: allowlisted skills only, shown once the run succeeded.
+  let asked = newRun("r4", "Berapa requisition tanpa TA PIC?");
+  asked = applyEvent(asked, { type: "CUSTOM", name: "celerates.actions", value: { items: [
+    { label: "Tindak lanjuti: X", skill: "follow_up_signal", args: { signal_key: "unassigned-requisitions" } },
+    { label: "Hapus", skill: "apply_command", args: { signal_key: "x" } },
+    { label: "Bad", skill: "follow_up_signal", args: { signal_key: "DROP TABLE" } },
+  ] } });
+  assert.deepEqual(asked.actions.map((a) => a.label), ["Tindak lanjuti: X"]);
+  assert.ok(!(toThreadMessages([asked])[1].content as { type: string }[]).some((p) => p.type === "data-actions"), "not while running");
+  asked = applyEvent(asked, { type: "RUN_FINISHED", threadId: "t", runId: "r4" });
+  assert.ok((toThreadMessages([asked])[1].content as { type: string }[]).some((p) => p.type === "data-actions"));
   assert.equal(parts[2].data?.id, proposalId);
   let failed = applyEvent(newRun("r2", "x"), { type: "RUN_ERROR", message: "Tidak boleh", code: "ERP_403" });
   failed = applyEvent(failed, { type: "TEXT_MESSAGE_CONTENT", delta: "late" });
@@ -168,6 +179,13 @@ test("delegated catalog reads: sensitivity, relationships, search, signal parity
     assert.deepEqual(new Set(found.results.map((r) => r.type)), new Set(["lead", "sales_opportunity", "requisition", "crm_client"]));
     assert.doesNotMatch(JSON.stringify(found), /PRIVATE/);
     assert.equal((await search(sql, ownerActor, "100%_")).results.length, 0, "LIKE wildcards are literal");
+    // Multi-term: every term must match some field of the same record (client + position across columns).
+    const both = await search(sql, ownerActor, "Astra, engineer?");
+    assert.deepEqual(both.terms, ["astra", "engineer"]);
+    assert.deepEqual(both.results.map((r) => r.type), ["requisition"]);
+    assert.equal((await search(sql, ownerActor, "astra zzzq")).results.length, 0);
+    const loose = await search(sql, ownerActor, "astra zzzq", "any");
+    assert.ok(loose.results.length >= 4 && loose.results.every((r) => r.score === 1), "any-mode ranks partial matches");
 
     await assert.rejects(readEntity(sql, taActor, "sales_opportunity", tracker.id), (e: AgentReadError) => e.status === 403);
     assert.equal((await readEntity(sql, taActor, "requisition", req.id)).entity.id, req.id);

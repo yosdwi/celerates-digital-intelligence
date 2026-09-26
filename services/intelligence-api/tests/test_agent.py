@@ -435,6 +435,8 @@ CSV = (
 
 def test_dataset_import_maps_columns_from_erp_specs_and_learns_only_from_applied_outcomes(monkeypatch):
     ProposingERP.proposed.clear()
+    with connect() as conn:
+        conn.execute("DELETE FROM agent_mapping_templates")  # test database: start without learned mappings
     token = mint(ctx={"path": "/ta", "module": "ta"})
     with TestClient(app) as c:
         files = {"file": ("kebutuhan.csv", CSV.encode(), "text/csv")}
@@ -513,3 +515,104 @@ def test_dataset_import_without_required_columns_proposes_nothing(monkeypatch):
         assert stream[-1][1]["type"] == "RUN_FINISHED" and not ProposingERP.proposed
         text = "".join(e["delta"] for _, e in stream if e["type"] == "TEXT_MESSAGE_CONTENT")
         assert "kolom wajib belum ditemukan" in text
+
+
+SIGNALS = [
+    {
+        "key": "qualified-trackers",
+        "module": "sales",
+        "title": "Opportunity belum diteruskan",
+        "rule": "Sales Qualified, tidak Dropped, belum memiliki Requisition maupun PQ yang terhubung.",
+        "unit": "opportunity tracker",
+        "source": "Opportunity Tracker",
+        "count": 0,
+        "href": "/sales",
+        "action": "Tinjau",
+        "items": [],
+    },
+    {
+        "key": "unassigned-requisitions",
+        "module": "ta",
+        "title": "Requisition belum memiliki TA PIC",
+        "rule": "TA PIC kosong atau Belum ditentukan.",
+        "unit": "requisition",
+        "source": "Requisition",
+        "count": 2,
+        "href": "/ta",
+        "action": "Tetapkan TA PIC",
+        "items": [{"id": REQUISITIONS[0], "label": "REQ-7 · Engineer"}],
+    },
+]
+
+
+class AskingERP(ProposingERP):
+    searches = []
+
+    def signals(self):
+        return {"signals": SIGNALS}
+
+    def search(self, query, mode="all"):
+        AskingERP.searches.append((query, mode))
+        rows = [
+            {"type": "requisition", "type_label": "Requisition", "id": REQUISITIONS[0], "label": "REQ-7 · Engineer"},
+            {"type": "requisition", "type_label": "Requisition", "id": REQUISITIONS[1], "label": "REQ-8 · Analyst"},
+        ]
+        if "req-7" in query:
+            rows = rows[:1]
+        elif "astra" not in query or (mode == "all" and "zzz" in query):
+            rows = []
+        for r in rows:
+            r.update(href="/ta", matched_field="Nomor", score=1)
+        return {"query": query, "results": rows, "truncated": False, "as_of": "2026-09-26T00:00:00Z"}
+
+
+def test_ask_routes_questions_to_rules_records_and_knowledge_without_a_model(monkeypatch):
+    AskingERP.searches.clear()
+    token = mint(ctx={"path": "/ta", "module": "ta"})
+    with TestClient(app) as c:
+        monkeypatch.setattr(settings(), "erp_mode", "http")
+        monkeypatch.setattr(playbooks, "DelegatedERP", AskingERP)
+        monkeypatch.setattr(playbooks, "start", lambda run, user, a: playbooks.execute(run, user, a))
+
+        def ask(q):
+            run_id = str(uuid4())
+            c.post(
+                "/api/agent/runs",
+                json={"run_id": run_id, "skill": "ask", "args": {"query": q}},
+                headers={"X-ERP-Delegation": token},
+            )
+            stream = events(c, run_id, token)
+            assert stream[-1][1]["type"] == "RUN_FINISHED", stream[-1]
+            text = "".join(e["delta"] for _, e in stream if e["type"] == "TEXT_MESSAGE_CONTENT")
+            custom = [e for _, e in stream if e["type"] == "CUSTOM"]
+            return stream[-1][1]["result"], text, custom
+
+        result, text, custom = ask("Berapa requisition yang belum punya TA PIC?")
+        assert result["signals"] == ["unassigned-requisitions"] and result["terms"] == [
+            "requisition",
+            "belum",
+            "ta",
+            "pic",
+        ]
+        assert "Requisition belum memiliki TA PIC: 2 requisition saat ini" in text
+        actions = [e["value"]["items"] for e in custom if e["name"] == "celerates.actions"]
+        assert actions == [
+            [
+                {
+                    "label": "Tindak lanjuti: Requisition belum memiliki TA PIC",
+                    "skill": "follow_up_signal",
+                    "args": {"signal_key": "unassigned-requisitions"},
+                }
+            ]
+        ]
+        assert AskingERP.searches[-1] == ("requisition belum ta pic", "all"), "no loose fallback when a rule answered"
+
+        result, text, _ = ask("status REQ-7")
+        assert result["examined"] == f"requisition/{REQUISITIONS[0]}" and "Relasi:" in text
+
+        result, text, _ = ask("astra zzz")
+        assert result["partial"] is True and "cocok sebagian" in text and "• Requisition (2)" in text
+
+        result, text, custom = ask("apa itu qwertyuiop")
+        assert result["erp_results"] == 0 and "Belum ada aturan ERP, record, atau pengetahuan" in text
+        assert not [e for e in custom if e["name"] == "celerates.actions"]

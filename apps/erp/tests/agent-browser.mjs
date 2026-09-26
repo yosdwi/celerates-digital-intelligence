@@ -34,10 +34,14 @@ export async function agentBrowser({ base, cookies }) {
     await mkdir(evidenceDir, { recursive: true });
     await page.screenshot({ path: evidenceDir + '/agent-m1-tanyakan-desktop.png' });
 
-    // Keyword search through the composer (no model).
+    // Ask anything through the composer (no model): records, and a rule with a next step.
     await panel.getByLabel('Pesan untuk Agent').fill('Synthetic');
     await panel.getByRole('button', { name: 'Kirim' }).click();
-    await panel.getByText('Pencarian kata kunci "Synthetic"', { exact: false }).waitFor({ timeout: 30000 });
+    await panel.getByText(/record ERP cocok dengan/).first().waitFor({ timeout: 30000 });
+    await panel.getByLabel('Pesan untuk Agent').fill('requisition mana yang belum punya TA PIC?');
+    await panel.getByRole('button', { name: 'Kirim' }).click();
+    await panel.getByRole('button', { name: 'Tindak lanjuti: Requisition belum memiliki TA PIC' }).waitFor({ timeout: 30000 });
+    await page.screenshot({ path: evidenceDir + '/agent-ask.png' });
 
     // Perlu perhatian and Masukan remain intact inside the Agent.
     await panel.getByRole('button', { name: 'Perlu perhatian', exact: true }).click();
