@@ -1,0 +1,15 @@
+flowchart TD
+  ERP["ERP facts and record grants"] --> CTX["Reusable context snapshot"]
+  SOURCES["Versioned source registry"] --> CURATION["Ingest and human approval"]
+  CURATION --> KNOWLEDGE["Scoped approved knowledge"]
+  KNOWLEDGE --> CTX
+  CTX --> PACK["Pre-Sales artifacts and review"]
+  PACK --> APPROVAL["ERP Owner reviews exact manifest"]
+  APPROVAL --> COMMAND["Idempotent reference command"]
+  ERP -->|"Current source version"| COMMAND
+  COMMAND -->|"Reference, receipt and outbox"| ERP
+  COMMAND --> OUTCOME["Read-back and evaluation outcome"]
+  OUTCOME --> FEEDBACK["Attributed feedback and correction"]
+  FEEDBACK -->|"Curator proposes draft lesson"| SOURCES
+  OUTCOME -->|"Prior observations, not ERP facts"| CTX
+  ERP --> PANEL["Native operational assistance"]

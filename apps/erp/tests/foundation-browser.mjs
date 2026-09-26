@@ -35,6 +35,7 @@ export async function foundationBrowser({env,python,base,cookies}){
   await page.screenshot({path:'../../docs/implementation/evidence/foundation-outcome.png',fullPage:true});
   await page.setViewportSize({width:390,height:844});await page.goto('http://127.0.0.1:5173/app/knowledge');
   await page.getByRole('heading',{name:'Knowledge',exact:true}).waitFor();
+  await page.getByRole('heading',{name:'Browser verified reference',exact:true}).waitFor();
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'mobile overflow');
   await page.screenshot({path:'../../docs/implementation/evidence/foundation-mobile.png',fullPage:true});
   await context.addCookies(cookies.map(([name,value])=>({name,value,url:base})));
