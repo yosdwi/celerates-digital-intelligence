@@ -34,10 +34,10 @@ Status: accepted (2026-09-26) with the Operating Substrate M2 increment. Record:
 - One path imports any command that has parameter specs. Requisitions and follow-up tasks work today. Leads need a `lead.create` command in ERP.
 - The existing Google Sheet sync importers stay until parity is proven for their sources. They are not retired in this increment.
 - Not yet covered:
-  - users correcting a mapping in the UI before proposing (today: rename the columns and re-upload);
   - mapping by model;
-  - PDF, DOCX or image "drop anything";
+  - images and scanned documents (OCR);
   - datasets larger than one proposal.
+- Done since this ADR was accepted: the mapping card lets users correct a mapping in the UI (M2), and documents are covered by the amendment below (M3).
 
 ## Amendment (M3, 2026-09-26) — documents
 
