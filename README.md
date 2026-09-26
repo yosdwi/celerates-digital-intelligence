@@ -40,6 +40,18 @@ Raw Sources
 - **Human review stays explicit** for business-critical outputs and external communication.
 - **Closed loop:** approved actions and outcomes are written back to ERP.
 
+## Implemented closed-loop foundation
+
+The shared foundation now includes governed source versions, scoped knowledge retrieval,
+reusable context snapshots, reviewed Pre-Sales output, an ERP-owned approval/command
+boundary, and outcome feedback with explicit lesson promotion. ERP operational assistance
+remains a native consumer alongside these shared capabilities.
+
+- [Audit and implementation evidence](docs/implementation/closed-loop-foundation.md)
+- [Operator setup and management demo](docs/implementation/closed-loop-operations.md)
+- [Controlled live ERP contract](packages/contracts/erp-http.md)
+- [Closed-loop diagram](docs/architecture/rendered/17-governed-closed-loop.svg)
+
 ## Start here for implementation
 
 **GPT Astra / implementation agent:** read [`HANDOFF-ASTRA.md`](./HANDOFF-ASTRA.md) first, then all architecture and product documents under `docs/` before writing code.

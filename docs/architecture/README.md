@@ -112,3 +112,10 @@ Do not edit generated SVG files manually. Change the `.mmd` source and let CI re
 session-bound ERP read boundary, explicit PMO commands and reused feedback flow.
 This human-facing endpoint is not the proposed ERP-to-Intelligence machine API.
 See [implementation and verification](../implementation/operational-assistance.md).
+
+## 17 — Shared governed closed loop (implemented)
+
+[Source](./17-governed-closed-loop.mmd) · [Rendered SVG](./rendered/17-governed-closed-loop.svg).
+Separates ERP truth, approved knowledge and outcome observations. Shows the exact
+human-review/action/receipt boundary and explicit feedback-to-lesson promotion.
+See [operator and demo flow](../implementation/closed-loop-operations.md).

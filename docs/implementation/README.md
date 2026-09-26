@@ -1,5 +1,10 @@
 # P0 implementation map
 
+**Current extension:** [closed-loop foundation](closed-loop-foundation.md) and
+[operator/demo guide](closed-loop-operations.md). The table below describes the
+original P0; governed source versions, live ERP approval/actions and outcomes now
+extend those same components.
+
 Issue: https://github.com/yosdwi/celerates-digital-intelligence/issues/1
 
 No locked ADR was replaced. React/TypeScript/Vite/Tailwind, FastAPI, PostgreSQL/pgvector/FTS, MinIO, LangGraph and LiteLLM remain the implementation boundaries.
@@ -27,7 +32,7 @@ LangGraph persists state and pauses at an actual human `interrupt`. Review decis
 
 Uploaded documents retain SHA-256, original objects, parser information, extracted text, chunks and source references. Reference registration requires the actual source text. URLs are recorded, not fetched. New evidence requires finishing the current review (e.g. requesting clarification), preventing a silent change to a pack's inputs.
 
-Demo embeddings are **deterministic hashed-token similarity**, not a semantic model. They exercise the real pgvector + FTS path without credentials or model downloads. `MODEL_MODE=litellm` uses the configured embedding model and the same web contract. Search is scoped to the opportunity; approved cross-opportunity knowledge curation is a future extension, not an implicit sharing of documents.
+Demo embeddings are **deterministic hashed-token similarity**, not a semantic model. They exercise the real pgvector + FTS path without credentials or model downloads. `MODEL_MODE=litellm` uses the configured embedding model and the same web contract. TOR search remains opportunity-scoped. Approved reusable knowledge now uses company/division/opportunity scope and classification filters before ranking; unapproved documents are never implicitly shared.
 
 Docling is the PDF/Office parser. Text/Markdown/CSV use direct UTF-8 extraction because layout inference is unnecessary. PDF model files may need a first-use download. Parse failures surface in the source list and the run; there is no silent text fabrication. The shipped Markdown TORs guarantee the demo does not depend on a model download.
 

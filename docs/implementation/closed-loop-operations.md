@@ -9,6 +9,18 @@ Railway and VPS use the same images. ERP migration 0004 and Intelligence migrati
 are additive; migrations execute at service start. Keep all existing volumes and
 backups. There is no destructive down-migration or automatic data seed in HTTP mode.
 
+The [execution record](closed-loop-foundation.md#final-railway-deployment-record)
+contains deployed revisions, runtime evidence and the outstanding MinIO registry
+gate for fresh Compose/VPS installs. Nginx uses the container's DNS resolver with a
+short cache so independent API deployments do not leave stale upstream addresses.
+
+For a read-only deployment check inside an Intelligence container, run
+`python scripts/check-foundation-runtime.py --web-base-url https://YOUR-WEB-ORIGIN`.
+It uses the existing pilot environment credential and prints only sanitized checks
+and a granted-record count. It makes no grants, approvals or business writes. Railway
+stores the JSON fields as log attributes. Keep the normal worker startup unchanged;
+the public-web probe is an operator verification tool, not a worker dependency.
+
 Configure ERP `INTELLIGENCE_ENVIRONMENT` (defaults to APP_ENV), `INTELLIGENCE_READ_TOKEN_SHA256`, `INTELLIGENCE_ACTION_TOKEN_SHA256`.
 Configure both Intelligence API and worker with `ERP_MODE=http`, `ERP_BASE_URL`,
 `ERP_ENVIRONMENT` matching INTELLIGENCE_ENVIRONMENT, independent `ERP_TOKEN`/`ERP_ACTION_TOKEN`,
