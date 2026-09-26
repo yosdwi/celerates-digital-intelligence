@@ -48,7 +48,14 @@ export async function POST(request: NextRequest) {
       }
     }
     else if (skill === "search") args = { query: String(given.query ?? lastUserText(input.messages)).trim().slice(0, 100) };
-    else if (skill === "ask") args = { query: String(given.query ?? lastUserText(input.messages)).trim().slice(0, 300) };
+    else if (skill === "ask") {
+      args = { query: String(given.query ?? lastUserText(input.messages)).trim().slice(0, 300) };
+      // A document the user attached earlier in this conversation; Intelligence checks it belongs to this user.
+      if (typeof given.dataset_id === "string" && UUID.test(given.dataset_id)) args.dataset_id = given.dataset_id.toLowerCase();
+    } else if (skill === "read_document") {
+      if (typeof given.dataset_id !== "string" || !UUID.test(given.dataset_id)) throw new BffError(422, "Berkas tidak dikenali.");
+      args = { dataset_id: given.dataset_id.toLowerCase() };
+    }
     else if (skill === "explain_entity") {
       // Only the entity the user is looking at, and only if ERP resolved it as readable for this user.
       if (!page.entity) throw new BffError(422, "Halaman ini belum memiliki record yang dikenali Agent.");

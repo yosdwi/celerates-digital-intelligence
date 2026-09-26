@@ -38,3 +38,19 @@ Status: accepted (2026-09-26) with the Operating Substrate M2 increment. Record:
   - mapping by model;
   - PDF, DOCX or image "drop anything";
   - datasets larger than one proposal.
+
+## Amendment (M3, 2026-09-26) — documents
+
+Uploads may also be **documents**: PDF with a text layer (via `pypdf`), DOCX (paragraphs and tables, read from the package XML), TXT or Markdown. The limit is 8 MB and 200 pages.
+
+- Documents are stored in the same owner-only `agent_datasets` table with `kind='document'`, as page-aware text chunks, and purged on the same schedule.
+- **Documents are not knowledge.**
+  - They are never shared with other users.
+  - They never enter governed retrieval.
+  - They are cited as *Berkas Anda* (`D1…`) only in the uploader's own conversation.
+  - Promoting a document to company knowledge remains the curator path (ADR-007).
+- **First read (`read_document`).**
+  - Without a model, the read is deterministic: size, sections, and record numbers the text names, linked to ERP records.
+  - With a model, the read is a cited summary. It may instead be an ERP-held proposal when the document asks for work the ERP commands can record. For example, a request letter becomes `requisition.create` items.
+- **Later questions** (`ask` with `dataset_id`) search the document's passages with the same Indonesian + English lexical query. The model can search only the document bound to the run.
+- Scanned PDFs without a text layer are refused with a clear message. OCR is not included.

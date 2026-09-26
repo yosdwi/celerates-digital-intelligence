@@ -18,6 +18,27 @@ def decide(messages):
         for m in messages[2:]
         if m["role"] == "user" and "evidence" in m["content"]
     )
+    document = first.get("document")
+    if document and question.startswith("ringkas berkas"):
+        need = re.search(r"(PT [A-Za-z ]+?) membutuhkan (\d+) ([A-Za-z ]+?) mulai", document["passages"])
+        if need:
+            return {
+                "proposal": {
+                    "title": f"Permintaan tenaga kerja {need.group(1)}",
+                    "items": [
+                        {
+                            "kind": "requisition.create",
+                            "target": None,
+                            "params": {
+                                "client_name": need.group(1),
+                                "position_name": need.group(3),
+                                "headcount_target": int(need.group(2)),
+                            },
+                        }
+                    ],
+                }
+            }
+        return {"answer": "Berkas ini tidak memuat permintaan kerja [D1].", "cite": ["D1"]}
     record = re.search(r"\b(req-[\w-]+)", question)
     if "task" in question and record:
         if not evidence:

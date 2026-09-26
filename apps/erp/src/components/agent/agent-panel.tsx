@@ -52,6 +52,7 @@ export function AgentPanel() {
   const [agent, setAgent] = useState<{ path: string; data?: AgentContext }>();
   const [runs, setRuns] = useState<AgentRun[]>([]);
   const [threadId] = useState(() => "thread-" + uuid());
+  const [attachment, setAttachment] = useState<{ id: string; name: string } | null>(null);
   const inflight = useRef<AbortController | null>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const close = useRef<HTMLButtonElement>(null);
@@ -148,7 +149,11 @@ export function AgentPanel() {
     const response = await fetch("/api/agent/datasets", { method: "POST", body: form }).catch(() => null);
     const body = await response?.json().catch(() => null);
     if (!response?.ok || !body?.id) return body?.error ?? "Berkas belum dapat diunggah.";
-    startRun("import_dataset", { dataset_id: body.id }, `Impor berkas ${body.name} (${body.rows} baris)`);
+    if (body.kind === "document") {
+      // A document stays attached to the conversation: later questions also search it.
+      setAttachment({ id: body.id, name: body.name });
+      startRun("read_document", { dataset_id: body.id }, `Baca berkas ${body.name} (${body.pages} halaman)`);
+    } else startRun("import_dataset", { dataset_id: body.id }, `Impor berkas ${body.name} (${body.rows} baris)`);
     return null;
   };
   const suggestions: Suggestion[] = [];
@@ -224,7 +229,10 @@ export function AgentPanel() {
           </nav>
           {tab === "ask" ? (
             <div className="min-h-0 flex-1">
-              <AgentThread runs={runs} running={running} enabled={agentReady} suggestions={suggestions} onSearch={(text) => startRun("ask", { query: text }, text)} onFile={importFile} onAction={(a) => startRun(a.skill, a.args, a.label)} />
+              <AgentThread runs={runs} running={running} enabled={agentReady} suggestions={suggestions} onSearch={(text) => startRun("ask", attachment ? { query: text, dataset_id: attachment.id } : { query: text }, text)}
+                onFile={importFile}
+                attachment={attachment}
+                onDetach={() => setAttachment(null)} onAction={(a) => startRun(a.skill, a.args, a.label)} />
             </div>
           ) : (
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5">

@@ -31,6 +31,7 @@ class RunContext:
     calls: int = 0
     read_opportunities: set = field(default_factory=set)
     proposals: list = field(default_factory=list)
+    document: dict | None = None
 
 
 @dataclass(frozen=True)
@@ -160,10 +161,20 @@ def dataset_read(ctx, dataset_id):
     row = datasets.load(ctx.principal, dataset_id)
     if not row:
         raise PolicyError("Berkas tidak ditemukan untuk pengguna ini")
-    return {
+    base = {
         "id": row["id"],
         "name": row["name"],
+        "kind": row["kind"],
         "sha256": row["sha256"],
         "profile": row["profile"],
-        "rows": row["rows"],
     }
+    if row["kind"] == "document":  # bounded: the opening chunks; the rest is reached through document_search
+        return {**base, "chunks": row["rows"][:6]}
+    return {**base, "rows": row["rows"]}
+
+
+@register("document_search", "1", "Passages of a document the user dropped into this Agent (owner only)")
+def document_search(ctx, dataset_id, query):
+    from . import documents
+
+    return {"passages": documents.search(ctx.principal, dataset_id, query)}

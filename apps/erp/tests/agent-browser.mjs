@@ -147,8 +147,16 @@ export async function agentModelBrowser({ base, cookies }) {
     const cited = (await line.textContent()).match(/\(([^)]*)\)/)[1].split(', ');
     for (const id of cited) await panel.locator('[data-evidence-type]').filter({ hasText: id }).first().waitFor();
     await page.screenshot({ path: evidenceDir + '/agent-model-inference.png' });
+    // Drop a request letter (PDF): the Agent reads it and prepares requisitions for the user to confirm in ERP.
+    const { pdfBytes } = await import('./agent-journey.mjs');
+    await panel.locator('[data-agent-file]').setInputFiles({ name: 'surat-permintaan.pdf', mimeType: 'application/pdf', buffer: pdfBytes(['SURAT PERMINTAAN TENAGA KERJA', 'PT Synthetic Browser Letter membutuhkan 3 Frontend Engineer mulai 1 November 2026.']) });
+    await panel.locator('[data-agent-attachment]').getByText('surat-permintaan.pdf', { exact: false }).waitFor();
+    const card = panel.locator('[data-proposal][data-proposal-state="pending"]').last();
+    await card.getByText('PT Synthetic Browser Letter — Frontend Engineer (3 orang)', { exact: false }).waitFor({ timeout: 30000 });
+    await panel.getByText('Berkas Anda', { exact: true }).first().waitFor();
+    await page.screenshot({ path: evidenceDir + '/agent-document-proposal.png' });
     assert.deepEqual(errors, []);
-    console.log('PASS: Agent browser (model) — answer labelled Inferensi, every cited id has an evidence card');
+    console.log('PASS: Agent browser (model) — answer labelled Inferensi, every cited id has an evidence card; dropped PDF → requisition proposal');
   } finally {
     await browser.close();
   }

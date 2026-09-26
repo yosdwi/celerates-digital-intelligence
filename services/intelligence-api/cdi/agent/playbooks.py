@@ -220,6 +220,7 @@ STOPWORDS = set(
     informasi semua daftar list berapakah apakah sudah masih punya the a an of for to in on is are was with and or what
     who which how many much show find list me my please about any all does do there""".split()
 )
+RECORD_IN_TEXT = re.compile(r"\b(?:REQ|OPTY|TASK|FR|LEAD)-?[A-Z0-9]*-?\d[\w-]*", re.I)
 RECORD_NO = re.compile(r"^(req|opty|task|fr|lead|pq|inv|crm)[-\w]*\d", re.I)
 MAX_RESULT_LINES = 4
 
@@ -249,22 +250,104 @@ def _matching_signals(terms, signals):
     return [g for sc, _, g in sorted(scored, key=lambda x: (-x[0], x[1])) if sc >= need and sc == best][:2]
 
 
-def ask(ctx, query):
+def _document(ctx, dataset_id):
+    """The attached document's identity, checked for ownership by the tool (PolicyError for anyone else)."""
+    if not dataset_id:
+        return None
+    data = invoke(ctx, "dataset_read", dataset_id=dataset_id)
+    if data["kind"] != "document":
+        raise PolicyError("Berkas ini adalah tabel; gunakan impor")
+    return {"id": data["id"], "name": data["name"], "profile": data["profile"], "chunks": data["chunks"]}
+
+
+def ask(ctx, query, dataset_id=None):
     """`Ask anything`. With an Agent model configured, a bounded plan → read → answer loop (reasoning.py) over the same
-    tools; otherwise, or whenever the model path fails validation, the deterministic router below."""
+    tools; otherwise, or whenever the model path fails validation, the deterministic router below. A dropped document
+    (`dataset_id`) adds its passages as evidence (*Berkas Anda*) to either path."""
+    document = _document(ctx, dataset_id)
     if agent_model_enabled():
         try:
-            return reasoning.ask_with_model(ctx, query)
+            return reasoning.ask_with_model(ctx, query, document=document)
         except (reasoning.ModelUnavailable, reasoning.ReasoningFailed, TimeoutError) as exc:
             log.warning("Agent model path fell back to deterministic: %s", type(exc).__name__)
             ctx.calls = 0
             ctx.deadline = max(ctx.deadline, time.monotonic() + reasoning.FALLBACK_RESERVE)
-            result = ask_deterministic(ctx, query, fallback=True)
+            result = ask_deterministic(ctx, query, fallback=True, document=document)
             return {**result, "reasoning": "fallback", "fallback_reason": type(exc).__name__}
-    return ask_deterministic(ctx, query)
+    return ask_deterministic(ctx, query, document=document)
 
 
-def ask_deterministic(ctx, query, fallback=False):
+def _document_lines(ctx, document, query):
+    with ctx.recorder.step("Mencari di berkas Anda"):
+        passages = invoke(ctx, "document_search", dataset_id=document["id"], query=query)["passages"]
+    _, cards = reasoning.document_cards(reasoning.Ledger(), document, passages[:3])
+    for card in cards:
+        card.pop("cite", None)
+    ctx.recorder.evidence(cards)
+    if not passages:
+        return [f"Tidak ada bagian {document['name']} yang cocok dengan pertanyaan ini."]
+    return [f"Dari {document['name']}:"] + [
+        f"• hal. {p['page']}: {' '.join(p['text'].split())[:220]}{'…' if len(p['text']) > 220 else ''}"
+        for p in passages[:3]
+    ]
+
+
+def read_document(ctx, dataset_id):
+    """First read of a dropped document. Deterministic: what it is, its sections, and ERP records it names. With a
+    model: a cited summary, or an ERP-held proposal when the document asks for work the ERP commands can record."""
+    document = _document(ctx, dataset_id)
+    prof = document["profile"]
+    ctx.recorder.evidence(
+        [
+            {
+                "type": "document",
+                "title": document["name"],
+                "detail": [f"{prof['pages']} halaman · {prof['chunks']} bagian · {prof['chars']} karakter"]
+                + [f"Bagian: {h}" for h in prof["headings"][:6]],
+                "source": {"kind": "upload", "ref": document["id"]},
+            }
+        ]
+    )
+    if agent_model_enabled():
+        try:
+            result = reasoning.ask_with_model(
+                ctx, reasoning.DOCUMENT_BRIEF, document=document, opening=document["chunks"]
+            )
+            return {**result, "skill": "read_document", "dataset_id": dataset_id}
+        except (reasoning.ModelUnavailable, reasoning.ReasoningFailed, TimeoutError) as exc:
+            log.warning("Document brief fell back to deterministic: %s", type(exc).__name__)
+            ctx.calls = 0
+            ctx.deadline = max(ctx.deadline, time.monotonic() + reasoning.FALLBACK_RESERVE)
+    text = " ".join(c["text"] for c in document["chunks"])
+    numbers = list(dict.fromkeys(m.group(0).upper() for m in RECORD_IN_TEXT.finditer(text)))[:3]
+    lines = [f"{document['name']}: {prof['pages']} halaman, {prof['chunks']} bagian."]
+    if prof["headings"]:
+        lines.append("Bagian utama: " + "; ".join(prof["headings"][:5]) + ".")
+    linked = 0
+    if numbers:
+        with ctx.recorder.step("Mencocokkan nomor record dengan ERP"):
+            found = invoke(ctx, "erp_search", query=" ".join(numbers), mode="any")["results"]
+        ctx.recorder.evidence(
+            [
+                {
+                    "type": "erp_fact",
+                    "title": f"{r['type_label']} {r['label']}",
+                    "detail": ["Disebut dalam berkas"],
+                    "href": r.get("href"),
+                    "source": {"kind": "erp", "ref": f"{r['type']}/{r['id']}"},
+                }
+                for r in found
+            ]
+        )
+        linked = len(found)
+        lines.append(f"Nomor record yang disebut: {', '.join(numbers)} — {linked} ditemukan di ERP.")
+    lines.append("Berkas ini sekarang terlampir di percakapan: tanyakan isinya, dan jawaban mengutip halaman berkas.")
+    ctx.recorder.provenance({"mode": "deterministic", "fallback": agent_model_enabled()})
+    ctx.recorder.message("\n".join(lines))
+    return {"skill": "read_document", "dataset_id": dataset_id, "reasoning": "deterministic", "linked": linked}
+
+
+def ask_deterministic(ctx, query, fallback=False, document=None):
     """`Ask anything`, without a model: route a free-text question to ERP rules, records and approved knowledge.
 
     1. rules whose wording matches the question (exact counts, examples, and a follow-up action);
@@ -277,6 +360,8 @@ def ask_deterministic(ctx, query, fallback=False):
         )
         return {"skill": "ask", "terms": []}
     lines, actions, found_signals = [], [], []
+    if document:
+        lines += _document_lines(ctx, document, query)
     with ctx.recorder.step("Mencocokkan dengan aturan perhatian ERP"):
         signals = invoke(ctx, "erp_signals")["signals"]
         found_signals = _matching_signals(terms, signals)
@@ -451,6 +536,8 @@ def import_dataset(ctx, dataset_id, command=None, mapping=None):
     user chose a command and mapping in the mapping card; either way ERP validates every row before anything applies."""
     with ctx.recorder.step("Membaca berkas"):
         data = invoke(ctx, "dataset_read", dataset_id=dataset_id)
+    if data["kind"] != "table":
+        raise PolicyError("Berkas ini adalah dokumen, bukan tabel; tanyakan isinya di Tanya")
     prof = data["profile"]
     ctx.recorder.evidence(
         [
@@ -558,6 +645,7 @@ PLAYBOOKS = {
     "ask": ask,
     "follow_up_signal": follow_up_signal,
     "import_dataset": import_dataset,
+    "read_document": read_document,
 }
 SKILLS = set(PLAYBOOKS)
 

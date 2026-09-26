@@ -40,7 +40,7 @@ export async function readSse(
 export type RunRequest = {
   runId: string;
   threadId: string;
-  skill: "explain_signal" | "explain_entity" | "search" | "ask" | "follow_up_signal" | "import_dataset";
+  skill: "explain_signal" | "explain_entity" | "search" | "ask" | "follow_up_signal" | "import_dataset" | "read_document";
   args: Record<string, unknown>;
   path: string;
   text: string;

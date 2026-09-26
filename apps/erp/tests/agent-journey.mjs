@@ -154,7 +154,43 @@ async function modelJourneys({ request, db }) {
   assert.equal(done.state, 'applied');
   const [task] = await db`SELECT source_type, source_id FROM kanban_tasks WHERE title=${'Follow up ' + req.requisition_no.toUpperCase()}`;
   assert.deepEqual({ ...task }, { source_type: 'requisition', source_id: req.id });
-  console.log('PASS: Agent model path — paraphrase understood with cited rule/SOP as inference, ungrounded answer rejected, natural-language action → ERP proposal → confirmed task');
+  // A dropped request letter becomes an ERP-held proposal for the requisition it asks for; ERP applies it on confirm.
+  const letter = pdfBytes(['SURAT PERMINTAAN TENAGA KERJA', 'PT Synthetic Letter membutuhkan 2 Data Analyst mulai 1 Oktober 2026.']);
+  const doc = await uploadFile(request, 'permintaan-model.pdf', letter, 'application/pdf');
+  const brief = await run(request, 'read_document', { dataset_id: doc.body.id });
+  assert.ok(brief.proposal?.id, brief.text);
+  const drafted = await (await request(`/api/agent/proposals/${brief.proposal.id}`)).json();
+  assert.deepEqual(drafted.items.map(i => [i.kind, i.params.client_name, i.params.position_name, i.params.headcount_target, i.validation.state]), [['requisition.create', 'PT Synthetic Letter', 'Data Analyst', 2, 'ok']]);
+  const made = await (await request(`/api/agent/proposals/${brief.proposal.id}/confirm`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sha256: drafted.sha256 }) })).json();
+  assert.equal(made.state, 'applied');
+  assert.equal((await db`SELECT count(*)::int AS n FROM requisitions WHERE client_name='PT Synthetic Letter'`)[0].n, 1);
+  console.log('PASS: Agent model path — paraphrase understood with cited rule/SOP as inference, ungrounded answer rejected, natural-language action → ERP proposal → confirmed task, dropped request letter → requisition proposal → applied');
+}
+
+/** A minimal one-page PDF with real text (Helvetica), for the document journeys. */
+export function pdfBytes(lines) {
+  const content = 'BT /F1 12 Tf 72 720 Td ' + lines.map((l) => `(${l}) Tj 0 -16 Td`).join(' ') + ' ET';
+  const objs = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>',
+    `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ];
+  let out = '%PDF-1.4\n';
+  const offsets = [];
+  objs.forEach((o, i) => { offsets.push(out.length); out += `${i + 1} 0 obj\n${o}\nendobj\n`; });
+  const xref = out.length;
+  out += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n` + offsets.map((o) => String(o).padStart(10, '0') + ' 00000 n \n').join('');
+  out += `trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  return Buffer.from(out, 'latin1');
+}
+
+async function uploadFile(request, name, body, type) {
+  const form = new FormData();
+  form.set('file', new Blob([body], { type }), name);
+  const res = await request('/api/agent/datasets', { method: 'POST', body: form });
+  return { status: res.status, body: await res.json() };
 }
 
 async function run(request, skill, args, path = '/ta') {
@@ -254,6 +290,20 @@ async function proposalJourneys({ base, request, db, env, intelligence, requisit
     const dup = (await json(`/api/agent/proposals/${reimport.proposal.id}`)).body;
     assert.equal(dup.items[0].validation.state, 'warning', 'duplicate of the row just imported is flagged by ERP');
     assert.equal((await post(`/api/agent/proposals/${dup.id}/reject`, {})).body.state, 'rejected');
+    // Drop a document: read deterministically (sections, ERP records it names), then questions cite its pages.
+    const letter = pdfBytes(['SURAT PERMINTAAN TENAGA KERJA', 'PT Synthetic Letter membutuhkan 2 Data Analyst mulai 1 Oktober 2026.', `Rujukan permintaan: ${requisition.requisition_no}.`, 'Kontrak berjalan 12 bulan.']);
+    const doc = await uploadFile(request, 'permintaan.pdf', letter, 'application/pdf');
+    assert.equal(doc.status, 201, JSON.stringify(doc.body));
+    assert.equal(doc.body.kind, 'document');
+    const read = await run(request, 'read_document', { dataset_id: doc.body.id });
+    assert.equal(read.evidence[0].type, 'document');
+    assert.ok(read.evidence.some(e => e.source?.ref === `requisition/${requisition.id}` && e.detail[0] === 'Disebut dalam berkas'), 'record named in the file is linked to ERP');
+    const docQ = await run(request, 'ask', { query: 'berapa lama kontrak berjalan?', dataset_id: doc.body.id });
+    assert.match(docQ.text, /Dari permintaan\.pdf:[\s\S]*12 bulan/);
+    assert.ok(docQ.evidence.some(e => e.type === 'document' && /hal\. 1/.test(e.title)));
+    const tooMuch = await uploadFile(request, 'x.pdf', Buffer.alloc(9 * 1024 * 1024), 'application/pdf');
+    assert.equal(tooMuch.status, 413);
+
     // Name resolution: legal forms are ignored; a typo still finds the client (fuzzy with pg_trgm, any-term without).
     const legal = await run(request, 'ask', { query: 'PT Synthetic Import Tbk' });
     assert.ok(legal.evidence.some(e => /Synthetic Import/.test(e.title)), legal.text);

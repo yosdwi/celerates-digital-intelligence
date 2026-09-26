@@ -15,7 +15,9 @@ export type Evidence = {
   cite?: string;
 };
 /** How the answer text was produced. `model` text is inference over the cited evidence, never a fact source. */
-export type Provenance = { mode: "model"; model: string; cited: string[]; rounds: number; tokens: number } | { mode: "deterministic"; fallback: boolean };
+export type Provenance =
+  | { mode: "model"; kind: "answer" | "proposal"; model: string; cited: string[]; read: number; rounds: number; tokens: number }
+  | { mode: "deterministic"; fallback: boolean };
 export type AgentAction =
   | { label: string; skill: "follow_up_signal"; args: { signal_key: string } }
   | { label: string; skill: "import_dataset"; args: { dataset_id: string; command: string; mapping: Record<string, string> } };
@@ -89,8 +91,10 @@ export function applyEvent(run: AgentRun, event: AgUiEvent, id: string | null = 
             ...run,
             provenance: {
               mode: "model",
+              kind: v.kind === "proposal" ? "proposal" : "answer",
+              read: Number(v.read) || 0,
               model: String(v.model ?? "model").slice(0, 80),
-              cited: Array.isArray(v.cited) ? v.cited.filter((c): c is string => typeof c === "string" && /^[ES]\d{1,3}$/.test(c)) : [],
+              cited: Array.isArray(v.cited) ? v.cited.filter((c): c is string => typeof c === "string" && /^[ESD]\d{1,3}$/.test(c)) : [],
               rounds: Number(v.rounds) || 0,
               tokens: Number(v.tokens) || 0,
             },

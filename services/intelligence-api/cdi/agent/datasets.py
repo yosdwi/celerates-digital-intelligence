@@ -54,7 +54,7 @@ def _cell(value):
 def _grid(name, body):
     suffix = "." + name.rsplit(".", 1)[-1].lower() if "." in name else ""
     if suffix not in MEDIA:
-        raise DatasetError("Unggah berkas CSV atau XLSX.")
+        raise DatasetError("Unggah CSV, XLSX, PDF, DOCX, TXT atau Markdown.")
     if suffix == ".xlsx":
         import openpyxl
 
@@ -245,19 +245,33 @@ def to_items(rows, command, mapping):
 
 
 def store(principal, name, body):
-    suffix, headers, rows, meta = parse(name, body)
+    """Tables (CSV/XLSX) become rows for import; documents (PDF/DOCX/TXT/MD) become text chunks for reading."""
+    from . import documents
+
+    suffix = "." + name.rsplit(".", 1)[-1].lower() if "." in name else ""
+    if suffix in documents.MEDIA:
+        try:
+            suffix, prof, rows = documents.parse(name, body)
+        except documents.DocumentError as exc:
+            raise DatasetError(str(exc)) from exc
+        kind, media = "document", documents.MEDIA[suffix]
+    else:
+        if len(body) > MAX_BYTES:
+            raise DatasetError("Ukuran maksimum tabel 2 MB.")
+        suffix, headers, rows, meta = parse(name, body)
+        prof = profile(headers, rows, meta)
+        prof["fingerprint"] = fingerprint(headers)
+        kind, media = "table", MEDIA[suffix]
     dataset_id = str(uuid4())
     digest = hashlib.sha256(body).hexdigest()
     key = f"agent-datasets/{dataset_id}{suffix}"
-    storage().put(key, body, MEDIA[suffix])
-    prof = profile(headers, rows, meta)
-    prof["fingerprint"] = fingerprint(headers)
+    storage().put(key, body, media)
     with connect() as conn:
         row = one(
             conn,
-            """INSERT INTO agent_datasets(id,principal_sub,name,media_type,sha256,object_key,size_bytes,profile,rows)
-               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id,name,sha256,profile,created_at""",
-            (dataset_id, principal.sub, name[:200], MEDIA[suffix], digest, key, len(body), json(prof), json(rows)),
+            """INSERT INTO agent_datasets(id,principal_sub,name,media_type,sha256,object_key,size_bytes,profile,rows,kind)
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id,name,sha256,profile,kind,created_at""",
+            (dataset_id, principal.sub, name[:200], media, digest, key, len(body), json(prof), json(rows), kind),
         )
     return row
 

@@ -43,6 +43,11 @@ class SearchArgs(Strict):
 
 class AskArgs(Strict):
     query: str = Field(min_length=2, max_length=300)
+    dataset_id: UUID | None = None
+
+
+class DocumentArgs(Strict):
+    dataset_id: UUID
 
 
 class DatasetArgs(Strict):
@@ -60,13 +65,16 @@ ARGS = {
     "ask": AskArgs,
     "follow_up_signal": SignalArgs,
     "import_dataset": DatasetArgs,
+    "read_document": DocumentArgs,
 }
 
 
 class RunRequest(Strict):
     run_id: UUID | None = None
     thread_id: str | None = Field(default=None, pattern=r"^[A-Za-z0-9_-]{8,100}$")
-    skill: Literal["explain_signal", "explain_entity", "search", "ask", "follow_up_signal", "import_dataset"]
+    skill: Literal[
+        "explain_signal", "explain_entity", "search", "ask", "follow_up_signal", "import_dataset", "read_document"
+    ]
     args: dict
     modality: Literal["text"] = "text"  # voice arrives with M2 through the same run model
 
@@ -185,9 +193,17 @@ def record_outcome(run_id: UUID, body: Outcome, user=Depends(delegated_actor)):
 
 @router.post("/datasets", status_code=201)
 def upload_dataset(file: UploadFile = File(...), user=Depends(delegated_actor)):
-    body = file.file.read(datasets.MAX_BYTES + 1)
+    from . import documents
+
+    body = file.file.read(documents.MAX_BYTES + 1)
     try:
         row = datasets.store(user, file.filename or "berkas.csv", body)
     except datasets.DatasetError as exc:
         raise HTTPException(422, str(exc)) from exc
-    return {"id": row["id"], "name": row["name"], "sha256": row["sha256"], "profile": row["profile"]}
+    return {
+        "id": row["id"],
+        "name": row["name"],
+        "kind": row["kind"],
+        "sha256": row["sha256"],
+        "profile": row["profile"],
+    }

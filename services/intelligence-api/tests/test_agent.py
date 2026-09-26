@@ -390,9 +390,9 @@ class ProposingERP(FakeERP):
         }
 
 
-def run_skill(monkeypatch, client, token, skill, args):
+def run_skill(monkeypatch, client, token, skill, args, erp=None):
     monkeypatch.setattr(settings(), "erp_mode", "http")
-    monkeypatch.setattr(playbooks, "DelegatedERP", ProposingERP)
+    monkeypatch.setattr(playbooks, "DelegatedERP", erp or ProposingERP)
     monkeypatch.setattr(playbooks, "start", lambda run, user, a: playbooks.execute(run, user, a))
     run_id = str(uuid4())
     created = client.post(
@@ -784,3 +784,173 @@ def test_model_reasoning_is_bounded_grounded_and_falls_back(monkeypatch):
         end, _, _, _ = run("hapus semua", [{"proposal": {"title": "x", "items": [{"kind": "requisition.delete"}]}}])
         assert end["result"]["reasoning"] == "fallback", "unknown commands never reach ERP"
     monkeypatch.setattr(playbooks, "DelegatedERP", original)
+
+
+def docx_bytes(paragraphs, table=None):
+    import io
+    import zipfile
+
+    ns = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
+    body = "".join(f"<w:p><w:r><w:t>{p}</w:t></w:r></w:p>" for p in paragraphs)
+    if table:
+        rows = "".join(
+            "<w:tr>" + "".join(f"<w:tc><w:p><w:r><w:t>{c}</w:t></w:r></w:p></w:tc>" for c in row) + "</w:tr>"
+            for row in table
+        )
+        body += f"<w:tbl>{rows}</w:tbl>"
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w") as z:
+        z.writestr("word/document.xml", f'<?xml version="1.0"?><w:document {ns}><w:body>{body}</w:body></w:document>')
+    return out.getvalue()
+
+
+def pdf_bytes(lines):
+    """A minimal single-page PDF with real text (Helvetica), enough for pypdf text extraction."""
+    content = "BT /F1 12 Tf 72 720 Td " + " ".join(f"({line}) Tj 0 -16 Td" for line in lines) + " ET"
+    objs = [
+        "<< /Type /Catalog /Pages 2 0 R >>",
+        "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
+        f"<< /Length {len(content)} >>\nstream\n{content}\nendstream",
+        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    ]
+    out, offsets = "%PDF-1.4\n", []
+    for i, obj in enumerate(objs, 1):
+        offsets.append(len(out))
+        out += f"{i} 0 obj\n{obj}\nendobj\n"
+    xref = len(out)
+    out += f"xref\n0 {len(objs) + 1}\n0000000000 65535 f \n" + "".join(f"{o:010d} 00000 n \n" for o in offsets)
+    out += f"trailer\n<< /Size {len(objs) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF"
+    return out.encode("latin-1")
+
+
+def test_dropped_documents_are_read_cited_and_owner_only(monkeypatch):
+    token = mint(ctx={"path": "/ta", "module": "ta"})
+    stranger = mint(sub=SECOND)
+    monkeypatch.setattr(settings(), "generation_mode", "demo")
+    letter = docx_bytes(
+        [
+            "SURAT PERMINTAAN TENAGA KERJA",
+            "PT Astra Sintetis membutuhkan 2 Backend Engineer level senior mulai 1 Oktober 2026.",
+            "Kontrak berjalan 12 bulan. Rujukan permintaan sebelumnya: REQ-7.",
+        ],
+        table=[["Posisi", "Jumlah"], ["QA Engineer", "1"]],
+    )
+    with TestClient(app) as c:
+        up = c.post(
+            "/api/agent/datasets",
+            files={"file": ("permintaan.docx", letter, "application/octet-stream")},
+            headers={"X-ERP-Delegation": token},
+        )
+        assert up.status_code == 201, up.text
+        doc = up.json()
+        assert doc["kind"] == "document" and "SURAT PERMINTAAN TENAGA KERJA" in doc["profile"]["headings"]
+        pdf = c.post(
+            "/api/agent/datasets",
+            files={
+                "file": (
+                    "kontrak.pdf",
+                    pdf_bytes(["Pembayaran invoice setiap tanggal 5.", "Termin 30 hari."]),
+                    "application/pdf",
+                )
+            },
+            headers={"X-ERP-Delegation": token},
+        )
+        assert pdf.status_code == 201 and pdf.json()["profile"]["pages"] == 1, pdf.text
+        blank = c.post(
+            "/api/agent/datasets",
+            files={"file": ("scan.pdf", pdf_bytes([]), "application/pdf")},
+            headers={"X-ERP-Delegation": token},
+        )
+        assert blank.status_code == 422 and "OCR" in blank.json()["detail"]
+
+        # Deterministic first read: what it is, sections, and ERP records it names.
+        monkeypatch.setattr(playbooks, "DelegatedERP", AskingERP)
+        _, stream = run_skill(monkeypatch, c, token, "read_document", {"dataset_id": doc["id"]}, AskingERP)
+        assert stream[-1][1]["type"] == "RUN_FINISHED", stream[-1]
+        cards = [
+            i
+            for _, e in stream
+            if e["type"] == "CUSTOM" and e["name"] == "celerates.evidence"
+            for i in e["value"]["items"]
+        ]
+        assert cards[0]["type"] == "document" and any(c["detail"] == ["Disebut dalam berkas"] for c in cards)
+        text = "".join(e["delta"] for _, e in stream if e["type"] == "TEXT_MESSAGE_CONTENT")
+        assert "REQ-7" in text and "terlampir" in text
+
+        # Follow-up question about the document cites its passages (deterministic).
+        _, stream = run_skill(
+            monkeypatch, c, token, "ask", {"query": "berapa lama kontrak berjalan?", "dataset_id": doc["id"]}, AskingERP
+        )
+        text = "".join(e["delta"] for _, e in stream if e["type"] == "TEXT_MESSAGE_CONTENT")
+        assert "Dari permintaan.docx:" in text and "12 bulan" in text
+        _, stream = run_skill(
+            monkeypatch,
+            c,
+            token,
+            "ask",
+            {"query": "kapan pembayaran invoice?", "dataset_id": pdf.json()["id"]},
+            AskingERP,
+        )
+        assert "tanggal 5" in "".join(e["delta"] for _, e in stream if e["type"] == "TEXT_MESSAGE_CONTENT")
+
+        # Owner only; a document is not a table.
+        _, stream = run_skill(monkeypatch, c, stranger, "ask", {"query": "kontrak", "dataset_id": doc["id"]}, AskingERP)
+        assert stream[-1][1]["type"] == "RUN_ERROR" and stream[-1][1]["code"] == "POLICY"
+        _, stream = run_skill(monkeypatch, c, token, "import_dataset", {"dataset_id": doc["id"]}, AskingERP)
+        assert stream[-1][1]["code"] == "POLICY"
+
+        # With a model: the brief proposes requisitions extracted from the letter; ERP still validates everything.
+        import sys
+        import types
+
+        ProposingERP.proposed.clear()
+        model = ScriptedModel(
+            [
+                {
+                    "proposal": {
+                        "title": "Permintaan tenaga kerja PT Astra Sintetis",
+                        "items": [
+                            {
+                                "kind": "requisition.create",
+                                "params": {
+                                    "client_name": "PT Astra Sintetis",
+                                    "position_name": "Backend Engineer",
+                                    "headcount_target": 2,
+                                },
+                            },
+                            {
+                                "kind": "requisition.create",
+                                "params": {
+                                    "client_name": "PT Astra Sintetis",
+                                    "position_name": "QA Engineer",
+                                    "headcount_target": 1,
+                                },
+                            },
+                        ],
+                    }
+                },
+                {"calls": [{"tool": "document_search", "args": {"query": "kontrak", "dataset_id": "evil"}}]},
+                {"calls": [{"tool": "document_search", "args": {"query": "kontrak"}}]},
+                {"answer": "Kontrak berjalan 12 bulan [D1].", "cite": ["D1"]},
+            ]
+        )
+        monkeypatch.setitem(sys.modules, "litellm", types.SimpleNamespace(completion=model.completion))
+        monkeypatch.setattr(settings(), "generation_mode", "litellm")
+        monkeypatch.setattr(settings(), "agent_model", "openai/scripted")
+        _, stream = run_skill(monkeypatch, c, token, "read_document", {"dataset_id": doc["id"]}, AskingERP)
+        assert stream[-1][1]["result"]["reasoning"] == "model"
+        assert [i["params"]["position_name"] for i in ProposingERP.proposed[-1]["items"]] == [
+            "Backend Engineer",
+            "QA Engineer",
+        ]
+        prompt = json.loads(model.calls[0]["messages"][1]["content"])
+        assert "D1: document 'permintaan.docx' page 1" in prompt["document"]["passages"]
+        # The model cannot choose which dataset to read: an extra dataset_id argument is rejected → fallback.
+        _, stream = run_skill(monkeypatch, c, token, "ask", {"query": "kontrak?", "dataset_id": doc["id"]}, AskingERP)
+        assert stream[-1][1]["result"]["reasoning"] == "fallback"
+        _, stream = run_skill(
+            monkeypatch, c, token, "ask", {"query": "berapa lama kontrak?", "dataset_id": doc["id"]}, AskingERP
+        )
+        end = stream[-1][1]["result"]
+        assert end["reasoning"] == "model" and end["cited"] == ["D1"], end

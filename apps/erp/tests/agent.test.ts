@@ -138,7 +138,7 @@ test("AG-UI conformance of the event shapes the panel consumes, and the pure run
   modelRun = applyEvent(modelRun, { type: "CUSTOM", name: "celerates.provenance", value: { mode: "model", model: "openai/x", cited: ["E1", "S2", "<b>"], rounds: 2, tokens: 10 } });
   modelRun = applyEvent(modelRun, { type: "TEXT_MESSAGE_CONTENT", delta: "Jawaban [E1]" });
   modelRun = applyEvent(modelRun, { type: "RUN_FINISHED", threadId: "t", runId: "r5" });
-  assert.deepEqual(modelRun.provenance, { mode: "model", model: "openai/x", cited: ["E1", "S2"], rounds: 2, tokens: 10 });
+  assert.deepEqual(modelRun.provenance, { mode: "model", kind: "answer", read: 0, model: "openai/x", cited: ["E1", "S2"], rounds: 2, tokens: 10 });
   const modelParts = toThreadMessages([modelRun])[1].content as { type: string }[];
   assert.deepEqual(modelParts.map((p) => p.type).slice(-2), ["text", "data-provenance"]);
   assert.equal(parts[2].data?.id, proposalId);

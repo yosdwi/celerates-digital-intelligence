@@ -97,6 +97,13 @@ export function ToolTrace({ toolName, result }: { toolName: string; result?: unk
 
 /** Keeps the three kinds of truth visible for the answer text itself (doc 14 §3): model text is inference. */
 export function ProvenanceLine({ value }: { value: Provenance }) {
+  if (value.mode === "model" && value.kind === "proposal")
+    return (
+      <p className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500" data-provenance="model">
+        <EvidenceBadge type="inference" />
+        Isi usulan disusun model dari {value.read} bukti yang dibaca. ERP sudah memvalidasi setiap item; tidak ada yang berubah sebelum Anda konfirmasi.
+      </p>
+    );
   if (value.mode === "model")
     return (
       <p className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500" data-provenance="model">

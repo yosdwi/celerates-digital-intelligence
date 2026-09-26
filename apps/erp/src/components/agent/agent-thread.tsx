@@ -98,6 +98,8 @@ export default function AgentThread({
   onSearch,
   onFile,
   onAction,
+  attachment,
+  onDetach,
 }: {
   runs: AgentRun[];
   running: boolean;
@@ -107,6 +109,9 @@ export default function AgentThread({
   /** `Drop anything`: a CSV/XLSX becomes a dataset, then a proposal the user confirms in ERP. */
   onFile: (file: File) => Promise<string | null>;
   onAction: (action: AgentAction) => void;
+  /** A dropped document attached to this conversation; questions also search it until detached. */
+  attachment: { id: string; name: string } | null;
+  onDetach: () => void;
 }) {
   const picker = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -150,7 +155,7 @@ export default function AgentThread({
             <div className="space-y-3">
               <p className="text-sm text-slate-600">
                 {enabled
-                  ? "Tanyakan apa saja tentang kondisi, record, atau aturan kerja — misalnya “requisition mana yang belum punya TA PIC?” — atau jatuhkan berkas CSV/XLSX untuk diimpor. Jawaban disusun dari fakta ERP dan pengetahuan yang disetujui, dengan buktinya; perubahan data selalu menunggu konfirmasi Anda."
+                  ? "Tanyakan apa saja tentang kondisi, record, atau aturan kerja — misalnya “requisition mana yang belum punya TA PIC?” — atau jatuhkan berkas: tabel CSV/XLSX untuk diimpor, dokumen PDF/DOCX untuk dibaca dan ditanyakan. Jawaban disusun dari fakta ERP dan pengetahuan yang disetujui, dengan buktinya; perubahan data selalu menunggu konfirmasi Anda."
                   : "Agent belum dikonfigurasi di lingkungan ini. Perlu perhatian dan Masukan tetap dapat digunakan."}
               </p>
               {enabled && suggestions.length > 0 && (
@@ -174,6 +179,14 @@ export default function AgentThread({
             <ThreadPrimitive.Messages components={{ UserMessage, AssistantMessage }} />
           </ActionContext.Provider>
         </ThreadPrimitive.Viewport>
+        {attachment && (
+          <p className="mx-3 mt-2 flex items-center justify-between gap-2 rounded-lg bg-sky-50 px-2.5 py-1.5 text-xs text-sky-900" data-agent-attachment>
+            <span className="truncate">Berkas terlampir: {attachment.name} — pertanyaan juga mencari di berkas ini</span>
+            <button type="button" onClick={onDetach} aria-label="Lepas berkas" className="shrink-0 font-semibold hover:underline">
+              Lepas
+            </button>
+          </p>
+        )}
         {fileError && (
           <p role="alert" className="mx-3 mb-0 mt-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-900">
             {fileError}
@@ -183,7 +196,7 @@ export default function AgentThread({
           <input
             ref={picker}
             type="file"
-            accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            accept=".csv,.xlsx,.pdf,.docx,.txt,.md"
             className="hidden"
             data-agent-file
             onChange={(e) => {
@@ -193,8 +206,8 @@ export default function AgentThread({
           />
           <button
             type="button"
-            aria-label="Lampirkan berkas CSV atau XLSX"
-            title="Impor CSV/XLSX"
+            aria-label="Lampirkan berkas"
+            title="Lampirkan tabel (CSV/XLSX) untuk impor, atau dokumen (PDF/DOCX/TXT/MD) untuk ditanyakan"
             disabled={!enabled || running || uploading}
             onClick={() => picker.current?.click()}
             className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-300 text-slate-600 hover:border-brand-300 hover:text-brand-700 disabled:opacity-40"
