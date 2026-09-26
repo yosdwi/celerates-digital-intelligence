@@ -117,7 +117,7 @@ def recent(limit: Annotated[int, Query(ge=1, le=100)] = 30, user=Depends(curator
     with connect() as conn:
         rows = all_rows(
             conn,
-            """SELECT r.id, r.skill, r.state, r.principal_name, r.created_at, r.finished_at, r.error,
+            """SELECT r.id, r.skill, r.state, r.principal_name, r.created_at, r.finished_at, r.error, r.modality,
                       r.input->>'query' AS query, r.result->>'reasoning' AS reasoning, r.result->>'proposal' AS proposal,
                       r.context->>'path' AS path, o.state AS decision
                FROM agent_runs r LEFT JOIN LATERAL (

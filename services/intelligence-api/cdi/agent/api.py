@@ -76,7 +76,8 @@ class RunRequest(Strict):
         "explain_signal", "explain_entity", "search", "ask", "follow_up_signal", "import_dataset", "read_document"
     ]
     args: dict
-    modality: Literal["text"] = "text"  # voice arrives with M2 through the same run model
+    # Voice is transcribed first (POST /transcribe) and the user reviews the text; the run itself is the same.
+    modality: Literal["text", "voice"] = "text"
 
 
 @router.post("/runs", status_code=201)
@@ -207,3 +208,34 @@ def upload_dataset(file: UploadFile = File(...), user=Depends(delegated_actor)):
         "sha256": row["sha256"],
         "profile": row["profile"],
     }
+
+
+AUDIO = {"audio/webm", "audio/ogg", "audio/wav", "audio/x-wav", "audio/mpeg", "audio/mp4", "audio/m4a"}
+MAX_AUDIO = 5 * 1024 * 1024  # about a minute of compressed speech
+
+
+@router.get("/capabilities")
+def capabilities(user=Depends(delegated_actor)):
+    from ..gateway import agent_model_enabled, voice_enabled
+
+    return {"reasoning": "model" if agent_model_enabled() else "deterministic", "voice": voice_enabled()}
+
+
+@router.post("/transcribe")
+def transcribe_audio(file: UploadFile = File(...), user=Depends(delegated_actor)):
+    """Push-to-talk: returns an editable transcript. Nothing is executed and the audio is not stored."""
+    from ..gateway import ModelUnavailable, transcribe, voice_enabled
+
+    if not voice_enabled():
+        raise HTTPException(503, "Voice input is not configured")
+    media = (file.content_type or "").split(";")[0].strip().lower()
+    if media not in AUDIO:
+        raise HTTPException(422, "Unsupported audio format")
+    audio = file.file.read(MAX_AUDIO + 1)
+    if not audio or len(audio) > MAX_AUDIO:
+        raise HTTPException(413, "Recording is empty or longer than about a minute")
+    try:
+        text, meta = transcribe(audio, "speech." + (media.split("/")[1].replace("x-", "").replace("mpeg", "mp3")))
+    except ModelUnavailable as exc:
+        raise HTTPException(502, "Transcription is unavailable; type the question instead") from exc
+    return {"text": text[:300], **meta}

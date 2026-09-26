@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     # Agent reasoning model alias (LiteLLM model string). Empty: the Agent stays deterministic.
     agent_model: str = ""
     agent_fast_model: str = ""
+    # Push-to-talk transcription model (LiteLLM, e.g. openai/whisper-1). Empty: no voice input (ADR-012).
+    agent_transcribe_model: str = ""
+    agent_transcribe_language: str = "id"
     reasoning_model: str = "openai/reasoning-strong"
     fallback_model: str = ""
     embedding_model: str = "openai/embedding-default"

@@ -33,6 +33,7 @@ type AgentContext = {
   enabled: boolean;
   context: { path: string; module: string; label: string };
   entity: { type: string; type_label: string; id: string; label: string; href: string } | null;
+  capabilities?: { reasoning: string; voice: boolean };
 };
 
 function uuid() {
@@ -127,7 +128,7 @@ export function AgentPanel() {
   useEffect(() => () => inflight.current?.abort(), []);
 
   const startRun = useCallback(
-    (skill: RunRequest["skill"], args: Record<string, unknown>, text: string) => {
+    (skill: RunRequest["skill"], args: Record<string, unknown>, text: string, modality: "text" | "voice" = "text") => {
       if (running) return;
       const runId = uuid();
       setTab("ask");
@@ -135,7 +136,7 @@ export function AgentPanel() {
       const controller = new AbortController();
       inflight.current = controller;
       const update = (fn: (run: AgentRun) => AgentRun) => setRuns((all) => all.map((r) => (r.runId === runId ? fn(r) : r)));
-      streamRun({ runId, threadId, skill, args, path: pathname, text }, (event, id) => update((r) => applyEvent(r, event, id)), controller.signal).catch(() => {
+      streamRun({ runId, threadId, skill, args, path: pathname, text, modality }, (event, id) => update((r) => applyEvent(r, event, id)), controller.signal).catch(() => {
         if (!controller.signal.aborted) update((r) => applyEvent(r, { type: "RUN_ERROR", message: "Koneksi ke Agent terputus. Coba lagi.", code: "NETWORK" }));
       });
     },
@@ -229,7 +230,8 @@ export function AgentPanel() {
           </nav>
           {tab === "ask" ? (
             <div className="min-h-0 flex-1">
-              <AgentThread runs={runs} running={running} enabled={agentReady} suggestions={suggestions} onSearch={(text) => startRun("ask", attachment ? { query: text, dataset_id: attachment.id } : { query: text }, text)}
+              <AgentThread runs={runs} running={running} enabled={agentReady} suggestions={suggestions} onSearch={(text, modality) => startRun("ask", attachment ? { query: text, dataset_id: attachment.id } : { query: text }, text, modality)}
+                voice={agentContext?.capabilities?.voice === true}
                 onFile={importFile}
                 attachment={attachment}
                 onDetach={() => setAttachment(null)} onAction={(a) => startRun(a.skill, a.args, a.label)} />

@@ -4,7 +4,7 @@
 // Semantics mirror the corresponding manual server actions (see tests for parity).
 import type { Sql, TransactionSql } from "postgres";
 import { operationalContext, type Module, type OperationalActor } from "@/lib/operations/policy";
-import { entity as catalogEntity } from "./catalog";
+import { entity as catalogEntity, nameKey } from "./catalog";
 import { canReadEntityModule } from "./reads";
 
 type Tx = Sql | TransactionSql;
@@ -204,9 +204,61 @@ const requisitionCreate: CommandSpec = {
   },
 };
 
+const LEAD_SOURCES = [["linkedin", "LinkedIn"], ["ads", "Ads"], ["referral", "Referral"], ["existing", "Existing"], ["website", "Website"]] as const;
+const LEAD_SERVICES = [...SERVICE_TYPES, ["corporate_training", "Corporate Training"], ["software_development", "Software Development"]] as const;
+const LEAD_CATEGORIES = [["it", "IT"], ["non_it", "Non IT"]] as const;
+
+const leadCreate: CommandSpec = {
+  kind: "lead.create",
+  label: "Buat Lead",
+  module: "marketing",
+  params: [
+    { name: "client_name", label: "Client", kind: "text", required: true, max: 200, aliases: ["client", "klien", "company", "perusahaan", "nama perusahaan", "account", "prospek", "prospect"] },
+    { name: "contact_name", label: "Kontak", kind: "text", required: true, max: 120, aliases: ["contact", "kontak", "nama kontak", "pic client", "contact person", "cp"] },
+    { name: "contact_email", label: "Email kontak", kind: "text", max: 200, aliases: ["email", "e-mail", "email kontak"] },
+    { name: "contact_phone", label: "Telepon kontak", kind: "text", max: 40, aliases: ["phone", "telepon", "hp", "no hp", "whatsapp", "wa"] },
+    { name: "service_type_code", label: "Jenis layanan", kind: "enum", enum: LEAD_SERVICES, required: true, aliases: ["service", "service type", "layanan", "jenis layanan", "kebutuhan"] },
+    { name: "lead_source_code", label: "Sumber lead", kind: "enum", enum: LEAD_SOURCES, required: true, aliases: ["source", "sumber", "lead source", "sumber lead", "channel"] },
+    { name: "category_code", label: "Kategori", kind: "enum", enum: LEAD_CATEGORIES, required: true, aliases: ["category", "kategori"] },
+    { name: "industry_code", label: "Industri", kind: "text", max: 100, aliases: ["industry", "industri", "sektor", "sector"] },
+    { name: "company_size", label: "Ukuran perusahaan", kind: "int", max: 1000000, aliases: ["company size", "ukuran", "jumlah karyawan", "employees"] },
+    { name: "position_name", label: "Posisi", kind: "text", max: 200, aliases: ["position", "posisi", "role", "jabatan"] },
+    { name: "headcount_target", label: "Headcount", kind: "int", max: 500, aliases: ["headcount", "hc", "jumlah", "qty"] },
+    { name: "sales_pic_name", label: "Sales PIC", kind: "text", max: 100, aliases: ["sales pic", "pic sales", "sales", "account manager", "am"] },
+    { name: "notes", label: "Catatan", kind: "longtext", max: 3000, aliases: ["notes", "catatan", "keterangan", "remarks"] },
+  ],
+  editable: ["contact_name", "service_type_code", "lead_source_code", "category_code", "sales_pic_name"],
+  summary: (p) => `Lead: ${p.client_name ?? "?"}${p.contact_name ? ` — ${p.contact_name}` : ""}`,
+  async check(tx, p) {
+    if (!p.client_name) return null;
+    const [dup] = await tx.unsafe<{ lead_no: string }[]>(
+      `SELECT lead_no FROM leads WHERE ${nameKey("client_name")} = ${nameKey("$1")} AND created_at > now() - interval '180 days' LIMIT 1`,
+      [String(p.client_name)],
+    );
+    return dup ? { state: "warning", messages: [`Kemungkinan duplikat dengan lead ${dup.lead_no} (client sama, 180 hari terakhir).`] } : null;
+  },
+  async apply(tx, actor, p) {
+    // Mirrors app/marketing/actions.ts createLead (lead number format, defaults) with Agent attribution.
+    const client = String(p.client_name);
+    const slug = client.toUpperCase().replace(/[^A-Z0-9]+/g, "").slice(0, 10) || "CLIENT";
+    const source = String(p.lead_source_code).toUpperCase().slice(0, 4);
+    const leadNo = await uniqueNumber(tx, "leads", "lead_no", () => `${slug}-${source}-${new Date().getFullYear()}-${String(rand(1, 1000)).padStart(3, "0")}`);
+    const [lead] = await tx`INSERT INTO leads (lead_no,client_name,contact_name,contact_email,contact_phone,company_size,industry_code,service_type_code,lead_source_code,category_code,sales_pic_name,notes,price_period_code,position_name,headcount_target)
+      VALUES (${leadNo},${client},${p.contact_name as string},${(p.contact_email as string) ?? null},${(p.contact_phone as string) ?? null},${(p.company_size as number) ?? null},${(p.industry_code as string) ?? null},${p.service_type_code as string},${p.lead_source_code as string},${p.category_code as string},${(p.sales_pic_name as string) || "-"},${(p.notes as string) ?? null},'monthly',${(p.position_name as string) ?? null},${(p.headcount_target as number) ?? null})
+      RETURNING id`;
+    await log(tx, "marketing", "create", `Lead: ${client} (${leadNo})`, actor);
+    return { target_type: "lead", target_id: lead.id, message: `${leadNo} dibuat` };
+  },
+  async outcome(tx, r) {
+    if (!r.target_id) return "unknown";
+    const [row] = await tx`SELECT is_qualified FROM leads WHERE id=${r.target_id}`;
+    return !row ? "unknown" : row.is_qualified === null ? "open" : "resolved";
+  },
+};
+
 export class CommandConflict extends Error {}
 
-export const COMMANDS: ReadonlyMap<string, CommandSpec> = new Map([taskCreate, assignTaPic, featureRequestCreate, requisitionCreate].map((c) => [c.kind, c]));
+export const COMMANDS: ReadonlyMap<string, CommandSpec> = new Map([taskCreate, assignTaPic, featureRequestCreate, requisitionCreate, leadCreate].map((c) => [c.kind, c]));
 
 export async function choices(tx: Tx): Promise<Record<string, string[]>> {
   const pics = await tx`SELECT name FROM pics ORDER BY name LIMIT 500`;

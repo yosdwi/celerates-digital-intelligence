@@ -144,3 +144,32 @@ def structured(messages, *, use_case, fast=False, max_tokens=1200, timeout=30):
         except Exception as exc:  # provider errors must never leak payloads or keys into run state
             last_error = exc
     raise ModelUnavailable("Model call failed") from last_error
+
+
+def voice_enabled():
+    cfg = settings()
+    return cfg.generation_mode == "litellm" and bool(cfg.agent_transcribe_model)
+
+
+def transcribe(audio, filename):
+    """Speech → text for push-to-talk (ADR-012). Audio is passed through and never stored; only text returns."""
+    cfg = settings()
+    if not voice_enabled():
+        raise ModelUnavailable("Voice is not configured")
+    import litellm
+
+    start = time.monotonic()
+    try:
+        result = litellm.transcription(
+            model=cfg.agent_transcribe_model,
+            file=(filename, audio),
+            language=cfg.agent_transcribe_language or None,
+            api_base=cfg.model_api_base,
+            api_key=cfg.model_api_key,
+            timeout=30,
+            max_retries=1,
+        )
+        text = " ".join(str(getattr(result, "text", "") or "").split())
+    except Exception as exc:
+        raise ModelUnavailable("Transcription failed") from exc
+    return text, {"model": cfg.agent_transcribe_model, "latency_ms": round((time.monotonic() - start) * 1000)}

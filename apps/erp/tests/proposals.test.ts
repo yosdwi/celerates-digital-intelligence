@@ -150,6 +150,30 @@ test("Agent proposals: validated for the user, confirmed only by them, re-valida
     const [note] = await sql`SELECT user_id FROM notifications WHERE title='Feature Request Baru'`;
     assert.equal(note.user_id, ownerRow.id);
 
+    // Leads (Marketing): same substrate, parity with createLead (number format, defaults), legal-form duplicate check.
+    await sql`INSERT INTO leads (lead_no,client_name,contact_name,service_type_code,lead_source_code,category_code,sales_pic_name) VALUES ('OLD-1','PT Nusantara Data Tbk','A','outsourcing','ads','it','-')`;
+    const leadsIn = await createProposal(sql, owner, "run:key-0010", {
+      title: "Impor leads",
+      items: [
+        { kind: "lead.create", params: { client_name: "Maju Bersama", contact_name: "Sari", lead_source_code: "LinkedIn", service_type_code: "Headhunting", category_code: "Non IT", headcount_target: "3" } },
+        { kind: "lead.create", params: { client_name: "Nusantara Data", contact_name: "Budi", lead_source_code: "ads", service_type_code: "outsourcing", category_code: "it" } },
+        { kind: "lead.create", params: { client_name: "Tanpa Sumber", contact_name: "C" } },
+      ],
+    });
+    assert.deepEqual(leadsIn.items.map((i) => i.validation.state), ["ok", "warning", "needs_input"]);
+    assert.match(leadsIn.items[1].validation.messages[0], /duplikat dengan lead OLD-1/);
+    assert.deepEqual(leadsIn.items[2].fields.map((f) => f.name).sort(), ["category_code", "contact_name", "lead_source_code", "sales_pic_name", "service_type_code"]);
+    const leadsDone = await confirmProposal(sql, owner, leadsIn.id, {
+      sha256: leadsIn.sha256,
+      decisions: [{ index: 0, include: true }, { index: 1, include: false }, { index: 2, include: true, params: { lead_source_code: "referral", service_type_code: "rpo", category_code: "it" } }],
+    });
+    assert.equal(leadsDone.state, "applied");
+    const made = await sql`SELECT lead_no, lead_source_code, service_type_code, category_code, headcount_target, price_period_code, sales_pic_name FROM leads WHERE client_name IN ('Maju Bersama','Tanpa Sumber') ORDER BY client_name`;
+    assert.match(made[0].lead_no, /^MAJUBERSAM-LINK-\d{4}-\d{3}$/);
+    assert.deepEqual({ ...made[0], lead_no: undefined }, { lead_no: undefined, lead_source_code: "linkedin", service_type_code: "headhunting", category_code: "non_it", headcount_target: 3, price_period_code: "monthly", sales_pic_name: "-" });
+    assert.equal(made[1].lead_source_code, "referral", "user-completed fields applied");
+    assert.deepEqual(leadsDone.outcome, { resolved: 0, open: 2, unknown: 0 }, "open until qualified or disqualified");
+
     // A revoked user loses the ability to confirm even their own pending proposal.
     const lastOne = await createProposal(sql, editor, "run:key-0009", { title: "Tugas", items: [{ kind: "task.create", params: { title: "X" } }] });
     await sql`DELETE FROM user_access WHERE user_id=${editorRow.id}`;

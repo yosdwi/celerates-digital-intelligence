@@ -44,6 +44,8 @@ export type RunRequest = {
   args: Record<string, unknown>;
   path: string;
   text: string;
+  /** "voice" when the text came from a reviewed push-to-talk transcript. */
+  modality?: "text" | "voice";
 };
 
 const TERMINAL = new Set(["RUN_FINISHED", "RUN_ERROR"]);
@@ -62,7 +64,7 @@ export async function streamRun(request: RunRequest, onEvent: (event: AgUiEvent,
     tools: [],
     context: [],
     messages: [{ id: request.runId + ":user", role: "user", content: request.text }],
-    forwardedProps: { skill: request.skill, args: request.args, path: request.path },
+    forwardedProps: { skill: request.skill, args: request.args, path: request.path, modality: request.modality ?? "text" },
   };
   let lastId: string | null = null;
   let response = await fetch("/api/agent/ag-ui", {

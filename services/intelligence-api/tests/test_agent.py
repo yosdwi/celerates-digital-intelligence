@@ -205,7 +205,7 @@ def test_run_persists_ag_ui_events_resumes_and_is_isolated(monkeypatch):
     with TestClient(app) as c:
         assert (
             c.post(
-                "/api/agent/runs", json={**body, "modality": "voice"}, headers={"X-ERP-Delegation": token}
+                "/api/agent/runs", json={**body, "modality": "video"}, headers={"X-ERP-Delegation": token}
             ).status_code
             == 422
         )
@@ -1009,3 +1009,49 @@ def test_brain_console_shows_runs_reasoning_outcomes_and_learning_to_curators_on
         trace = c.get(f"/api/console/agent/runs/{run_id}", headers=auth).json()
         assert [s["type"] for s in trace["steps"]][0] == "RUN_STARTED" and trace["outcomes"][0]["state"] == "applied"
         assert c.get(f"/api/console/agent/runs/{uuid4()}", headers=auth).status_code == 404
+
+
+def test_push_to_talk_returns_an_editable_transcript_and_never_runs_anything(monkeypatch):
+    import sys
+    import types
+
+    token = mint()
+    heard = []
+
+    def transcription(model, file, **kwargs):
+        heard.append((model, file[0], len(file[1]), kwargs.get("language")))
+        return types.SimpleNamespace(text="  Siapa saja yang   belum ditugasi recruiter? ")
+
+    with TestClient(app) as c:
+        audio = {"file": ("rec.webm", b"\x1aE\xdf\xa3" + b"0" * 2000, "audio/webm;codecs=opus")}
+        assert c.get("/api/agent/capabilities", headers={"X-ERP-Delegation": token}).json()["voice"] is False
+        assert c.post("/api/agent/transcribe", files=audio, headers={"X-ERP-Delegation": token}).status_code == 503
+        monkeypatch.setitem(sys.modules, "litellm", types.SimpleNamespace(transcription=transcription))
+        monkeypatch.setattr(settings(), "generation_mode", "litellm")
+        monkeypatch.setattr(settings(), "agent_transcribe_model", "openai/whisper-test")
+        assert c.get("/api/agent/capabilities", headers={"X-ERP-Delegation": token}).json()["voice"] is True
+        assert c.post("/api/agent/transcribe", files=audio).status_code == 401
+        bad = {"file": ("x.exe", b"MZ", "application/octet-stream")}
+        assert c.post("/api/agent/transcribe", files=bad, headers={"X-ERP-Delegation": token}).status_code == 422
+        before = one_count("agent_runs")
+        r = c.post("/api/agent/transcribe", files=audio, headers={"X-ERP-Delegation": token})
+        assert r.status_code == 200 and r.json()["text"] == "Siapa saja yang belum ditugasi recruiter?"
+        assert heard == [("openai/whisper-test", "speech.webm", 2004, "id")]
+        assert one_count("agent_runs") == before, "transcribing starts no run"
+        # The reviewed transcript runs through the same Agent run, recorded as voice.
+        monkeypatch.setattr(settings(), "erp_mode", "http")
+        monkeypatch.setattr(playbooks, "start", lambda r_, u, a: None)
+        run_id = str(uuid4())
+        created = c.post(
+            "/api/agent/runs",
+            json={"run_id": run_id, "skill": "ask", "args": {"query": r.json()["text"]}, "modality": "voice"},
+            headers={"X-ERP-Delegation": token},
+        )
+        assert created.status_code == 201
+    with connect() as conn:
+        assert one(conn, "SELECT modality FROM agent_runs WHERE id=%s", (run_id,))["modality"] == "voice"
+
+
+def one_count(table):
+    with connect() as conn:
+        return one(conn, f"SELECT count(*)::int AS n FROM {table}")["n"]

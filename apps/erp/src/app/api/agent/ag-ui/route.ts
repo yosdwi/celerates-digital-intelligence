@@ -7,7 +7,7 @@ import { agentActor, agentEnabled, assertSameOrigin, BffError, delegate, intelli
 export const dynamic = "force-dynamic";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const THREAD = /^[A-Za-z0-9_-]{8,100}$/;
-type Input = { threadId?: unknown; runId?: unknown; messages?: unknown; forwardedProps?: { skill?: unknown; args?: unknown; path?: unknown } };
+type Input = { threadId?: unknown; runId?: unknown; messages?: unknown; forwardedProps?: { skill?: unknown; args?: unknown; path?: unknown; modality?: unknown } };
 function lastUserText(messages: unknown): string {
   if (!Array.isArray(messages)) return "";
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
     const created = await fetch(`${base}/api/agent/runs`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-ERP-Delegation": token },
-      body: JSON.stringify({ run_id: runId, thread_id: threadId, skill, args }),
+      body: JSON.stringify({ run_id: runId, thread_id: threadId, skill, args, modality: props.modality === "voice" && skill === "ask" ? "voice" : "text" }),
       signal: AbortSignal.timeout(10000),
       cache: "no-store",
     }).catch(() => null);

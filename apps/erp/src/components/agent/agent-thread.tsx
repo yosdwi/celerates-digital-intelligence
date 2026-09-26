@@ -13,6 +13,7 @@ import {
   type ThreadMessageLike,
 } from "@assistant-ui/react";
 import { Loader2, Paperclip, SendHorizontal, Sparkles } from "lucide-react";
+import { VoiceButton } from "./voice";
 import { toThreadMessages, type AgentAction, type AgentRun, type Evidence, type MappingCardData, type Provenance } from "@/lib/agent/run-state";
 import { EvidenceCard, ProvenanceLine, RunError, RunProgress, ToolTrace } from "./evidence";
 import { MappingCard } from "./mapping";
@@ -100,12 +101,15 @@ export default function AgentThread({
   onAction,
   attachment,
   onDetach,
+  voice,
 }: {
   runs: AgentRun[];
   running: boolean;
   enabled: boolean;
   suggestions: Suggestion[];
-  onSearch: (text: string) => void;
+  onSearch: (text: string, modality: "text" | "voice") => void;
+  /** Push-to-talk is offered only when Intelligence has a transcription model (ADR-012). */
+  voice: boolean;
   /** `Drop anything`: a CSV/XLSX becomes a dataset, then a proposal the user confirms in ERP. */
   onFile: (file: File) => Promise<string | null>;
   onAction: (action: AgentAction) => void;
@@ -114,6 +118,8 @@ export default function AgentThread({
   onDetach: () => void;
 }) {
   const picker = useRef<HTMLInputElement>(null);
+  // Set when the composer text came from a transcript; the run is then recorded with modality "voice".
+  const fromVoice = useRef(false);
   const [uploading, setUploading] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -144,7 +150,8 @@ export default function AgentThread({
     convertMessage: (message) => message,
     onNew: async (message: AppendMessage) => {
       const text = message.content.map((part) => (part.type === "text" ? part.text : "")).join(" ").trim();
-      if (text) onSearch(text);
+      if (text) onSearch(text, fromVoice.current ? "voice" : "text");
+      fromVoice.current = false;
     },
   });
   return (
@@ -222,6 +229,16 @@ export default function AgentThread({
             className="min-h-10 flex-1 resize-none rounded-xl border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 disabled:bg-slate-50"
           />
           {/* Voice (M2) will sit here as push-to-talk feeding the same run; it can never confirm a write. */}
+          {voice && (
+            <VoiceButton
+              disabled={!enabled || running}
+              onTranscript={(text) => {
+                fromVoice.current = true;
+                runtime.thread.composer.setText(text);
+              }}
+              onError={setFileError}
+            />
+          )}
           <ComposerPrimitive.Send
             aria-label="Kirim"
             className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 text-white disabled:opacity-40"

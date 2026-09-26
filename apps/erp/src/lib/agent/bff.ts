@@ -125,3 +125,24 @@ export async function reportOutcome(
     console.error("agent_outcome_report_failed");
   }
 }
+
+let capabilities: { at: number; value: { reasoning: string; voice: boolean } } | null = null;
+/** What the Intelligence runtime offers (model reasoning, voice), cached for 15 seconds. Never blocks the panel. */
+export async function agentCapabilities(actor: AgentActor): Promise<{ reasoning: string; voice: boolean }> {
+  const base = intelligenceBase();
+  if (!base || !agentEnabled()) return { reasoning: "none", voice: false };
+  if (capabilities && Date.now() - capabilities.at < 15000) return capabilities.value;
+  try {
+    const response = await fetch(`${base}/api/agent/capabilities`, {
+      headers: { "X-ERP-Delegation": delegate(actor, { path: "/", module: "general", entity: null }) },
+      signal: AbortSignal.timeout(2000),
+      cache: "no-store",
+    });
+    const body = response.ok ? await response.json() : null;
+    const value = { reasoning: body?.reasoning === "model" ? "model" : "deterministic", voice: body?.voice === true };
+    capabilities = { at: Date.now(), value };
+    return value;
+  } catch {
+    return { reasoning: "deterministic", voice: false };
+  }
+}

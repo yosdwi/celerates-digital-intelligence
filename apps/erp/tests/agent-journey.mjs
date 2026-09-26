@@ -113,7 +113,7 @@ export async function agentJourney({ base, request, db, env, python, publicKey, 
     api.kill();
     await new Promise((r) => api.once('exit', r));
     fakeModel = spawn(python, ['../../services/intelligence-api/tests/fake_model_server.py', '8011'], { stdio: ['ignore', 'ignore', 'inherit'] });
-    const modelEnv = { ...agentEnv, GENERATION_MODE: 'litellm', EMBEDDING_MODE: 'demo', AGENT_MODEL: 'openai/fake-agent', MODEL_API_BASE: 'http://127.0.0.1:8011/v1', MODEL_API_KEY: 'test-only', LITELLM_LOCAL_MODEL_COST_MAP: 'True' };
+    const modelEnv = { ...agentEnv, GENERATION_MODE: 'litellm', EMBEDDING_MODE: 'demo', AGENT_MODEL: 'openai/fake-agent', AGENT_TRANSCRIBE_MODEL: 'openai/whisper-fake', MODEL_API_BASE: 'http://127.0.0.1:8011/v1', MODEL_API_KEY: 'test-only', LITELLM_LOCAL_MODEL_COST_MAP: 'True' };
     api = spawn(python, ['-m', 'uvicorn', 'cdi.api:app', '--host', '127.0.0.1', '--port', '8010'], { env: modelEnv, stdio: ['ignore', 'ignore', 'inherit'] });
     await until(async () => (await fetch(intelligence + '/ready')).ok, 'Intelligence API with model');
     await modelJourneys({ request, db });
@@ -137,6 +137,19 @@ async function modelJourneys({ request, db }) {
   assert.ok(para.evidence.some(e => e.type === 'signal' && /^S\d+$/.test(e.cite)), 'cited rule shown as a Sinyal card');
   assert.ok(para.evidence.some(e => e.type === 'knowledge' && /^E\d+$/.test(e.cite)), 'cited SOP shown as knowledge');
   assert.ok(para.stream.some(s => s.event.type === 'CUSTOM' && s.event.name === 'celerates.actions'), 'follow-up offered');
+
+  // Push-to-talk: audio → editable transcript only (no run starts); the reviewed text runs as a voice run.
+  // Capabilities are cached by ERP for 15 s; Intelligence was just restarted with a model.
+  await until(async () => (await (await request('/api/agent/context?path=/ta')).json()).capabilities?.voice === true, 'voice capability');
+  const ctx = await (await request('/api/agent/context?path=/ta')).json();
+  assert.deepEqual(ctx.capabilities, { reasoning: 'model', voice: true });
+  const audio = new FormData();
+  audio.set('file', new Blob([Buffer.alloc(4000, 1)], { type: 'audio/webm' }), 'speech.webm');
+  const heard = await (await request('/api/agent/transcribe', { method: 'POST', body: audio })).json();
+  assert.equal(heard.text, 'Siapa saja yang belum ditugasi recruiter?');
+  const notAudio = new FormData();
+  notAudio.set('file', new Blob(['x'], { type: 'text/plain' }), 'x.txt');
+  assert.equal((await request('/api/agent/transcribe', { method: 'POST', body: notAudio })).status, 422);
 
   // An ungrounded number is never shown: the run falls back to the deterministic router and says so.
   const ungrounded = await run(request, 'ask', { query: 'berapa angka requisition?' });
@@ -291,6 +304,16 @@ async function proposalJourneys({ base, request, db, env, intelligence, requisit
     const dup = (await json(`/api/agent/proposals/${reimport.proposal.id}`)).body;
     assert.equal(dup.items[0].validation.state, 'warning', 'duplicate of the row just imported is flagged by ERP');
     assert.equal((await post(`/api/agent/proposals/${dup.id}/reject`, {})).body.state, 'rejected');
+    // Marketing on the same substrate: a leads sheet maps to `lead.create` from ERP's own command specs.
+    const leadsCsv = await uploadFile(request, 'leads.csv', 'Perusahaan,Kontak,Sumber,Layanan,Kategori\nPT Synthetic Prospect,Rina,LinkedIn,Headhunting,IT\n', 'text/csv');
+    const leadRun = await run(request, 'import_dataset', { dataset_id: leadsCsv.body.id });
+    const leadProposal = await (await request(`/api/agent/proposals/${leadRun.proposal.id}`)).json();
+    assert.deepEqual(leadProposal.items.map((i) => [i.kind, i.validation.state]), [['lead.create', 'ok']]);
+    const leadDone = await post(`/api/agent/proposals/${leadProposal.id}/confirm`, { sha256: leadProposal.sha256 });
+    assert.equal(leadDone.body.state, 'applied');
+    const [lead] = await db`SELECT lead_source_code, service_type_code, category_code FROM leads WHERE client_name='PT Synthetic Prospect'`;
+    assert.deepEqual({ ...lead }, { lead_source_code: 'linkedin', service_type_code: 'headhunting', category_code: 'it' });
+
     // Drop a document: read deterministically (sections, ERP records it names), then questions cite its pages.
     const letter = pdfBytes(['SURAT PERMINTAAN TENAGA KERJA', 'PT Synthetic Letter membutuhkan 2 Data Analyst mulai 1 Oktober 2026.', `Rujukan permintaan: ${requisition.requisition_no}.`, 'Kontrak berjalan 12 bulan.']);
     const doc = await uploadFile(request, 'permintaan.pdf', letter, 'application/pdf');

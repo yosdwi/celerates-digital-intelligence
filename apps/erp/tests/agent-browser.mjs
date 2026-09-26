@@ -127,10 +127,10 @@ export async function agentBrowser({ base, cookies }) {
 /** With an Agent model configured: the answer text is labelled as inference and its citations match evidence cards. */
 export async function agentModelBrowser({ base, cookies }) {
   assert.equal(new URL(base).hostname, '127.0.0.1');
-  const browser = await chromium.launch({ headless: true, executablePath: process.env.ERP_BROWSER_EXECUTABLE || undefined, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
+  const browser = await chromium.launch({ headless: true, executablePath: process.env.ERP_BROWSER_EXECUTABLE || undefined, args: ['--no-sandbox', '--disable-dev-shm-usage', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] });
   const evidenceDir = process.env.ERP_SCREENSHOT_DIR || '../../docs/implementation/evidence';
   try {
-    const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+    const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, permissions: ['microphone'] });
     await context.addCookies(cookies.map(([name, value]) => ({ name, value, url: base })));
     const page = await context.newPage();
     const errors = [];
@@ -139,7 +139,13 @@ export async function agentModelBrowser({ base, cookies }) {
     await page.getByRole('button', { name: /^Celerates Agent/ }).click();
     const panel = page.getByRole('dialog', { name: 'Celerates Agent' });
     await panel.getByRole('button', { name: 'Tanya', exact: true }).click();
-    await panel.getByLabel('Pesan untuk Agent').fill('Siapa saja yang belum ditugasi recruiter?');
+    // Push-to-talk with Chromium's fake microphone: the transcript lands in the composer; the user sends it.
+    await panel.getByRole('button', { name: 'Bicara (tekan untuk merekam)' }).click();
+    await panel.locator('[data-agent-voice="recording"]').waitFor();
+    await page.waitForTimeout(1200);
+    await panel.getByRole('button', { name: 'Berhenti merekam' }).click();
+    await page.waitForFunction(() => document.querySelector('[aria-label="Pesan untuk Agent"]')?.value === 'Siapa saja yang belum ditugasi recruiter?', null, { timeout: 30000 });
+    assert.equal(await panel.locator('[data-agent-message]').count(), 0, 'voice alone sends nothing');
     await panel.getByRole('button', { name: 'Kirim' }).click();
     const line = panel.locator('[data-provenance="model"]');
     await line.waitFor({ timeout: 30000 });
@@ -156,7 +162,7 @@ export async function agentModelBrowser({ base, cookies }) {
     await panel.getByText('Berkas Anda', { exact: true }).first().waitFor();
     await page.screenshot({ path: evidenceDir + '/agent-document-proposal.png' });
     assert.deepEqual(errors, []);
-    console.log('PASS: Agent browser (model) — answer labelled Inferensi, every cited id has an evidence card; dropped PDF → requisition proposal');
+    console.log('PASS: Agent browser (model) — push-to-talk transcript reviewed then sent, answer labelled Inferensi, every cited id has an evidence card; dropped PDF → requisition proposal');
   } finally {
     await browser.close();
   }
@@ -182,8 +188,9 @@ export async function consoleBrowser({ env, python }) {
     await page.locator('[data-console-reasoning]').getByText('model (openai/fake-agent)', { exact: false }).waitFor();
     await page.locator('[data-console-learned]').getByText('requisition.create', { exact: true }).first().waitFor();
     const runs = page.locator('[data-console-runs] tbody tr');
+    await page.locator('[data-console-runs]').getByText('suara', { exact: true }).first().waitFor();
     assert.ok((await runs.count()) >= 10, 'recent runs listed');
-    const modelRow = runs.filter({ hasText: 'Model · inferensi' }).first();
+    const modelRow = runs.filter({ hasText: 'Model · inferensi' }).filter({ hasText: 'recruiter' }).first();
     await modelRow.getByRole('button', { name: 'Jejak' }).click();
     const dialog = page.getByRole('dialog', { name: 'Jejak run Agent' });
     await dialog.getByText(/JAWABAN · INFERENSI MODEL/).waitFor();

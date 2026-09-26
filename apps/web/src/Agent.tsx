@@ -29,6 +29,7 @@ type Run = {
   path: string | null;
   decision: string | null;
   error: string | null;
+  modality: string;
 };
 type Step = { seq: number; type: string; event: Record<string, unknown> };
 type Trace = { run: Run & { result: Record<string, unknown> | null; playbook_version: string }; steps: Step[]; outcomes: { proposal_id: string; state: string; receipts: Record<string, number>; outcome: Record<string, number> | null; edited_items: number }[] };
@@ -180,7 +181,10 @@ export function AgentConsole() {
                   <tr key={r.id}>
                     <td>{when(r.created_at)}</td>
                     <td>{r.principal_name}</td>
-                    <td>{SKILL[r.skill] ?? r.skill}</td>
+                    <td>
+                      {SKILL[r.skill] ?? r.skill}
+                      {r.modality === "voice" && <> <Badge>suara</Badge></>}
+                    </td>
                     <td className="break-anywhere">{r.query ?? r.path ?? "—"}</td>
                     <td>{r.state === "failed" ? <Badge tone="red">Gagal</Badge> : <ReasoningBadge value={r.reasoning} />}</td>
                     <td>{r.decision ? <Badge tone={r.decision === "rejected" ? "red" : "green"}>{r.decision}</Badge> : r.proposal ? <Badge tone="amber">menunggu</Badge> : "—"}</td>
