@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/db';
 import { authenticateMachine, ContractError, fail, text, uuid } from '@/lib/integration/contract';
 import { applyCommand, listResources, proposeReview, readEvents, readResource } from '@/lib/integration/service';
+import { handleAgent } from '@/lib/agent/contract';
 import { randomUUID } from 'node:crypto';
 export const dynamic='force-dynamic';
 async function handle(request: NextRequest, params: Promise<{path:string[]}>) {
@@ -11,7 +12,8 @@ async function handle(request: NextRequest, params: Promise<{path:string[]}>) {
     const {path}=await params;
     const principal=authenticateMachine(request.headers,request.method==='POST'&&['commands','review-requests'].includes(path[0])?'action':'read');
     let result: unknown;
-    if(request.method==='GET'&&path[0]==='resources'&&path[1]==='sales_opportunity'&&path.length<=3) {
+    if(path[0]==='agent') result=await handleAgent(request,path,sql);
+    else if(request.method==='GET'&&path[0]==='resources'&&path[1]==='sales_opportunity'&&path.length<=3) {
       if(path[2])result=await readResource(sql,uuid(path[2]));
       else{const cursor=request.nextUrl.searchParams.get('cursor')||undefined;if(cursor)uuid(cursor);const limit=Number(request.nextUrl.searchParams.get('limit')||50);if(!Number.isInteger(limit)||limit<1||limit>100)fail(422,'SCHEMA','Invalid limit.');result=await listResources(sql,cursor,limit);}
     } else if(request.method==='GET'&&path[0]==='events'&&path.length===1) {

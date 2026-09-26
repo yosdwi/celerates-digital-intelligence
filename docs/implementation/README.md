@@ -1,6 +1,9 @@
 # P0 implementation map
 
-**Current extension:** [closed-loop foundation](closed-loop-foundation.md) and
+**Latest increment:** [Operating Substrate M1 — Celerates Agent shell](operating-substrate-m1.md)
+(ERP delegation, Entity Catalog v1, persisted AG-UI runs, `Tanyakan`).
+
+**Previous extension:** [closed-loop foundation](closed-loop-foundation.md) and
 [operator/demo guide](closed-loop-operations.md). The table below describes the
 original P0; governed source versions, live ERP approval/actions and outcomes now
 extend those same components.

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { randomBytes, createHash } from 'node:crypto';
+import { randomBytes, createHash, generateKeyPairSync } from 'node:crypto';
 import { createRequire } from 'node:module';
 import S3rver from 's3rver';
 import postgres from 'postgres';
@@ -15,6 +15,12 @@ const base='http://127.0.0.1:3310';
 const readToken=randomBytes(32).toString('hex'),actionToken=randomBytes(32).toString('hex');
 process.env.INTELLIGENCE_READ_TOKEN_SHA256=createHash('sha256').update(readToken).digest('hex');
 process.env.INTELLIGENCE_ACTION_TOKEN_SHA256=createHash('sha256').update(actionToken).digest('hex');
+// ADR-008: disposable Ed25519 delegation key for this harness only.
+const delegationKeys=generateKeyPairSync('ed25519');
+process.env.AGENT_DELEGATION_PRIVATE_KEY=delegationKeys.privateKey.export({type:'pkcs8',format:'pem'}).toString();
+process.env.AGENT_DELEGATION_KID='test-k1';
+process.env.INTELLIGENCE_BASE_URL='http://127.0.0.1:8010';
+const delegationPublicKey=delegationKeys.publicKey.export({type:'spki',format:'pem'}).toString();
 const dir=await mkdtemp(tmpdir()+'/erp-http-');
 Object.assign(process.env,{ DATABASE_URL:process.env.ERP_HTTP_DATABASE_URL||'postgres://postgres:postgres@127.0.0.1:55440/postgres', DB_POOL_MAX:process.env.ERP_HTTP_DATABASE_URL?'4':'1', NEXTAUTH_URL:base, NEXTAUTH_SECRET:randomBytes(32).toString('hex'), PII_ENCRYPTION_KEY:randomBytes(32).toString('hex'), SETUP_TOKEN:randomBytes(32).toString('hex'), S3_ENDPOINT:'http://127.0.0.1:59000', S3_ACCESS_KEY_ID:'S3RVER', S3_SECRET_ACCESS_KEY:'S3RVER', S3_BUCKET_PREFIX:'erp-test', APP_ENV:'local-test',RELEASE_SHA:'http-smoke',NEXT_TELEMETRY_DISABLED:'1' });
 if(process.env.ERP_HTTP_DATABASE_URL)assert.equal(new URL(process.env.ERP_HTTP_DATABASE_URL).hostname,'127.0.0.1','Disposable localhost database only');
@@ -117,9 +123,12 @@ try {
     const child=spawn(python,['../../services/intelligence-api/tests/live_closed_loop.py'],{env:intelligenceEnv,stdio:['ignore','inherit','inherit']});
     await new Promise((resolve,reject)=>{child.on('exit',code=>code===0?resolve():reject(Error('Closed-loop verification failed: '+code)));child.on('error',reject);});
     if(process.env.FOUNDATION_BROWSER_TEST==='1'){const {foundationBrowser}=await import('./foundation-browser.mjs');await foundationBrowser({env:intelligenceEnv,python,base,cookies:[...jar]});}
+    const {agentJourney}=await import('./agent-journey.mjs');
+    await agentJourney({base,request,db,env:intelligenceEnv,python,publicKey:delegationPublicKey,tracker,requisition:req,readToken,cookies:[...jar].map(([k,v])=>k+'='+v).join('; ')});
   }
   await db`UPDATE users SET status='rejected'  WHERE email='owner@example.test'`;
   assert.equal((await request('/api/operations/context?path=/finance')).status,403,'revoked session cannot read operational context');
+  assert.equal((await request('/api/agent/context?path=/sales')).status,403,'revoked session cannot use the Agent');
   const before=(await db`SELECT count(*)::int AS n FROM leads`)[0].n;
   const body=await encodeReply([form({client_name:'MUST NOT WRITE'})]);
   await request('/marketing',{method:'POST',headers:{'Next-Action':actionId('createLead','app/marketing/actions.ts')},body});

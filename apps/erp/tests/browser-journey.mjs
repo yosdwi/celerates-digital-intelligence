@@ -25,9 +25,9 @@ export async function runBrowserJourney({ base, cookies }) {
     const errors = [];
     page.on("pageerror", (e) => errors.push(e.message));
     await page.goto(base + "/pmo/invoices");
-    const trigger = page.getByRole("button", { name: /^Bantuan/ });
+    const trigger = page.getByRole("button", { name: /^Celerates Agent/ });
     await trigger.click();
-    const panel = page.getByRole("dialog", { name: "Bantuan Operasional" });
+    const panel = page.getByRole("dialog", { name: "Celerates Agent" });
     await panel
       .getByRole("heading", {
         name: "Invoice perlu ditinjau untuk submission",

@@ -76,3 +76,25 @@ or transport credential details. Missing/invalid credential 401; wrong audience 
 unavailable record 404; conflicting idempotency 409; stale/missing approval 412;
 invalid schema 422. No HTTP-mode fallback to demo. Pending human review is surfaced as
 ERP_REVIEW_REQUIRED in Intelligence; explicit Check approval resumes its checkpoint.
+
+## Delegated Agent reads (v1, Operating Substrate M1)
+
+ADR-008/009. `GET /api/integration/v1/agent/*` requires the machine **read** token and
+`X-ERP-Delegation`, an ERP-issued Ed25519 JWS (`aud=celerates-intelligence`,
+`iss=celerates-erp:<environment>`, ≤ 5 min, `scope=["agent"]`). ERP verifies its own
+signature, reloads the user (active status, Owner flag, division access) and authorizes by
+module. Record grants are not consulted. Any other method returns 405: the Agent contract is
+read-only.
+
+| Path | Returns |
+| --- | --- |
+| `agent/catalog` | SQL-free Entity Catalog v1: types, modules, fields with sensitivity, search fields, routes, edges |
+| `agent/signals/{key}` | One `Perlu perhatian` rule, identical to the panel group, plus `entity_type` and `as_of`; 404 if the module is not readable |
+| `agent/entities/{type}/{id}` | Projection: `internal` values, `commercial` presence only, `pii`/`restricted` names under `withheld`; `record_version` where the table is versioned |
+| `agent/entities/{type}/{id}/neighbours` | Catalog edges with count and ≤ 5 labelled targets; `kind` `fk` or `name_match`; forbidden target modules return `withheld: MODULE_FORBIDDEN` |
+| `agent/entities/{type}/{id}/signals` | Rules for that entity type with `matches` for this record (restricted-id "check" mode) |
+| `agent/search?q=` | Case-insensitive substring search over `internal` search fields of readable types, ≤ 5 per type, ≤ 40 total |
+
+Errors: 401 `DELEGATION` (missing, forged, expired, wrong issuer/audience); 403
+`USER_INACTIVE` or `MODULE_FORBIDDEN`; 404 `NOT_FOUND` / `UNKNOWN_ENTITY_TYPE`;
+422 `QUERY_TOO_SHORT`.

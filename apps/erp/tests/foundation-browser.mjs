@@ -10,7 +10,7 @@ export async function foundationBrowser({env,python,base,cookies}){
  let browser;
  try{
   for(let i=0;i<80;i++){try{if((await fetch('http://127.0.0.1:8000/ready')).ok&&(await fetch('http://127.0.0.1:5173')).ok)break;}catch{}await new Promise(r=>setTimeout(r,250));}
-  browser=await chromium.launch({headless:true,args:['--no-sandbox']});
+  browser=await chromium.launch({headless:true,executablePath:process.env.ERP_BROWSER_EXECUTABLE||undefined,args:['--no-sandbox']});
   const context=await browser.newContext({viewport:{width:1440,height:1000}});
   await context.addInitScript(token=>sessionStorage.setItem('cdi-token',token),env.API_ACCESS_TOKEN);
   const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));

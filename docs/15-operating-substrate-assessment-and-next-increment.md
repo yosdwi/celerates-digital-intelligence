@@ -2,7 +2,7 @@
 
 Date: 2026-09-26
 Baseline: `audit/erp-production-readiness` @ `8721132` (doc 14 added; application code unchanged since the deployed foundation).
-Status: **architecture/product recommendation for review. Nothing here is implemented.** Proposed decisions that change locked intent are listed in §9 as ADR proposals; none has been written or accepted.
+Status: **architecture/product recommendation. M1 (§5) is implemented** — see [the M1 record](implementation/operating-substrate-m1.md); M2–M4 are not. ADR-008, ADR-009 and ADR-013 are accepted; ADR-010–012 (§9) remain proposals until M2–M4 need them.
 
 North Star: [doc 14](14-celerates-enterprise-intelligence-operating-model.md). Grounded engineering audit: [doc 13](13-celerates-agent-audit-and-recommendation.md). Library/framework decisions: [doc 16](16-operating-substrate-build-reuse-adopt.md). Also relies on [ERP audit 04](erp-audit/04-production-readiness-audit.md) and [10](erp-audit/10-capability-decomposition-audit.md).
 

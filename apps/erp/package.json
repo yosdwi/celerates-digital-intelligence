@@ -18,6 +18,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@assistant-ui/react": "0.15.22",
     "@aws-sdk/client-s3": "3.1139.0",
     "@tailwindcss/postcss": "^4.3.3",
     "bcryptjs": "^3.0.3",
@@ -39,6 +40,8 @@
     "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
+    "@ag-ui/client": "1.0.0",
+    "@ag-ui/core": "1.0.0",
     "@electric-sql/pglite": "0.5.8",
     "@electric-sql/pglite-socket": "0.2.11",
     "@types/bcryptjs": "^2.4.6",

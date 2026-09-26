@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     max_upload_bytes: int = 10 * 1024 * 1024
     worker_poll_seconds: float = 1
     lease_seconds: int = 600
+    # ADR-008: public keys only (kid -> PEM). Intelligence can verify ERP delegation, never mint it.
+    erp_delegation_public_keys: str = "{}"
+    agent_max_seconds: float = 60
+    agent_workers: int = 4
 
     @field_validator("model_api_base", "model_api_key", mode="before")
     @classmethod

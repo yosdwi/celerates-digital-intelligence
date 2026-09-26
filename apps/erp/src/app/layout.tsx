@@ -10,7 +10,7 @@ import { LanguageSwitcher } from "@/components/language-switcher";
 import { ActivityLogLink } from "@/components/activity-log-link";
 import { AppShell } from "@/components/app-shell";
 import { SidebarCollapseProvider } from "@/components/sidebar-context";
-import { OperationalAssistance } from "@/components/operational-assistance";
+import { AgentPanel } from "@/components/agent/agent-panel";
 export const dynamic = 'force-dynamic';
 
 export const metadata = {
@@ -34,7 +34,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <NotificationBell />
     <UserMenu />
     <AppShell>{children}</AppShell>
-    <OperationalAssistance />
+    <AgentPanel />
   </SidebarCollapseProvider>
 </Providers>
       </body>

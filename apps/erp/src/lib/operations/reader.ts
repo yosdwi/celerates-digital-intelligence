@@ -3,8 +3,10 @@ import type { Sql } from "postgres";
 import {
   operationalContext,
   selectedModules,
+  canReadModule,
   type OperationalActor,
   type OperationalContextResponse,
+  type OperationalGroup,
   type Module,
 } from "./policy";
 // Source SQL is code-owned. Neither URL input nor AI can supply SQL, identifiers, roles or actor IDs.
@@ -118,6 +120,67 @@ const specs = [
     query: `SELECT h.id, o.opty_no AS label FROM finance_document_handoffs h JOIN opportunities o ON o.id=h.opportunity_id WHERE h.status_code='needs_revision'`,
   },
 ] as const;
+type Spec = (typeof specs)[number];
+type Tx = Parameters<Parameters<Sql["begin"]>[1]>[0];
+/** ADR-009: which catalog entity a rule's ids refer to. PMO/Finance rules stay unmapped until their
+ * semantics are settled (ERP audit F13); their explanations use the rule and labels only. */
+export const SIGNAL_ENTITY: Record<string, string | null> = {
+  "qualified-leads": "lead",
+  "qualified-trackers": "sales_opportunity",
+  "unassigned-requisitions": "requisition",
+  "invoice-submission": null,
+  "missing-invoices": null,
+  "ambiguous-billing": null,
+  "missing-documents": "commercial_pq",
+  "finance-review": null,
+  "finance-revision": null,
+};
+async function evaluate(tx: Tx, spec: Spec, asOf: string): Promise<OperationalGroup> {
+  // A single aggregate per rule returns an exact count and at most five records.
+  const [row] = await tx.unsafe<{ count: number; items: { id: string; label: string }[] }[]>(
+    `WITH clock AS (SELECT $1::timestamptz AS as_of), matches AS (${spec.query}) SELECT (SELECT count(*)::int FROM matches) AS count, coalesce((SELECT jsonb_agg(sample) FROM (SELECT id,label FROM matches ORDER BY label,id LIMIT 5) sample),'[]'::jsonb) AS items`,
+    [asOf],
+  );
+  return {
+    key: spec.key,
+    module: spec.module,
+    title: spec.title,
+    rule: spec.rule,
+    source: spec.source,
+    unit: spec.unit,
+    count: row.count,
+    href: spec.href,
+    action: spec.action,
+    items: row.items.map((item) => ({
+      ...item,
+      href: spec.itemPath ? `${spec.itemPath}/${item.id}/edit` : spec.href,
+    })),
+  };
+}
+/** One rule by key, if the actor may read its module. Same SQL, wording and links as the panel. */
+export async function readSignal(sql: Sql, actor: OperationalActor, key: string, now = new Date()) {
+  const spec = specs.find((s) => s.key === key);
+  if (!spec || !canReadModule(actor, spec.module as Module)) return null;
+  const asOf = now.toISOString();
+  const group = await sql.begin("isolation level repeatable read read only", (tx) => evaluate(tx, spec, asOf));
+  return { ...group, entity_type: SIGNAL_ENTITY[spec.key] ?? null, as_of: asOf };
+}
+/** Restricted-id evaluation ("check" mode): which readable rules for this entity type match these ids now. */
+export async function checkSignals(sql: Sql, actor: OperationalActor, entityType: string, ids: string[], now = new Date()) {
+  const selected = specs.filter((s) => SIGNAL_ENTITY[s.key] === entityType && canReadModule(actor, s.module as Module));
+  const asOf = now.toISOString();
+  return sql.begin("isolation level repeatable read read only", async (tx) => {
+    const out: { key: string; title: string; rule: string; href: string; matches: string[] }[] = [];
+    for (const spec of selected) {
+      const rows = await tx.unsafe<{ id: string }[]>(
+        `WITH clock AS (SELECT $1::timestamptz AS as_of), matches AS (${spec.query}) SELECT id::text AS id FROM matches WHERE id::text = ANY($2::text[])`,
+        [asOf, ids],
+      );
+      out.push({ key: spec.key, title: spec.title, rule: spec.rule, href: spec.href, matches: rows.map((r) => r.id) });
+    }
+    return out;
+  });
+}
 export async function readOperationalContext(
   sql: Sql,
   actor: OperationalActor,
@@ -137,32 +200,7 @@ export async function readOperationalContext(
     "isolation level repeatable read read only",
     async (tx) => {
       const result: OperationalContextResponse["groups"] = [];
-      for (const spec of selected) {
-        // A single aggregate per rule returns an exact count and at most five records.
-        const [row] = await tx.unsafe<
-          { count: number; items: { id: string; label: string }[] }[]
-        >(
-          `WITH clock AS (SELECT $1::timestamptz AS as_of), matches AS (${spec.query}) SELECT (SELECT count(*)::int FROM matches) AS count, coalesce((SELECT jsonb_agg(sample) FROM (SELECT id,label FROM matches ORDER BY label,id LIMIT 5) sample),'[]'::jsonb) AS items`,
-          [asOf],
-        );
-        result.push({
-          key: spec.key,
-          module: spec.module,
-          title: spec.title,
-          rule: spec.rule,
-          source: spec.source,
-          unit: spec.unit,
-          count: row.count,
-          href: spec.href,
-          action: spec.action,
-          items: row.items.map((item) => ({
-            ...item,
-            href: spec.itemPath
-              ? `${spec.itemPath}/${item.id}/edit`
-              : spec.href,
-          })),
-        });
-      }
+      for (const spec of selected) result.push(await evaluate(tx, spec, asOf));
       return result;
     },
   );

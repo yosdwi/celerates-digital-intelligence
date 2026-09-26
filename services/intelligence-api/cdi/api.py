@@ -1,3 +1,4 @@
+import json as stdjson
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated
@@ -5,6 +6,7 @@ from typing import Annotated
 from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile
 from fastapi.responses import Response
 
+from .agent.api import router as agent_router
 from .artifacts import KINDS
 from .config import settings
 from .context import authorize_run
@@ -28,6 +30,7 @@ app = FastAPI(title="Celerates Digital Intelligence", version="0.1.0", lifespan=
 
 
 app.include_router(foundation_router)
+app.include_router(agent_router)
 
 
 @app.exception_handler(KeyError)
@@ -406,4 +409,9 @@ def system():
         "erp_review_url": cfg.erp_base_url.split("/api/")[0] + "/intelligence" if cfg.erp_mode == "http" else None,
         "contract_resources": ["sales_opportunity"] if cfg.erp_mode == "http" else ["demo fixtures"],
         "unsupported_live_resources": ["capacity", "project_history", "exceptions", "service_cases"],
+        "agent": {
+            "delegation_keys": len(stdjson.loads(cfg.erp_delegation_public_keys or "{}")),
+            "playbooks": "m1-playbooks-v1",
+            "model": "none (deterministic playbooks)",
+        },
     }
