@@ -143,3 +143,16 @@ Start from the final commit of this record on `audit/erp-production-readiness`.
 3. **Scheduled snapshots.** Replace panel-driven snapshots with a daily ERP job. Once there is history, add a morning *Ringkasan* in the panel.
 4. **Close the loop from complaints to knowledge.** Offer curators "turn this note into a knowledge draft" from a complaint, reusing the existing feedback → lesson curator path.
 5. **Broaden sign-in and commands.** Extend the console sign-in to non-Owner managers when the pilot opens up. Add PMO/Finance remedies once F13 is settled.
+
+## CI results
+
+GitHub Actions on `audit/erp-production-readiness` (push and pull-request runs):
+
+| Commit | ERP pilot checks (`verify`) | P0 `api` | P0 `web` | P0 `compose` |
+|---|---|---|---|---|
+| `49af176` quality loop | success | success | success | failure (pre-existing) |
+| `779e3df` console sign-in | success | success | success | failure (pre-existing) |
+| `1baf8a9` signal history | success | success | success | failure (pre-existing) |
+| `44d2c72` this record | success | success | success | failure (pre-existing) |
+
+The `compose` job fails at `docker compose … up --build -d` on the baseline commit `ced8be1` too. It is independent of this increment.
