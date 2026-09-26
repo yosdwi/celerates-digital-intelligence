@@ -8,7 +8,7 @@ import { EventSchemas } from "@ag-ui/core/schemas";
 import { CATALOG, entityTypes, hrefFor, publicCatalog, resolvePageEntity } from "../src/lib/agent/catalog";
 import { DelegationError, mintDelegation, verifyDelegation } from "../src/lib/agent/delegation";
 import { applyEvent, newRun, toThreadMessages } from "../src/lib/agent/run-state";
-import { readEntity, readEntitySignals, readNeighbours, search, loadActor, AgentReadError } from "../src/lib/agent/reads";
+import { readEntity, readEntitySignals, readNeighbours, search, searchTerms, loadActor, AgentReadError } from "../src/lib/agent/reads";
 import { readOperationalContext, readSignal, checkSignals } from "../src/lib/operations/reader";
 
 const ID = "5b0f2c7e-1d2a-4f3b-9c8d-7e6f5a4b3c2d";
@@ -197,6 +197,19 @@ test("delegated catalog reads: sensitivity, relationships, search, signal parity
     assert.equal((await search(sql, ownerActor, "astra zzzq")).results.length, 0);
     const loose = await search(sql, ownerActor, "astra zzzq", "any");
     assert.ok(loose.results.length >= 4 && loose.results.every((r) => r.score === 1), "any-mode ranks partial matches");
+    // Name resolution: legal forms are ignored in search and in name-match relations ("PT Astra Synthetic Tbk").
+    assert.deepEqual(searchTerms("PT. Astra Tbk"), ["astra"]);
+    assert.deepEqual(searchTerms("PT"), ["pt"], "a lone legal form is still searchable");
+    await sql`INSERT INTO crm_clients (name,status_code) VALUES ('Astra Synthetic, Tbk.','active')`;
+    const accounts = (await readNeighbours(sql, ownerActor, "sales_opportunity", tracker.id)).edges.find((e) => e.name === "account")!;
+    assert.equal(accounts.count, 2, "legal-form and punctuation-insensitive name match");
+    // Typos: fuzzy (pg_trgm) where installed; otherwise it degrades to any-term search, never an error.
+    const [{ trgm }] = await sql`SELECT count(*)::int AS trgm FROM pg_extension WHERE extname='pg_trgm'`;
+    const typo = await search(sql, ownerActor, "Astrra", "fuzzy");
+    if (trgm) {
+      assert.equal(typo.mode, "fuzzy");
+      assert.ok(typo.results.some((r) => r.type === "requisition" && /mirip/.test(r.matched_field)), JSON.stringify(typo.results));
+    } else assert.equal(typo.mode, "any");
 
     await assert.rejects(readEntity(sql, taActor, "sales_opportunity", tracker.id), (e: AgentReadError) => e.status === 403);
     assert.equal((await readEntity(sql, taActor, "requisition", req.id)).entity.id, req.id);

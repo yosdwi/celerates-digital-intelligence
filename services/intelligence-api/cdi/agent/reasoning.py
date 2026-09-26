@@ -37,8 +37,9 @@ PROMPT_VERSION = "agent-ask-v1"
 # The planner may call these read tools. Argument names and allowed values are fixed here; ERP authorizes each call.
 PLANNER_TOOLS = {
     "erp_search": {
-        "doc": "Search ERP records by words (client, position, number, name). mode 'all' (every word) or 'any'.",
-        "args": {"query": str, "mode": ("all", "any")},
+        "doc": "Search ERP records by words (client, position, number, name). mode 'all' (every word), 'any' or "
+        "'fuzzy' (typo-tolerant). Legal forms like PT/Tbk are ignored.",
+        "args": {"query": str, "mode": ("all", "any", "fuzzy")},
         "required": {"query"},
     },
     "erp_signal_detail": {

@@ -589,7 +589,7 @@ class AskingERP(ProposingERP):
         ]
         if "req-7" in query:
             rows = rows[:1]
-        elif "astra" not in query or (mode == "all" and "zzz" in query):
+        elif "astra" not in query or (mode == "all" and "zzz" in query) or mode == "any":
             rows = []
         for r in rows:
             r.update(href="/ta", matched_field="Nomor", score=1)

@@ -96,7 +96,7 @@ def entity_signals(ctx, entity_type, entity_id):
     return ctx.erp.entity_signals(entity_type, entity_id)
 
 
-@register("erp_search", "2", "Multi-term search over catalog-declared, non-sensitive ERP fields (all or any terms)")
+@register("erp_search", "3", "Multi-term search over catalog-declared, non-sensitive ERP fields (all, any or fuzzy)")
 def erp_search(ctx, query, mode="all"):
     return ctx.erp.search(query, mode)
 

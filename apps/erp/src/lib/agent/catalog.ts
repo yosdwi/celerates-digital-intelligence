@@ -45,12 +45,16 @@ const f = (name: string, label: string, sensitivity: Sensitivity = "internal", k
   sensitivity,
   kind,
 });
+/** Legal forms ignored when names are compared or searched ("PT Astra Tbk" ~ "astra"). */
+export const LEGAL_FORMS = ["pt", "tbk", "cv", "persero", "ud", "ltd", "inc", "corp", "co", "llc", "plc", "gmbh", "bv"];
+/** SQL key for comparing organisation names: lower-case, legal forms and punctuation/spaces removed. */
+export const nameKey = (expr: string) => `regexp_replace(lower(${expr}), '\\m(${LEGAL_FORMS.join("|")})\\M|[^a-z0-9]+', '', 'g')`;
 const byName = (target: EntityType, table: string, column: string, label: string, name: string): CatalogEdge => ({
   name,
   label,
   target,
   kind: "name_match",
-  sql: `SELECT t.id FROM ${table} t, (SELECT %NAME% AS n FROM %SELF%) s WHERE lower(trim(t.${column}))=lower(trim(s.n))`,
+  sql: `SELECT t.id FROM ${table} t, (SELECT ${nameKey("%NAME%")} AS n FROM %SELF%) s WHERE s.n <> '' AND ${nameKey(`t.${column}`)}=s.n`,
 });
 
 const ENTITIES: CatalogEntity[] = [

@@ -1,12 +1,12 @@
 """Governed sources reuse the document parser, object store, chunks and Model Gateway."""
 
 import hashlib
-import re
 from pathlib import Path
 from uuid import uuid4
 
 from fastapi import HTTPException
 
+from . import retrieval
 from .config import settings
 from .db import all_rows, connect, json, one
 from .documents import ALLOWED, ingest
@@ -157,75 +157,33 @@ def retrieve(opportunity_id, query, actor, division="sales"):
           WHERE d.lifecycle='active' AND d.state='INGESTED' AND (s.classification='internal' OR %s)
           AND (s.scope_type='company' OR (s.scope_type='division' AND s.scope_id=ANY(%s)) OR (s.scope_type='opportunity' AND s.scope_id=%s))
         ) SELECT c.id,c.document_id,c.text,a.name,a.sha256,a.source_id,a.source_version,a.title,a.scope_type,a.scope_id,a.classification,
-          ts_rank(c.search,plainto_tsquery('english',%s))+(1-(c.embedding <=> %s::vector)) AS score
+          ts_rank_cd(c.search_multi,"""
+            + retrieval.TSQUERY_SQL
+            + """)+(1-(c.embedding <=> %s::vector)) AS score
           FROM authorized a JOIN chunks c ON c.document_id=a.id WHERE c.embedding_model=%s
           ORDER BY score DESC,c.id LIMIT 8""",
-            (actor.restricted, scopes, opportunity_id, query, str(embedding), model),
+            (actor.restricted, scopes, opportunity_id, *retrieval.tsquery_params(query), str(embedding), model),
         )
 
 
-DEMO_EMBEDDING = "demo-hash-64-v1"
-# Minimal Indonesian function words so an OR query does not match on grammar alone. Proper multilingual
-# lexical configuration (indonesian + english, unaccent, RRF) is the M2 retrieval work.
-STOPWORDS = {
-    "yang",
-    "dan",
-    "atau",
-    "untuk",
-    "dengan",
-    "dari",
-    "pada",
-    "ini",
-    "itu",
-    "belum",
-    "sudah",
-    "tidak",
-    "ada",
-    "oleh",
-    "dalam",
-    "sebelum",
-    "setelah",
-    "akan",
-    "bukan",
-    "saat",
-    "juga",
-    "bisa",
-    "harus",
-    "maupun",
-    "the",
-    "and",
-    "for",
-    "with",
-    "from",
-    "that",
-    "this",
-    "are",
-    "was",
-    "not",
-}
-
-
-def _any_terms(query):
-    """OR of sanitized terms for lexical matching. plainto_tsquery ANDs every word, which never matches a
-    sentence-length query; ts_rank also returns a tiny non-zero value on no match, so matching must use @@."""
-    terms = sorted({t for t in re.findall(r"[a-z0-9]+", query.lower()) if len(t) >= 3 and t not in STOPWORDS})[:32]
-    return " | ".join(terms) or "__none__"
+DEMO_EMBEDDING = retrieval.DEMO_EMBEDDING
 
 
 def search_for_principal(query, actor, opportunity_ids=(), limit=5, min_vector=0.5):
     """Agent retrieval: approved, active knowledge the principal may read. Scope filters run before ranking.
 
     Opportunity-scoped sources are included only for opportunity IDs the caller has already read from ERP under
-    the same delegation (ERP authorized them); company and the principal's divisions otherwise. A passage must
-    match lexically, or clear a vector-similarity floor when a semantic embedding model is configured. The
-    deterministic demo hash is not semantic, so it never admits a passage on similarity alone.
+    the same delegation (ERP authorized them); company and the principal's divisions otherwise. A passage must match
+    lexically (Indonesian + English stems, prefixes), or clear a vector-similarity floor when a semantic embedding
+    model is configured. Ranking is reciprocal-rank fusion of lexical and (semantic only) vector rank. The
+    deterministic demo hash is not semantic, so it never admits or ranks a passage.
     """
     embedding, model = ModelGateway().embed(query)
-    floor = 2.0 if model == DEMO_EMBEDDING else min_vector
+    semantic = model != DEMO_EMBEDDING
     with connect() as conn:
         return all_rows(
             conn,
-            """WITH q AS (SELECT to_tsquery('english', %s) AS terms), authorized AS MATERIALIZED (
+            f"""WITH q AS (SELECT {retrieval.TSQUERY_SQL} AS terms), authorized AS MATERIALIZED (
           SELECT d.id,d.name,d.sha256,d.source_version,d.approved_at,s.id AS source_id,s.title,s.scope_type,s.scope_id,
                  s.classification,s.source_kind
           FROM documents d JOIN knowledge_sources s ON s.id=d.source_id
@@ -235,23 +193,31 @@ def search_for_principal(query, actor, opportunity_ids=(), limit=5, min_vector=0
         ), scored AS (
           SELECT c.id,c.document_id,c.text,a.name,a.sha256,a.source_id,a.source_version,a.title,a.scope_type,
                  a.scope_id,a.classification,a.source_kind,a.approved_at,
-                 (c.search @@ q.terms) AS lexical_match,
-                 ts_rank_cd(c.search, q.terms) AS lexical,
+                 (c.search_multi @@ q.terms) AS lexical_match,
+                 ts_rank_cd(c.search_multi, q.terms) AS lexical,
                  1-(c.embedding <=> %s::vector) AS vector
           FROM authorized a JOIN chunks c ON c.document_id=a.id CROSS JOIN q WHERE c.embedding_model=%s
+        ), admitted AS (
+          SELECT *, row_number() OVER (ORDER BY lexical DESC, id) AS lrank,
+                    row_number() OVER (ORDER BY vector DESC, id) AS vrank
+          FROM scored WHERE lexical_match OR (%s AND vector >= %s)
+        ), fused AS (
+          SELECT *, (CASE WHEN lexical_match THEN 1.0/({retrieval.RRF_K}+lrank) ELSE 0 END
+                     + CASE WHEN %s THEN 1.0/({retrieval.RRF_K}+vrank) ELSE 0 END) AS score
+          FROM admitted
         ), ranked AS (
-          SELECT *, lexical+vector AS score,
-                 row_number() OVER (PARTITION BY source_id ORDER BY lexical+vector DESC, id) AS rank
-          FROM scored WHERE lexical_match OR vector >= %s
+          SELECT *, row_number() OVER (PARTITION BY source_id ORDER BY score DESC, id) AS rank FROM fused
         ) SELECT * FROM ranked WHERE rank=1 ORDER BY score DESC, id LIMIT %s""",
             (
-                _any_terms(query),
+                *retrieval.tsquery_params(query),
                 actor.restricted,
                 sorted(actor.divisions),
                 list(opportunity_ids),
                 str(embedding),
                 model,
-                floor,
+                semantic,
+                min_vector,
+                semantic,
                 limit,
             ),
         )

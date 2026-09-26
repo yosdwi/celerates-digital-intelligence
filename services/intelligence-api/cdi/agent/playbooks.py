@@ -296,7 +296,8 @@ def ask_deterministic(ctx, query, fallback=False):
         found = invoke(ctx, "erp_search", query=" ".join(terms))
         partial = False
         if not found["results"] and len(terms) > 1 and not found_signals:
-            found, partial = invoke(ctx, "erp_search", query=" ".join(terms), mode="any"), True
+            # Typo-tolerant where ERP has pg_trgm (ERP degrades to any-term otherwise).
+            found, partial = invoke(ctx, "erp_search", query=" ".join(terms), mode="fuzzy"), True
     results = found["results"]
     exact = [r for r in results if any(RECORD_NO.match(t) and t in r["label"].lower() for t in terms)]
     focus = exact[0] if len(exact) == 1 else results[0] if len(results) == 1 and not partial else None
@@ -311,10 +312,7 @@ def ask_deterministic(ctx, query, fallback=False):
                 {
                     "type": "erp_fact",
                     "title": f"{r['type_label']} {r['label']}",
-                    "detail": [
-                        f"Cocok pada {r['matched_field']}"
-                        + (f" · {r['score']} dari {len(terms)} kata" if partial else "")
-                    ],
+                    "detail": [f"Cocok pada {r['matched_field']}" + (" · cocok sebagian" if partial else "")],
                     "href": r.get("href"),
                     "source": {"kind": "erp", "ref": f"{r['type']}/{r['id']}", "as_of": found.get("as_of")},
                 }

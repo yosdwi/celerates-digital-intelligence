@@ -3,6 +3,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from uuid import uuid4
 
+from . import retrieval
 from .db import all_rows, connect, json, one
 from .gateway import ModelGateway
 from .storage import storage
@@ -122,12 +123,12 @@ def retrieve(opportunity_id, query):
     with connect() as conn:
         return all_rows(
             conn,
-            """SELECT c.id,c.document_id,d.name,c.text,
-            ts_rank(c.search,plainto_tsquery('english',%s)) AS keyword_rank,
+            f"""WITH q AS (SELECT {retrieval.TSQUERY_SQL} AS terms)
+            SELECT c.id,c.document_id,d.name,c.text,
+            ts_rank_cd(c.search_multi,q.terms) AS keyword_rank,
             1 - (c.embedding <=> %s::vector) AS vector_score
-            FROM chunks c JOIN documents d ON d.id=c.document_id
+            FROM chunks c JOIN documents d ON d.id=c.document_id CROSS JOIN q
             WHERE d.opportunity_id=%s AND c.embedding_model=%s
-            ORDER BY (ts_rank(c.search,plainto_tsquery('english',%s)) +
-                      (1 - (c.embedding <=> %s::vector))) DESC LIMIT 8""",
-            (query, str(embedding), opportunity_id, model, query, str(embedding)),
+            ORDER BY (ts_rank_cd(c.search_multi,q.terms) + (1 - (c.embedding <=> %s::vector))) DESC, c.id LIMIT 8""",
+            (*retrieval.tsquery_params(query), str(embedding), opportunity_id, model, str(embedding)),
         )

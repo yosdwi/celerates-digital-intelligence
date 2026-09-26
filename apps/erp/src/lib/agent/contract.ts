@@ -46,7 +46,7 @@ export async function handleAgent(request: NextRequest, path: string[], sql: Sql
       return { schema_version: "1.0", as_of: signal.as_of, signal };
     }
     if (a === "search" && path.length === 2)
-      return await search(sql, actor, request.nextUrl.searchParams.get("q") || "", request.nextUrl.searchParams.get("mode") === "any" ? "any" : "all");
+      return await search(sql, actor, request.nextUrl.searchParams.get("q") || "", (["any", "fuzzy"] as const).find((m) => m === request.nextUrl.searchParams.get("mode")) ?? "all");
     if (a === "signals" && path.length === 2) {
       // Every rule this user may read (all modules), with exact counts: what `Perlu perhatian` would show anywhere.
       const all = await readOperationalContext(sql, actor, "/");

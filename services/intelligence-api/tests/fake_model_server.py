@@ -14,7 +14,9 @@ def decide(messages):
     first = json.loads(messages[1]["content"])
     question = first["question"].lower()
     evidence = "\n".join(
-        json.loads(m["content"]).get("evidence", "") for m in messages[2:] if m["role"] == "user" and "evidence" in m["content"]
+        json.loads(m["content"]).get("evidence", "")
+        for m in messages[2:]
+        if m["role"] == "user" and "evidence" in m["content"]
     )
     record = re.search(r"\b(req-[\w-]+)", question)
     if "task" in question and record:

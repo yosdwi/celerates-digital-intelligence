@@ -4,7 +4,7 @@
 import type { Sql } from "postgres";
 import { canReadModule, MODULES, type Module, type OperationalActor } from "@/lib/operations/policy";
 import { checkSignals } from "@/lib/operations/reader";
-import { CATALOG, edgeSql, entity as catalogEntity, hrefFor, type CatalogEntity, type EntityType } from "./catalog";
+import { LEGAL_FORMS, CATALOG, edgeSql, entity as catalogEntity, hrefFor, type CatalogEntity, type EntityType } from "./catalog";
 
 const EDGE_SAMPLE = 5;
 const SEARCH_PER_TYPE = 5;
@@ -140,26 +140,42 @@ export async function readEntitySignals(sql: Sql, actor: OperationalActor, type:
   };
 }
 
-/** Search terms: whitespace-separated, edge punctuation stripped, de-duplicated, at most six. */
+/** Search terms: whitespace-separated, edge punctuation stripped, de-duplicated, at most six. Legal forms
+ * ("PT", "Tbk", …) are dropped unless nothing else remains, so "PT Astra" finds "Astra International Tbk". */
 export function searchTerms(query: string): string[] {
   const terms = query
     .toLowerCase()
     .split(" ")
     .map((t) => t.replace(/^[^\p{L}\p{N}%_]+|[^\p{L}\p{N}%_]+$/gu, ""))
     .filter((t) => t.length >= 2);
-  return [...new Set(terms)].slice(0, 6);
+  const unique = [...new Set(terms)];
+  const content = unique.filter((t) => !LEGAL_FORMS.includes(t.replace(/\./g, "")));
+  return (content.length ? content : unique).slice(0, 6);
 }
+
+let trigram: Promise<boolean> | null = null;
+/** Whether pg_trgm is installed (migration 0006 is best-effort). Cached per process. */
+function hasTrigram(sql: Sql): Promise<boolean> {
+  trigram ??= sql`SELECT 1 FROM pg_extension WHERE extname='pg_trgm'`.then((r) => r.length > 0).catch(() => false);
+  return trigram;
+}
+export function resetTrigramCache() {
+  trigram = null;
+}
+const FUZZY = 0.5;
 
 /**
  * Catalog search over non-sensitive fields. `all` (default): every term must match some field of the record.
  * `any`: records matching at least one term, ranked by how many terms matched (for questions phrased loosely).
+ * `fuzzy`: typo-tolerant (pg_trgm word similarity ≥ 0.5 per term), ranked by summed similarity; `any` without pg_trgm.
  */
-export async function search(sql: Sql, actor: OperationalActor, raw: string, mode: "all" | "any" = "all") {
+export async function search(sql: Sql, actor: OperationalActor, raw: string, requested: "all" | "any" | "fuzzy" = "all") {
+  const mode = requested === "fuzzy" && !(await hasTrigram(sql)) ? "any" : requested;
   const query = raw.replace(/\s+/g, " ").trim().slice(0, 100);
   if (query.length < 2) throw new AgentReadError(422, "QUERY_TOO_SHORT");
   const terms = searchTerms(query);
   if (!terms.length) throw new AgentReadError(422, "QUERY_TOO_SHORT");
-  const patterns = terms.map((t) => "%" + t.replace(/[\\%_]/g, (c) => "\\" + c) + "%");
+  const patterns = mode === "fuzzy" ? terms : terms.map((t) => "%" + t.replace(/[\\%_]/g, (c) => "\\" + c) + "%");
   const readable = [...CATALOG.values()].filter((d) => canReadEntityModule(actor, d.module));
   type Result = { type: string; type_label: string; id: string; label: string; href: string; module: string; matched_field: string; score: number };
   const results: Result[] = [];
@@ -168,12 +184,19 @@ export async function search(sql: Sql, actor: OperationalActor, raw: string, mod
     for (const def of readable) {
       const fields = def.search.filter((name) => def.fields.find((f) => f.name === name)?.sensitivity === "internal");
       if (!fields.length) continue;
-      const hit = (i: number) => "(" + fields.map((name) => `${def.alias}.${name} ILIKE $${i + 1}`).join(" OR ") + ")";
-      const score = terms.map((_, i) => `(CASE WHEN ${hit(i)} THEN 1 ELSE 0 END)`).join("+");
+      const label = (name: string) => def.fields.find((f) => f.name === name)!.label.replace(/'/g, "");
+      const col = (name: string) => `coalesce(${def.alias}.${name}::text,'')`;
+      const sim = (i: number) => `greatest(${fields.map((name) => `word_similarity($${i + 1}, ${col(name)})`).join(", ")}, 0)`;
+      const hit = (i: number) =>
+        mode === "fuzzy" ? `${sim(i)} >= ${FUZZY}` : "(" + fields.map((name) => `${def.alias}.${name} ILIKE $${i + 1}`).join(" OR ") + ")";
+      const score = terms.map((_, i) => (mode === "fuzzy" ? sim(i) : `(CASE WHEN ${hit(i)} THEN 1 ELSE 0 END)`)).join("+");
       const where = terms.map((_, i) => hit(i)).join(mode === "all" ? " AND " : " OR ");
-      const matched = `CASE ${terms.flatMap((_, i) => fields.map((name) => `WHEN ${def.alias}.${name} ILIKE $${i + 1} THEN '${def.fields.find((f) => f.name === name)!.label.replace(/'/g, "")}'`)).join(" ")} END`;
+      const matched =
+        mode === "fuzzy"
+          ? `CASE ${terms.flatMap((_, i) => fields.map((name) => `WHEN word_similarity($${i + 1}, ${col(name)}) >= ${FUZZY} THEN '${label(name)} (mirip)'`)).join(" ")} END`
+          : `CASE ${terms.flatMap((_, i) => fields.map((name) => `WHEN ${def.alias}.${name} ILIKE $${i + 1} THEN '${label(name)}'`)).join(" ")} END`;
       const rows = await tx.unsafe<{ id: string; label: string; matched: string; score: number }[]>(
-        `SELECT ${def.alias}.id::text AS id, ${def.display} AS label, ${matched} AS matched, (${score})::int AS score FROM ${def.table} ${def.alias} WHERE ${where} ORDER BY 4 DESC, 2, 1 LIMIT ${SEARCH_PER_TYPE + 1}`,
+        `SELECT ${def.alias}.id::text AS id, ${def.display} AS label, ${matched} AS matched, round((${score})::numeric, 2)::float AS score FROM ${def.table} ${def.alias} WHERE ${where} ORDER BY 4 DESC, 2, 1 LIMIT ${SEARCH_PER_TYPE + 1}`,
         patterns,
       );
       if (rows.length > SEARCH_PER_TYPE) truncated = true;

@@ -79,7 +79,7 @@ class DelegatedERP:
         query = " ".join(str(query).split())[:100]
         if len(query) < 2:
             raise ValueError("Search needs at least two characters")
-        return self._get("search", {"q": query, "mode": "any" if mode == "any" else "all"})
+        return self._get("search", {"q": query, "mode": mode if mode in ("any", "fuzzy") else "all"})
 
     def signals(self):
         return self._get("signals")

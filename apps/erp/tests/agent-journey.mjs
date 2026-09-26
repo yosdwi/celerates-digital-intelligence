@@ -254,6 +254,12 @@ async function proposalJourneys({ base, request, db, env, intelligence, requisit
     const dup = (await json(`/api/agent/proposals/${reimport.proposal.id}`)).body;
     assert.equal(dup.items[0].validation.state, 'warning', 'duplicate of the row just imported is flagged by ERP');
     assert.equal((await post(`/api/agent/proposals/${dup.id}/reject`, {})).body.state, 'rejected');
+    // Name resolution: legal forms are ignored; a typo still finds the client (fuzzy with pg_trgm, any-term without).
+    const legal = await run(request, 'ask', { query: 'PT Synthetic Import Tbk' });
+    assert.ok(legal.evidence.some(e => /Synthetic Import/.test(e.title)), legal.text);
+    const typo = await run(request, 'ask', { query: 'Sinthetic Import' });
+    assert.ok(typo.evidence.some(e => /Synthetic Import/.test(e.title)), typo.text);
+    assert.match(typo.text, /cocok sebagian/);
     console.log('PASS: Agent proposals — follow-up (signal → proposal → confirm → receipt → signal cleared → outcome) and import (file → mapping → per-row validation → confirm → learned mapping)');
   } finally {
     await brain.end();
