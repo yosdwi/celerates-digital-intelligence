@@ -1009,6 +1009,10 @@ export const kanbanTasks = pgTable("kanban_tasks", {
   parent_id: uuid("parent_id").references((): AnyPgColumn => kanbanTasks.id),
   tags: text("tags").array(), // label bebas per task, warna ditentukan otomatis dari hash nama tag (bukan disimpan)
   created_by_name: text("created_by_name"),
+  // Provenance for Agent-created tasks (drizzle/0005). Manual tasks leave these empty.
+  source_type: text("source_type"),
+  source_id: uuid("source_id"),
+  created_by_user_id: uuid("created_by_user_id").references(() => users.id),
   created_at: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updated_at: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({

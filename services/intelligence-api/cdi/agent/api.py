@@ -1,20 +1,22 @@
 """Agent HTTP surface for the ERP BFF (ADR-008/013). Every route requires a verified ERP delegation.
 
 POST creates (or idempotently re-attaches to) a run; GET streams its persisted AG-UI events as SSE with
-`id:` lines so a dropped connection resumes with Last-Event-ID. No route here accepts approvals or writes."""
+`id:` lines so a dropped connection resumes with Last-Event-ID. Datasets are user-owned uploads. Outcomes are
+observations ERP reports after the user decided on a proposal. No route here approves or writes ERP state."""
 
 import json as stdjson
 import time
 from typing import Annotated, Literal
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..config import settings
+from ..db import connect, json
 from ..delegation import delegated_actor
-from . import playbooks, runs
+from . import datasets, playbooks, runs
 
 router = APIRouter(prefix="/api/agent")
 POLL_SECONDS = 0.25
@@ -39,13 +41,23 @@ class SearchArgs(Strict):
     query: str = Field(min_length=2, max_length=100)
 
 
-ARGS = {"explain_signal": SignalArgs, "explain_entity": EntityArgs, "search": SearchArgs}
+class DatasetArgs(Strict):
+    dataset_id: UUID
+
+
+ARGS = {
+    "explain_signal": SignalArgs,
+    "explain_entity": EntityArgs,
+    "search": SearchArgs,
+    "follow_up_signal": SignalArgs,
+    "import_dataset": DatasetArgs,
+}
 
 
 class RunRequest(Strict):
     run_id: UUID | None = None
     thread_id: str | None = Field(default=None, pattern=r"^[A-Za-z0-9_-]{8,100}$")
-    skill: Literal["explain_signal", "explain_entity", "search"]
+    skill: Literal["explain_signal", "explain_entity", "search", "follow_up_signal", "import_dataset"]
     args: dict
     modality: Literal["text"] = "text"  # voice arrives with M2 through the same run model
 
@@ -126,3 +138,47 @@ def run_events(
         media_type="text/event-stream",
         headers={"Cache-Control": "private, no-store", "X-Accel-Buffering": "no"},
     )
+
+
+class Outcome(Strict):
+    proposal_id: UUID
+    state: Literal["applied", "partially_applied", "failed", "rejected", "expired", "pending"]
+    counts: dict = {}
+    receipts: dict = {}
+    outcome: dict | None = None
+    edited_items: int = Field(default=0, ge=0, le=1000)
+
+
+@router.post("/runs/{run_id}/outcomes")
+def record_outcome(run_id: UUID, body: Outcome, user=Depends(delegated_actor)):
+    """ERP reports how the user decided. Receipts stay in ERP; this is the learning/observation copy."""
+    run = owned(str(run_id), user)
+    with connect() as conn:
+        conn.execute(
+            """INSERT INTO agent_outcomes(run_id,proposal_id,principal_sub,state,counts,receipts,outcome,edited_items)
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+               ON CONFLICT (run_id,proposal_id) DO UPDATE SET state=EXCLUDED.state,counts=EXCLUDED.counts,
+                 receipts=EXCLUDED.receipts,outcome=EXCLUDED.outcome,edited_items=EXCLUDED.edited_items,recorded_at=now()""",
+            (
+                run["id"],
+                str(body.proposal_id),
+                user.sub,
+                body.state,
+                json(body.counts),
+                json(body.receipts),
+                json(body.outcome),
+                body.edited_items,
+            ),
+        )
+    learned = body.state in {"applied", "partially_applied"} and datasets.learn(run, user)
+    return {"recorded": True, "learned": learned}
+
+
+@router.post("/datasets", status_code=201)
+def upload_dataset(file: UploadFile = File(...), user=Depends(delegated_actor)):
+    body = file.file.read(datasets.MAX_BYTES + 1)
+    try:
+        row = datasets.store(user, file.filename or "berkas.csv", body)
+    except datasets.DatasetError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    return {"id": row["id"], "name": row["name"], "sha256": row["sha256"], "profile": row["profile"]}

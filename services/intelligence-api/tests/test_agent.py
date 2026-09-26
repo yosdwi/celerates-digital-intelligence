@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 from cdi import delegation
 from cdi.agent import playbooks, runs
 from cdi.agent.erp_client import DelegatedERP, ERPAgentError
-from cdi.agent.tools import REGISTRY, allowed_tools
+from cdi.agent.tools import REGISTRY, allowed_tools, register
 from cdi.api import app
 from cdi.config import settings
 from cdi.db import connect, one
@@ -103,11 +103,17 @@ def test_delegated_principal_is_scoped_and_cannot_use_workspace_routes(monkeypat
         assert c.post("/api/agent/runs", json={"skill": "search", "args": {"query": "abc"}}).status_code == 401
 
 
-def test_all_registered_tools_are_read_only():
-    assert REGISTRY and all(t.risk == "read" for t in REGISTRY.values())
+def test_tools_can_read_or_propose_but_never_write():
+    assert REGISTRY and {t.risk for t in REGISTRY.values()} == {"read", "propose"}
+    assert [t.name for t in REGISTRY.values() if t.risk == "propose"] == ["erp_propose"]
     owner = delegation.DelegatedPrincipal(delegation.verify(mint()), "t")
     assert {t.name for t in allowed_tools(owner)} == set(REGISTRY)
-    assert not [n for n in dir(DelegatedERP) if n.startswith(("post", "put", "patch", "delete", "create", "apply"))]
+    with pytest.raises(ValueError):
+        register("erp_write", "1", "x", risk="write")(lambda ctx: None)
+    # The client's only non-read call creates an ERP-held pending proposal; ERP applies nothing without the user.
+    public = [n for n in dir(DelegatedERP) if not n.startswith("_")]
+    assert not [n for n in public if n.startswith(("post", "put", "patch", "delete", "create", "apply", "confirm"))]
+    assert "propose" in public
 
 
 class FakeERP:
@@ -116,7 +122,7 @@ class FakeERP:
     def __init__(self, principal):
         self.principal = principal
 
-    def signal(self, key, path):
+    def signal(self, key, path, items=5):
         FakeERP.calls.append(("signal", key, self.principal.sub))
         if key == "finance-review":
             raise ERPAgentError(403, "FORBIDDEN")
@@ -307,3 +313,203 @@ def test_agent_knowledge_search_is_scoped_and_not_padded_with_unrelated_sources(
         # Leave no approved company knowledge behind for other tests' context builds.
         for doc in docs:
             knowledge.transition(doc, "deprecate", curator)
+
+
+COMMANDS = [
+    {
+        "kind": "task.create",
+        "label": "Buat task tindak lanjut",
+        "target": None,
+        "params": [
+            {"name": "title", "label": "Judul", "kind": "text", "required": True, "aliases": ["judul", "tugas"]},
+            {"name": "due_date", "label": "Jatuh tempo", "kind": "date", "required": False, "aliases": ["deadline"]},
+        ],
+    },
+    {
+        "kind": "requisition.assign_ta_pic",
+        "label": "Tetapkan TA PIC",
+        "target": "requisition",
+        "params": [{"name": "ta_pic_name", "label": "TA PIC", "kind": "choice", "required": True, "aliases": []}],
+    },
+    {
+        "kind": "requisition.create",
+        "label": "Buat Requisition",
+        "target": None,
+        "params": [
+            {"name": "client_name", "label": "Client", "kind": "text", "required": True, "aliases": ["klien"]},
+            {"name": "position_name", "label": "Posisi", "kind": "text", "required": True, "aliases": ["jabatan"]},
+            {"name": "headcount_target", "label": "Headcount", "kind": "int", "required": False, "aliases": ["jumlah"]},
+            {
+                "name": "level_code",
+                "label": "Level",
+                "kind": "enum",
+                "required": False,
+                "aliases": [],
+                "enum": [{"code": "junior", "label": "Junior"}, {"code": "senior", "label": "Senior"}],
+            },
+            {"name": "opty_request_date", "label": "Tanggal request", "kind": "date", "required": False, "aliases": []},
+        ],
+    },
+]
+REQUISITIONS = ["8e3c5f0b-4a5d-4c6e-8f1a-0b9c8d7e6f5a", "9f4d6a1c-5b6e-4d7f-9a2b-1c0d9e8f7a6b"]
+
+
+class ProposingERP(FakeERP):
+    proposed = []
+
+    def signal(self, key, path, items=5):
+        base = super().signal(key, path, items)["signal"]
+        if key == "unassigned-requisitions":
+            base.update(
+                key=key,
+                title="Requisition tanpa TA PIC",
+                count=2,
+                entity_type="requisition",
+                remedy="requisition.assign_ta_pic",
+                items=[{"id": r, "label": f"REQ-{i}", "href": "/ta"} for i, r in enumerate(REQUISITIONS)],
+            )
+        if key == "missing-invoices":
+            base.update(key=key, entity_type=None, remedy="task.create", count=4, items=[])
+        return {"signal": base}
+
+    def catalog(self):
+        return {"commands": COMMANDS}
+
+    def propose(self, key, title, items, run_id, context_path):
+        ProposingERP.proposed.append({"key": key, "title": title, "items": items, "run_id": run_id})
+        counts = {"ok": len(items), "warning": 0, "needs_input": 0, "invalid": 0}
+        if items and items[0]["kind"] == "requisition.assign_ta_pic":
+            counts = {"ok": 0, "warning": 0, "needs_input": len(items), "invalid": 0}
+        return {
+            "id": str(uuid4()),
+            "state": "pending",
+            "title": title,
+            "counts": counts,
+            "items": [{}] * len(items),
+            "expires_at": "2026-09-26T02:00:00Z",
+        }
+
+
+def run_skill(monkeypatch, client, token, skill, args):
+    monkeypatch.setattr(settings(), "erp_mode", "http")
+    monkeypatch.setattr(playbooks, "DelegatedERP", ProposingERP)
+    monkeypatch.setattr(playbooks, "start", lambda run, user, a: playbooks.execute(run, user, a))
+    run_id = str(uuid4())
+    created = client.post(
+        "/api/agent/runs", json={"run_id": run_id, "skill": skill, "args": args}, headers={"X-ERP-Delegation": token}
+    )
+    assert created.status_code == 201, created.text
+    return run_id, events(client, run_id, token)
+
+
+def test_follow_up_signal_proposes_the_erp_declared_remedy_without_applying(monkeypatch):
+    ProposingERP.proposed.clear()
+    token = mint(ctx={"path": "/ta", "module": "ta"})
+    with TestClient(app) as c:
+        run_id, stream = run_skill(monkeypatch, c, token, "follow_up_signal", {"signal_key": "unassigned-requisitions"})
+        assert stream[-1][1]["type"] == "RUN_FINISHED"
+        proposal = ProposingERP.proposed[-1]
+        assert proposal["key"] == f"run:{run_id}" and proposal["run_id"] == run_id
+        assert [i["kind"] for i in proposal["items"]] == ["requisition.assign_ta_pic"] * 2
+        assert [i["target"]["id"] for i in proposal["items"]] == REQUISITIONS
+        assert all(i["params"] == {} for i in proposal["items"]), "the PIC is the user's choice, not a guess"
+        cards = [e["value"] for _, e in stream if e["type"] == "CUSTOM" and e["name"] == "celerates.proposal"]
+        assert len(cards) == 1 and cards[0]["id"]
+        text = "".join(e["delta"] for _, e in stream if e["type"] == "TEXT_MESSAGE_CONTENT")
+        assert "Belum ada data yang berubah" in text and "2 perlu Anda lengkapi" in text
+
+        _, stream = run_skill(monkeypatch, c, token, "follow_up_signal", {"signal_key": "missing-invoices"})
+        items = ProposingERP.proposed[-1]["items"]
+        assert len(items) == 1 and items[0]["kind"] == "task.create" and items[0]["target"] is None
+        assert items[0]["params"]["due_date"] > "2026-01-01"
+
+
+CSV = (
+    "Kebutuhan kandidat Q4\n"
+    "Klien;Jabatan;Jumlah;Level;Tanggal Request;Catatan\n"
+    "PT Sintetis;Backend Engineer;2;Senior;03/10/2026;urgent\n"
+    "PT Sintetis;QA Engineer;1;junior;4 Okt 2026;\n"
+    "\n"
+)
+
+
+def test_dataset_import_maps_columns_from_erp_specs_and_learns_only_from_applied_outcomes(monkeypatch):
+    ProposingERP.proposed.clear()
+    token = mint(ctx={"path": "/ta", "module": "ta"})
+    with TestClient(app) as c:
+        files = {"file": ("kebutuhan.csv", CSV.encode(), "text/csv")}
+        uploaded = c.post("/api/agent/datasets", files=files, headers={"X-ERP-Delegation": token})
+        assert uploaded.status_code == 201, uploaded.text
+        profile = uploaded.json()["profile"]
+        assert profile["rows"] == 2 and profile["header_row"] == 2
+        dataset_id = uploaded.json()["id"]
+        bad = c.post(
+            "/api/agent/datasets",
+            files={"file": ("x.exe", b"MZ", "application/octet-stream")},
+            headers={"X-ERP-Delegation": token},
+        )
+        assert bad.status_code == 422
+
+        run_id, stream = run_skill(monkeypatch, c, token, "import_dataset", {"dataset_id": dataset_id})
+        assert stream[-1][1]["type"] == "RUN_FINISHED", stream[-1]
+        items = ProposingERP.proposed[-1]["items"]
+        assert {i["kind"] for i in items} == {"requisition.create"}
+        assert items[0]["params"] == {
+            "client_name": "PT Sintetis",
+            "position_name": "Backend Engineer",
+            "headcount_target": "2",
+            "level_code": "Senior",
+            "opty_request_date": "2026-10-03",
+        }
+        assert items[1]["params"]["opty_request_date"] == "2026-10-04"
+        evidence = [
+            i
+            for _, e in stream
+            if e["type"] == "CUSTOM" and e["name"] == "celerates.evidence"
+            for i in e["value"]["items"]
+        ]
+        assert [i["type"] for i in evidence] == ["document", "inference"], "a fresh mapping is an inference"
+        assert "Tidak dipakai: Catatan" in evidence[1]["detail"]
+
+        # Another user can neither use the dataset nor report outcomes for this run.
+        stranger = mint(sub=SECOND)
+        _, other = run_skill(monkeypatch, c, stranger, "import_dataset", {"dataset_id": dataset_id})
+        assert other[-1][1]["type"] == "RUN_ERROR" and other[-1][1]["code"] == "POLICY"
+        outcome = {"proposal_id": str(uuid4()), "state": "applied", "counts": {"ok": 2}, "receipts": {"applied": 2}}
+        assert (
+            c.post(
+                f"/api/agent/runs/{run_id}/outcomes", json=outcome, headers={"X-ERP-Delegation": stranger}
+            ).status_code
+            == 404
+        )
+
+        # A rejected proposal teaches nothing; an applied one teaches the mapping for this header set.
+        rejected = {**outcome, "state": "rejected"}
+        r = c.post(f"/api/agent/runs/{run_id}/outcomes", json=rejected, headers={"X-ERP-Delegation": token})
+        assert r.json() == {"recorded": True, "learned": False}
+        r = c.post(f"/api/agent/runs/{run_id}/outcomes", json=outcome, headers={"X-ERP-Delegation": token})
+        assert r.json() == {"recorded": True, "learned": True}
+        again = c.post("/api/agent/datasets", files=files, headers={"X-ERP-Delegation": token}).json()
+        _, stream = run_skill(monkeypatch, c, token, "import_dataset", {"dataset_id": again["id"]})
+        evidence = [
+            i
+            for _, e in stream
+            if e["type"] == "CUSTOM" and e["name"] == "celerates.evidence"
+            for i in e["value"]["items"]
+        ]
+        assert evidence[1]["type"] == "observation", "a mapping used in an applied import is an observation"
+    with connect() as conn:
+        row = one(conn, "SELECT state FROM agent_outcomes WHERE run_id=%s", (run_id,))
+        assert row["state"] == "applied"
+
+
+def test_dataset_import_without_required_columns_proposes_nothing(monkeypatch):
+    ProposingERP.proposed.clear()
+    token = mint()
+    with TestClient(app) as c:
+        files = {"file": ("catatan.csv", b"Nama Kandidat,Nilai\nA,90\nB,80\n", "text/csv")}
+        dataset_id = c.post("/api/agent/datasets", files=files, headers={"X-ERP-Delegation": token}).json()["id"]
+        _, stream = run_skill(monkeypatch, c, token, "import_dataset", {"dataset_id": dataset_id})
+        assert stream[-1][1]["type"] == "RUN_FINISHED" and not ProposingERP.proposed
+        text = "".join(e["delta"] for _, e in stream if e["type"] == "TEXT_MESSAGE_CONTENT")
+        assert "kolom wajib belum ditemukan" in text

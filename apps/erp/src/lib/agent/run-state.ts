@@ -2,7 +2,7 @@
 // Unit-tested without a browser. Evidence types are the doc 14/15 vocabulary shown as badges.
 import type { AgUiEvent } from "./ag-ui-client";
 
-export type EvidenceType = "erp_fact" | "signal" | "knowledge" | "observation" | "inference";
+export type EvidenceType = "erp_fact" | "signal" | "knowledge" | "document" | "observation" | "inference";
 export type Evidence = {
   type: EvidenceType;
   title: string;
@@ -21,16 +21,18 @@ export type AgentRun = {
   steps: { name: string; done: boolean }[];
   tools: ToolTrace[];
   evidence: Evidence[];
+  /** ERP-held proposals this run created (ADR-010). The card loads the live proposal from ERP by id. */
+  proposals: { id: string; title: string }[];
   text: string;
   error?: { message: string; code?: string };
 };
 
 export function newRun(runId: string, userText: string): AgentRun {
-  return { runId, userText, status: "running", lastSeq: 0, steps: [], tools: [], evidence: [], text: "" };
+  return { runId, userText, status: "running", lastSeq: 0, steps: [], tools: [], evidence: [], proposals: [], text: "" };
 }
 
-export const PROPOSAL_TOOL = "propose_commands";
-const EVIDENCE_TYPES = new Set<EvidenceType>(["erp_fact", "signal", "knowledge", "observation", "inference"]);
+const EVIDENCE_TYPES = new Set<EvidenceType>(["erp_fact", "signal", "knowledge", "document", "observation", "inference"]);
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function applyEvent(run: AgentRun, event: AgUiEvent, id: string | null = null): AgentRun {
   if (id !== null) {
@@ -55,6 +57,11 @@ export function applyEvent(run: AgentRun, event: AgUiEvent, id: string | null = 
     case "TOOL_CALL_RESULT":
       return { ...run, tools: run.tools.map((t) => (t.id === event.toolCallId ? { ...t, result: String(event.content ?? "") } : t)) };
     case "CUSTOM": {
+      if (event.name === "celerates.proposal") {
+        const value = event.value as { id?: unknown; title?: unknown } | undefined;
+        if (typeof value?.id !== "string" || !UUID.test(value.id) || run.proposals.some((p) => p.id === value.id)) return run;
+        return { ...run, proposals: [...run.proposals, { id: value.id, title: String(value.title ?? "Usulan") }] };
+      }
       if (event.name !== "celerates.evidence") return run;
       const items = ((event.value as { items?: unknown[] })?.items ?? []).filter(
         (i): i is Evidence => !!i && typeof i === "object" && EVIDENCE_TYPES.has((i as Evidence).type),
@@ -87,12 +94,12 @@ export function toThreadMessages(runs: AgentRun[]) {
     const content: unknown[] = [];
     if (run.status === "running" || run.steps.length) content.push({ type: "data-progress", data: { steps: run.steps, running: run.status === "running" } });
     for (const item of run.evidence) content.push({ type: "data-evidence", data: item });
-    // A proposal is first-class UI, never buried in the tool trace (ADR-010 preview; confirmation stays in ERP).
-    for (const tool of run.tools.filter((t) => t.name === PROPOSAL_TOOL)) content.push({ type: "data-proposal", data: parseArgs(tool.args) });
+    // A proposal is first-class UI, never buried in the tool trace. The card reads the ERP-held proposal (ADR-010).
     if (run.error) content.push({ type: "data-error", data: run.error });
     // The conclusion sits last, where the auto-scrolling viewport lands; evidence is directly above it.
     if (run.text) content.push({ type: "text", text: run.text });
-    for (const tool of run.tools.filter((t) => t.name !== PROPOSAL_TOOL))
+    for (const proposal of run.proposals) content.push({ type: "data-proposal", data: proposal });
+    for (const tool of run.tools)
       content.push({
         type: "tool-call",
         toolCallId: tool.id,

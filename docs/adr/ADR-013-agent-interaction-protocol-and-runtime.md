@@ -17,6 +17,7 @@ Status: accepted for Operating Substrate M1 (2026-09-26), based on spikes S1 and
 5. **Deterministic playbooks over a typed tool registry.**
    - M1 has three skills (`explain_signal`, `explain_entity`, `search`) and six read tools.
    - Registry metadata (risk class, module, bounds) is ours. The registry refuses non-read tools in M1.
+   - *Amended by ADR-010 (M2):* a `propose` risk class is allowed. It is used only by `erp_propose`, which creates an ERP-held pending proposal. There is still no `write` class.
    - No model is called.
 6. **assistant-ui (`@assistant-ui/react` 0.15.22, pinned exactly) is used for the `Tanya` thread and composer only.**
    - It runs as `ExternalStoreRuntime` over our run state, and is lazy-loaded when the tab opens.

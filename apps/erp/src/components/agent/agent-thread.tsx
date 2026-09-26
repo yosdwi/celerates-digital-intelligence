@@ -2,7 +2,7 @@
 // `Tanya` thread (spike S1): assistant-ui primitives over our own run store via ExternalStoreRuntime.
 // assistant-ui renders messages/composer only. Run state, transport (AG-UI via ERP BFF) and authority stay ours.
 // Loaded lazily by the Agent panel so pages that never open this tab pay nothing for it.
-import type { ReactNode } from "react";
+import { useRef, useState, type DragEvent, type ReactNode } from "react";
 import {
   AssistantRuntimeProvider,
   ComposerPrimitive,
@@ -12,9 +12,10 @@ import {
   type AppendMessage,
   type ThreadMessageLike,
 } from "@assistant-ui/react";
-import { SendHorizontal, Sparkles } from "lucide-react";
+import { Loader2, Paperclip, SendHorizontal, Sparkles } from "lucide-react";
 import { toThreadMessages, type AgentRun, type Evidence } from "@/lib/agent/run-state";
-import { EvidenceCard, ProposalCard, RunError, RunProgress, ToolTrace } from "./evidence";
+import { EvidenceCard, RunError, RunProgress, ToolTrace } from "./evidence";
+import { ProposalCard } from "./proposal";
 
 export type Suggestion = { label: string; run: () => void };
 
@@ -39,7 +40,7 @@ function AssistantMessage() {
               progress: ({ data }) => <RunProgress steps={data.steps} running={data.running} />,
               evidence: ({ data }) => <EvidenceCard item={data as Evidence} />,
               error: ({ data }) => <RunError message={String(data.message)} />,
-              proposal: ({ data }) => <ProposalCard args={data as Record<string, unknown>} />,
+              proposal: ({ data }) => <ProposalCard id={String(data.id)} title={String(data.title)} />,
             },
           },
           tools: {
@@ -63,13 +64,40 @@ export default function AgentThread({
   enabled,
   suggestions,
   onSearch,
+  onFile,
 }: {
   runs: AgentRun[];
   running: boolean;
   enabled: boolean;
   suggestions: Suggestion[];
   onSearch: (text: string) => void;
+  /** `Drop anything`: a CSV/XLSX becomes a dataset, then a proposal the user confirms in ERP. */
+  onFile: (file: File) => Promise<string | null>;
 }) {
+  const picker = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const accept = async (file: File | undefined) => {
+    if (!file || !enabled || running || uploading) return;
+    setUploading(true);
+    setFileError(await onFile(file));
+    setUploading(false);
+  };
+  const drop = {
+    onDragOver: (e: DragEvent) => {
+      if (!enabled || !e.dataTransfer.types.includes("Files")) return;
+      e.preventDefault();
+      setDragging(true);
+    },
+    onDragLeave: () => setDragging(false),
+    onDrop: (e: DragEvent) => {
+      if (!enabled) return;
+      e.preventDefault();
+      setDragging(false);
+      void accept(e.dataTransfer.files[0]);
+    },
+  };
   const runtime = useExternalStoreRuntime<ThreadMessageLike>({
     messages: toThreadMessages(runs) as ThreadMessageLike[],
     isRunning: running,
@@ -82,13 +110,13 @@ export default function AgentThread({
   });
   return (
     <AssistantRuntimeProvider runtime={runtime}>
-      <ThreadPrimitive.Root className="flex h-full flex-col">
+      <ThreadPrimitive.Root className={`flex h-full flex-col ${dragging ? "bg-brand-50/60 ring-2 ring-inset ring-brand-300" : ""}`} {...drop}>
         <ThreadPrimitive.Viewport className="flex-1 space-y-4 overflow-y-auto overscroll-contain p-5">
           <ThreadPrimitive.Empty>
             <div className="space-y-3">
               <p className="text-sm text-slate-600">
                 {enabled
-                  ? "Tanyakan kondisi halaman ini atau cari record. Jawaban disusun dari fakta ERP dan pengetahuan yang disetujui, dengan buktinya."
+                  ? "Tanyakan kondisi halaman ini, cari record, atau jatuhkan berkas CSV/XLSX untuk diimpor. Jawaban disusun dari fakta ERP dan pengetahuan yang disetujui, dengan buktinya; perubahan data selalu menunggu konfirmasi Anda."
                   : "Agent belum dikonfigurasi di lingkungan ini. Perlu perhatian dan Masukan tetap dapat digunakan."}
               </p>
               {enabled && suggestions.length > 0 && (
@@ -110,7 +138,33 @@ export default function AgentThread({
           </ThreadPrimitive.Empty>
           <ThreadPrimitive.Messages components={{ UserMessage, AssistantMessage }} />
         </ThreadPrimitive.Viewport>
+        {fileError && (
+          <p role="alert" className="mx-3 mb-0 mt-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-900">
+            {fileError}
+          </p>
+        )}
         <ComposerPrimitive.Root className="flex items-end gap-2 border-t border-slate-100 p-3">
+          <input
+            ref={picker}
+            type="file"
+            accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            className="hidden"
+            data-agent-file
+            onChange={(e) => {
+              void accept(e.target.files?.[0]);
+              e.target.value = "";
+            }}
+          />
+          <button
+            type="button"
+            aria-label="Lampirkan berkas CSV atau XLSX"
+            title="Impor CSV/XLSX"
+            disabled={!enabled || running || uploading}
+            onClick={() => picker.current?.click()}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-300 text-slate-600 hover:border-brand-300 hover:text-brand-700 disabled:opacity-40"
+          >
+            {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+          </button>
           <ComposerPrimitive.Input
             aria-label="Pesan untuk Agent"
             placeholder="Cari nomor, client, atau posisi…"

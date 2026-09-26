@@ -7,13 +7,16 @@ import { readSignal } from "@/lib/operations/reader";
 import { publicCatalog } from "./catalog";
 import { DelegationError, verifyDelegation } from "./delegation";
 import { AgentReadError, loadActor, readEntity, readEntitySignals, readNeighbours, search } from "./reads";
+import { createProposal, getProposal, ProposalError } from "./proposals";
+import { publicCommands } from "./commands";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TYPE = /^[a-z_]{2,40}$/;
 const KEY = /^[a-z0-9-]{2,60}$/;
 
 export async function handleAgent(request: NextRequest, path: string[], sql: Sql): Promise<unknown> {
-  if (request.method !== "GET") fail(405, "METHOD", "Agent contract is read-only.");
+  const proposing = request.method === "POST" && path.length === 2 && path[1] === "proposals";
+  if (request.method !== "GET" && !proposing) fail(405, "METHOD", "Agent contract reads only, except creating an ERP-held proposal.");
   let claims;
   try {
     claims = verifyDelegation(request.headers.get("x-erp-delegation"));
@@ -24,9 +27,21 @@ export async function handleAgent(request: NextRequest, path: string[], sql: Sql
   try {
     const actor = await loadActor(sql, claims.sub);
     const [, a, b, c, d] = path;
-    if (a === "catalog" && path.length === 2) return publicCatalog();
+    if (proposing) {
+      // Creates a pending proposal only. No business effect until the same user confirms it in ERP.
+      const key = request.headers.get("idempotency-key") ?? "";
+      if (!/^[A-Za-z0-9:_-]{8,160}$/.test(key)) fail(422, "SCHEMA", "Idempotency-Key required.");
+      const raw = await request.text();
+      if (Buffer.byteLength(raw) > 524288) fail(413, "TOO_LARGE", "Maximum proposal payload is 512 KiB.");
+      let body: unknown;
+      try { body = JSON.parse(raw); } catch { fail(422, "SCHEMA", "Invalid JSON."); }
+      return await createProposal(sql, { ...actor, id: actor.id, name: actor.name }, key, body);
+    }
+    if (a === "catalog" && path.length === 2) return { ...publicCatalog(), commands: publicCommands() };
+    if (a === "proposals" && b && UUID.test(b) && path.length === 3) return await getProposal(sql, actor, b.toLowerCase());
     if (a === "signals" && b && KEY.test(b) && path.length === 3) {
-      const signal = await readSignal(sql, actor, b);
+      const items = Number(request.nextUrl.searchParams.get("items") || 5);
+      const signal = await readSignal(sql, actor, b, new Date(), Number.isFinite(items) ? items : 5);
       if (!signal) fail(404, "NOT_FOUND", "Signal not available.");
       return { schema_version: "1.0", as_of: signal.as_of, signal };
     }
@@ -41,6 +56,7 @@ export async function handleAgent(request: NextRequest, path: string[], sql: Sql
   } catch (error) {
     if (error instanceof AgentReadError)
       fail(error.status, error.code, error.status === 403 ? "Not permitted for this user." : "Not available.");
+    if (error instanceof ProposalError) fail(error.status, error.code, error.message);
     throw error;
   }
 }

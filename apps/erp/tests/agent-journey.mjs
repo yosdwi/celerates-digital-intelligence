@@ -1,11 +1,13 @@
-// Operating Substrate M1 cross-stack journey (disposable local harness only).
-// Real Next ERP + real FastAPI Intelligence + separate PostgreSQL databases. Verifies ADR-008/009/013:
-// session → BFF → ERP-signed delegation → Intelligence run → delegated ERP reads → persisted AG-UI events.
+// Operating Substrate cross-stack journeys (disposable local harness only).
+// Real Next ERP + real FastAPI Intelligence + separate PostgreSQL databases. Verifies ADR-008/009/010/013:
+// session → BFF → ERP-signed delegation → Intelligence run → delegated ERP reads → persisted AG-UI events, and
+// signal/file → Intelligence proposes → ERP-held proposal → user confirms in ERP → receipts → outcome → learning.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { EventSchemas } from '@ag-ui/core/schemas';
 import { HttpAgent } from '@ag-ui/client';
+import postgres from 'postgres';
 
 async function until(fn, label) { for (let i = 0; i < 120; i++) { try { if (await fn()) return; } catch {} await new Promise(r => setTimeout(r, 250)); } throw new Error('Timeout: ' + label); }
 function parseSse(text) {
@@ -41,7 +43,10 @@ export async function agentJourney({ base, request, db, env, python, publicKey, 
     const machine = { Authorization: 'Bearer ' + readToken, 'X-ERP-Audience': 'celerates-intelligence', 'X-ERP-Environment': 'local-test' };
     assert.equal((await fetch(`${base}/api/integration/v1/agent/entities/sales_opportunity/${tracker.id}`, { headers: machine })).status, 401);
     assert.equal((await fetch(`${base}/api/integration/v1/agent/entities/sales_opportunity/${tracker.id}`, { headers: { ...machine, 'X-ERP-Delegation': 'e30.e30.AAAA' } })).status, 401);
-    assert.equal((await fetch(`${base}/api/integration/v1/agent/catalog`, { method: 'POST', headers: machine })).status, 405, 'agent contract is read-only');
+    assert.equal((await fetch(`${base}/api/integration/v1/agent/catalog`, { method: 'POST', headers: machine })).status, 401, 'a read credential cannot POST');
+    const actionMachine = { ...machine, Authorization: 'Bearer ' + env.ERP_ACTION_TOKEN };
+    assert.equal((await fetch(`${base}/api/integration/v1/agent/catalog`, { method: 'POST', headers: actionMachine })).status, 405, 'only proposals may be POSTed');
+    assert.equal((await fetch(`${base}/api/integration/v1/agent/proposals`, { method: 'POST', headers: { ...actionMachine, 'Content-Type': 'application/json', 'Idempotency-Key': 'forged-key-1' }, body: '{}' })).status, 401, 'proposals need a user delegation');
     // Intelligence refuses runs that did not come through ERP.
     assert.equal((await fetch(intelligence + '/api/agent/runs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ skill: 'search', args: { query: 'abc' } }) })).status, 401);
     assert.equal((await fetch(base + '/api/agent/ag-ui', { method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: cookies }, body: '{}' })).status, 403, 'cross-origin POST refused');
@@ -95,10 +100,105 @@ export async function agentJourney({ base, request, db, env, python, publicKey, 
     assert.ok(entityRun.some(s => s.event.type === 'CUSTOM' && s.event.value.items.some(i => i.source?.ref === `sales_opportunity/${tracker.id}` && i.source.version >= 1)));
     const persisted = await (await fetch(`${intelligence}/api/agent/runs/${runId}`)).status;
     assert.equal(persisted, 401, 'run status requires delegation');
+    await proposalJourneys({ base, request, db, env, intelligence, requisition, cookies });
     if (process.env.ERP_BROWSER_TEST === '1') {
+      // A fresh unassigned requisition for the browser's own `Tindak lanjuti` flow.
+      await db`INSERT INTO requisitions (requisition_no,client_name,position_name,ta_pic_name) VALUES ('REQ-BROWSER','PT Synthetic Browser','Data Engineer','')`;
       const { agentBrowser } = await import('./agent-browser.mjs');
       await agentBrowser({ base, cookies: cookies.split('; ').map((pair) => [pair.slice(0, pair.indexOf('=')), pair.slice(pair.indexOf('=') + 1)]) });
     }
-    console.log('PASS: Agent M1 — catalog page context, ERP-signed delegation, delegated reads with sensitivity filter, persisted AG-UI stream + resume, standard AG-UI client, forged approval inert, no ERP writes');
+    console.log('PASS: Agent — catalog page context, ERP-signed delegation, delegated reads with sensitivity filter, persisted AG-UI stream + resume, standard AG-UI client, forged approval inert, no ERP writes without the user; follow-up and import proposals confirmed in ERP with receipts, outcomes and mapping memory');
   } finally { api.kill(); }
+}
+
+async function run(request, skill, args, path = '/ta') {
+  const res = await request('/api/agent/ag-ui', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ threadId: 'thread-agent-journey', runId: randomUUID(), messages: [], forwardedProps: { skill, args, path } }) });
+  const stream = parseSse(await res.text());
+  for (const { event } of stream) EventSchemas.parse(event);
+  assert.equal(stream.at(-1).event.type, 'RUN_FINISHED', JSON.stringify(stream.at(-1)));
+  return {
+    stream,
+    proposal: stream.find(s => s.event.type === 'CUSTOM' && s.event.name === 'celerates.proposal')?.event.value,
+    evidence: stream.filter(s => s.event.type === 'CUSTOM' && s.event.name === 'celerates.evidence').flatMap(s => s.event.value.items),
+    text: stream.filter(s => s.event.type === 'TEXT_MESSAGE_CONTENT').map(s => s.event.delta).join(''),
+    runId: stream[0].event.runId,
+  };
+}
+
+async function proposalJourneys({ base, request, db, env, intelligence, requisition, cookies }) {
+  const brain = postgres(env.DATABASE_URL, { max: 1, prepare: false });
+  try {
+    await db`INSERT INTO pics (name) VALUES ('Rina Synthetic'), ('Budi Synthetic')`;
+    const json = async (path, init) => { const r = await request(path, init); return { status: r.status, body: await r.json() }; };
+    const post = (path, body) => json(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+
+    // Journey C — signal → proposal → confirm → receipt → outcome.
+    const [original] = await db`SELECT ta_pic_name FROM requisitions WHERE id=${requisition.id}`;
+    const follow = await run(request, 'follow_up_signal', { signal_key: 'unassigned-requisitions' });
+    assert.ok(follow.proposal?.id, 'proposal card event');
+    assert.match(follow.text, /Belum ada data yang berubah/);
+    const [still] = await db`SELECT ta_pic_name FROM requisitions WHERE id=${requisition.id}`;
+    assert.equal(still.ta_pic_name, original.ta_pic_name, 'proposing changed nothing');
+    let proposal = (await json(`/api/agent/proposals/${follow.proposal.id}`)).body;
+    assert.equal(proposal.state, 'pending');
+    assert.equal(proposal.run_id, follow.runId);
+    const item = proposal.items.find(i => i.target.id === requisition.id);
+    assert.equal(item.validation.state, 'needs_input', 'the PIC is chosen by the user');
+    assert.deepEqual(item.fields[0].options.map(o => o.value), ['Budi Synthetic', 'Rina Synthetic']);
+    const decisions = [{ index: item.index, include: true, params: { ta_pic_name: 'Rina Synthetic' } }];
+    assert.equal((await fetch(`${base}/api/agent/proposals/${proposal.id}/confirm`, { method: 'POST', headers: { Cookie: cookies, 'Content-Type': 'application/json', Origin: 'http://evil.test' }, body: JSON.stringify({ sha256: proposal.sha256, decisions }) })).status, 403, 'cross-origin confirm refused');
+    assert.equal((await post(`/api/agent/proposals/${proposal.id}/confirm`, { sha256: 'f'.repeat(64), decisions })).status, 412);
+    const confirmed = await post(`/api/agent/proposals/${proposal.id}/confirm`, { sha256: proposal.sha256, decisions });
+    assert.equal(confirmed.status, 200, JSON.stringify(confirmed.body));
+    assert.equal(confirmed.body.state, 'applied');
+    assert.equal(confirmed.body.outcome.resolved, 1);
+    const [assigned] = await db`SELECT ta_pic_name FROM requisitions WHERE id=${requisition.id}`;
+    assert.equal(assigned.ta_pic_name, 'Rina Synthetic');
+    const [log] = await db`SELECT actor_name FROM activity_logs WHERE entity_label LIKE ${'%TA PIC → Rina Synthetic%'}`;
+    assert.match(log.actor_name, /via Celerates Agent/);
+    const again = await post(`/api/agent/proposals/${proposal.id}/confirm`, { sha256: proposal.sha256, decisions });
+    assert.deepEqual(again.body.receipts, confirmed.body.receipts, 'replay is idempotent');
+    const ctx = await json('/api/operations/context?path=/ta');
+    assert.equal(ctx.body.groups.find(g => g.key === 'unassigned-requisitions').count, 0, 'the signal cleared in Perlu perhatian');
+    const listed = (await json('/api/agent/proposals')).body.items.find(p => p.id === proposal.id);
+    assert.equal(listed.outcome.resolved, 1, 'Tindak lanjut berjalan shows the outcome');
+    const [outcome] = await brain`SELECT state, receipts FROM agent_outcomes WHERE proposal_id=${proposal.id}`;
+    assert.equal(outcome.state, 'applied', 'ERP reported the outcome to Intelligence');
+
+    // Journey B — drop a file → mapped by ERP command specs → proposal → confirm → rows in ERP → mapping memory.
+    const csv = 'Kebutuhan klien Q4\nKlien;Jabatan;Jumlah;Level;Tanggal Request;Catatan\nPT Synthetic Import;Backend Engineer;3;Senior;03/10/2026;urgent\nPT Synthetic Import;QA Engineer;1;Wizard;04/10/2026;\n';
+    const upload = async () => {
+      const form = new FormData();
+      form.set('file', new Blob([csv], { type: 'text/csv' }), 'kebutuhan-q4.csv');
+      return json('/api/agent/datasets', { method: 'POST', body: form });
+    };
+    const bad = new FormData();
+    bad.set('file', new Blob(['MZ'], { type: 'application/octet-stream' }), 'x.exe');
+    assert.equal((await request('/api/agent/datasets', { method: 'POST', body: bad })).status, 422);
+    const dataset = await upload();
+    assert.equal(dataset.status, 201, JSON.stringify(dataset.body));
+    assert.equal(dataset.body.rows, 2);
+    const imported = await run(request, 'import_dataset', { dataset_id: dataset.body.id });
+    assert.deepEqual(imported.evidence.map(e => e.type), ['document', 'inference']);
+    proposal = (await json(`/api/agent/proposals/${imported.proposal.id}`)).body;
+    assert.deepEqual(proposal.items.map(i => i.validation.state), ['ok', 'invalid'], 'ERP validates each row');
+    assert.match(proposal.items[1].validation.messages.join(' '), /Level "Wizard" tidak dikenal/);
+    const before = (await db`SELECT count(*)::int AS n FROM requisitions`)[0].n;
+    const applied = await post(`/api/agent/proposals/${proposal.id}/confirm`, { sha256: proposal.sha256 });
+    assert.equal(applied.body.state, 'applied');
+    assert.equal((await db`SELECT count(*)::int AS n FROM requisitions`)[0].n, before + 1);
+    const [row] = await db`SELECT r.headcount_target, r.level_code, o.pipeline_stage_code FROM requisitions r JOIN opportunities o ON o.opportunity_tracker_id=r.opportunity_id WHERE r.client_name='PT Synthetic Import'`;
+    assert.deepEqual({ ...row }, { headcount_target: 3, level_code: 'senior', pipeline_stage_code: 'on_going' });
+    const [template] = await brain`SELECT command, uses FROM agent_mapping_templates`;
+    assert.equal(template.command, 'requisition.create', 'mapping learned from the applied import');
+    const second = await upload();
+    const reimport = await run(request, 'import_dataset', { dataset_id: second.body.id });
+    assert.equal(reimport.evidence[1].type, 'observation', 'same headers → learned mapping, labelled as observation');
+    const dup = (await json(`/api/agent/proposals/${reimport.proposal.id}`)).body;
+    assert.equal(dup.items[0].validation.state, 'warning', 'duplicate of the row just imported is flagged by ERP');
+    assert.equal((await post(`/api/agent/proposals/${dup.id}/reject`, {})).body.state, 'rejected');
+    console.log('PASS: Agent proposals — follow-up (signal → proposal → confirm → receipt → signal cleared → outcome) and import (file → mapping → per-row validation → confirm → learned mapping)');
+  } finally {
+    await brain.end();
+  }
 }

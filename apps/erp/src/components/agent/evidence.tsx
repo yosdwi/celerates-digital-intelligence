@@ -8,6 +8,7 @@ const BADGE: Record<EvidenceType, { label: string; className: string }> = {
   erp_fact: { label: "Fakta ERP", className: "bg-emerald-50 text-emerald-800 ring-emerald-200" },
   signal: { label: "Sinyal", className: "bg-amber-50 text-amber-900 ring-amber-200" },
   knowledge: { label: "Pengetahuan disetujui", className: "bg-violet-50 text-violet-800 ring-violet-200" },
+  document: { label: "Berkas Anda", className: "bg-sky-50 text-sky-800 ring-sky-200" },
   observation: { label: "Observasi", className: "bg-slate-100 text-slate-700 ring-slate-200" },
   inference: { label: "Inferensi", className: "bg-pink-50 text-pink-800 ring-pink-200" },
 };
@@ -88,22 +89,5 @@ export function ToolTrace({ toolName, result }: { toolName: string; result?: unk
       {result === undefined ? <Circle className="h-3 w-3" /> : <FileSearch className="h-3 w-3 text-slate-400" />}
       {toolName}
     </li>
-  );
-}
-
-/** Read-only preview of an ERP-held proposal (ADR-010, M3). Confirmation never happens in this card or by voice:
- * it is an ERP action against the stored proposal digest. M1 registers no tool that produces proposals. */
-export function ProposalCard({ args }: { args: Record<string, unknown> }) {
-  const commands = Array.isArray(args.commands) ? (args.commands as { kind?: string; summary?: string }[]) : [];
-  return (
-    <article className="rounded-xl border border-dashed border-brand-300 bg-brand-50/40 p-3" data-proposal>
-      <h4 className="text-xs font-semibold text-slate-900">Usulan tindakan · menunggu konfirmasi di ERP</h4>
-      <ul className="mt-2 space-y-1 text-xs text-slate-700">
-        {commands.map((c, i) => (
-          <li key={i}>{c.summary ?? c.kind}</li>
-        ))}
-      </ul>
-      <p className="mt-2 text-[11px] text-slate-500">Belum ada perubahan data. Konfirmasi dilakukan di ERP terhadap usulan yang tersimpan.</p>
-    </article>
   );
 }

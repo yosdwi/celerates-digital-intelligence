@@ -1,7 +1,9 @@
 "use client";
-// Celerates Agent shell (Operating Substrate M1). Evolves `Bantuan Operasional` without regressing it:
-//  • Perlu perhatian — the same deterministic ERP rules, counts, wording and links, plus `Tanyakan`.
-//  • Tanya — evidence-backed runs through the Intelligence Layer (AG-UI via the ERP BFF, ADR-008/013).
+// Celerates Agent shell. Evolves `Bantuan Operasional` without regressing it:
+//  • Perlu perhatian — the same deterministic ERP rules, counts, wording and links, plus `Tanyakan`,
+//    `Tindak lanjuti` (signal → ERP-held proposal, ADR-010) and `Tindak lanjut berjalan` (live outcomes).
+//  • Tanya — evidence-backed runs through the Intelligence Layer (AG-UI via the ERP BFF, ADR-008/013), including
+//    dropped CSV/XLSX files that become proposals the user confirms in ERP.
 //  • Masukan — the same contextual Feature Request form.
 import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
@@ -14,6 +16,7 @@ import { streamRun, type RunRequest } from "@/lib/agent/ag-ui-client";
 import { applyEvent, newRun, type AgentRun } from "@/lib/agent/run-state";
 import { AttentionGroup } from "./attention";
 import { ContextualFeedback } from "./feedback";
+import { FollowUps } from "./follow-ups";
 import type { Suggestion } from "./agent-thread";
 
 const AgentThread = dynamic(() => import("./agent-thread"), {
@@ -138,6 +141,16 @@ export function AgentPanel() {
     [pathname, running, threadId],
   );
   const ask = (group: OperationalGroup) => startRun("explain_signal", { signal_key: group.key }, `Tanyakan: ${group.title}`);
+  const followUp = (group: OperationalGroup) => startRun("follow_up_signal", { signal_key: group.key }, `Tindak lanjuti: ${group.title}`);
+  const importFile = async (file: File): Promise<string | null> => {
+    const form = new FormData();
+    form.append("file", file);
+    const response = await fetch("/api/agent/datasets", { method: "POST", body: form }).catch(() => null);
+    const body = await response?.json().catch(() => null);
+    if (!response?.ok || !body?.id) return body?.error ?? "Berkas belum dapat diunggah.";
+    startRun("import_dataset", { dataset_id: body.id }, `Impor berkas ${body.name} (${body.rows} baris)`);
+    return null;
+  };
   const suggestions: Suggestion[] = [];
   if (agentContext?.entity) {
     const e = agentContext.entity;
@@ -211,7 +224,7 @@ export function AgentPanel() {
           </nav>
           {tab === "ask" ? (
             <div className="min-h-0 flex-1">
-              <AgentThread runs={runs} running={running} enabled={agentReady} suggestions={suggestions} onSearch={(text) => startRun("search", { query: text }, text)} />
+              <AgentThread runs={runs} running={running} enabled={agentReady} suggestions={suggestions} onSearch={(text) => startRun("search", { query: text }, text)} onFile={importFile} />
             </div>
           ) : (
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5">
@@ -250,7 +263,7 @@ export function AgentPanel() {
                     <>
                       <p className="text-xs leading-relaxed text-slate-500">{data.coverage}</p>
                       {attention.map((group) => (
-                        <AttentionGroup key={group.key} group={group} onAsk={agentReady && !running ? ask : undefined} />
+                        <AttentionGroup key={group.key} group={group} onAsk={agentReady && !running ? ask : undefined} onFollowUp={agentReady && !running ? followUp : undefined} />
                       ))}
                       {!attention.length && data.groups.length > 0 && (
                         <div className="rounded-xl bg-emerald-50 p-4 text-sm text-emerald-900">
@@ -272,6 +285,7 @@ export function AgentPanel() {
                       )}
                     </>
                   )}
+                  {agentReady && <FollowUps refresh={refresh + runs.filter((r) => r.status !== "running").length} />}
                   <button onClick={() => setTab("feedback")} className="w-full rounded-xl border border-pink-200 bg-pink-50 px-4 py-3 text-left text-sm font-medium text-pink-800">
                     Ada kendala di halaman ini? Kirim masukan →
                   </button>

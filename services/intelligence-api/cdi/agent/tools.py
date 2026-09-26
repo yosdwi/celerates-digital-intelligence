@@ -1,7 +1,8 @@
 """Tool registry (ADR-013). Our metadata is the source of truth: risk class, required module, output bounds.
 
-M1 registers read tools only. Playbooks call tools through `invoke`, which checks policy before calling and records
-the call as AG-UI tool events. A future model loop receives only the subset `allowed_tools` returns for its principal.
+Risk classes: `read` (delegated ERP/knowledge reads) and `propose` (creates an ERP-held pending proposal, ADR-010).
+There is deliberately no `write` class: no tool here can change ERP state. Playbooks call tools through `invoke`, which
+checks policy before calling and records the call as AG-UI tool events. A model loop receives only `allowed_tools`.
 """
 
 import time
@@ -9,6 +10,7 @@ from dataclasses import dataclass, field
 from typing import Callable
 
 from .. import knowledge
+from . import datasets
 from .erp_client import DelegatedERP
 
 MAX_TOOL_CALLS = 12
@@ -28,6 +30,7 @@ class RunContext:
     path: str = "/"
     calls: int = 0
     read_opportunities: set = field(default_factory=set)
+    proposals: list = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -41,12 +44,13 @@ class Tool:
 
 
 REGISTRY: dict[str, Tool] = {}
+RISKS = {"read", "propose"}
 
 
 def register(name, version, description, module=None, risk="read"):
     def wrap(fn):
-        if risk != "read":
-            raise ValueError("M1 registers read tools only")
+        if risk not in RISKS:
+            raise ValueError("Only read and propose tools can be registered; ERP applies effects (ADR-010)")
         REGISTRY[name] = Tool(name, version, risk, description, fn, module)
         return fn
 
@@ -54,7 +58,7 @@ def register(name, version, description, module=None, risk="read"):
 
 
 def allowed_tools(principal):
-    return [t for t in REGISTRY.values() if t.risk == "read" and (t.module is None or t.module in principal.divisions)]
+    return [t for t in REGISTRY.values() if t.risk in RISKS and (t.module is None or t.module in principal.divisions)]
 
 
 def invoke(ctx: RunContext, name, **args):
@@ -70,8 +74,8 @@ def invoke(ctx: RunContext, name, **args):
 
 
 @register("erp_signal_detail", "1", "Deterministic ERP attention rule with exact count and sample records")
-def signal_detail(ctx, signal_key):
-    return ctx.erp.signal(signal_key, ctx.path)
+def signal_detail(ctx, signal_key, items=5):
+    return ctx.erp.signal(signal_key, ctx.path, items)
 
 
 @register("erp_read_entity", "1", "Catalog projection of one ERP record; sensitive fields filtered by ERP")
@@ -116,4 +120,45 @@ def knowledge_search(ctx, query):
             }
             for r in rows
         ]
+    }
+
+
+@register(
+    "erp_catalog", "1", "ERP entity catalog and the command allowlist the Agent may propose (with parameter specs)"
+)
+def erp_catalog(ctx):
+    return ctx.erp.catalog()
+
+
+@register(
+    "erp_propose",
+    "1",
+    "Create an ERP-held pending proposal; ERP validates each item and only the user can confirm it in ERP",
+    risk="propose",
+)
+def erp_propose(ctx, title, items):
+    run_id = ctx.recorder.run["id"]
+    proposal = ctx.erp.propose(f"run:{run_id}", title, items, run_id, ctx.path)
+    ctx.proposals.append(proposal["id"])
+    return {
+        "id": proposal["id"],
+        "state": proposal["state"],
+        "title": proposal["title"],
+        "counts": proposal["counts"],
+        "items": len(proposal["items"]),
+        "expires_at": proposal["expires_at"],
+    }
+
+
+@register("dataset_read", "1", "A dataset the user uploaded to this Agent: profile and rows (owner only)")
+def dataset_read(ctx, dataset_id):
+    row = datasets.load(ctx.principal, dataset_id)
+    if not row:
+        raise PolicyError("Berkas tidak ditemukan untuk pengguna ini")
+    return {
+        "id": row["id"],
+        "name": row["name"],
+        "sha256": row["sha256"],
+        "profile": row["profile"],
+        "rows": row["rows"],
     }

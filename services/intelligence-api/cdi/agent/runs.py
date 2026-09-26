@@ -24,7 +24,12 @@ from ag_ui.core import (
 from ..db import all_rows, connect, json, one
 
 TERMINAL = {"RUN_FINISHED", "RUN_ERROR"}
+TRACE_CHARS = 4000  # tool args/results in the trace are bounded; datasets and proposals can be large
 STALE_SECONDS = 90
+
+
+def _bounded(text):
+    return text if len(text) <= TRACE_CHARS else text[:TRACE_CHARS] + "…"
 
 
 def encode(event):
@@ -131,14 +136,14 @@ class Recorder:
         self._tool += 1
         call_id = f"{self.run['id']}:tool:{self._tool}"
         self.emit(ToolCallStartEvent(tool_call_id=call_id, tool_call_name=name))
-        self.emit(ToolCallArgsEvent(tool_call_id=call_id, delta=stdjson.dumps(args, ensure_ascii=False)))
+        self.emit(ToolCallArgsEvent(tool_call_id=call_id, delta=_bounded(stdjson.dumps(args, ensure_ascii=False))))
         self.emit(ToolCallEndEvent(tool_call_id=call_id))
         self.emit(
             ToolCallResultEvent(
                 message_id=f"{call_id}:result",
                 tool_call_id=call_id,
                 role="tool",
-                content=stdjson.dumps(result, ensure_ascii=False, default=str),
+                content=_bounded(stdjson.dumps(result, ensure_ascii=False, default=str)),
             )
         )
         return call_id
@@ -146,6 +151,10 @@ class Recorder:
     def evidence(self, items):
         if items:
             self.emit(CustomEvent(name="celerates.evidence", value={"items": items}))
+
+    def proposal(self, value):
+        """An ERP-held proposal the UI renders as a first-class card (it fetches the live proposal from ERP)."""
+        self.emit(CustomEvent(name="celerates.proposal", value=value))
 
     def message(self, text):
         message_id = f"{self.run['id']}:message:{uuid4().hex[:8]}"

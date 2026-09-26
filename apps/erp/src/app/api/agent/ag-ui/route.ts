@@ -31,7 +31,12 @@ export async function POST(request: NextRequest) {
     const given = (props.args && typeof props.args === "object" && !Array.isArray(props.args) ? props.args : {}) as Record<string, unknown>;
     const page = await pageContext(actor, typeof props.path === "string" ? props.path : "/");
     let args: Record<string, unknown>;
-    if (skill === "explain_signal") args = { signal_key: String(given.signal_key ?? "") };
+    if (skill === "explain_signal" || skill === "follow_up_signal") args = { signal_key: String(given.signal_key ?? "") };
+    else if (skill === "import_dataset") {
+      // The dataset is owned by this user in Intelligence; a foreign id fails there under this user's delegation.
+      if (typeof given.dataset_id !== "string" || !UUID.test(given.dataset_id)) throw new BffError(422, "Berkas tidak dikenali.");
+      args = { dataset_id: given.dataset_id.toLowerCase() };
+    }
     else if (skill === "search") args = { query: String(given.query ?? lastUserText(input.messages)).trim().slice(0, 100) };
     else if (skill === "explain_entity") {
       // Only the entity the user is looking at, and only if ERP resolved it as readable for this user.

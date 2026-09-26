@@ -10,7 +10,7 @@ async function handle(request: NextRequest, params: Promise<{path:string[]}>) {
   const headers={'Cache-Control':'private, no-store','X-Correlation-Id':correlation};
   try {
     const {path}=await params;
-    const principal=authenticateMachine(request.headers,request.method==='POST'&&['commands','review-requests'].includes(path[0])?'action':'read');
+    const principal=authenticateMachine(request.headers,request.method==='POST'&&['commands','review-requests','agent'].includes(path[0])?'action':'read');
     let result: unknown;
     if(path[0]==='agent') result=await handleAgent(request,path,sql);
     else if(request.method==='GET'&&path[0]==='resources'&&path[1]==='sales_opportunity'&&path.length<=3) {

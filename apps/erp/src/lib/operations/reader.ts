@@ -135,10 +135,15 @@ export const SIGNAL_ENTITY: Record<string, string | null> = {
   "finance-review": null,
   "finance-revision": null,
 };
-async function evaluate(tx: Tx, spec: Spec, asOf: string): Promise<OperationalGroup> {
-  // A single aggregate per rule returns an exact count and at most five records.
+/** ADR-010: the ERP-declared remedy command for each rule's records. Unlisted rules default to a follow-up
+ * task linked to the record (or unlinked, for rules whose records are outside the catalog). */
+export const SIGNAL_REMEDY: Record<string, string> = {
+  "unassigned-requisitions": "requisition.assign_ta_pic",
+};
+async function evaluate(tx: Tx, spec: Spec, asOf: string, sample = 5): Promise<OperationalGroup> {
+  // A single aggregate per rule returns an exact count and at most `sample` records (5 for the panel).
   const [row] = await tx.unsafe<{ count: number; items: { id: string; label: string }[] }[]>(
-    `WITH clock AS (SELECT $1::timestamptz AS as_of), matches AS (${spec.query}) SELECT (SELECT count(*)::int FROM matches) AS count, coalesce((SELECT jsonb_agg(sample) FROM (SELECT id,label FROM matches ORDER BY label,id LIMIT 5) sample),'[]'::jsonb) AS items`,
+    `WITH clock AS (SELECT $1::timestamptz AS as_of), matches AS (${spec.query}) SELECT (SELECT count(*)::int FROM matches) AS count, coalesce((SELECT jsonb_agg(sample) FROM (SELECT id,label FROM matches ORDER BY label,id LIMIT ${sample}) sample),'[]'::jsonb) AS items`,
     [asOf],
   );
   return {
@@ -158,12 +163,13 @@ async function evaluate(tx: Tx, spec: Spec, asOf: string): Promise<OperationalGr
   };
 }
 /** One rule by key, if the actor may read its module. Same SQL, wording and links as the panel. */
-export async function readSignal(sql: Sql, actor: OperationalActor, key: string, now = new Date()) {
+export async function readSignal(sql: Sql, actor: OperationalActor, key: string, now = new Date(), sample = 5) {
   const spec = specs.find((s) => s.key === key);
   if (!spec || !canReadModule(actor, spec.module as Module)) return null;
   const asOf = now.toISOString();
-  const group = await sql.begin("isolation level repeatable read read only", (tx) => evaluate(tx, spec, asOf));
-  return { ...group, entity_type: SIGNAL_ENTITY[spec.key] ?? null, as_of: asOf };
+  const size = Math.max(1, Math.min(50, Math.floor(sample)));
+  const group = await sql.begin("isolation level repeatable read read only", (tx) => evaluate(tx, spec, asOf, size));
+  return { ...group, entity_type: SIGNAL_ENTITY[spec.key] ?? null, remedy: SIGNAL_REMEDY[spec.key] ?? "task.create", as_of: asOf };
 }
 /** Restricted-id evaluation ("check" mode): which readable rules for this entity type match these ids now. */
 export async function checkSignals(sql: Sql, actor: OperationalActor, entityType: string, ids: string[], now = new Date()) {

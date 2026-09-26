@@ -1,9 +1,18 @@
 "use client";
-// `Perlu perhatian`: deterministic ERP rule groups, unchanged wording/counts/links (M1 adds only `Tanyakan`).
+// `Perlu perhatian`: deterministic ERP rule groups, unchanged wording/counts/links. The Agent adds `Tanyakan`
+// (explain with evidence) and `Tindak lanjuti` (prepare an ERP-held proposal; nothing changes until confirmed).
 import Link from "next/link";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight, ListPlus, Sparkles } from "lucide-react";
 import { MODULES, type OperationalGroup } from "@/lib/operations/policy";
-export function AttentionGroup({ group, onAsk }: { group: OperationalGroup; onAsk?: (group: OperationalGroup) => void }) {
+export function AttentionGroup({
+  group,
+  onAsk,
+  onFollowUp,
+}: {
+  group: OperationalGroup;
+  onAsk?: (group: OperationalGroup) => void;
+  onFollowUp?: (group: OperationalGroup) => void;
+}) {
   return (
     <article className="rounded-xl border border-slate-200 bg-white p-4">
       <div className="flex items-start justify-between gap-3">
@@ -55,6 +64,18 @@ export function AttentionGroup({ group, onAsk }: { group: OperationalGroup; onAs
           {group.action}
           <ArrowRight className="h-3.5 w-3.5" />
         </Link>
+        <span className="flex flex-wrap gap-2">
+        {onFollowUp && (
+          <button
+            type="button"
+            onClick={() => onFollowUp(group)}
+            aria-label={`Tindak lanjuti: ${group.title}`}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:border-brand-300 hover:text-brand-700"
+          >
+            <ListPlus className="h-3.5 w-3.5" />
+            Tindak lanjuti
+          </button>
+        )}
         {onAsk && (
           <button
             type="button"
@@ -66,6 +87,7 @@ export function AttentionGroup({ group, onAsk }: { group: OperationalGroup; onAs
             Tanyakan
           </button>
         )}
+        </span>
       </div>
     </article>
   );

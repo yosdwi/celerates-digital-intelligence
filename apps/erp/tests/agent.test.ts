@@ -110,6 +110,16 @@ test("AG-UI conformance of the event shapes the panel consumes, and the pure run
   assert.equal(userMessage.role, "user");
   const kinds = (assistant.content as { type: string }[]).map((p) => p.type);
   assert.deepEqual(kinds, ["data-progress", "data-evidence", "text", "tool-call"]);
+  // ERP-held proposals are first-class parts; malformed or repeated proposal events are ignored.
+  const proposalId = "0f0e0d0c-0b0a-4908-8706-050403020100";
+  let proposed = newRun("r3", "Tindak lanjuti");
+  for (const value of [{ id: proposalId, title: "Usulan" }, { id: proposalId, title: "Usulan" }, { id: "not-a-uuid" }])
+    proposed = applyEvent(proposed, { type: "CUSTOM", name: "celerates.proposal", value });
+  proposed = applyEvent(proposed, { type: "CUSTOM", name: "celerates.evidence", value: { items: [{ type: "document", title: "f.csv", detail: [] }] } });
+  assert.deepEqual(proposed.proposals, [{ id: proposalId, title: "Usulan" }]);
+  const parts = (toThreadMessages([proposed])[1].content as { type: string; data?: { id?: string } }[]);
+  assert.deepEqual(parts.map((p) => p.type), ["data-progress", "data-evidence", "data-proposal"]);
+  assert.equal(parts[2].data?.id, proposalId);
   let failed = applyEvent(newRun("r2", "x"), { type: "RUN_ERROR", message: "Tidak boleh", code: "ERP_403" });
   failed = applyEvent(failed, { type: "TEXT_MESSAGE_CONTENT", delta: "late" });
   assert.equal(failed.status, "failed");
@@ -173,9 +183,10 @@ test("delegated catalog reads: sensitivity, relationships, search, signal parity
     for (const group of panel.groups) {
       const signal = await readSignal(sql, ownerActor, group.key, now);
       assert.ok(signal);
-      const { entity_type, as_of, ...same } = signal;
+      const { entity_type, remedy, as_of, ...same } = signal;
       assert.deepEqual(same, group, `signal ${group.key} equals panel group`);
       assert.equal(as_of, now.toISOString());
+      assert.ok(remedy === "task.create" || remedy === "requisition.assign_ta_pic", "every rule has an ERP-declared remedy");
       void entity_type;
     }
     assert.equal(await readSignal(sql, taActor, "qualified-trackers", now), null, "module-gated");

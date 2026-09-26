@@ -1,5 +1,6 @@
-"""Delegated ERP reads (ADR-008/009). Every call carries the machine read token and the user's assertion;
-ERP re-authorizes the user. This client has no write methods by design (M1 is read-only)."""
+"""Delegated ERP calls (ADR-008/009/010). Every call carries a machine token and the user's assertion; ERP
+re-authorizes the user. Reads use the read token. The only non-read call is `propose`, which uses the action token
+to create an ERP-held *pending* proposal: it has no business effect until the same user confirms it in ERP."""
 
 import re
 
@@ -23,17 +24,22 @@ class DelegatedERP:
         self.principal = principal
 
     def _get(self, path, params=None):
+        return self._call("GET", path, params=params)
+
+    def _call(self, method, path, params=None, body=None, key=None):
         cfg = settings()
         if cfg.erp_mode != "http":
             raise ERPAgentError(503, "AGENT_REQUIRES_CONNECTED_ERP")
         headers = {
-            "Authorization": f"Bearer {cfg.erp_token}",
+            "Authorization": f"Bearer {cfg.erp_token if method == 'GET' else cfg.erp_action_token}",
             "X-ERP-Audience": "celerates-intelligence",
             "X-ERP-Environment": cfg.erp_environment,
             "X-ERP-Delegation": self.principal.token,
         }
-        with httpx.Client(base_url=cfg.erp_base_url.rstrip("/") + "/", timeout=15, headers=headers) as client:
-            response = client.get("agent/" + path, params=params)
+        if key:
+            headers["Idempotency-Key"] = key
+        with httpx.Client(base_url=cfg.erp_base_url.rstrip("/") + "/", timeout=20, headers=headers) as client:
+            response = client.request(method, "agent/" + path, params=params, json=body)
         if response.is_error:
             try:
                 code = response.json().get("error", {}).get("code", "UNAVAILABLE")
@@ -42,10 +48,20 @@ class DelegatedERP:
             raise ERPAgentError(response.status_code, code)
         return response.json()
 
-    def signal(self, key, path):
+    def signal(self, key, path, items=5):
         if not KEY.match(key):
             raise ValueError("Invalid signal key")
-        return self._get("signals/" + key, {"path": path})
+        return self._get("signals/" + key, {"path": path, "items": max(1, min(50, int(items)))})
+
+    def catalog(self):
+        return self._get("catalog")
+
+    def propose(self, key, title, items, run_id, context_path):
+        """Create (idempotently, by key) an ERP-held pending proposal. ERP validates every item for this user."""
+        if not re.match(r"^[A-Za-z0-9:_-]{8,160}$", key):
+            raise ValueError("Invalid idempotency key")
+        body = {"title": title[:200], "items": items, "run_id": run_id, "context_path": context_path}
+        return self._call("POST", "proposals", body=body, key=key)
 
     def entity(self, entity_type, entity_id):
         self._check(entity_type, entity_id)

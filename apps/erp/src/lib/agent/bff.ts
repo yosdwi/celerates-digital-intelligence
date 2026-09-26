@@ -100,3 +100,28 @@ export async function proxyEvents(base: string, runId: string, token: string, la
   }
   return new Response(upstream.body, { status: 200, headers: SSE_HEADERS });
 }
+
+/** Best-effort learning signal: tell Intelligence how the user decided on an Agent proposal. ERP state and the
+ * receipts are already committed; a failure here never affects them (the Console can re-read ERP later). */
+export async function reportOutcome(
+  actor: AgentActor,
+  proposal: { id: string; run_id: string | null; state: string; counts: unknown; receipts: unknown; outcome: unknown; items?: unknown[] },
+) {
+  const base = intelligenceBase();
+  if (!proposal.run_id || !base || !agentEnabled()) return;
+  try {
+    const token = delegate(actor, { path: "/", module: "general", entity: null });
+    const edits = (proposal.items as { params?: unknown; receipt?: { params?: unknown } | null }[] | undefined)?.filter(
+      (i) => i.receipt?.params && JSON.stringify(i.receipt.params) !== JSON.stringify(i.params),
+    ).length;
+    await fetch(`${base}/api/agent/runs/${encodeURIComponent(proposal.run_id)}/outcomes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-ERP-Delegation": token },
+      body: JSON.stringify({ proposal_id: proposal.id, state: proposal.state, counts: proposal.counts, receipts: proposal.receipts, outcome: proposal.outcome, edited_items: edits ?? 0 }),
+      signal: AbortSignal.timeout(3000),
+      cache: "no-store",
+    });
+  } catch {
+    console.error("agent_outcome_report_failed");
+  }
+}

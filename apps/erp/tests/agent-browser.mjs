@@ -1,4 +1,4 @@
-// Browser verification of the Agent shell (spike S1 + M1 demo flow). Disposable local harness only.
+// Browser verification of the Agent shell and its three journeys. Disposable local harness only.
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import { chromium } from 'playwright';
@@ -25,12 +25,12 @@ export async function agentBrowser({ base, cookies }) {
     await group.getByRole('button', { name: 'Tanyakan: Requisition belum memiliki TA PIC' }).click();
     await panel.getByRole('button', { name: 'Tanya', exact: true }).waitFor();
     assert.equal(await panel.getByRole('button', { name: 'Tanya', exact: true }).getAttribute('aria-pressed'), 'true');
-    await panel.getByText('Requisition belum memiliki TA PIC: 1 requisition memenuhi aturan ini.', { exact: false }).waitFor({ timeout: 30000 });
+    await panel.getByText(/Requisition belum memiliki TA PIC: \d+ requisition memenuhi aturan ini\./).waitFor({ timeout: 30000 });
     assert.ok(lazy.length > chunksBeforeAsk, 'assistant-ui thread chunk loads only when Tanya opens');
     for (const badge of ['Sinyal', 'Fakta ERP', 'Pengetahuan disetujui']) await panel.getByText(badge, { exact: true }).first().waitFor();
     assert.equal(await panel.getByText('Tidak dibagikan ke Agent:', { exact: false }).count() > 0, true, 'withheld fields are named, not shown');
     await panel.getByText('Jejak alat Agent', { exact: true }).click();
-    await panel.getByText('erp_read_entity', { exact: true }).waitFor();
+    await panel.getByText('erp_read_entity', { exact: true }).first().waitFor();
     await mkdir(evidenceDir, { recursive: true });
     await page.screenshot({ path: evidenceDir + '/agent-m1-tanyakan-desktop.png' });
 
@@ -57,24 +57,35 @@ export async function agentBrowser({ base, cookies }) {
     await panel.getByText('Relasi:', { exact: false }).first().waitFor({ timeout: 30000 });
     await page.screenshot({ path: evidenceDir + '/agent-m1-entity-desktop.png' });
 
-    // S1: a proposal-shaped tool call renders read-only (M3 contract), injected at the transport boundary.
-    await page.route('**/api/agent/ag-ui', (route) => route.fulfill({
-      status: 200,
-      contentType: 'text/event-stream',
-      body: [
-        { type: 'RUN_STARTED', threadId: 't', runId: 'fixture' },
-        { type: 'TOOL_CALL_START', toolCallId: 'p1', toolCallName: 'propose_commands' },
-        { type: 'TOOL_CALL_ARGS', toolCallId: 'p1', delta: JSON.stringify({ commands: [{ kind: 'task.create', summary: 'Buat task tindak lanjut untuk REQ-FIXTURE' }] }) },
-        { type: 'TOOL_CALL_END', toolCallId: 'p1' },
-        { type: 'RUN_FINISHED', threadId: 't', runId: 'fixture' },
-      ].map((e, i) => `id: ${i + 1}\ndata: ${JSON.stringify(e)}\n\n`).join(''),
-    }));
-    await panel.getByLabel('Pesan untuk Agent').fill('fixture');
-    await panel.getByRole('button', { name: 'Kirim' }).click();
-    const proposal = panel.locator('[data-proposal]');
-    await proposal.getByText('Buat task tindak lanjut untuk REQ-FIXTURE', { exact: true }).waitFor();
-    assert.equal(await proposal.getByRole('button').count(), 0, 'no confirm control outside ERP proposal flow');
-    await page.unroute('**/api/agent/ag-ui');
+    // Journey C in the UI: Perlu perhatian → Tindak lanjuti → ERP-held proposal → choose PIC → Konfirmasi.
+    await page.keyboard.press('Escape');
+    await page.goto(base + '/ta');
+    await trigger.click();
+    const unassigned = panel.locator('article').filter({ has: page.getByRole('heading', { name: 'Requisition belum memiliki TA PIC', exact: true }) });
+    await unassigned.getByRole('button', { name: 'Tindak lanjuti: Requisition belum memiliki TA PIC' }).click();
+    const card = panel.locator('[data-proposal][data-proposal-state="pending"]');
+    await card.waitFor({ timeout: 30000 });
+    const item = card.locator('[data-proposal-item="needs_input"]').filter({ hasText: 'REQ-BROWSER' });
+    await item.getByRole('combobox').selectOption('Budi Synthetic');
+    assert.equal(await item.getByRole('checkbox').isChecked(), true, 'completing the field includes the item');
+    await page.screenshot({ path: evidenceDir + '/agent-proposal-follow-up.png' });
+    await card.getByRole('button', { name: /^Konfirmasi 1 perubahan/ }).click();
+    await panel.locator('[data-proposal][data-proposal-state="applied"]').waitFor({ timeout: 30000 });
+    await panel.getByText('TA PIC REQ-BROWSER = Budi Synthetic', { exact: false }).waitFor();
+    await panel.getByRole('button', { name: 'Perlu perhatian', exact: true }).click();
+    await panel.locator('[data-agent-follow-ups]').getByText('Tindak lanjut: Requisition belum memiliki TA PIC', { exact: false }).first().waitFor();
+    await panel.locator('[data-follow-up="applied"]').filter({ hasText: '1 dari 1 tuntas' }).first().waitFor();
+
+    // Journey B in the UI: attach a CSV → mapping evidence → per-row validation → Konfirmasi.
+    await panel.getByRole('button', { name: 'Tanya', exact: true }).click();
+    await panel.locator('[data-agent-file]').setInputFiles({ name: 'kebutuhan-browser.csv', mimeType: 'text/csv', buffer: Buffer.from('Client,Position,Headcount\nPT Synthetic Browser Import,Product Designer,2\n') });
+    const imported = panel.locator('[data-proposal][data-proposal-state="pending"]').last();
+    await imported.waitFor({ timeout: 30000 });
+    await panel.getByText('Berkas Anda', { exact: true }).last().waitFor();
+    await panel.getByText('Inferensi', { exact: true }).last().waitFor();
+    await page.screenshot({ path: evidenceDir + '/agent-proposal-import.png' });
+    await imported.getByRole('button', { name: /^Konfirmasi 1 perubahan/ }).click();
+    await panel.locator('[data-proposal][data-proposal-state="applied"]').last().getByText('dibuat', { exact: false }).waitFor({ timeout: 30000 });
 
     // Keyboard and mobile.
     await page.keyboard.press('Escape');
@@ -90,7 +101,7 @@ export async function agentBrowser({ base, cookies }) {
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), pageWidth, 'panel adds no horizontal overflow');
     await page.screenshot({ path: evidenceDir + '/agent-m1-mobile.png' });
     assert.deepEqual(errors, [], 'no browser runtime exceptions');
-    console.log('PASS: Agent browser — Tanyakan with typed evidence, lazy thread chunk, keyword search, entity context, read-only proposal rendering, keyboard and mobile');
+    console.log('PASS: Agent browser — Tanyakan with typed evidence, lazy thread chunk, keyword search, entity context, follow-up and file import confirmed in ERP, keyboard and mobile');
   } finally {
     await browser.close();
   }
