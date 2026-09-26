@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { requirePilotActor } from "@/lib/actor";
 import { sql } from "@/db";
-import { readOperationalContext } from "@/lib/operations/reader";
+import { readOperationalContext, signalTrends } from "@/lib/operations/reader";
 import type { OperationalActor } from "@/lib/operations/policy";
 export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
@@ -23,7 +23,12 @@ export async function GET(request: NextRequest) {
       session?.user as OperationalActor,
       request.nextUrl.searchParams.get("path"),
     );
-    return NextResponse.json(result, { headers });
+    // What changed since the last day observed (observation). Never allowed to break the panel.
+    const trends = await signalTrends(sql, result.groups).catch(() => {
+      console.error("operational_trends_failed");
+      return {};
+    });
+    return NextResponse.json({ ...result, trends }, { headers });
   } catch {
     console.error("operational_context_read_failed");
     return NextResponse.json(

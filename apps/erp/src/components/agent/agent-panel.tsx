@@ -15,6 +15,7 @@ import { operationalContext, type OperationalContextResponse, type OperationalGr
 import { streamRun, type RunRequest } from "@/lib/agent/ag-ui-client";
 import { applyEvent, newRun, type AgentRun } from "@/lib/agent/run-state";
 import { AttentionGroup } from "./attention";
+import type { SignalTrend } from "@/lib/operations/reader";
 import { ContextualFeedback } from "./feedback";
 import { FollowUps } from "./follow-ups";
 import type { Suggestion } from "./agent-thread";
@@ -49,7 +50,7 @@ export function AgentPanel() {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<Tab>("attention");
   const [refresh, setRefresh] = useState(0);
-  const [result, setResult] = useState<{ path: string; data?: OperationalContextResponse; error?: string }>();
+  const [result, setResult] = useState<{ path: string; data?: OperationalContextResponse & { trends?: Record<string, SignalTrend> }; error?: string }>();
   const [loading, setLoading] = useState(false);
   const [agent, setAgent] = useState<{ path: string; data?: AgentContext }>();
   const [runs, setRuns] = useState<AgentRun[]>([]);
@@ -274,7 +275,7 @@ export function AgentPanel() {
                     <>
                       <p className="text-xs leading-relaxed text-slate-500">{data.coverage}</p>
                       {attention.map((group) => (
-                        <AttentionGroup key={group.key} group={group} onAsk={agentReady && !running ? ask : undefined} onFollowUp={agentReady && !running ? followUp : undefined} />
+                        <AttentionGroup key={group.key} group={group} trend={data.trends?.[group.key]} onAsk={agentReady && !running ? ask : undefined} onFollowUp={agentReady && !running ? followUp : undefined} />
                       ))}
                       {!attention.length && data.groups.length > 0 && (
                         <div className="rounded-xl bg-emerald-50 p-4 text-sm text-emerald-900">

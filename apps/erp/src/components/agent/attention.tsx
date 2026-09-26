@@ -4,12 +4,32 @@
 import Link from "next/link";
 import { ArrowRight, ListPlus, Sparkles } from "lucide-react";
 import { MODULES, type OperationalGroup } from "@/lib/operations/policy";
+import type { SignalTrend } from "@/lib/operations/reader";
+
+const day = (d: string) => new Date(d + "T00:00:00+07:00").toLocaleDateString("id-ID", { day: "numeric", month: "short", timeZone: "Asia/Jakarta" });
+
+/** What changed since the last day observed. An observation from saved snapshots, not the live rule result. */
+function Trend({ trend }: { trend: SignalTrend }) {
+  if (!trend.delta && !trend.added && !trend.resolved) return <p className="mt-1 text-[11px] text-slate-500" data-signal-trend="flat">Sejak {day(trend.since)}: tidak berubah · observasi</p>;
+  return (
+    <p className="mt-1 text-[11px] text-slate-600" data-signal-trend={trend.delta > 0 ? "up" : trend.delta < 0 ? "down" : "same"}>
+      <span className={trend.delta > 0 ? "font-semibold text-amber-800" : trend.delta < 0 ? "font-semibold text-emerald-700" : ""}>
+        {trend.delta > 0 ? `▲ ${trend.delta}` : trend.delta < 0 ? `▼ ${-trend.delta}` : "= 0"}
+      </span>{" "}
+      sejak {day(trend.since)} · {trend.added} baru · {trend.resolved} selesai
+      {trend.added_items.length > 0 && <> — baru: {trend.added_items.map((i) => i.label).join(", ")}</>}
+      <span className="ml-1 rounded bg-slate-100 px-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600">Observasi</span>
+    </p>
+  );
+}
 export function AttentionGroup({
   group,
   onAsk,
   onFollowUp,
+  trend,
 }: {
   group: OperationalGroup;
+  trend?: SignalTrend;
   onAsk?: (group: OperationalGroup) => void;
   onFollowUp?: (group: OperationalGroup) => void;
 }) {
@@ -31,6 +51,7 @@ export function AttentionGroup({
       <p className="mt-2 text-xs text-slate-500">
         {group.count} {group.unit} · {group.source}
       </p>
+      {trend && <Trend trend={trend} />}
       <details className="mt-3 text-xs text-slate-600">
         <summary className="cursor-pointer font-medium text-brand-600">
           Mengapa perlu ditinjau?

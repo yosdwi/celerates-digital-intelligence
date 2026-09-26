@@ -212,3 +212,68 @@ export async function readOperationalContext(
   );
   return { version: 1, context, asOf, groups, coverage };
 }
+
+export type SignalTrend = {
+  /** The last earlier day with a snapshot (YYYY-MM-DD, Asia/Jakarta). */
+  since: string;
+  previous: number;
+  delta: number;
+  /** Records matching now that did not match then (and vice versa), from up to 500 ids per snapshot. */
+  added: number;
+  resolved: number;
+  added_items: { id: string; label: string; href: string }[];
+};
+const SNAPSHOT_IDS = 500;
+const SNAPSHOT_REFRESH_MINUTES = 15;
+const jakartaDay = (now: Date) => new Date(now.getTime() + 7 * 3600 * 1000).toISOString().slice(0, 10);
+
+/**
+ * Signal history for the given evaluated groups: refresh today's snapshot (at most every 15 minutes) and compare
+ * with the last earlier day observed. Best effort: callers must treat a failure as "no trend", never as an error.
+ */
+export async function signalTrends(sql: Sql, groups: OperationalGroup[], now = new Date()): Promise<Record<string, SignalTrend>> {
+  if (!groups.length) return {};
+  const day = jakartaDay(now);
+  const keys = groups.map((g) => g.key);
+  // jsonb arrives parsed from PostgreSQL but as text through some drivers (e.g. PGlite socket).
+  const list = (value: unknown): string[] => (typeof value === "string" ? JSON.parse(value) : (value as string[])) ?? [];
+  const fresh = await sql<{ rule_key: string; count: number; ids: unknown }[]>`SELECT rule_key, count, ids FROM operational_signal_snapshots
+    WHERE day=${day} AND rule_key IN ${sql(keys)} AND captured_at > now() - ${SNAPSHOT_REFRESH_MINUTES} * interval '1 minute'`;
+  // A recent snapshot is reused only while its count still equals the live count, so "new"/"resolved" stay
+  // consistent with the delta shown next to them.
+  const live = new Map(groups.map((g) => [g.key, g.count]));
+  const today = new Map(fresh.filter((r) => r.count === live.get(r.rule_key)).map((r) => [r.rule_key, list(r.ids)]));
+  for (const group of groups) {
+    if (today.has(group.key)) continue;
+    const spec = specs.find((s) => s.key === group.key);
+    if (!spec) continue;
+    const rows = await sql.unsafe<{ id: string }[]>(
+      `WITH clock AS (SELECT $1::timestamptz AS as_of), matches AS (${spec.query}) SELECT id::text AS id FROM matches ORDER BY id LIMIT ${SNAPSHOT_IDS}`,
+      [now.toISOString()],
+    );
+    const ids = rows.map((r) => r.id);
+    await sql`INSERT INTO operational_signal_snapshots (day, rule_key, count, ids) VALUES (${day}, ${group.key}, ${group.count}, ${JSON.stringify(ids)}::jsonb)
+      ON CONFLICT (day, rule_key) DO UPDATE SET count=EXCLUDED.count, ids=EXCLUDED.ids, captured_at=now()`;
+    today.set(group.key, ids);
+  }
+  const previous = await sql<{ rule_key: string; day: string; count: number; ids: unknown }[]>`
+    SELECT DISTINCT ON (rule_key) rule_key, to_char(day,'YYYY-MM-DD') AS day, count, ids FROM operational_signal_snapshots
+    WHERE rule_key IN ${sql(keys)} AND day < ${day} ORDER BY rule_key, day DESC`;
+  const out: Record<string, SignalTrend> = {};
+  for (const prev of previous) {
+    const group = groups.find((g) => g.key === prev.rule_key)!;
+    const now_ = new Set(today.get(prev.rule_key) ?? []);
+    const then = new Set(list(prev.ids));
+    const added = [...now_].filter((id) => !then.has(id));
+    const addedSet = new Set(added);
+    out[prev.rule_key] = {
+      since: prev.day,
+      previous: prev.count,
+      delta: group.count - prev.count,
+      added: added.length,
+      resolved: [...then].filter((id) => !now_.has(id)).length,
+      added_items: group.items.filter((i) => addedSet.has(i.id)).slice(0, 3),
+    };
+  }
+  return out;
+}

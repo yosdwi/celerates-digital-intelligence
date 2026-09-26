@@ -47,6 +47,9 @@ export async function agentBrowser({ base, cookies }) {
     await panel.getByRole('button', { name: 'Perlu perhatian', exact: true }).click();
     await panel.getByRole('heading', { name: 'Requisition belum memiliki TA PIC', exact: true }).waitFor();
     assert.equal(await panel.locator('[data-agent-console-link]').getAttribute('href'), '/api/agent/console', 'Owner sees the Brain Console link');
+    await panel.locator('[data-signal-trend]').first().getByText('Observasi').waitFor();
+    await panel.locator('[data-signal-trend]').first().scrollIntoViewIfNeeded();
+    await page.screenshot({ path: evidenceDir + '/agent-signal-trend.png' });
     await panel.getByRole('button', { name: 'Masukan', exact: true }).click();
     await panel.getByLabel('Judul', { exact: true }).waitFor();
 

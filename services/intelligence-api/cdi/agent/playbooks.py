@@ -362,6 +362,8 @@ def ask_deterministic(ctx, query, fallback=False, document=None):
     lines, actions, found_signals = [], [], []
     if document:
         lines += _document_lines(ctx, document, query)
+    if CHANGE_WORDS & set(terms) and not document:
+        return _what_changed(ctx, terms, fallback)
     with ctx.recorder.step("Mencocokkan dengan aturan perhatian ERP"):
         signals = invoke(ctx, "erp_signals")["signals"]
         found_signals = _matching_signals(terms, signals)
@@ -445,6 +447,84 @@ def ask_deterministic(ctx, query, fallback=False, document=None):
         "examined": examined,
         "knowledge": len(passages),
     }
+
+
+CHANGE_WORDS = {
+    "berubah",
+    "perubahan",
+    "kemarin",
+    "naik",
+    "turun",
+    "bertambah",
+    "berkurang",
+    "changed",
+    "change",
+    "since",
+}
+
+
+def _day(d):
+    months = "Jan Feb Mar Apr Mei Jun Jul Agu Sep Okt Nov Des".split()
+    y, m, dd = d.split("-")
+    return f"{int(dd)} {months[int(m) - 1]}"
+
+
+def _what_changed(ctx, terms, fallback=False):
+    """ "Apa yang berubah sejak kemarin?" — signal history as observations (ERP snapshots), never as live facts."""
+    with ctx.recorder.step("Membandingkan dengan pengamatan sebelumnya"):
+        signals = invoke(ctx, "erp_signals")["signals"]
+    wanted = _matching_signals([t for t in terms if t not in CHANGE_WORDS], signals) if len(terms) > 1 else []
+    scope = wanted or signals
+    changed = [
+        s for s in scope if s.get("trend") and (s["trend"]["delta"] or s["trend"]["added"] or s["trend"]["resolved"])
+    ]
+    ctx.recorder.evidence(
+        [
+            {
+                "type": "observation",
+                "title": f"{s['title']} · sejak {_day(s['trend']['since'])}",
+                "detail": [
+                    f"{s['trend']['previous']} → {s['count']} {s['unit']} ({s['trend']['delta']:+d})",
+                    f"{s['trend']['added']} baru · {s['trend']['resolved']} selesai",
+                ]
+                + [f"Baru: {', '.join(i['label'] for i in s['trend']['added_items'])}"]
+                * bool(s["trend"]["added_items"]),
+                "href": s["href"],
+                "source": {"kind": "erp_snapshot", "ref": f"{s['key']}@{s['trend']['since']}"},
+            }
+            for s in changed
+        ]
+    )
+    observed = [s for s in scope if s.get("trend")]
+    if not observed:
+        lines = [
+            "Belum ada pengamatan hari sebelumnya untuk dibandingkan. Riwayat mulai tercatat saat Perlu perhatian dibuka."
+        ]
+    elif not changed:
+        lines = [f"Tidak ada perubahan pada {len(observed)} kondisi sejak pengamatan terakhir."]
+    else:
+        lines = [f"Perubahan sejak pengamatan terakhir ({len(changed)} kondisi):"] + [
+            f"• {s['title']}: {s['trend']['previous']} → {s['count']} ({s['trend']['delta']:+d}; {s['trend']['added']} baru, "
+            f"{s['trend']['resolved']} selesai, sejak {_day(s['trend']['since'])})"
+            for s in changed
+        ]
+        up = [s for s in changed if s["trend"]["delta"] > 0 and s["count"]]
+        if up:
+            ctx.recorder.actions(
+                [
+                    {
+                        "label": f"Tindak lanjuti: {s['title']}",
+                        "skill": "follow_up_signal",
+                        "args": {"signal_key": s["key"]},
+                    }
+                    for s in up[:2]
+                ]
+            )
+    if fallback:
+        lines.append("(Model tidak menghasilkan jawaban yang dapat dibuktikan; jawaban ini disusun tanpa model.)")
+    ctx.recorder.provenance({"mode": "deterministic", "fallback": fallback})
+    ctx.recorder.message("\n".join(lines))
+    return {"skill": "ask", "reasoning": "deterministic", "changes": [s["key"] for s in changed]}
 
 
 def _proposal_lines(proposal):

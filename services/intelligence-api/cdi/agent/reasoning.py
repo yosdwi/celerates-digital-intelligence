@@ -341,8 +341,14 @@ def ask_with_model(ctx, query, document=None, opening=None):
         commands = invoke(ctx, "erp_catalog")["commands"]
     by_key = {}
     for s in signals:
+        trend = s.get("trend")
+        change = (
+            f"; observed change since {trend['since']}: {trend['delta']:+d} ({trend['added']} new, {trend['resolved']} resolved)"
+            if trend
+            else ""
+        )
         key = ledger.add(
-            "S", f"rule {s['key']} '{s['title']}' ({s['module']}): {s['count']} {s['unit']} now — {s['rule']}"
+            "S", f"rule {s['key']} '{s['title']}' ({s['module']}): {s['count']} {s['unit']} now — {s['rule']}{change}"
         )
         ledger.refs[key] = f"erp_rule:{s['key']}"
         by_key[key] = s

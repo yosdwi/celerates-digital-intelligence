@@ -1220,3 +1220,41 @@ def test_erp_owner_sign_in_to_brain_console_is_scoped_to_the_console(monkeypatch
             ).status_code
             == 401
         )
+
+
+def test_what_changed_uses_signal_history_as_observations(monkeypatch):
+    token = mint(ctx={"path": "/ta", "module": "ta"})
+    trended = [dict(s) for s in SIGNALS]
+    trended[1]["trend"] = {
+        "since": "2026-09-25",
+        "previous": 0,
+        "delta": 2,
+        "added": 2,
+        "resolved": 0,
+        "added_items": [{"id": REQUISITIONS[0], "label": "REQ-7 · Engineer", "href": "/ta"}],
+    }
+    trended[0]["trend"] = {
+        "since": "2026-09-25",
+        "previous": 0,
+        "delta": 0,
+        "added": 0,
+        "resolved": 0,
+        "added_items": [],
+    }
+
+    class TrendERP(AskingERP):
+        def signals(self):
+            return {"signals": trended}
+
+    monkeypatch.setattr(settings(), "generation_mode", "demo")
+    with TestClient(app) as c:
+        _, stream = run_skill(monkeypatch, c, token, "ask", {"query": "Apa yang berubah sejak kemarin?"}, TrendERP)
+    end = stream[-1][1]
+    assert end["type"] == "RUN_FINISHED" and end["result"]["changes"] == ["unassigned-requisitions"]
+    text = "".join(e["delta"] for _, e in stream if e["type"] == "TEXT_MESSAGE_CONTENT")
+    assert "Requisition belum memiliki TA PIC: 0 → 2 (+2; 2 baru, 0 selesai, sejak 25 Sep)" in text
+    cards = [
+        i for _, e in stream if e["type"] == "CUSTOM" and e["name"] == "celerates.evidence" for i in e["value"]["items"]
+    ]
+    assert [c_["type"] for c_ in cards] == ["observation"] and "Baru: REQ-7 · Engineer" in cards[0]["detail"]
+    assert any(e["type"] == "CUSTOM" and e["name"] == "celerates.actions" for _, e in stream)

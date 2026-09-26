@@ -9,7 +9,7 @@ import { CATALOG, entityTypes, hrefFor, publicCatalog, resolvePageEntity } from 
 import { CONSOLE_AUDIENCE, DelegationError, mintConsoleSignIn, mintDelegation, verifyDelegation } from "../src/lib/agent/delegation";
 import { applyEvent, newRun, toThreadMessages } from "../src/lib/agent/run-state";
 import { readEntity, readEntitySignals, readNeighbours, search, searchTerms, loadActor, AgentReadError } from "../src/lib/agent/reads";
-import { readOperationalContext, readSignal, checkSignals } from "../src/lib/operations/reader";
+import { readOperationalContext, readSignal, checkSignals, signalTrends } from "../src/lib/operations/reader";
 
 const ID = "5b0f2c7e-1d2a-4f3b-9c8d-7e6f5a4b3c2d";
 function keys() {
@@ -253,6 +253,21 @@ test("delegated catalog reads: sensitivity, relationships, search, signal parity
     assert.deepEqual(matches.signals.map((s) => [s.key, s.matches]), [["qualified-trackers", true]]);
     const unassigned = await checkSignals(sql, ownerActor, "requisition", [req.id]);
     assert.deepEqual(unassigned[0].matches, [req.id]);
+
+    // Signal history (observation): today's snapshot vs the last earlier day observed.
+    await sql`INSERT INTO operational_signal_snapshots (day, rule_key, count, ids) VALUES ('2026-09-20','unassigned-requisitions',0,'[]'::jsonb), ('2026-09-24','qualified-trackers',3,${JSON.stringify([tracker.id, ID, "gone-1"])}::jsonb)`;
+    const trends = await signalTrends(sql, panel.groups, now);
+    assert.deepEqual(trends["unassigned-requisitions"], { since: "2026-09-20", previous: 0, delta: 1, added: 1, resolved: 0, added_items: [panel.groups.find((g) => g.key === "unassigned-requisitions")!.items[0]] });
+    assert.deepEqual({ ...trends["qualified-trackers"], added_items: [] }, { since: "2026-09-24", previous: 3, delta: -2, added: 0, resolved: 2, added_items: [] });
+    assert.equal(trends["missing-invoices"], undefined, "no earlier day observed → no trend");
+    const [{ captured }] = await sql`SELECT max(captured_at) AS captured FROM operational_signal_snapshots WHERE day='2026-09-26'`;
+    await signalTrends(sql, panel.groups, now);
+    const [{ again }] = await sql`SELECT max(captured_at) AS again FROM operational_signal_snapshots WHERE day='2026-09-26'`;
+    assert.equal(String(again), String(captured), "snapshots refresh at most every 15 minutes while the count is unchanged");
+    const moved = panel.groups.map((g) => (g.key === "unassigned-requisitions" ? { ...g, count: g.count + 1 } : g));
+    await signalTrends(sql, moved, now);
+    const [{ stored }] = await sql`SELECT count AS stored FROM operational_signal_snapshots WHERE day='2026-09-26' AND rule_key='unassigned-requisitions'`;
+    assert.equal(stored, moved.find((g) => g.key === "unassigned-requisitions")!.count, "a changed count refreshes the snapshot at once");
 
     // `Perlu perhatian` wording/links snapshot: any change here must be deliberate.
     const metadata = panel.groups.map(({ key, module, title, rule, source, unit, href, action }) => ({ key, module, title, rule, source, unit, href, action }));

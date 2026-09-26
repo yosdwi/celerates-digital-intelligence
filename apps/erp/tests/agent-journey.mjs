@@ -238,6 +238,15 @@ async function proposalJourneys({ base, request, db, env, intelligence, requisit
     const json = async (path, init) => { const r = await request(path, init); return { status: r.status, body: await r.json() }; };
     const post = (path, body) => json(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
+    // Signal history: an earlier day's snapshot makes Perlu perhatian and the Agent report what changed (observation).
+    await db`INSERT INTO operational_signal_snapshots (day, rule_key, count, ids) VALUES (current_date - 3, 'unassigned-requisitions', 0, '[]'::jsonb)`;
+    const withTrends = await json('/api/operations/context?path=/ta');
+    assert.equal(withTrends.body.trends['unassigned-requisitions'].previous, 0);
+    assert.ok(withTrends.body.trends['unassigned-requisitions'].added >= 1);
+    const changed = await run(request, 'ask', { query: 'Apa yang berubah sejak kemarin?' });
+    assert.match(changed.text, /Requisition belum memiliki TA PIC: 0 → \d+ \(\+\d+/);
+    assert.ok(changed.evidence.some((e) => e.type === 'observation' && e.source.kind === 'erp_snapshot'));
+
     // Journey A — ask anything: rules, records and knowledge, deterministically routed; next step offered.
     const question = await run(request, 'ask', { query: 'Requisition mana yang belum punya TA PIC?' });
     assert.match(question.text, /Requisition belum memiliki TA PIC: 1 requisition saat ini/);
