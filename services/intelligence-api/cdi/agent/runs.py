@@ -160,6 +160,28 @@ class Recorder:
         """The column mapping behind an import, for the user to inspect or correct (a correction is a new run)."""
         self.emit(CustomEvent(name="celerates.mapping", value=value))
 
+    def model_turns(self, turns, ledger):
+        """Persist model turns (ADR-015): each request, reply and verdict; the evidence ledger on the last turn."""
+        if not turns:
+            return
+        with connect() as conn:
+            for i, t in enumerate(turns, 1):
+                conn.execute(
+                    """INSERT INTO agent_model_turns(run_id,turn,model,request,reply,verdict,tokens,latency_ms,ledger)
+                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (run_id,turn) DO NOTHING""",
+                    (
+                        self.run["id"],
+                        i,
+                        t.get("model") or "unknown",
+                        json(t["request"]),
+                        json(t["reply"]) if t.get("reply") is not None else None,
+                        t["verdict"],
+                        t.get("tokens", 0),
+                        t.get("latency_ms", 0),
+                        json(ledger) if i == len(turns) else None,
+                    ),
+                )
+
     def provenance(self, value):
         """How the answer text was produced: `deterministic` (assembled from tool results) or `model` (inference,
         with model, rounds, tokens and cited evidence ids). The UI labels the text accordingly."""

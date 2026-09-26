@@ -105,11 +105,12 @@ def agent_model_enabled():
     return cfg.generation_mode == "litellm" and bool(cfg.agent_model)
 
 
-def structured(messages, *, use_case, fast=False, max_tokens=1200, timeout=30):
+def structured(messages, *, use_case, fast=False, max_tokens=1200, timeout=30, model=None):
     """One JSON-object completion through LiteLLM for the Agent (ADR-014). Returns (dict, usage metadata).
 
     The model only ever returns data for validation by the caller; it never receives credentials or ERP authority.
-    Tries the configured Agent model, then the fallback model. Raises ModelUnavailable on any failure."""
+    Tries the configured Agent model, then the fallback model; `model` (evaluation) pins one model without fallback.
+    Raises ModelUnavailable on any failure."""
     cfg = settings()
     if not agent_model_enabled():
         raise ModelUnavailable("Agent model is not configured")
@@ -118,9 +119,13 @@ def structured(messages, *, use_case, fast=False, max_tokens=1200, timeout=30):
     if cfg.langfuse_enabled:
         litellm.success_callback = ["langfuse"]
         litellm.failure_callback = ["langfuse"]
-    candidates = [cfg.agent_fast_model if fast and cfg.agent_fast_model else cfg.agent_model, cfg.fallback_model]
+    candidates = (
+        [model]
+        if model
+        else [cfg.agent_fast_model if fast and cfg.agent_fast_model else cfg.agent_model, cfg.fallback_model]
+    )
     last_error = None
-    for model in [m for m in dict.fromkeys(candidates) if m]:
+    for model in [m for m in dict.fromkeys(candidates) if m]:  # noqa: B020
         start = time.monotonic()
         try:
             result = litellm.completion(

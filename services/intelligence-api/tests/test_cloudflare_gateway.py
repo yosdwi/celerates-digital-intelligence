@@ -33,8 +33,7 @@ def test_cloudflare_workers_ai_transcription_uses_native_run_endpoint(monkeypatc
 
     assert text == "Halo Celerates"
     assert seen["url"] == (
-        "https://api.cloudflare.com/client/v4/accounts/test-account/ai/run/"
-        "@cf/openai/whisper-large-v3-turbo"
+        "https://api.cloudflare.com/client/v4/accounts/test-account/ai/run/@cf/openai/whisper-large-v3-turbo"
     )
     assert seen["headers"] == {"Authorization": "Bearer test-secret"}
     assert seen["json"] == {

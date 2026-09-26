@@ -152,7 +152,14 @@ export async function agentModelBrowser({ base, cookies }) {
     await line.getByText('Inferensi', { exact: true }).waitFor();
     const cited = (await line.textContent()).match(/\(([^)]*)\)/)[1].split(', ');
     for (const id of cited) await panel.locator('[data-evidence-type]').filter({ hasText: id }).first().waitFor();
+    // Answer feedback: the user says the answer was incomplete (an observation for the Brain Console).
+    const fb = panel.locator('[data-agent-message]').last().locator('[data-answer-feedback]');
+    await fb.getByRole('button', { name: 'Jawaban tidak membantu' }).click();
+    await fb.getByRole('radio', { name: 'Kurang lengkap' }).click();
+    await fb.getByLabel('Catatan (opsional)').fill('Sebutkan nomor requisition-nya');
     await page.screenshot({ path: evidenceDir + '/agent-model-inference.png' });
+    await fb.getByRole('button', { name: 'Kirim umpan balik' }).click();
+    await panel.locator('[data-answer-feedback="saved"]').last().waitFor();
     // Drop a request letter (PDF): the Agent reads it and prepares requisitions for the user to confirm in ERP.
     const { pdfBytes } = await import('./agent-journey.mjs');
     await panel.locator('[data-agent-file]').setInputFiles({ name: 'surat-permintaan.pdf', mimeType: 'application/pdf', buffer: pdfBytes(['SURAT PERMINTAAN TENAGA KERJA', 'PT Synthetic Browser Letter membutuhkan 3 Frontend Engineer mulai 1 November 2026.']) });
@@ -195,15 +202,29 @@ export async function consoleBrowser({ env, python }) {
     const dialog = page.getByRole('dialog', { name: 'Jejak run Agent' });
     await dialog.getByText(/JAWABAN · INFERENSI MODEL/).waitFor();
     await dialog.locator('code', { hasText: 'erp_signals' }).first().waitFor();
+    // Quality loop: recorded model turns, the user's feedback, and saving the run as an evaluation case.
+    await dialog.locator('[data-console-turns]').getByText('answer', { exact: true }).first().waitFor();
+    await dialog.locator('[data-console-trace-feedback]').getByText('Sebutkan nomor requisition-nya', { exact: false }).waitFor();
+    await dialog.getByRole('button', { name: 'Simpan sebagai kasus uji' }).click();
+    await dialog.getByText('Tersimpan.', { exact: false }).waitFor();
     await page.screenshot({ path: evidenceDir + '/console-agent-trace.png' });
     await page.keyboard.press('Escape');
+    await page.locator('[data-console-feedback]').getByText('Sebutkan nomor requisition-nya').waitFor();
+    await page.locator('[data-console-cases] tbody tr').filter({ hasText: 'recruiter' }).first().waitFor();
+    await page.getByRole('button', { name: 'Jalankan evaluasi' }).click();
+    const evalRow = page.locator('[data-console-evals] tbody tr').filter({ hasText: 'openai/fake-agent' }).first();
+    await evalRow.getByRole('button', { name: 'Rinci' }).waitFor({ timeout: 60000 });
+    assert.match(await evalRow.textContent(), /100%.*100%/, 'plan valid and grounded on the replayed case');
+    await evalRow.getByRole('button', { name: 'Rinci' }).click();
+    await page.locator('[data-console-eval-detail]').getByText('recruiter', { exact: false }).first().waitFor();
+    await page.screenshot({ path: evidenceDir + '/console-quality.png', fullPage: true });
     await page.screenshot({ path: evidenceDir + '/console-agent.png', fullPage: true });
     await page.setViewportSize({ width: 390, height: 844 });
     await page.reload();
     await page.getByRole('heading', { name: 'What the Agent did, and what it learned.' }).waitFor();
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, 'console mobile overflow');
     assert.deepEqual(errors, []);
-    console.log('PASS: Brain Console — reasoning mode, runs with model/deterministic provenance, trace, learned mappings, mobile');
+    console.log('PASS: Brain Console — reasoning mode, runs, trace with model turns, feedback, evaluation case saved and replayed against the model, learned mappings, mobile');
   } finally {
     await browser?.close();
     api.kill();

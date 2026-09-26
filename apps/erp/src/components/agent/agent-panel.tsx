@@ -132,7 +132,7 @@ export function AgentPanel() {
       if (running) return;
       const runId = uuid();
       setTab("ask");
-      setRuns((all) => [...all, newRun(runId, text)]);
+      setRuns((all) => [...all, newRun(runId, text, skill)]);
       const controller = new AbortController();
       inflight.current = controller;
       const update = (fn: (run: AgentRun) => AgentRun) => setRuns((all) => all.map((r) => (r.runId === runId ? fn(r) : r)));

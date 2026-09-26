@@ -107,6 +107,7 @@ class Ledger:
     def __init__(self):
         self.items = {}
         self.cards = {}
+        self.refs = {}  # evidence id → stable source reference (erp_rule:key, erp:type/id, knowledge:doc, upload:…)
 
     def add(self, prefix, compact, card=None):
         key = f"{prefix}{sum(1 for k in self.items if k.startswith(prefix)) + 1}"
@@ -117,6 +118,16 @@ class Ledger:
 
     def text(self, keys=None):
         return "\n".join(f"{k}: {v}" for k, v in self.items.items() if keys is None or k in keys)
+
+    def note(self, cards):
+        """Remember which source each cited card came from, for audit and evaluation against stable references."""
+        for card in cards:
+            source = card.get("source") or {}
+            if card.get("cite") and source.get("ref"):
+                self.refs.setdefault(card["cite"], f"{source.get('kind')}:{source['ref']}")
+
+    def snapshot(self):
+        return {"items": self.items, "refs": self.refs}
 
 
 DOCUMENT_TOOL = {
@@ -187,7 +198,7 @@ def _record(ctx, ledger, tool, args, result):
             keys.append(
                 ledger.add("E", f"search hit: {r['type']} id={r['id']} label={r['label']} ({r['matched_field']})")
             )
-            cards.append(card)
+            cards.append({**card, "cite": keys[-1]})
         if not result.get("results"):
             keys.append(ledger.add("E", f"search '{args['query']}' ({args.get('mode', 'all')}): no ERP records"))
     elif tool == "erp_read_entity":
@@ -197,7 +208,7 @@ def _record(ctx, ledger, tool, args, result):
         keys.append(
             ledger.add("E", f"record {e['type']} id={e['id']} {card['title']}: " + "; ".join(card["detail"]) + withheld)
         )
-        cards.append(card)
+        cards.append({**card, "cite": keys[-1]})
     elif tool == "erp_entity_neighbours":
         lines = []
         for edge in result["edges"]:
@@ -253,6 +264,7 @@ def _record(ctx, ledger, tool, args, result):
         if not result["passages"]:
             keys.append(ledger.add("E", f"knowledge '{args['query']}': no approved passages"))
     ctx.recorder.evidence(cards)
+    ledger.note(cards)
     return keys
 
 
@@ -320,7 +332,6 @@ def ask_with_model(ctx, query, document=None, opening=None):
 
     `document` ({id, name}) binds a dropped document to this run: its passages become D-evidence and the planner
     gains `document_search` for it. `opening` (chunks) seeds D-evidence for a first read of the document."""
-    from .playbooks import _proposal_lines
 
     today = datetime.now(JAKARTA).strftime("%Y-%m-%d (%A)")
     ledger = Ledger()
@@ -333,6 +344,7 @@ def ask_with_model(ctx, query, document=None, opening=None):
         key = ledger.add(
             "S", f"rule {s['key']} '{s['title']}' ({s['module']}): {s['count']} {s['unit']} now — {s['rule']}"
         )
+        ledger.refs[key] = f"erp_rule:{s['key']}"
         by_key[key] = s
     ctx.document = document
     if document:
@@ -344,6 +356,7 @@ def ask_with_model(ctx, query, document=None, opening=None):
             )
             _, cards = document_cards(ledger, document, passages)
             ctx.recorder.evidence(cards)
+            ledger.note(cards)
     page = {"path": ctx.path}
     entity = ctx.principal.context.get("entity") if isinstance(ctx.principal.context, dict) else None
     if isinstance(entity, dict):
@@ -377,6 +390,21 @@ def ask_with_model(ctx, query, document=None, opening=None):
             ),
         },
     ]
+    turns = []
+    try:
+        return _loop(ctx, query, document, ledger, usage, messages, by_key, commands, today, turns)
+    except (ReasoningFailed, PolicyError) as exc:
+        if turns and not turns[-1]["verdict"].startswith(("rejected", "unavailable")):
+            turns[-1]["verdict"] = f"invalid: {exc}"[:300]
+        raise
+    finally:
+        # Every model turn is kept (ADR-015): request, reply and what the runtime decided about it.
+        ctx.recorder.model_turns(turns, ledger.snapshot())
+
+
+def _loop(ctx, query, document, ledger, usage, messages, by_key, commands, today, turns):
+    from .playbooks import _proposal_lines
+
     repaired = False
     for round_no in range(MAX_ROUNDS):
         remaining = ctx.deadline - time.monotonic() - FALLBACK_RESERVE
@@ -384,7 +412,14 @@ def ask_with_model(ctx, query, document=None, opening=None):
             raise ReasoningFailed("time budget exhausted")
         step = "Menyusun jawaban" if round_no else "Merencanakan langkah"
         with ctx.recorder.step(step):
-            reply, meta = structured(messages, use_case="agent-ask", timeout=min(MODEL_TIMEOUT, remaining))
+            request = [dict(m) for m in messages]
+            try:
+                reply, meta = structured(messages, use_case="agent-ask", timeout=min(MODEL_TIMEOUT, remaining))
+            except ModelUnavailable:
+                turns.append({"model": "unavailable", "request": request, "reply": None, "verdict": "unavailable"})
+                raise
+        turn = {**meta, "request": request, "reply": reply, "verdict": "invalid"}
+        turns.append(turn)
         usage["model"] = meta["model"]
         usage["tokens"] += meta["tokens"]
         usage["latency_ms"] += meta["latency_ms"]
@@ -393,6 +428,7 @@ def ask_with_model(ctx, query, document=None, opening=None):
         shapes = [k for k in ("calls", "proposal", "answer") if k in reply]
         if len(shapes) != 1:
             raise ReasoningFailed("model reply must contain exactly one of calls, proposal, answer")
+        turn["verdict"] = shapes[0]
         if "calls" in reply:
             calls = reply["calls"]
             if not isinstance(calls, list) or not 1 <= len(calls) <= MAX_CALLS_PER_ROUND:
@@ -443,6 +479,7 @@ def ask_with_model(ctx, query, document=None, opening=None):
             return {"skill": "ask", "reasoning": "model", "proposal": proposal["id"], **_usage(usage)}
         problem = _check_answer(reply["answer"], reply.get("cite", []), ledger, query, today)
         if problem:
+            turn["verdict"] = f"rejected: {problem}"[:300]
             if repaired:
                 raise ReasoningFailed(problem)
             repaired = True

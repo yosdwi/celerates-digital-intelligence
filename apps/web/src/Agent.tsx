@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { api } from "./api";
 import { Badge, ErrorBanner, Loading, Metric, Modal, PageHead, SectionTitle, useResource } from "./ui";
+import { CaseForm, EvaluationSection, FeedbackSection, TurnsList, type Candidates, type Feedback, type Turn } from "./Quality";
 
 type Count = { runs: number };
 type Overview = {
@@ -16,6 +17,7 @@ type Overview = {
   outcomes: { decided: number; applied: number; rejected: number; items_applied: number; items_edited: number; items_resolved: number };
   learned_mappings: { command: string; uses: number; updated_at: string; mapping: Record<string, string> }[];
   datasets: { items: { kind: string; files: number; bytes: number; oldest: string }[]; retention_days: number };
+  feedback: Feedback;
 };
 type Run = {
   id: string;
@@ -30,9 +32,19 @@ type Run = {
   decision: string | null;
   error: string | null;
   modality: string;
+  feedback: number | null;
+  is_case: boolean;
 };
 type Step = { seq: number; type: string; event: Record<string, unknown> };
-type Trace = { run: Run & { result: Record<string, unknown> | null; playbook_version: string }; steps: Step[]; outcomes: { proposal_id: string; state: string; receipts: Record<string, number>; outcome: Record<string, number> | null; edited_items: number }[] };
+type Trace = {
+  run: Run & { result: Record<string, unknown> | null; playbook_version: string };
+  steps: Step[];
+  outcomes: { proposal_id: string; state: string; receipts: Record<string, number>; outcome: Record<string, number> | null; edited_items: number }[];
+  turns: Turn[];
+  feedback: { rating: number; reason: string | null; comment: string | null }[];
+  case: { expect: { refs: string[] }; note: string | null } | null;
+  case_candidates: Candidates;
+};
 
 const SKILL: Record<string, string> = {
   ask: "Tanya",
@@ -52,7 +64,7 @@ function ReasoningBadge({ value }: { value: string | null }) {
   return <Badge>Deterministik</Badge>;
 }
 
-function TraceView({ id }: { id: string }) {
+function TraceView({ id, onChanged }: { id: string; onChanged: () => void }) {
   const { data, error, loading } = useResource(() => api<Trace>(`/console/agent/runs/${id}`), [id]);
   if (loading) return <Loading />;
   if (error || !data) return <ErrorBanner error={error || "Run not found"} />;
@@ -94,6 +106,15 @@ function TraceView({ id }: { id: string }) {
           {o.outcome ? ` · ${o.outcome.resolved ?? 0} tuntas` : ""}
         </p>
       ))}
+      {data.feedback.map((f, i) => (
+        <p key={i} className="muted" data-console-trace-feedback>
+          Umpan balik pengguna: <strong>{f.rating > 0 ? "membantu" : "kurang membantu"}</strong>
+          {f.reason ? ` · ${f.reason}` : ""}
+          {f.comment ? ` · “${f.comment}”` : ""}
+        </p>
+      ))}
+      <TurnsList turns={data.turns} />
+      {data.run.state === "succeeded" && <CaseForm runId={data.run.id} candidates={data.case_candidates} existing={data.case} onSaved={onChanged} />}
     </div>
   );
 }
@@ -101,6 +122,7 @@ function TraceView({ id }: { id: string }) {
 export function AgentConsole() {
   const [days, setDays] = useState(14);
   const [open, setOpen] = useState<string | null>(null);
+  const [evalKey, setEvalKey] = useState(0);
   const overview = useResource(() => api<Overview>(`/console/agent?days=${days}`), [days]);
   const runs = useResource(() => api<{ items: Run[] }>("/console/agent/runs?limit=30"), []);
   const d = overview.data;
@@ -174,7 +196,7 @@ export function AgentConsole() {
           <div className="artifact-table-wrap">
             <table className="artifact-table" data-console-runs>
               <thead>
-                <tr><th>Waktu</th><th>Pengguna</th><th>Kemampuan</th><th>Pertanyaan / konteks</th><th>Penalaran</th><th>Keputusan</th><th /></tr>
+                <tr><th>Waktu</th><th>Pengguna</th><th>Kemampuan</th><th>Pertanyaan / konteks</th><th>Penalaran</th><th>Keputusan</th><th>Nilai</th><th /></tr>
               </thead>
               <tbody>
                 {(runs.data?.items ?? []).map((r) => (
@@ -188,12 +210,18 @@ export function AgentConsole() {
                     <td className="break-anywhere">{r.query ?? r.path ?? "—"}</td>
                     <td>{r.state === "failed" ? <Badge tone="red">Gagal</Badge> : <ReasoningBadge value={r.reasoning} />}</td>
                     <td>{r.decision ? <Badge tone={r.decision === "rejected" ? "red" : "green"}>{r.decision}</Badge> : r.proposal ? <Badge tone="amber">menunggu</Badge> : "—"}</td>
+                    <td>
+                      {r.feedback === null ? "—" : r.feedback > 0 ? <Badge tone="green">👍</Badge> : <Badge tone="red">👎</Badge>}
+                      {r.is_case && <> <Badge>kasus uji</Badge></>}
+                    </td>
                     <td><button className="button secondary small" onClick={() => setOpen(r.id)}>Jejak</button></td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          <FeedbackSection feedback={d.feedback} onOpen={setOpen} />
+          <EvaluationSection key={evalKey} />
           <SectionTitle title="Yang dipelajari" subtitle="Pemetaan kolom yang diingat hanya setelah ERP melaporkan impor diterapkan." />
           <div className="artifact-table-wrap">
             <table className="artifact-table" data-console-learned>
@@ -221,7 +249,7 @@ export function AgentConsole() {
       )}
       {open && (
         <Modal title="Jejak run Agent" onClose={() => setOpen(null)}>
-          <TraceView id={open} />
+          <TraceView id={open} onChanged={() => setEvalKey((k) => k + 1)} />
         </Modal>
       )}
     </>

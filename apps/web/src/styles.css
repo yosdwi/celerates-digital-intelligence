@@ -3574,3 +3574,31 @@ code {
     grid-template-columns: 1fr;
   }
 }
+.console-turns,
+.console-case {
+  margin-top: 14px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+  font-size: 12px;
+}
+.console-turns ol,
+.console-case ul {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0;
+  display: grid;
+  gap: 5px;
+}
+.console-case label {
+  display: block;
+  color: var(--ink);
+}
+.console-case input[type="text"],
+.console-case label > input:not([type]) {
+  width: 100%;
+}
+.console-eval-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}

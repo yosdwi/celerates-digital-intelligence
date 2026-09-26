@@ -9,10 +9,12 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..config import settings
 from ..db import all_rows, connect, one
 from ..identity import actor
+from . import quality
 
 router = APIRouter(prefix="/api/console/agent")
 
@@ -94,7 +96,26 @@ def overview(days: Annotated[int, Query(ge=1, le=90)] = 14, user=Depends(curator
             """SELECT kind, count(*)::int AS files, coalesce(sum(size_bytes),0)::bigint AS bytes,
                       min(created_at) AS oldest FROM agent_datasets GROUP BY kind ORDER BY kind""",
         )
+        feedback = one(
+            conn,
+            """SELECT count(*) FILTER (WHERE f.rating=1)::int AS helpful, count(*) FILTER (WHERE f.rating=-1)::int AS not_helpful,
+                      count(*) FILTER (WHERE f.rating=1 AND r.result->>'reasoning'='model')::int AS model_helpful,
+                      count(*) FILTER (WHERE r.result->>'reasoning'='model')::int AS model_rated
+               FROM agent_feedback f JOIN agent_runs r ON r.id=f.run_id
+               WHERE f.updated_at > now() - %s * interval '1 day'""",
+            (days,),
+        )
+        complaints = all_rows(
+            conn,
+            """SELECT f.run_id, f.reason, f.comment, f.updated_at, r.input->>'query' AS query, r.skill,
+                      r.result->>'reasoning' AS reasoning
+               FROM agent_feedback f JOIN agent_runs r ON r.id=f.run_id
+               WHERE f.rating=-1 AND f.updated_at > now() - %s * interval '1 day'
+               ORDER BY f.updated_at DESC LIMIT 10""",
+            (days,),
+        )
     return {
+        "feedback": {**feedback, "recent_negative": complaints},
         "days": days,
         "reasoning": {
             "mode": "model" if cfg.generation_mode == "litellm" and cfg.agent_model else "deterministic",
@@ -119,7 +140,9 @@ def recent(limit: Annotated[int, Query(ge=1, le=100)] = 30, user=Depends(curator
             conn,
             """SELECT r.id, r.skill, r.state, r.principal_name, r.created_at, r.finished_at, r.error, r.modality,
                       r.input->>'query' AS query, r.result->>'reasoning' AS reasoning, r.result->>'proposal' AS proposal,
-                      r.context->>'path' AS path, o.state AS decision
+                      r.context->>'path' AS path, o.state AS decision,
+                      (SELECT sum(rating)::int FROM agent_feedback WHERE run_id=r.id) AS feedback,
+                      EXISTS (SELECT 1 FROM agent_eval_cases WHERE run_id=r.id) AS is_case
                FROM agent_runs r LEFT JOIN LATERAL (
                  SELECT state FROM agent_outcomes WHERE run_id=r.id ORDER BY recorded_at DESC LIMIT 1) o ON true
                ORDER BY r.created_at DESC LIMIT %s""",
@@ -147,4 +170,86 @@ def trace(run_id: UUID, user=Depends(curator)):
             "WHERE run_id=%s ORDER BY recorded_at",
             (run["id"],),
         )
-    return {"run": run, "steps": steps, "outcomes": outcomes}
+        turns = all_rows(
+            conn,
+            "SELECT turn, model, verdict, tokens, latency_ms, reply FROM agent_model_turns WHERE run_id=%s ORDER BY turn",
+            (run["id"],),
+        )
+        feedback = all_rows(
+            conn, "SELECT rating, reason, comment, updated_at FROM agent_feedback WHERE run_id=%s", (run["id"],)
+        )
+        case = one(conn, "SELECT id, expect, note, created_by FROM agent_eval_cases WHERE run_id=%s", (run["id"],))
+    return {
+        "run": run,
+        "steps": steps,
+        "outcomes": outcomes,
+        "turns": turns,
+        "feedback": feedback,
+        "case": case,
+        "case_candidates": quality.case_candidates(run["id"]),
+    }
+
+
+class CaseRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    run_id: UUID
+    refs: list[Annotated[str, Field(max_length=300)]] = Field(default_factory=list, max_length=40)
+    note: str | None = Field(default=None, max_length=500)
+
+
+@router.post("/cases", status_code=201)
+def create_case(body: CaseRequest, user=Depends(curator)):
+    """Turn a model-answered run into an evaluation case: the expected sources are chosen from what it read."""
+    try:
+        return quality.create_case(str(body.run_id), body.refs, body.note, user)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@router.delete("/cases/{case_id}")
+def delete_case(case_id: UUID, user=Depends(curator)):
+    with connect() as conn:
+        conn.execute("DELETE FROM agent_eval_cases WHERE id=%s", (str(case_id),))
+    return {"deleted": True}
+
+
+@router.get("/evals")
+def evals(user=Depends(curator)):
+    with connect() as conn:
+        cases = all_rows(
+            conn,
+            "SELECT id, run_id, question, expect, note, created_by, created_at FROM agent_eval_cases ORDER BY created_at",
+        )
+        runs_ = all_rows(
+            conn,
+            "SELECT id, model, state, created_by, created_at, finished_at, summary FROM agent_eval_runs "
+            "ORDER BY created_at DESC LIMIT 10",
+        )
+    return {"models": quality.eval_models(), "cases": cases, "runs": runs_}
+
+
+class EvalRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    model: str = Field(min_length=1, max_length=200)
+
+
+@router.post("/evals", status_code=202)
+def start_eval(body: EvalRequest, user=Depends(curator)):
+    """Replay every case against one allowlisted model with frozen evidence. Runs in the background."""
+    try:
+        row = quality.start_eval(body.model, user)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    from .playbooks import pool
+
+    pool().submit(quality.run_eval, row["id"], body.model)
+    return {"id": row["id"], "state": row["state"]}
+
+
+@router.get("/evals/{eval_id}")
+def eval_result(eval_id: UUID, user=Depends(curator)):
+    with connect() as conn:
+        row = one(conn, "SELECT * FROM agent_eval_runs WHERE id=%s", (str(eval_id),))
+    if not row:
+        raise HTTPException(404, "Evaluation not found")
+    return row

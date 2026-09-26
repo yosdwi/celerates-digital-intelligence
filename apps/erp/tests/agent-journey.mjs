@@ -151,6 +151,10 @@ async function modelJourneys({ request, db }) {
   notAudio.set('file', new Blob(['x'], { type: 'text/plain' }), 'x.txt');
   assert.equal((await request('/api/agent/transcribe', { method: 'POST', body: notAudio })).status, 422);
 
+  // Feedback on an answer goes through ERP (same origin, session) to Intelligence under the user's delegation.
+  assert.equal((await request(`/api/agent/runs/${para.runId}/feedback`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rating: 1 }) })).status, 200);
+  assert.equal((await request(`/api/agent/runs/${para.runId}/feedback`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rating: 5 }) })).status, 422);
+
   // An ungrounded number is never shown: the run falls back to the deterministic router and says so.
   const ungrounded = await run(request, 'ask', { query: 'berapa angka requisition?' });
   assert.doesNotMatch(ungrounded.text, /987654/);

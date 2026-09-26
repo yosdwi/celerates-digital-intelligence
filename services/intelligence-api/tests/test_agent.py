@@ -1055,3 +1055,134 @@ def test_push_to_talk_returns_an_editable_transcript_and_never_runs_anything(mon
 def one_count(table):
     with connect() as conn:
         return one(conn, f"SELECT count(*)::int AS n FROM {table}")["n"]
+
+
+def test_quality_loop_feedback_cases_and_replay_evaluation(monkeypatch):
+    import hashlib
+    import sys
+    import types
+
+    from cdi.agent import quality
+
+    with connect() as conn:  # test database: evaluation state starts empty
+        conn.execute("DELETE FROM agent_eval_cases")
+        conn.execute("DELETE FROM agent_eval_runs")
+    curator_token = "k" * 40
+    principals = [
+        {
+            "id": "curator",
+            "token_sha256": hashlib.sha256(curator_token.encode()).hexdigest(),
+            "roles": ["reviewer", "curator"],
+            "divisions": ["sales"],
+        }
+    ]
+    monkeypatch.setattr(settings(), "intelligence_principals_json", json.dumps(principals))
+    monkeypatch.setattr(settings(), "api_access_token", "")
+    auth = {"Authorization": "Bearer " + curator_token}
+    token = mint(ctx={"path": "/ta", "module": "ta"})
+    stranger = mint(sub=SECOND)
+
+    def use_model(replies, name="openai/scripted"):
+        model = ScriptedModel(replies)
+        monkeypatch.setitem(sys.modules, "litellm", types.SimpleNamespace(completion=model.completion))
+        monkeypatch.setattr(settings(), "generation_mode", "litellm")
+        monkeypatch.setattr(settings(), "agent_model", name)
+        return model
+
+    with TestClient(app) as c:
+        # A model-answered run records every turn with its verdict and the evidence ledger (stable refs).
+        use_model(
+            [
+                {"calls": [{"tool": "erp_search", "args": {"query": "REQ-7"}}]},
+                {"answer": "Ada 17 requisition [S2].", "cite": ["S2"]},  # ungrounded → rejected, then repaired
+                {"answer": "REQ-7 · Engineer [E1]; 2 requisition tanpa TA PIC [S2].", "cite": ["E1", "S2"]},
+            ]
+        )
+        _, stream = run_skill(monkeypatch, c, token, "ask", {"query": "status REQ-7 dan PIC"}, AskingERP)
+        run_id = stream[0][1]["runId"]
+        assert stream[-1][1]["result"]["reasoning"] == "model"
+        turns = quality.turns(run_id)
+        assert [t["verdict"] for t in turns] == ["calls", "rejected: numbers not present in evidence: 17", "answer"]
+        refs = turns[-1]["ledger"]["refs"]
+        assert refs["S2"] == "erp_rule:unassigned-requisitions" and refs["E1"] == f"erp:requisition/{REQUISITIONS[0]}"
+        assert turns[0]["ledger"] is None and turns[0]["request"][0]["role"] == "system"
+
+        # Feedback: the asker only, completed runs only, one judgement per user (updatable).
+        fb = {"rating": -1, "reason": "incomplete", "comment": "PIC belum disebut"}
+        assert (
+            c.post(f"/api/agent/runs/{run_id}/feedback", json=fb, headers={"X-ERP-Delegation": stranger}).status_code
+            == 404
+        )
+        assert (
+            c.post(
+                f"/api/agent/runs/{run_id}/feedback", json={"rating": 5}, headers={"X-ERP-Delegation": token}
+            ).status_code
+            == 422
+        )
+        assert (
+            c.post(f"/api/agent/runs/{run_id}/feedback", json=fb, headers={"X-ERP-Delegation": token}).json()["rating"]
+            == -1
+        )
+        assert (
+            c.post(
+                f"/api/agent/runs/{run_id}/feedback", json={"rating": 1}, headers={"X-ERP-Delegation": token}
+            ).json()["rating"]
+            == 1
+        )
+        c.post(f"/api/agent/runs/{run_id}/feedback", json=fb, headers={"X-ERP-Delegation": token})
+        view = c.get("/api/console/agent", headers=auth).json()
+        assert (
+            view["feedback"]["not_helpful"] >= 1
+            and view["feedback"]["recent_negative"][0]["comment"] == "PIC belum disebut"
+        )
+
+        # The trace shows turns and what could become an evaluation case; a curator saves it with expected sources.
+        trace = c.get(f"/api/console/agent/runs/{run_id}", headers=auth).json()
+        assert [t["verdict"] for t in trace["turns"]][-1] == "answer" and trace["feedback"][0]["reason"] == "incomplete"
+        cands = trace["case_candidates"]
+        assert cands["shape"] == "answer" and {r["ref"] for r in cands["refs"] if r["cited"]} == set(refs.values()) & {
+            "erp_rule:unassigned-requisitions",
+            f"erp:requisition/{REQUISITIONS[0]}",
+        }
+        want = ["erp_rule:unassigned-requisitions", f"erp:requisition/{REQUISITIONS[0]}", "erp:forged/1"]
+        case = c.post("/api/console/agent/cases", json={"run_id": run_id, "refs": want, "note": "PIC"}, headers=auth)
+        assert case.status_code == 201 and case.json()["expect"]["refs"] == sorted(want[:2]), "unknown refs dropped"
+        monkeypatch.setattr(settings(), "generation_mode", "demo")
+        _, det = run_skill(monkeypatch, c, token, "ask", {"query": "requisition belum ada PIC"}, AskingERP)
+        det_case = c.post("/api/console/agent/cases", json={"run_id": det[0][1]["runId"]}, headers=auth)
+        assert det_case.status_code == 422, "deterministic runs have no recorded model turns to replay"
+
+        # Replay evaluation: allowlisted models only; frozen evidence; no ERP call; grounding and expected sources.
+        monkeypatch.setattr(settings(), "agent_eval_models", "openai/candidate")
+        assert c.post("/api/console/agent/evals", json={"model": "openai/anything"}, headers=auth).status_code == 422
+        use_model(
+            [
+                {"calls": [{"tool": "erp_search", "args": {"query": "REQ-7"}}]},  # plan (replayed first request)
+                {"answer": "REQ-7 [E1], aturan [S2].", "cite": ["E1", "S2"]},  # answer (replayed last request)
+            ]
+        )
+        from cdi.agent import playbooks as pb
+
+        monkeypatch.setattr(pb, "pool", lambda: types.SimpleNamespace(submit=lambda fn, *a: fn(*a)))
+        before = len(AskingERP.searches)
+        started = c.post("/api/console/agent/evals", json={"model": "openai/candidate"}, headers=auth)
+        assert started.status_code == 202, started.text
+        result = c.get(f"/api/console/agent/evals/{started.json()['id']}", headers=auth).json()
+        assert result["state"] == "succeeded" and len(AskingERP.searches) == before, "replay never calls ERP"
+        mine = next(r for r in result["results"] if r["case_id"] == case.json()["id"])
+        assert mine["plan_valid"] and mine["grounded"] and mine["recall"] == 1.0 and mine["tokens"] == 84
+        # A weaker candidate: invents a number and plans a tool that is not allowed.
+        use_model([{"calls": [{"tool": "erp_propose", "args": {}}]}, {"answer": "Ada 99 requisition.", "cite": []}])
+        worse = c.post("/api/console/agent/evals", json={"model": "openai/candidate"}, headers=auth).json()
+        bad = c.get(f"/api/console/agent/evals/{worse['id']}", headers=auth).json()
+        row = next(r for r in bad["results"] if r["case_id"] == case.json()["id"])
+        assert not row["plan_valid"] and not row["grounded"] and row["recall"] == 0.0
+        assert bad["summary"]["grounded_pct"] < 100
+        listing = c.get("/api/console/agent/evals", headers=auth).json()
+        assert "openai/candidate" in listing["models"] and len(listing["runs"]) >= 2
+
+        # Retention keeps the turns that evaluation cases depend on.
+        with connect() as conn:
+            conn.execute("UPDATE agent_model_turns SET recorded_at=now()-interval '400 days'")
+        quality.purge_turns()
+        assert quality.turns(run_id), "case evidence kept"

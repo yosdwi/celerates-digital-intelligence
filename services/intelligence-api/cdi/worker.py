@@ -66,9 +66,11 @@ def main():
         try:
             if time.monotonic() - housekeeping > 3600:
                 from .agent.datasets import purge
+                from .agent.quality import purge_turns
 
                 housekeeping = time.monotonic()
                 purge()
+                purge_turns()
             if not tick():
                 time.sleep(settings().worker_poll_seconds)
         except Exception:

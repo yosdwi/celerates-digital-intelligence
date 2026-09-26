@@ -239,3 +239,21 @@ def transcribe_audio(file: UploadFile = File(...), user=Depends(delegated_actor)
     except ModelUnavailable as exc:
         raise HTTPException(502, "Transcription is unavailable; type the question instead") from exc
     return {"text": text[:300], **meta}
+
+
+class Feedback(Strict):
+    rating: Literal[1, -1]
+    reason: Literal["wrong", "incomplete", "irrelevant", "other"] | None = None
+    comment: str | None = Field(default=None, max_length=1000)
+
+
+@router.post("/runs/{run_id}/feedback")
+def answer_feedback(run_id: UUID, body: Feedback, user=Depends(delegated_actor)):
+    """The user's own judgement of an answer (ADR-015). An observation: it never changes ERP or knowledge."""
+    from . import quality
+
+    run = owned(str(run_id), user)
+    if run["state"] != "succeeded":
+        raise HTTPException(409, "Only completed answers can be rated")
+    row = quality.record_feedback(run, user, body.rating, body.reason if body.rating < 0 else None, body.comment)
+    return {"recorded": True, "rating": row["rating"]}

@@ -33,6 +33,7 @@ export type MappingCardData = {
 export type ToolTrace = { id: string; name: string; args: string; result?: string; done: boolean };
 export type AgentRun = {
   runId: string;
+  skill?: string;
   userText: string;
   status: "running" | "succeeded" | "failed";
   lastSeq: number;
@@ -49,8 +50,11 @@ export type AgentRun = {
   error?: { message: string; code?: string };
 };
 
-export function newRun(runId: string, userText: string): AgentRun {
-  return { runId, userText, status: "running", lastSeq: 0, steps: [], tools: [], evidence: [], proposals: [], actions: [], text: "" };
+/** Skills whose output is an answer a user can judge (feedback, ADR-015). */
+const ANSWER_SKILLS = new Set(["ask", "explain_signal", "explain_entity", "search", "read_document"]);
+
+export function newRun(runId: string, userText: string, skill?: string): AgentRun {
+  return { runId, userText, skill, status: "running", lastSeq: 0, steps: [], tools: [], evidence: [], proposals: [], actions: [], text: "" };
 }
 
 const EVIDENCE_TYPES = new Set<EvidenceType>(["erp_fact", "signal", "knowledge", "document", "observation", "inference"]);
@@ -156,6 +160,7 @@ export function toThreadMessages(runs: AgentRun[]) {
     for (const proposal of run.proposals) content.push({ type: "data-proposal", data: proposal });
     if (run.mapping && run.status === "succeeded") content.push({ type: "data-mapping", data: run.mapping });
     if (run.actions.length && run.status === "succeeded") content.push({ type: "data-actions", data: { items: run.actions } });
+    if (run.status === "succeeded" && run.text && run.skill && ANSWER_SKILLS.has(run.skill)) content.push({ type: "data-feedback", data: { runId: run.runId } });
     for (const tool of run.tools)
       content.push({
         type: "tool-call",

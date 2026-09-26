@@ -140,6 +140,15 @@ test("AG-UI conformance of the event shapes the panel consumes, and the pure run
   modelRun = applyEvent(modelRun, { type: "RUN_FINISHED", threadId: "t", runId: "r5" });
   assert.deepEqual(modelRun.provenance, { mode: "model", kind: "answer", read: 0, model: "openai/x", cited: ["E1", "S2"], rounds: 2, tokens: 10 });
   const modelParts = toThreadMessages([modelRun])[1].content as { type: string }[];
+  // Feedback is offered on completed answers only, not on proposal-making skills.
+  const done = (skill: string) => {
+    let r = newRun("r6", "q", skill);
+    r = applyEvent(r, { type: "TEXT_MESSAGE_CONTENT", delta: "x" });
+    r = applyEvent(r, { type: "RUN_FINISHED", threadId: "t", runId: "r6" });
+    return (toThreadMessages([r])[1].content as { type: string }[]).some((p) => p.type === "data-feedback");
+  };
+  assert.equal(done("ask"), true);
+  assert.equal(done("follow_up_signal"), false);
   assert.deepEqual(modelParts.map((p) => p.type).slice(-2), ["text", "data-provenance"]);
   assert.equal(parts[2].data?.id, proposalId);
   let failed = applyEvent(newRun("r2", "x"), { type: "RUN_ERROR", message: "Tidak boleh", code: "ERP_403" });
