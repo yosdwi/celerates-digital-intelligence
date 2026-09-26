@@ -201,3 +201,16 @@ Start from the final commit of this record on `audit/erp-production-readiness`.
    - candidate or talent intake for TA;
    - promotion of a dropped document to a knowledge draft for curator review.
 6. **OCR for scanned documents**, as an optional extra on the worker, following the Docling path.
+
+## CI results
+
+GitHub Actions on the pushed M3 commits:
+
+| Commit | ERP pilot checks `verify` (unit, typecheck, builds, full HTTP + browser harness) | P0 `api` / `web` | P0 `compose` |
+| --- | --- | --- | --- |
+| `8c8ddf0` model reasoning | Pass | Pass | Fails (pre-existing MinIO image pull, as in M1/M2) |
+| `ee9b80a` retrieval + names | Pass | Pass | Fails (pre-existing) |
+| `5d5f138` documents | Pass | Pass | Fails (pre-existing) |
+| `0023db5` Brain Console | **Fail** — the console browser check opened the first "Model · inferensi" row. Rows created in the same second can order a document-proposal run first, whose trace is labelled "USULAN DISUSUN MODEL". The check was made specific in `52bb056`. | Pass | Fails (pre-existing) |
+| `52bb056` voice + `lead.create` | Pass: [run 36248990776](https://github.com/yosdwi/celerates-digital-intelligence/actions/runs/36248990776) | Pass: [run 36248990773](https://github.com/yosdwi/celerates-digital-intelligence/actions/runs/36248990773) | Fails (pre-existing) |
+| `a255c6b` docs | not triggered (path filter) | Pass | Fails (pre-existing) |
