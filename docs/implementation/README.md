@@ -1,7 +1,8 @@
 # P0 implementation map
 
-**Latest increment:** [Operating Substrate M3 — understanding, documents, voice, Brain Console](operating-substrate-m3.md)
-(optional grounded model reasoning, PDF/DOCX drop, Indonesian + English retrieval, name resolution, push-to-talk, Agent & learning console, lead import).
+**Latest increment:** [Operating Substrate M4 — quality loop, Brain Console sign-in, signal history](operating-substrate-m4.md)
+(answer feedback, persisted model turns, replay evaluation of models, ERP Owner sign-in to the Brain Console, "what changed" in Perlu perhatian).
+Before that: [M3 — understanding, documents, voice, Brain Console](operating-substrate-m3.md).
 Before that: [M2 — Ask, Drop, Act](operating-substrate-m2.md) (ask anything, CSV/XLSX import, `Tindak lanjuti` → ERP-held proposals → receipts → outcomes).
 Before that: [M1 — Celerates Agent shell](operating-substrate-m1.md) (ERP delegation, Entity Catalog v1, persisted AG-UI runs, `Tanyakan`).
 
