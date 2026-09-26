@@ -4,7 +4,7 @@ Date: 2026-09-26
 Baseline: `audit/erp-production-readiness` @ `8721132` (doc 14 added; application code unchanged since the deployed foundation).
 Status: **architecture/product recommendation for review. Nothing here is implemented.** Proposed decisions that change locked intent are listed in §9 as ADR proposals; none has been written or accepted.
 
-North Star: [doc 14](14-celerates-enterprise-intelligence-operating-model.md). Grounded engineering audit: [doc 13](13-celerates-agent-audit-and-recommendation.md). Also relies on [ERP audit 04](erp-audit/04-production-readiness-audit.md) and [10](erp-audit/10-capability-decomposition-audit.md).
+North Star: [doc 14](14-celerates-enterprise-intelligence-operating-model.md). Grounded engineering audit: [doc 13](13-celerates-agent-audit-and-recommendation.md). Library/framework decisions: [doc 16](16-operating-substrate-build-reuse-adopt.md). Also relies on [ERP audit 04](erp-audit/04-production-readiness-audit.md) and [10](erp-audit/10-capability-decomposition-audit.md).
 
 ---
 
@@ -74,7 +74,7 @@ Everything the Agent does then becomes composition over the catalog, not new `if
 - **Shown through:** a thin version of all three journeys in the embedded Agent, with `Perlu perhatian` and `Masukan` preserved as its first capabilities.
 - **Visible in:** a Brain Console re-scoped around memory, entities, imports and agent runs.
 
-It deliberately does **not** add a graph database, a connector framework, a new service, token streaming, spoken responses, or any sensitive-domain write.
+It deliberately does **not** add a graph database, a connector framework, a new application service, token streaming, spoken responses, or any sensitive-domain write. The only infrastructure addition is the already-configured LiteLLM Proxy, enabled when real model providers are evaluated ([doc 16](16-operating-substrate-build-reuse-adopt.md)).
 
 ---
 
@@ -368,7 +368,7 @@ Roughly 8–11 weeks in total. M1 + M3 alone (≈4 weeks) already show proactive
 | 10 ERP Sheet importers | **Retire after parity**: their target fields and value maps seed the catalog; per-module removal once the dataset path covers that entity |
 | `FeatureRequestFab` (unmounted) | Remove |
 | Console Exceptions / Human Service / Management | Hide in HTTP mode or label Demo |
-| LiteLLM proxy, n8n, Langfuse | Still optional; nothing here needs them |
+| LiteLLM proxy, n8n, Langfuse | LiteLLM Proxy is **adopted when real providers are enabled** (model-evaluation track), because PydanticAI and transcription both route through it. n8n and Langfuse stay optional. See [doc 16](16-operating-substrate-build-reuse-adopt.md). |
 
 ---
 
@@ -417,6 +417,7 @@ Roughly 8–11 weeks in total. M1 + M3 alone (≈4 weeks) already show proactive
 | **ADR-010** ERP-held command-batch proposals with outcome watch | Generalises ADR-007's action boundary for interactive and batch use; Pre-Sales flow unchanged |
 | **ADR-011** Datasets and imports | Intelligence profiles/maps; ERP validates/applies; bespoke Sheet importers retired after parity |
 | **ADR-012** Speech via Model Gateway | Transcription is a gateway alias; no audio retention; voice never confirms |
+| **ADR-013** Agent interaction protocol and runtime libraries | AG-UI as the event format; assistant-ui primitives for the Ask thread; PydanticAI for the bounded model loop; LangGraph narrowed to durable workflows; LiteLLM Proxy as provider egress; CopilotKit and LiveKit not adopted. Framework approvals never authorize ERP writes. Evaluated in [doc 16](16-operating-substrate-build-reuse-adopt.md). |
 
 Product-owner decisions needed:
 
