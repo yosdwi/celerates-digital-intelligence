@@ -20,8 +20,10 @@ import {
   FileCheck2,
   Users,
   PanelLeftClose,
+  BrainCircuit,
 } from "lucide-react";
 import { Knowledge, Outcomes } from "./Foundation";
+import { AgentConsole } from "./Agent";
 import { Presales } from "./Presales";
 import {
   Overview,
@@ -39,6 +41,7 @@ const nav = [
   ["/app/exceptions", "Exceptions", ShieldAlert],
   ["/app/human-service", "Human Service", MessagesSquare],
   ["/app/management", "Management", ChartNoAxesCombined],
+  ["/app/agent", "Agent & learning", BrainCircuit],
   ["/app/knowledge", "Knowledge", FileCheck2],
   ["/app/outcomes", "Outcomes & feedback", Check],
   ["/app/sources", "Sources & Integrations", Database],
@@ -445,6 +448,7 @@ function Shell() {
             <Route path="exceptions" element={<Exceptions />} />
             <Route path="human-service" element={<HumanService />} />
             <Route path="management" element={<Management />} />
+            <Route path="agent" element={<AgentConsole />} />
             <Route path="knowledge" element={<Knowledge />} />
             <Route path="outcomes" element={<Outcomes />} />
             <Route path="sources" element={<Sources />} />

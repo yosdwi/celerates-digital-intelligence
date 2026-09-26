@@ -7,6 +7,7 @@ from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile
 from fastapi.responses import Response
 
 from .agent.api import router as agent_router
+from .agent.console import router as console_router
 from .artifacts import KINDS
 from .config import settings
 from .context import authorize_run
@@ -31,6 +32,7 @@ app = FastAPI(title="Celerates Digital Intelligence", version="0.1.0", lifespan=
 
 app.include_router(foundation_router)
 app.include_router(agent_router)
+app.include_router(console_router)
 
 
 @app.exception_handler(KeyError)

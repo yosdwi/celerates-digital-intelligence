@@ -118,8 +118,9 @@ export async function agentJourney({ base, request, db, env, python, publicKey, 
     await until(async () => (await fetch(intelligence + '/ready')).ok, 'Intelligence API with model');
     await modelJourneys({ request, db });
     if (process.env.ERP_BROWSER_TEST === '1') {
-      const { agentModelBrowser } = await import('./agent-browser.mjs');
+      const { agentModelBrowser, consoleBrowser } = await import('./agent-browser.mjs');
       await agentModelBrowser({ base, cookies: cookies.split('; ').map((pair) => [pair.slice(0, pair.indexOf('=')), pair.slice(pair.indexOf('=') + 1)]) });
+      await consoleBrowser({ env: modelEnv, python });
     }
     console.log('PASS: Agent — catalog page context, ERP-signed delegation, delegated reads with sensitivity filter, persisted AG-UI stream + resume, standard AG-UI client, forged approval inert, no ERP writes without the user; follow-up and import proposals confirmed in ERP with receipts, outcomes and mapping memory');
   } finally { api.kill(); fakeModel?.kill(); }

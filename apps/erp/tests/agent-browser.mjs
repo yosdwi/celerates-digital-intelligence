@@ -161,3 +161,45 @@ export async function agentModelBrowser({ base, cookies }) {
     await browser.close();
   }
 }
+
+/** Brain Console (Intelligence web): the Agent's runs, reasoning, decisions and learned mappings, read-only. */
+export async function consoleBrowser({ env, python }) {
+  const { spawn } = await import('node:child_process');
+  const api = spawn(python, ['-m', 'uvicorn', 'cdi.api:app', '--host', '127.0.0.1', '--port', '8000'], { env, stdio: ['ignore', 'ignore', 'inherit'] });
+  const web = spawn(process.execPath, ['../web/node_modules/vite/bin/vite.js', '--host', '127.0.0.1', '--port', '5173'], { cwd: '../web', env, stdio: ['ignore', 'ignore', 'inherit'] });
+  const evidenceDir = process.env.ERP_SCREENSHOT_DIR || '../../docs/implementation/evidence';
+  let browser;
+  try {
+    for (let i = 0; i < 120; i++) { try { if ((await fetch('http://127.0.0.1:8000/ready')).ok && (await fetch('http://127.0.0.1:5173')).ok) break; } catch {} await new Promise((r) => setTimeout(r, 250)); }
+    browser = await chromium.launch({ headless: true, executablePath: process.env.ERP_BROWSER_EXECUTABLE || undefined, args: ['--no-sandbox'] });
+    const context = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
+    await context.addInitScript((token) => sessionStorage.setItem('cdi-token', token), env.API_ACCESS_TOKEN);
+    const page = await context.newPage();
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    await page.goto('http://127.0.0.1:5173/app/agent');
+    await page.getByRole('heading', { name: 'What the Agent did, and what it learned.' }).waitFor({ timeout: 30000 });
+    await page.locator('[data-console-reasoning]').getByText('model (openai/fake-agent)', { exact: false }).waitFor();
+    await page.locator('[data-console-learned]').getByText('requisition.create', { exact: true }).first().waitFor();
+    const runs = page.locator('[data-console-runs] tbody tr');
+    assert.ok((await runs.count()) >= 10, 'recent runs listed');
+    const modelRow = runs.filter({ hasText: 'Model · inferensi' }).first();
+    await modelRow.getByRole('button', { name: 'Jejak' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Jejak run Agent' });
+    await dialog.getByText(/JAWABAN · INFERENSI MODEL/).waitFor();
+    await dialog.locator('code', { hasText: 'erp_signals' }).first().waitFor();
+    await page.screenshot({ path: evidenceDir + '/console-agent-trace.png' });
+    await page.keyboard.press('Escape');
+    await page.screenshot({ path: evidenceDir + '/console-agent.png', fullPage: true });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.reload();
+    await page.getByRole('heading', { name: 'What the Agent did, and what it learned.' }).waitFor();
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, 'console mobile overflow');
+    assert.deepEqual(errors, []);
+    console.log('PASS: Brain Console — reasoning mode, runs with model/deterministic provenance, trace, learned mappings, mobile');
+  } finally {
+    await browser?.close();
+    api.kill();
+    web.kill();
+  }
+}

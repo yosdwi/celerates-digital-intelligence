@@ -954,3 +954,58 @@ def test_dropped_documents_are_read_cited_and_owner_only(monkeypatch):
         )
         end = stream[-1][1]["result"]
         assert end["reasoning"] == "model" and end["cited"] == ["D1"], end
+
+
+def test_brain_console_shows_runs_reasoning_outcomes_and_learning_to_curators_only(monkeypatch):
+    import hashlib
+
+    reviewer, curator_token = "r" * 40, "c" * 40
+    principals = [
+        {
+            "id": "reviewer-only",
+            "token_sha256": hashlib.sha256(reviewer.encode()).hexdigest(),
+            "roles": ["reviewer"],
+            "divisions": ["sales"],
+        },
+        {
+            "id": "curator",
+            "token_sha256": hashlib.sha256(curator_token.encode()).hexdigest(),
+            "roles": ["reviewer", "curator"],
+            "divisions": ["sales"],
+        },
+    ]
+    monkeypatch.setattr(settings(), "intelligence_principals_json", json.dumps(principals))
+    monkeypatch.setattr(settings(), "api_access_token", "")
+    token = mint()
+    with TestClient(app) as c:
+        # Generate one model answer, one fallback and one proposal run with outcome.
+        _, stream = run_skill(monkeypatch, c, token, "follow_up_signal", {"signal_key": "unassigned-requisitions"})
+        run_id = stream[0][1]["runId"]
+        c.post(
+            f"/api/agent/runs/{run_id}/outcomes",
+            json={
+                "proposal_id": str(uuid4()),
+                "state": "applied",
+                "counts": {},
+                "receipts": {"applied": 2},
+                "outcome": {"resolved": 1},
+                "edited_items": 1,
+            },
+            headers={"X-ERP-Delegation": token},
+        )
+        assert c.get("/api/console/agent", headers={"Authorization": "Bearer " + reviewer}).status_code == 403
+        assert c.get("/api/console/agent", headers={"X-ERP-Delegation": token}).status_code == 401, (
+            "delegation is not console access"
+        )
+        auth = {"Authorization": "Bearer " + curator_token}
+        view = c.get("/api/console/agent?days=7", headers=auth).json()
+        assert view["runs"]["runs"] >= 1 and view["runs"]["proposals"] >= 1
+        assert view["outcomes"]["items_applied"] >= 2 and view["outcomes"]["items_edited"] >= 1
+        assert view["reasoning"]["mode"] in {"model", "deterministic"} and view["datasets"]["retention_days"] == 30
+        assert any(s["skill"] == "follow_up_signal" for s in view["skills"])
+        recent = c.get("/api/console/agent/runs?limit=5", headers=auth).json()["items"]
+        mine = next(r for r in recent if r["id"] == run_id)
+        assert mine["decision"] == "applied" and mine["proposal"]
+        trace = c.get(f"/api/console/agent/runs/{run_id}", headers=auth).json()
+        assert [s["type"] for s in trace["steps"]][0] == "RUN_STARTED" and trace["outcomes"][0]["state"] == "applied"
+        assert c.get(f"/api/console/agent/runs/{uuid4()}", headers=auth).status_code == 404
