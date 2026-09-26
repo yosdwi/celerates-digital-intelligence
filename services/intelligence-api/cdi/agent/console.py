@@ -8,7 +8,7 @@ Curator role only: the view shows users' questions and decisions. Dataset conten
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..config import settings
@@ -19,8 +19,17 @@ from . import quality
 router = APIRouter(prefix="/api/console/agent")
 
 
-def curator(user=Depends(actor)):
-    return user.require("curator")
+def curator(authorization: Annotated[str | None, Header()] = None):
+    """Curators: a named workspace token with the curator role, or an ERP Owner signed in from ERP (ADR-016)."""
+    from ..delegation import DelegationError, console_principal, verify_console
+
+    token = (authorization or "").removeprefix("Bearer ")
+    if token.count(".") == 2:
+        try:
+            return console_principal(verify_console(token))
+        except (DelegationError, ValueError, TypeError) as exc:
+            raise HTTPException(401, "ERP sign-in expired or invalid; open the Brain Console from ERP again") from exc
+    return actor(authorization).require("curator")
 
 
 def _summary(conn, days):

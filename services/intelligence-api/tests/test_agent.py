@@ -1186,3 +1186,37 @@ def test_quality_loop_feedback_cases_and_replay_evaluation(monkeypatch):
             conn.execute("UPDATE agent_model_turns SET recorded_at=now()-interval '400 days'")
         quality.purge_turns()
         assert quality.turns(run_id), "case evidence kept"
+
+
+def test_erp_owner_sign_in_to_brain_console_is_scoped_to_the_console(monkeypatch):
+    monkeypatch.setattr(
+        settings(),
+        "intelligence_principals_json",
+        json.dumps([{"id": "x", "token_sha256": "0" * 64, "roles": ["reviewer"], "divisions": []}]),
+    )
+    now = int(time.time())
+    console = mint(aud="celerates-intelligence-console", scope=["console"], exp=now + 7200)
+    with TestClient(app) as c:
+        ok = c.get("/api/console/agent", headers={"Authorization": "Bearer " + console})
+        assert ok.status_code == 200, ok.text
+        for bad in (
+            mint(aud="celerates-intelligence-console", scope=["console"], exp=now + 7200, owner=False),  # not Owner
+            mint(
+                aud="celerates-intelligence-console", scope=["console"], iat=now - 9 * 3600, exp=now - 3600
+            ),  # expired
+            mint(aud="celerates-intelligence-console", scope=["console"], exp=now + 9 * 3600),  # too long-lived
+            mint(),  # an Agent delegation is not a console sign-in
+            mint(aud="celerates-intelligence-console", scope=["agent"], exp=now + 7200),
+            mint(key=OTHER, aud="celerates-intelligence-console", scope=["console"], exp=now + 7200),  # forged
+        ):
+            assert c.get("/api/console/agent", headers={"Authorization": "Bearer " + bad}).status_code == 401
+        # The console sign-in is not a workspace credential nor an Agent delegation.
+        assert c.get("/api/knowledge", headers={"Authorization": "Bearer " + console}).status_code == 401
+        assert (
+            c.post(
+                "/api/agent/runs",
+                json={"skill": "search", "args": {"query": "abc"}},
+                headers={"X-ERP-Delegation": console},
+            ).status_code
+            == 401
+        )

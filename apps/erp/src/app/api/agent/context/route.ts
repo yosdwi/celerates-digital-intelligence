@@ -7,7 +7,10 @@ export async function GET(request: NextRequest) {
   try {
     const actor = await agentActor();
     const result = await pageContext(actor, request.nextUrl.searchParams.get("path") || "/");
-    return NextResponse.json({ version: 1, enabled: agentEnabled(), capabilities: await agentCapabilities(actor), ...result }, { headers });
+    return NextResponse.json(
+      { version: 1, enabled: agentEnabled(), capabilities: await agentCapabilities(actor), console: agentEnabled() && actor.isOwner === true, ...result },
+      { headers },
+    );
   } catch (error) {
     if (error instanceof BffError) return NextResponse.json({ error: error.message }, { status: error.status, headers });
     console.error("agent_context_failed");

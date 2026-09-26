@@ -120,7 +120,7 @@ export async function agentJourney({ base, request, db, env, python, publicKey, 
     if (process.env.ERP_BROWSER_TEST === '1') {
       const { agentModelBrowser, consoleBrowser } = await import('./agent-browser.mjs');
       await agentModelBrowser({ base, cookies: cookies.split('; ').map((pair) => [pair.slice(0, pair.indexOf('=')), pair.slice(pair.indexOf('=') + 1)]) });
-      await consoleBrowser({ env: modelEnv, python });
+      await consoleBrowser({ env: modelEnv, python, base, cookies });
     }
     console.log('PASS: Agent — catalog page context, ERP-signed delegation, delegated reads with sensitivity filter, persisted AG-UI stream + resume, standard AG-UI client, forged approval inert, no ERP writes without the user; follow-up and import proposals confirmed in ERP with receipts, outcomes and mapping memory');
   } finally { api.kill(); fakeModel?.kill(); }
@@ -154,6 +154,12 @@ async function modelJourneys({ request, db }) {
   // Feedback on an answer goes through ERP (same origin, session) to Intelligence under the user's delegation.
   assert.equal((await request(`/api/agent/runs/${para.runId}/feedback`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rating: 1 }) })).status, 200);
   assert.equal((await request(`/api/agent/runs/${para.runId}/feedback`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rating: 5 }) })).status, 422);
+
+  // Brain Console sign-in from ERP (Owner): a 303 to the console with a console-scoped assertion in the fragment.
+  const signIn = await request('/api/agent/console');
+  assert.equal(signIn.status, 303);
+  assert.match(signIn.headers.get('location'), /^http:\/\/127\.0\.0\.1:8010\/app\/agent#erp_token=[\w-]+\.[\w-]+\.[\w-]+$/);
+  assert.equal((await (await request('/api/agent/context?path=/ta')).json()).console, true);
 
   // An ungrounded number is never shown: the run falls back to the deterministic router and says so.
   const ungrounded = await run(request, 'ask', { query: 'berapa angka requisition?' });

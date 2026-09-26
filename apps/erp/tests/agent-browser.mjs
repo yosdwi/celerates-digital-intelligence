@@ -46,6 +46,7 @@ export async function agentBrowser({ base, cookies }) {
     // Perlu perhatian and Masukan remain intact inside the Agent.
     await panel.getByRole('button', { name: 'Perlu perhatian', exact: true }).click();
     await panel.getByRole('heading', { name: 'Requisition belum memiliki TA PIC', exact: true }).waitFor();
+    assert.equal(await panel.locator('[data-agent-console-link]').getAttribute('href'), '/api/agent/console', 'Owner sees the Brain Console link');
     await panel.getByRole('button', { name: 'Masukan', exact: true }).click();
     await panel.getByLabel('Judul', { exact: true }).waitFor();
 
@@ -176,7 +177,7 @@ export async function agentModelBrowser({ base, cookies }) {
 }
 
 /** Brain Console (Intelligence web): the Agent's runs, reasoning, decisions and learned mappings, read-only. */
-export async function consoleBrowser({ env, python }) {
+export async function consoleBrowser({ env, python, base, cookies }) {
   const { spawn } = await import('node:child_process');
   const api = spawn(python, ['-m', 'uvicorn', 'cdi.api:app', '--host', '127.0.0.1', '--port', '8000'], { env, stdio: ['ignore', 'ignore', 'inherit'] });
   const web = spawn(process.execPath, ['../web/node_modules/vite/bin/vite.js', '--host', '127.0.0.1', '--port', '5173'], { cwd: '../web', env, stdio: ['ignore', 'ignore', 'inherit'] });
@@ -185,12 +186,17 @@ export async function consoleBrowser({ env, python }) {
   try {
     for (let i = 0; i < 120; i++) { try { if ((await fetch('http://127.0.0.1:8000/ready')).ok && (await fetch('http://127.0.0.1:5173')).ok) break; } catch {} await new Promise((r) => setTimeout(r, 250)); }
     browser = await chromium.launch({ headless: true, executablePath: process.env.ERP_BROWSER_EXECUTABLE || undefined, args: ['--no-sandbox'] });
+    // Signed in from ERP (ADR-016): the Owner's ERP session mints a console-scoped assertion; no workspace token.
+    const redirect = await fetch(base + '/api/agent/console', { headers: { Cookie: cookies }, redirect: 'manual' });
+    assert.equal(redirect.status, 303);
+    const fragment = new URL(redirect.headers.get('location')).hash;
     const context = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
-    await context.addInitScript((token) => sessionStorage.setItem('cdi-token', token), env.API_ACCESS_TOKEN);
     const page = await context.newPage();
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
-    await page.goto('http://127.0.0.1:5173/app/agent');
+    await page.goto('http://127.0.0.1:5173/app/agent' + fragment);
+    assert.equal(new URL(page.url()).hash, '', 'sign-in removed from the address bar');
+    assert.deepEqual(await page.locator('.sidebar nav a').allTextContents(), ['Agent & learning'], 'ERP sign-in opens the Brain Console only');
     await page.getByRole('heading', { name: 'What the Agent did, and what it learned.' }).waitFor({ timeout: 30000 });
     await page.locator('[data-console-reasoning]').getByText('model (openai/fake-agent)', { exact: false }).waitFor();
     await page.locator('[data-console-learned]').getByText('requisition.create', { exact: true }).first().waitFor();

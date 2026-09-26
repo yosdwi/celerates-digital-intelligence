@@ -353,6 +353,9 @@ function Shell() {
   const [collapsed, setCollapsed] = useState(false);
   const [access, setAccess] = useState(false);
   const [token, setToken] = useState(sessionStorage.getItem("cdi-token") || "");
+  // Signed in from ERP: the console-scoped assertion opens the Brain Console only (ADR-016).
+  const erpSignIn = sessionStorage.getItem("cdi-signin") === "erp";
+  const visibleNav = erpSignIn ? nav.filter(([path]) => path === "/app/agent") : nav;
   const current =
     nav.find(([path]) => path === location.pathname)?.[1] || "Workspace";
   return (
@@ -370,7 +373,7 @@ function Shell() {
         </div>
         <div className="workspace-label">INTELLIGENCE WORKSPACE</div>
         <nav>
-          {nav.map(([path, label, Icon]) => (
+          {visibleNav.map(([path, label, Icon]) => (
             <NavLink
               to={path}
               end
@@ -395,10 +398,10 @@ function Shell() {
             </p>
           </div>
           <button className="profile" onClick={() => setAccess(true)}>
-            <span className="avatar">PS</span>
+            <span className="avatar">{erpSignIn ? "ERP" : "PS"}</span>
             <span>
-              <strong>Pre-Sales workspace</strong>
-              <small>Reviewer access</small>
+              <strong>{erpSignIn ? "Masuk dari ERP" : "Pre-Sales workspace"}</strong>
+              <small>{erpSignIn ? "Brain Console · Owner" : "Reviewer access"}</small>
             </span>
             <KeyRound size={16} />
           </button>
@@ -481,6 +484,7 @@ function Shell() {
               token
                 ? sessionStorage.setItem("cdi-token", token)
                 : sessionStorage.removeItem("cdi-token");
+              sessionStorage.removeItem("cdi-signin");
               location.pathname;
               window.location.reload();
             }}

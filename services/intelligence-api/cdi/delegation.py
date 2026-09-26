@@ -16,6 +16,9 @@ from .identity import Principal
 
 AUDIENCE = "celerates-intelligence"
 MAX_LIFETIME = 600
+# ERP sign-in to the Brain Console (ADR-016): a separate audience and scope, longer-lived, Owner only.
+CONSOLE_AUDIENCE = "celerates-intelligence-console"
+CONSOLE_MAX_LIFETIME = 8 * 3600
 SKEW = 30
 UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
 ALL_DIVISIONS = {"marketing", "sales", "ta", "hr", "tm", "pmo", "finance", "timesheet", "attendance", "school"}
@@ -44,7 +47,7 @@ def _keys():
     return keys
 
 
-def verify(token, now=None):
+def verify(token, now=None, audience=AUDIENCE, scope="agent", max_lifetime=MAX_LIFETIME):
     """Return verified claims or raise DelegationError. Never trusts unsigned header content beyond kid lookup."""
     if not token or len(token) > 8192 or token.count(".") != 2:
         raise DelegationError("Malformed delegation")
@@ -61,14 +64,14 @@ def verify(token, now=None):
         raise DelegationError("Invalid delegation signature") from exc
     claims = stdjson.loads(_b64(body))
     now = int(now if now is not None else time.time())
-    if claims.get("iss") != f"celerates-erp:{settings().erp_environment}" or claims.get("aud") != AUDIENCE:
+    if claims.get("iss") != f"celerates-erp:{settings().erp_environment}" or claims.get("aud") != audience:
         raise DelegationError("Delegation issuer or audience mismatch")
     iat, exp = claims.get("iat"), claims.get("exp")
-    if not isinstance(iat, int) or not isinstance(exp, int) or exp <= iat or exp - iat > MAX_LIFETIME:
+    if not isinstance(iat, int) or not isinstance(exp, int) or exp <= iat or exp - iat > max_lifetime:
         raise DelegationError("Invalid delegation lifetime")
     if iat > now + SKEW or exp < now - SKEW:
         raise DelegationError("Delegation expired")
-    if "agent" not in (claims.get("scope") or []) or not UUID.match(str(claims.get("sub", ""))):
+    if scope not in (claims.get("scope") or []) or not UUID.match(str(claims.get("sub", ""))):
         raise DelegationError("Delegation scope or subject invalid")
     if not isinstance(claims.get("jti"), str) or not 8 <= len(claims["jti"]) <= 100:
         raise DelegationError("Delegation id invalid")
@@ -105,3 +108,20 @@ def delegated_actor(x_erp_delegation: Annotated[str | None, Header()] = None):
     except (DelegationError, ValueError, TypeError) as exc:
         raise HTTPException(401, "A valid ERP delegation is required") from exc
     return DelegatedPrincipal(claims, x_erp_delegation)
+
+
+def verify_console(token, now=None):
+    """ERP-issued Brain Console sign-in (ADR-016). Only ERP Owners are issued one; checked again here."""
+    claims = verify(token, now, audience=CONSOLE_AUDIENCE, scope="console", max_lifetime=CONSOLE_MAX_LIFETIME)
+    if claims.get("owner") is not True:
+        raise DelegationError("Brain Console sign-in requires an ERP Owner")
+    return claims
+
+
+def console_principal(claims):
+    """Curator of the Brain Console only. Not a workspace principal: Pre-Sales review and knowledge approval still
+    require a named workspace token."""
+    name = str(claims.get("name") or "ERP Owner")[:100]
+    principal = Principal(f"{name} (ERP)", ["curator"], ALL_DIVISIONS, True)
+    principal.sub = claims["sub"]
+    return principal

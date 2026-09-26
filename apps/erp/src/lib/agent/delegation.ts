@@ -86,6 +86,19 @@ export function mintDelegation(
   return `${head}.${body}.${b64(sign(null, Buffer.from(`${head}.${body}`), signer.key))}`;
 }
 
+/** ERP sign-in to the Brain Console (ADR-016): Owner only, separate audience and scope, 2 hours. */
+export const CONSOLE_AUDIENCE = "celerates-intelligence-console";
+const CONSOLE_TTL_SECONDS = 2 * 3600;
+export function mintConsoleSignIn(user: { id: string; name: string; owner: boolean }, now = Math.floor(Date.now() / 1000)): string {
+  const signer = privateKey();
+  if (!signer) throw new DelegationError("Agent delegation is not configured");
+  if (!user.owner) throw new DelegationError("Brain Console sign-in is for ERP Owners");
+  const claims = { iss: issuer(), aud: CONSOLE_AUDIENCE, sub: user.id, name: user.name.slice(0, 120), owner: true, scope: ["console"], iat: now, exp: now + CONSOLE_TTL_SECONDS, jti: randomUUID() };
+  const head = b64(JSON.stringify({ alg: "EdDSA", typ: "JWT", kid: signer.kid }));
+  const body = b64(JSON.stringify(claims));
+  return `${head}.${body}.${b64(sign(null, Buffer.from(`${head}.${body}`), signer.key))}`;
+}
+
 export function verifyDelegation(token: string | null, now = Math.floor(Date.now() / 1000)): DelegationClaims {
   if (!token || token.length > 8192 || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token))
     throw new DelegationError("Malformed delegation");

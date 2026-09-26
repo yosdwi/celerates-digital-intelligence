@@ -6,7 +6,7 @@ import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
 import postgres from "postgres";
 import { EventSchemas } from "@ag-ui/core/schemas";
 import { CATALOG, entityTypes, hrefFor, publicCatalog, resolvePageEntity } from "../src/lib/agent/catalog";
-import { DelegationError, mintDelegation, verifyDelegation } from "../src/lib/agent/delegation";
+import { CONSOLE_AUDIENCE, DelegationError, mintConsoleSignIn, mintDelegation, verifyDelegation } from "../src/lib/agent/delegation";
 import { applyEvent, newRun, toThreadMessages } from "../src/lib/agent/run-state";
 import { readEntity, readEntitySignals, readNeighbours, search, searchTerms, loadActor, AgentReadError } from "../src/lib/agent/reads";
 import { readOperationalContext, readSignal, checkSignals } from "../src/lib/operations/reader";
@@ -30,6 +30,14 @@ test("ERP delegation: Ed25519, short-lived, issuer/audience bound, rotation-awar
   process.env.INTELLIGENCE_ENVIRONMENT = "unit";
   const token = mintDelegation(user, ctx);
   const claims = verifyDelegation(token);
+  // Brain Console sign-in (ADR-016): Owner only, console audience and scope, 2 hours; never an Agent delegation.
+  const signIn = mintConsoleSignIn({ id: ID, name: "Owner", owner: true });
+  const signInClaims = JSON.parse(Buffer.from(signIn.split(".")[1], "base64url").toString());
+  assert.equal(signInClaims.aud, CONSOLE_AUDIENCE);
+  assert.deepEqual(signInClaims.scope, ["console"]);
+  assert.equal(signInClaims.exp - signInClaims.iat, 7200);
+  assert.throws(() => verifyDelegation(signIn), DelegationError, "a console sign-in is not a delegation");
+  assert.throws(() => mintConsoleSignIn({ id: ID, name: "Viewer", owner: false }), DelegationError);
   assert.equal(claims.sub, ID);
   assert.equal(claims.iss, "celerates-erp:unit");
   assert.equal(claims.aud, "celerates-intelligence");

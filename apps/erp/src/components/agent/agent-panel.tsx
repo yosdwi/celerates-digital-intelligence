@@ -34,6 +34,7 @@ type AgentContext = {
   context: { path: string; module: string; label: string };
   entity: { type: string; type_label: string; id: string; label: string; href: string } | null;
   capabilities?: { reasoning: string; voice: boolean };
+  console?: boolean;
 };
 
 function uuid() {
@@ -294,6 +295,11 @@ export function AgentPanel() {
                         </details>
                       )}
                     </>
+                  )}
+                  {agentContext?.console && (
+                    <a href="/api/agent/console" target="_blank" rel="noopener" className="block text-right text-xs font-semibold text-brand-600 hover:underline" data-agent-console-link>
+                      Brain Console: kualitas &amp; pembelajaran Agent →
+                    </a>
                   )}
                   {agentReady && <FollowUps refresh={refresh + runs.filter((r) => r.status !== "running").length} />}
                   <button onClick={() => setTab("feedback")} className="w-full rounded-xl border border-pink-200 bg-pink-50 px-4 py-3 text-left text-sm font-medium text-pink-800">
