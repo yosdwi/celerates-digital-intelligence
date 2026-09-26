@@ -210,3 +210,14 @@ Start from this commit on `audit/erp-production-readiness`. In order:
    - task assignment for PMO/Finance rules once F13 semantics are settled.
 5. **Brain Console**: read-only views over `agent_runs`, `agent_outcomes` and `agent_mapping_templates` (what was asked, proposed, applied and learned), behind ERP sign-in.
 6. **Voice (ADR-012)**: push-to-talk → transcript → the same `ask` run. Voice never confirms.
+
+## CI results
+
+GitHub Actions on the pushed commits (`a98eec5`, `985c390`, `468ed9c`, `81ce85c`):
+
+| Job | Result |
+| --- | --- |
+| ERP pilot checks `verify` — unit tests on PostgreSQL, typecheck, builds, full cross-stack HTTP + browser harness incl. the new Agent journeys | Pass on all four commits. Final: [run 36235498763](https://github.com/yosdwi/celerates-digital-intelligence/actions/runs/36235498763/job/108386399284) |
+| P0 `api` (pytest + ruff) | Pass: [run 36235498772](https://github.com/yosdwi/celerates-digital-intelligence/actions/runs/36235498772/job/108386399465) |
+| P0 `web` | Pass: [same run](https://github.com/yosdwi/celerates-digital-intelligence/actions/runs/36235498772/job/108386399456) |
+| P0 `compose` | Fails at `docker compose up --build`. This is the same pre-existing gate as M1 and the foundation commits (pinned MinIO image pull); this increment did not cause it. |
