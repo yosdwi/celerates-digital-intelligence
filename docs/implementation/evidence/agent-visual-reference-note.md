@@ -1,0 +1,1 @@
+The user-provided visual reference consists of a compact agent entry point and an expanded right-side agent panel, inspired by Railway's Agent interaction pattern. Preserve the interaction qualities (low-friction launcher, contextual suggestions, animated/progressive feel, compact side panel) but do not clone branding or pixels.
