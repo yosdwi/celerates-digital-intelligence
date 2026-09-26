@@ -2,7 +2,7 @@
 
 Date: 2026-09-26
 Baseline: `audit/erp-production-readiness` @ `8721132` (doc 14 added; application code unchanged since the deployed foundation).
-Status: **architecture/product recommendation. M1 (§5) is implemented** — see [the M1 record](implementation/operating-substrate-m1.md); M2–M4 are not. ADR-008, ADR-009 and ADR-013 are accepted; ADR-010–012 (§9) remain proposals until M2–M4 need them.
+Status: **architecture/product recommendation. M1 (§5) is implemented** — see [the M1 record](implementation/operating-substrate-m1.md). **The three Golden Journeys (ask, drop a table, signal → act → outcome) are implemented without a model** — see [the M2 record](implementation/operating-substrate-m2.md), which lists what of M2–M4 remains (retrieval quality, model loop, voice, Console). ADR-008, ADR-009, ADR-010, ADR-011 and ADR-013 are accepted; ADR-012 (speech) remains a proposal.
 
 North Star: [doc 14](14-celerates-enterprise-intelligence-operating-model.md). Grounded engineering audit: [doc 13](13-celerates-agent-audit-and-recommendation.md). Library/framework decisions: [doc 16](16-operating-substrate-build-reuse-adopt.md). Also relies on [ERP audit 04](erp-audit/04-production-readiness-audit.md) and [10](erp-audit/10-capability-decomposition-audit.md).
 

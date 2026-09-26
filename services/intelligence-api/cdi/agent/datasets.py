@@ -10,6 +10,7 @@ from datetime import date, datetime
 from difflib import SequenceMatcher
 from uuid import uuid4
 
+from ..config import settings
 from ..db import all_rows, connect, json, one
 from ..storage import storage
 
@@ -287,3 +288,19 @@ def learn(run, principal):
             (result["fingerprint"], result["command"], json(result["mapping"]), run["id"], principal.sub),
         )
     return True
+
+
+def purge(limit=100):
+    """Retention: delete datasets (rows and original file) older than AGENT_DATASET_DAYS. Mapping templates hold only
+    header and parameter names and are kept. Objects are deleted before rows, so a failure leaves a retryable row."""
+    with connect() as conn:
+        old = all_rows(
+            conn,
+            "SELECT id,object_key FROM agent_datasets WHERE created_at < now() - %s * interval '1 day' LIMIT %s",
+            (settings().agent_dataset_days, limit),
+        )
+    for row in old:
+        storage().delete(row["object_key"])
+        with connect() as conn:
+            conn.execute("DELETE FROM agent_datasets WHERE id=%s", (row["id"],))
+    return len(old)

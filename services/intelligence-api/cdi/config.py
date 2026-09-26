@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     erp_delegation_public_keys: str = "{}"
     agent_max_seconds: float = 60
     agent_workers: int = 4
+    agent_dataset_days: int = 30  # uploaded Agent datasets (may contain personal data) are purged after this
 
     @field_validator("model_api_base", "model_api_key", mode="before")
     @classmethod

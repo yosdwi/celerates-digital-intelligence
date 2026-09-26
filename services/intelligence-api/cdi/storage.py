@@ -10,6 +10,7 @@ from .config import settings
 class ObjectStorage(Protocol):
     def put(self, key: str, body: bytes, media_type: str): ...
     def get(self, key: str) -> bytes: ...
+    def delete(self, key: str): ...
     def healthy(self) -> bool: ...
 
 
@@ -30,6 +31,9 @@ class FileStorage:
 
     def get(self, key):
         return self.path(key).read_bytes()
+
+    def delete(self, key):
+        self.path(key).unlink(missing_ok=True)
 
     def healthy(self):
         path = Path(settings().storage_path)
@@ -62,6 +66,9 @@ class S3Storage:
 
     def get(self, key):
         return self.client.get_object(Bucket=self.bucket, Key=key)["Body"].read()
+
+    def delete(self, key):
+        self.client.delete_object(Bucket=self.bucket, Key=key)
 
     def healthy(self):
         self.ensure()

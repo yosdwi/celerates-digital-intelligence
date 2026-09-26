@@ -61,8 +61,14 @@ def main():
 
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
+    housekeeping = 0.0
     while not stopped:
         try:
+            if time.monotonic() - housekeeping > 3600:
+                from .agent.datasets import purge
+
+                housekeeping = time.monotonic()
+                purge()
             if not tick():
                 time.sleep(settings().worker_poll_seconds)
         except Exception:

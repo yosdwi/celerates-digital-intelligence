@@ -645,3 +645,20 @@ def test_ask_routes_questions_to_rules_records_and_knowledge_without_a_model(mon
         result, text, custom = ask("apa itu qwertyuiop")
         assert result["erp_results"] == 0 and "Belum ada aturan ERP, record, atau pengetahuan" in text
         assert not [e for e in custom if e["name"] == "celerates.actions"]
+
+
+def test_dataset_retention_purges_rows_and_files(monkeypatch):
+    from cdi.agent import datasets
+    from cdi.storage import storage
+
+    principal = delegation.DelegatedPrincipal(delegation.verify(mint()), "t")
+    old = datasets.store(principal, "lama.csv", b"Client,Position\nA,B\n")
+    fresh = datasets.store(principal, "baru.csv", b"Client,Position\nC,D\n")
+    with connect() as conn:
+        conn.execute("UPDATE agent_datasets SET created_at=now()-interval '31 days' WHERE id=%s", (old["id"],))
+        key = one(conn, "SELECT object_key FROM agent_datasets WHERE id=%s", (old["id"],))["object_key"]
+    assert storage().get(key)
+    assert datasets.purge() >= 1
+    assert datasets.load(principal, old["id"]) is None and datasets.load(principal, fresh["id"]) is not None
+    with pytest.raises(FileNotFoundError):
+        storage().get(key)
