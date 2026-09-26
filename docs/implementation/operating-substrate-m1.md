@@ -88,6 +88,15 @@ All local verification ran on PostgreSQL 16 + pgvector, with Chromium via Playwr
 
 CI: `.github/workflows/erp-ci.yml` gains an `erp_agent_test` database (`AGENT_DATABASE_URL`) and uploads the Agent screenshots with the existing evidence.
 
+GitHub Actions on the implementation commit `454344e`:
+
+| Job | Result |
+| --- | --- |
+| ERP pilot checks `verify` — unit, typecheck, builds, full cross-stack HTTP + browser harness incl. Agent journeys | Pass: [run 36224793952](https://github.com/yosdwi/celerates-digital-intelligence/actions/runs/36224793952/job/108356606729) |
+| P0 `api` (pytest + ruff) | Pass: [run 36224793966](https://github.com/yosdwi/celerates-digital-intelligence/actions/runs/36224793966/job/108356606837) |
+| P0 `web` | Pass: [same run](https://github.com/yosdwi/celerates-digital-intelligence/actions/runs/36224793966/job/108356607127) |
+| P0 `compose` | Fails at `docker compose up --build`, the same pre-existing gate as the foundation commits (pinned MinIO image pull). Not caused by M1. |
+
 ![Tanyakan on a deterministic signal](evidence/agent-m1-tanyakan-desktop.png)
 ![Explain the current record](evidence/agent-m1-entity-desktop.png)
 ![Mobile, with read-only proposal fixture](evidence/agent-m1-mobile.png)
