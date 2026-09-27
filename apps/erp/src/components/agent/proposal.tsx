@@ -81,12 +81,22 @@ function FieldInput({ field, value, onChange, disabled }: { field: Field; value:
   );
 }
 
+// The person's edits survive a remount (the thread re-keys parts while a run is still streaming), like SubmissionCard.
+type Edits = { sha256: string; include: Record<number, boolean>; values: Record<number, Record<string, unknown>> };
+const edits = new Map<string, Edits>();
+
 export function ProposalCard({ id, title, onDecided }: { id: string; title?: string; onDecided?: (p: Proposal) => void }) {
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [include, setInclude] = useState<Record<number, boolean>>({});
-  const [values, setValues] = useState<Record<number, Record<string, unknown>>>({});
+  const [include, setIncludeState] = useState<Record<number, boolean>>({});
+  const [values, setValuesState] = useState<Record<number, Record<string, unknown>>>({});
+  const remember = (patch: Partial<Edits>) => {
+    const current = edits.get(id);
+    if (current) edits.set(id, { ...current, ...patch });
+  };
+  const setInclude = (next: Record<number, boolean>) => { remember({ include: next }); setIncludeState(next); };
+  const setValues = (next: Record<number, Record<string, unknown>>) => { remember({ values: next }); setValuesState(next); };
 
   const load = useCallback(async () => {
     setError(null);
@@ -96,9 +106,17 @@ export function ProposalCard({ id, title, onDecided }: { id: string; title?: str
       setError(body?.error ?? "Usulan belum dapat dimuat.");
       return;
     }
-    setProposal(body);
-    setInclude(Object.fromEntries((body as Proposal).items.map((i) => [i.index, i.validation.state === "ok"])));
-    setValues(Object.fromEntries((body as Proposal).items.map((i) => [i.index, Object.fromEntries(i.editable.map((k) => [k, i.params[k]]))])));
+    const loaded = body as Proposal;
+    setProposal(loaded);
+    const saved = edits.get(id);
+    const next: Edits = saved?.sha256 === loaded.sha256 ? saved : {
+      sha256: loaded.sha256,
+      include: Object.fromEntries(loaded.items.map((i) => [i.index, i.validation.state === "ok"])),
+      values: Object.fromEntries(loaded.items.map((i) => [i.index, Object.fromEntries(i.editable.map((k) => [k, i.params[k]]))])),
+    };
+    edits.set(id, next);
+    setIncludeState(next.include);
+    setValuesState(next.values);
   }, [id]);
   useEffect(() => {
     void load();
