@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { api } from "./api";
 import { Badge, ErrorBanner, Loading, Metric, Modal, PageHead, SectionTitle, useResource } from "./ui";
-import { CaseForm, EvaluationSection, FeedbackSection, SubmissionsSection, TurnsList, type Candidates, type Feedback, type Intents, type Turn } from "./Quality";
+import { CaseForm, EvaluationSection, FeedbackSection, FilesSection, SubmissionsSection, TurnsList, type Candidates, type Feedback, type Intents, type Turn } from "./Quality";
 
 type Count = { runs: number };
 type Overview = {
@@ -224,6 +224,7 @@ export function AgentConsole() {
           </div>
           <FeedbackSection feedback={d.feedback} onOpen={setOpen} />
           <SubmissionsSection intents={d.intents} onOpen={setOpen} />
+          <FilesSection />
           <EvaluationSection key={evalKey} />
           <SectionTitle title="Yang dipelajari" subtitle="Pemetaan kolom yang diingat hanya setelah ERP melaporkan impor diterapkan." />
           <div className="artifact-table-wrap">

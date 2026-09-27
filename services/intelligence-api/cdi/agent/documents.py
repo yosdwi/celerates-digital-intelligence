@@ -1,14 +1,13 @@
-"""`Drop anything` for documents (PDF, DOCX, TXT, Markdown). Text is extracted deterministically, split into
+"""`Drop anything` for documents (PDF, DOCX, TXT, Markdown). Text is extracted deterministically (the shared
+readers in `cdi.extract`; OCR runs only for Company Files, in the worker), split into
 page-aware chunks and kept owner-only in `agent_datasets` (kind='document'). Nothing here is knowledge: a dropped
 document is the user's working material for this conversation, cited as *Berkas Anda* and purged with datasets."""
 
-import io
 import re
-import zipfile
-from xml.etree import ElementTree
 
 from .. import retrieval
 from ..db import all_rows, connect
+from ..extract import ExtractError, docx_blocks, pdf_pages
 
 MAX_BYTES = 8 * 1024 * 1024
 MAX_PAGES = 200
@@ -20,7 +19,6 @@ MEDIA = {
     ".txt": "text/plain",
     ".md": "text/markdown",
 }
-W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 
 
 class DocumentError(ValueError):
@@ -28,44 +26,21 @@ class DocumentError(ValueError):
 
 
 def _pdf(body):
-    from pypdf import PdfReader
-
     try:
-        reader = PdfReader(io.BytesIO(body))
-        if reader.is_encrypted:
-            raise DocumentError("PDF terkunci kata sandi belum didukung.")
-        pages = [(i + 1, page.extract_text() or "") for i, page in enumerate(reader.pages[:MAX_PAGES])]
-    except DocumentError:
-        raise
-    except Exception as exc:
-        raise DocumentError("PDF tidak dapat dibaca.") from exc
+        pages = pdf_pages(body)
+    except ExtractError as exc:
+        raise DocumentError(str(exc)) from exc
     if not any(text.strip() for _, text in pages):
-        raise DocumentError("PDF ini tidak memiliki teks (hasil scan). OCR belum didukung.")
+        raise DocumentError("PDF ini tidak memiliki teks (hasil scan). Simpan ke Company Files agar dibaca dengan OCR.")
     return pages
 
 
 def _docx(body):
     try:
-        with zipfile.ZipFile(io.BytesIO(body)) as archive:
-            info = archive.getinfo("word/document.xml")
-            if info.file_size > 20 * 1024 * 1024:
-                raise DocumentError("Isi DOCX terlalu besar.")
-            root = ElementTree.fromstring(archive.read(info))
-    except DocumentError:
-        raise
-    except Exception as exc:
-        raise DocumentError("DOCX tidak dapat dibaca.") from exc
-    lines = []
-    body_el = root.find(f"{W}body")
-    for block in body_el if body_el is not None else []:
-        if block.tag == f"{W}p":
-            lines.append("".join(t.text or "" for t in block.iter(f"{W}t")))
-        elif block.tag == f"{W}tbl":
-            for row in block.iter(f"{W}tr"):
-                cells = ["".join(t.text or "" for t in cell.iter(f"{W}t")).strip() for cell in row.iter(f"{W}tc")]
-                lines.append(" | ".join(cells))
-            lines.append("")
-    return [(1, "\n".join(lines))]
+        blocks = docx_blocks(body)
+    except ExtractError as exc:
+        raise DocumentError(str(exc)) from exc
+    return [(1, "\n".join(b["text"] + ("\n" if b["kind"] == "table" else "") for b in blocks))]
 
 
 def _text(body):

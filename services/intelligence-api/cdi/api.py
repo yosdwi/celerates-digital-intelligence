@@ -15,6 +15,8 @@ from .contracts import ArtifactEdit, ContextQuery, Decision, DocumentRegister, O
 from .db import all_rows, connect, json, one
 from .documents import register, retrieve
 from .erp import erp
+from .files_api import console as files_console_router
+from .files_api import router as files_router
 from .foundation_api import router as foundation_router
 from .identity import actor
 from .storage import storage
@@ -33,6 +35,8 @@ app = FastAPI(title="Celerates Digital Intelligence", version="0.1.0", lifespan=
 app.include_router(foundation_router)
 app.include_router(agent_router)
 app.include_router(console_router)
+app.include_router(files_router)
+app.include_router(files_console_router)
 
 
 @app.exception_handler(KeyError)

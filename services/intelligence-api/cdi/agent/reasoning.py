@@ -32,7 +32,7 @@ MODEL_TIMEOUT = 20
 FALLBACK_RESERVE = 10  # seconds kept for the deterministic answer if the model path fails
 EVIDENCE_CHARS = 700
 JAKARTA = ZoneInfo("Asia/Jakarta")
-PROMPT_VERSION = "agent-ask-v2"
+PROMPT_VERSION = "agent-ask-v3"
 
 # The planner may call these read tools. Argument names and allowed values are fixed here; ERP authorizes each call.
 PLANNER_TOOLS = {
@@ -62,6 +62,23 @@ PLANNER_TOOLS = {
         "args": {"entity_type": str, "entity_id": str},
         "required": {"entity_type", "entity_id"},
     },
+    "files_search": {
+        "doc": "Company Files the user may read (SOP, contracts/PKS, PO, BAST, proposals, manpower sheets, CVs, …): "
+        "title, kind, linked records, page. Content is included only where class policy shares it with you.",
+        "args": {"query": str, "kind": str},
+        "required": {"query"},
+    },
+    "file_read": {
+        "doc": "Page-cited passages of one Company File (by id from files_search). Withheld for classes whose content "
+        "is not shared with you: then tell the user to open the file.",
+        "args": {"file_id": str, "query": str},
+        "required": {"file_id"},
+    },
+    "files_for_entity": {
+        "doc": "Company Files linked to one ERP record.",
+        "args": {"entity_type": str, "entity_id": str},
+        "required": {"entity_type", "entity_id"},
+    },
     "knowledge_search": {
         "doc": "Approved company knowledge (SOPs, policies, lessons) relevant to a query.",
         "args": {"query": str},
@@ -78,6 +95,8 @@ Reply with exactly one JSON object, one of:
   "detail": "...", "expected": "...", "type": "improvement|bug_fix|new_feature|data_fix",
   "reason": "wrong|incomplete|irrelevant|other", "cite": ["E1"]}}   -- the message is feedback, not a question
 Rules:
+- Company Files: when a file's content is withheld, say which file holds the answer and that the user can open it;
+  never guess what a withheld file says.
 - Facts come only from the numbered evidence (S = attention rules, E = tool results, D = the user's attached
   document). Cite every fact as [E1]/[S2]/[D1].
 - Never invent names, ids, numbers, dates or statuses. If the evidence does not answer the question, say so briefly.
@@ -172,16 +191,25 @@ def _validate_call(call, document=None):
 def document_cards(ledger, document, passages):
     """Document passages as D-evidence (shown as *Berkas Anda*). Returns (keys, cards)."""
     keys, cards = [], []
+    company = bool(document.get("file"))
     for p in passages:
         key = ledger.add("D", f"document '{document['name']}' page {p['page']} part {p['ordinal']}: {p['text']}")
         keys.append(key)
         cards.append(
             {
                 "cite": key,
-                "type": "document",
+                "type": "file" if company else "document",
                 "title": f"{document['name']} · hal. {p['page']}",
                 "detail": [_clip(p["text"], 320)],
-                "source": {"kind": "upload", "ref": f"{document['id']}#{p['ordinal']}"},
+                "href": f"/files?file={document['id']}" if company else None,
+                "source": {
+                    "kind": "file",
+                    "ref": f"{document['id']}#p{p['page']}",
+                    "file_id": document["id"],
+                    "shared": True,
+                }
+                if company
+                else {"kind": "upload", "ref": f"{document['id']}#{p['ordinal']}"},
             }
         )
     return keys, cards
@@ -267,6 +295,40 @@ def _record(ctx, ledger, tool, args, result):
             )
         )
         cards.append({**_signal_evidence(s), "cite": keys[-1]})
+    elif tool in ("files_search", "files_for_entity"):
+        from .playbooks import file_card
+
+        for f in result["files"]:
+            content = f.get("snippet") or (
+                "content withheld by class policy (user can open it)" if not f["content_shared"] else "no matching text"
+            )
+            links = "; ".join(link["label"] or link["entity_type"] for link in f["links"][:3])
+            keys.append(
+                ledger.add(
+                    "E",
+                    f"company file id={f['id']} '{f['title']}' kind={f['kind']} class={f['access_class']}"
+                    + (f" page {f['page']}" if f.get("page") else "")
+                    + (f" linked: {links}" if links else "")
+                    + f": {content}",
+                )
+            )
+            cards.append({**file_card(f), "cite": keys[-1]})
+        if not result["files"]:
+            keys.append(ledger.add("E", f"{tool} {args}: no company files the user may read"))
+    elif tool == "file_read":
+        from .playbooks import file_card
+
+        f = result["file"]
+        if result["withheld"]:
+            keys.append(
+                ledger.add("E", f"company file '{f['title']}': content withheld by class policy; user can open it")
+            )
+            cards.append({**file_card(f), "cite": keys[-1]})
+        for p in result["passages"]:
+            keys.append(ledger.add("E", f"company file '{f['title']}' page {p['page']}: {p['text']}"))
+            cards.append({**file_card({**f, "page": p["page"], "snippet": _clip(p["text"], 320)}), "cite": keys[-1]})
+        if not result["withheld"] and not result["passages"]:
+            keys.append(ledger.add("E", f"company file '{f['title']}': no matching passages"))
     elif tool == "knowledge_search":
         for p, card in zip(result["passages"], _knowledge_evidence(result["passages"])):
             keys.append(ledger.add("E", f"approved knowledge '{p['title']}' v{p['version']}: {p['excerpt']}"))

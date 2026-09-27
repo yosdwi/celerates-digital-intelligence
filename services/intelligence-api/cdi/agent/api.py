@@ -44,6 +44,7 @@ class SearchArgs(Strict):
 class AskArgs(Strict):
     query: str = Field(min_length=2, max_length=1000)
     dataset_id: UUID | None = None
+    file_id: UUID | None = None  # a Company File attached to the conversation (ADR-018)
 
 
 class DocumentArgs(Strict):

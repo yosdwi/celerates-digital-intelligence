@@ -84,6 +84,50 @@ def _relations_line(edges):
     return " · ".join(f"{e['label']}: {e['count']}" for e in edges) or "tidak ada relasi terdaftar di katalog"
 
 
+KIND_LABEL = {
+    "sop": "SOP",
+    "policy": "Kebijakan",
+    "template": "Template",
+    "admin": "Administratif",
+    "proposal": "Proposal",
+    "manpower": "Manpower",
+    "report": "Laporan",
+    "contract": "Kontrak",
+    "po": "PO",
+    "bast": "BAST",
+    "invoice": "Invoice",
+    "cv": "CV",
+    "appraisal": "Penilaian",
+    "other": "Berkas",
+}
+CLASS_LABEL = {"general": "umum", "division": "divisi", "commercial": "komersial", "personal": "personal"}
+
+
+def file_card(f):
+    """A Company File as evidence (*Berkas perusahaan*). Content appears only when class policy shares it."""
+    detail = [
+        f"{KIND_LABEL.get(f['kind'], f['kind'])} · kelas {CLASS_LABEL.get(f['access_class'], f['access_class'])}"
+        + (f" · hal. {f['page']}" if f.get("page") else "")
+    ]
+    if f.get("snippet"):
+        detail.append(f["snippet"])
+    elif not f.get("content_shared", True):
+        detail.append("Isi tidak dibagikan ke Agent menurut kebijakan kelas ini. Buka berkasnya untuk membaca.")
+    detail += [f"Tertaut: {link['label']}" for link in f.get("links", [])[:2] if link.get("label")]
+    return {
+        "type": "file",
+        "title": f["title"],
+        "detail": detail,
+        "href": f"/files?file={f['id']}",
+        "source": {
+            "kind": "file",
+            "ref": f"{f['id']}@v{f.get('version') or 1}" + (f"#p{f['page']}" if f.get("page") else ""),
+            "file_id": f["id"],
+            "shared": bool(f.get("content_shared", True)),
+        },
+    }
+
+
 def _signal_evidence(signal):
     return {
         "type": "signal",
@@ -250,6 +294,68 @@ def _matching_signals(terms, signals):
     return [g for sc, _, g in sorted(scored, key=lambda x: (-x[0], x[1])) if sc >= need and sc == best][:2]
 
 
+FILE_WORDS = {
+    "berkas": None,
+    "file": None,
+    "dokumen": None,
+    "document": None,
+    "kontrak": "contract",
+    "contract": "contract",
+    "pks": "contract",
+    "cv": "cv",
+    "bast": "bast",
+    "sop": "sop",
+    "proposal": "proposal",
+    "manpower": "manpower",
+    "po": "po",
+    "invoice": "invoice",
+    "template": "template",
+}
+
+
+def _files_lines(ctx, query, terms):
+    """Company Files for a question that names files (deterministic): cards and one line per file."""
+    kinds = [FILE_WORDS[t] for t in terms if FILE_WORDS.get(t)]
+    rest = " ".join(t for t in terms if t not in FILE_WORDS) or query
+    with ctx.recorder.step("Mencari di Company Files"):
+        try:
+            found = invoke(ctx, "files_search", query=rest, kind=kinds[0] if len(set(kinds)) == 1 else None)["files"]
+        except ERPAgentError:
+            return ["Company Files belum dapat dicari saat ini."]
+    ctx.recorder.evidence([file_card(f) for f in found])
+    if not found:
+        return [f"Tidak ada berkas perusahaan yang cocok dengan “{rest}” dan dapat Anda akses."]
+    lines = [f"Berkas perusahaan yang cocok ({len(found)}):"]
+    for f in found[:MAX_RESULT_LINES]:
+        where = f", hal. {f['page']}" if f.get("page") else ""
+        lines.append(f"• {f['title']} ({KIND_LABEL.get(f['kind'], f['kind'])}{where})")
+    if any(not f["content_shared"] for f in found):
+        lines.append(
+            "Isi sebagian berkas tidak dibagikan ke Agent menurut kebijakan kelasnya; buka berkasnya untuk membaca."
+        )
+    return lines
+
+
+def _file_document(ctx, file_id):
+    """A Company File attached to the conversation. Refused when its class keeps content from the model."""
+    read = invoke(ctx, "file_read", file_id=file_id)
+    if read["withheld"]:
+        raise PolicyError(
+            "Isi berkas ini tidak dibagikan ke Agent menurut kebijakan kelasnya. Buka berkasnya untuk membaca."
+        )
+    f = read["file"]
+    chunks = [{"page": p["page"], "ordinal": p["ordinal"], "text": p["text"]} for p in read["passages"]]
+    document = {
+        "id": f["id"],
+        "name": f["title"],
+        "file": True,
+        "profile": {"pages": max((c["page"] or 1 for c in chunks), default=1), "chunks": len(chunks), "headings": []},
+        "chunks": chunks,
+    }
+    ctx.document = document
+    return document
+
+
 def _document(ctx, dataset_id):
     """The attached document's identity, checked for ownership by the tool (PolicyError for anyone else)."""
     if not dataset_id:
@@ -260,11 +366,11 @@ def _document(ctx, dataset_id):
     return {"id": data["id"], "name": data["name"], "profile": data["profile"], "chunks": data["chunks"]}
 
 
-def ask(ctx, query, dataset_id=None):
+def ask(ctx, query, dataset_id=None, file_id=None):
     """`Ask anything`. With an Agent model configured, a bounded plan → read → answer loop (reasoning.py) over the same
     tools; otherwise, or whenever the model path fails validation, the deterministic router below. A dropped document
     (`dataset_id`) adds its passages as evidence (*Berkas Anda*) to either path."""
-    document = _document(ctx, dataset_id)
+    document = _file_document(ctx, file_id) if file_id else _document(ctx, dataset_id)
     if not document and is_brief(query):
         return brief(ctx)  # deterministic in both modes: exact counts and observed change, nothing to infer
     if agent_model_enabled():
@@ -366,6 +472,8 @@ def ask_deterministic(ctx, query, fallback=False, document=None):
         lines += _document_lines(ctx, document, query)
     if CHANGE_WORDS & set(terms) and not document:
         return _what_changed(ctx, terms, fallback)
+    if FILE_WORDS.keys() & set(terms) and not document:
+        lines += _files_lines(ctx, query, terms)
     with ctx.recorder.step("Mencocokkan dengan aturan perhatian ERP"):
         signals = invoke(ctx, "erp_signals")["signals"]
         found_signals = _matching_signals(terms, signals)
@@ -862,6 +970,7 @@ def execute(run, principal, args):
         deadline=time.monotonic() + settings().agent_max_seconds,
         path=str(principal.context.get("path") or "/"),
     )
+    principal._erp = ctx.erp  # Company Files asks ERP through the run's delegated client (ADR-018)
     try:
         recorder.started()
         result = PLAYBOOKS[run["skill"]](ctx, **args)

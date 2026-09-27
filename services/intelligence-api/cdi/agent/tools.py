@@ -177,4 +177,45 @@ def dataset_read(ctx, dataset_id):
 def document_search(ctx, dataset_id, query):
     from . import documents
 
+    if ctx.document and ctx.document.get("file") and ctx.document["id"] == dataset_id:
+        # A Company File attached to the conversation (ADR-018): same authorization and model policy as file_read.
+        found = _file_read(ctx, dataset_id, query)
+        return {
+            "passages": [{"page": p["page"], "ordinal": p["ordinal"], "text": p["text"]} for p in found["passages"]]
+        }
     return {"passages": documents.search(ctx.principal, dataset_id, query)}
+
+
+# ── Company Files (ADR-018). Content of classes ERP policy keeps from the model never appears in these results. ──
+@register("files_search", "1", "Company Files the user may read (metadata; content only where class policy shares it)")
+def files_search(ctx, query, kind=None):
+    from .. import files
+
+    try:
+        return {"files": files.search(ctx.principal, query, kinds=[kind] if kind else None, limit=6, purpose="agent")}
+    except files.FilesError as exc:
+        raise PolicyError(str(exc)) from exc
+
+
+def _file_read(ctx, file_id, query=None):
+    from .. import files
+
+    try:
+        return files.read(ctx.principal, file_id, query, purpose="agent")
+    except files.FilesError as exc:
+        raise PolicyError("Berkas tidak tersedia untuk pengguna ini") from exc
+
+
+@register("file_read", "1", "Page-cited passages of one Company File the user may read (withheld per class policy)")
+def file_read(ctx, file_id, query=None):
+    return _file_read(ctx, file_id, query)
+
+
+@register("files_for_entity", "1", "Company Files linked to one ERP record the user may read")
+def files_for_entity(ctx, entity_type, entity_id):
+    from .. import files
+
+    try:
+        return {"files": files.for_entity(ctx.principal, entity_type, entity_id, purpose="agent")}
+    except files.FilesError as exc:
+        raise PolicyError(str(exc)) from exc

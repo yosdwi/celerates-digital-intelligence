@@ -6,6 +6,11 @@ COPY services/intelligence-api/cdi services/intelligence-api/cdi
 RUN uv sync --project services/intelligence-api --frozen --no-dev
 # Docling is installed for the standard Compose path. CPU wheels avoid CUDA libraries.
 RUN uv pip install --python services/intelligence-api/.venv/bin/python --torch-backend=cpu 'docling==2.129.0'
+# Company Files (ADR-018): layout, TableFormer and RapidOCR (torch backend, Latin script) are fetched at build time so
+# the worker never downloads models at run time. Verify in the deployed image with `python -m cdi.files_smoke`.
+ENV DOCLING_ARTIFACTS_PATH=/opt/docling-models
+RUN services/intelligence-api/.venv/bin/docling-tools models download layout tableformer rapidocr \
+      --rapidocr-backend-lang torch:latin -o /opt/docling-models
 COPY infra/postgres infra/postgres
 COPY samples samples
 COPY scripts scripts

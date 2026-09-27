@@ -295,3 +295,79 @@ export function SubmissionsSection({ intents, onOpen }: { intents: Intents; onOp
     </>
   );
 }
+
+// ── Company Files (ADR-018): ingestion health, identity-pattern holds, and who opened what ─────────────────────────
+type FilesOverview = {
+  files: { origin: string; access_class: string; state: string; n: number }[];
+  ingestion: { ingest_state: string; n: number; ocr_pages: number }[];
+  failures: { file_id: string; version: number; title: string; kind: string; origin: string; attempts: number; error: string | null; created_at: string }[];
+  holds: { id: string; title: string; kind: string; access_class: string; owner_division: string | null; created_by_name: string | null; created_at: string; pii: string[] | null }[];
+  access: { at: string; action: string; via: string; principal_name: string | null; title: string; access_class: string }[];
+};
+
+export function FilesSection() {
+  const [data, setData] = useState<FilesOverview>();
+  const [error, setError] = useState("");
+  const load = () => api<FilesOverview>("/console/files").then(setData).catch((e) => setError(e.message));
+  useEffect(() => {
+    void load();
+  }, []);
+  if (!data) return error ? <ErrorBanner error={error} /> : null;
+  const total = data.files.reduce((n, f) => n + f.n, 0);
+  const by = (key: "origin" | "access_class") =>
+    Object.entries(data.files.reduce<Record<string, number>>((acc, f) => ({ ...acc, [f[key]]: (acc[f[key]] ?? 0) + f.n }), {}))
+      .map(([k, n]) => `${k} ${n}`)
+      .join(" · ");
+  return (
+    <>
+      <SectionTitle
+        title="Company Files"
+        subtitle={`${total} berkas terdaftar (${by("origin")}; kelas: ${by("access_class")}). Pembacaan: ${data.ingestion.map((i) => `${i.ingest_state} ${i.n}`).join(" · ") || "—"}; OCR ${data.ingestion.reduce((n, i) => n + i.ocr_pages, 0)} halaman.`}
+      />
+      <ErrorBanner error={error} />
+      <div className="console-grid">
+        <div className="artifact-table-wrap">
+          <table className="artifact-table" data-console-file-holds>
+            <thead><tr><th>Ditahan (pola dokumen identitas)</th><th>Kelas</th><th /></tr></thead>
+            <tbody>
+              {data.holds.map((h) => (
+                <tr key={h.id}>
+                  <td className="break-anywhere">{h.title}<br /><small>{h.created_by_name ?? "—"} · {when(h.created_at)} · {(h.pii ?? []).join(", ")}</small></td>
+                  <td><Badge tone="red">{h.access_class}</Badge></td>
+                  <td><button className="button secondary small" onClick={() => post(`/console/files/${h.id}/withdraw`).then(load).catch((e) => setError((e as Error).message))}>Tarik</button></td>
+                </tr>
+              ))}
+              {!data.holds.length && <tr><td colSpan={3}>Tidak ada berkas yang ditahan.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+        <div className="artifact-table-wrap">
+          <table className="artifact-table" data-console-file-failures>
+            <thead><tr><th>Gagal dibaca</th><th>Percobaan</th><th /></tr></thead>
+            <tbody>
+              {data.failures.map((f) => (
+                <tr key={f.file_id + f.version}>
+                  <td className="break-anywhere">{f.title} (v{f.version}, {f.origin})<br /><small>{f.error}</small></td>
+                  <td>{f.attempts}</td>
+                  <td><button className="button secondary small" onClick={() => post(`/console/files/${f.file_id}/versions/${f.version}/retry`).then(load).catch((e) => setError((e as Error).message))}>Ulangi</button></td>
+                </tr>
+              ))}
+              {!data.failures.length && <tr><td colSpan={3}>Tidak ada kegagalan.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div className="artifact-table-wrap">
+        <table className="artifact-table" data-console-file-access>
+          <thead><tr><th>Waktu</th><th>Siapa</th><th>Berkas</th><th>Aksi</th></tr></thead>
+          <tbody>
+            {data.access.map((a, i) => (
+              <tr key={i}><td>{when(a.at)}</td><td>{a.principal_name ?? "—"}</td><td className="break-anywhere">{a.title} <Badge>{a.access_class}</Badge></td><td>{a.action} · {a.via}</td></tr>
+            ))}
+            {!data.access.length && <tr><td colSpan={4}>Belum ada pembukaan berkas.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}

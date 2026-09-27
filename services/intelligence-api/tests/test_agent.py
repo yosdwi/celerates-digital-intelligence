@@ -175,6 +175,12 @@ class FakeERP:
     def search(self, query):
         return {"query": query, "results": [], "truncated": False}
 
+    def files_access(self):  # Company Files (ADR-018): an Owner sees every class
+        return {"owner": True, "general": True, "divisions": [], "commercial": [], "personal": []}
+
+    def files_readable(self, refs, entities):
+        return {"refs": list(refs), "entities": list(entities)}
+
 
 def events(client, run_id, token, last=None):
     headers = {"X-ERP-Delegation": token}

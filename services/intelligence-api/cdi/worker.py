@@ -19,9 +19,10 @@ def tick():
             ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1""",
         )
         if not run:
+            from .files import tick as files_tick
             from .knowledge import tick as knowledge_tick
 
-            return knowledge_tick()
+            return knowledge_tick() or files_tick()
         conn.execute(
             "UPDATE runs SET lease_until=now()+(%s * interval '1 second'),attempt=attempt+1 WHERE id=%s",
             (settings().lease_seconds, run["id"]),
@@ -61,16 +62,23 @@ def main():
 
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
-    housekeeping = 0.0
+    housekeeping = synced = 0.0
     while not stopped:
         try:
             if time.monotonic() - housekeeping > 3600:
+                from . import files
                 from .agent.datasets import purge
                 from .agent.quality import purge_turns
 
                 housekeeping = time.monotonic()
                 purge()
                 purge_turns()
+                files.purge()
+            if time.monotonic() - synced > settings().files_sync_seconds:
+                from . import files
+
+                synced = time.monotonic()
+                files.sync_erp()  # Company Files: reconcile ERP-declared files (ADR-018)
             if not tick():
                 time.sleep(settings().worker_poll_seconds)
         except Exception:

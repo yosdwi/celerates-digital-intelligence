@@ -84,6 +84,18 @@ class DelegatedERP:
     def signals(self):
         return self._get("signals")
 
+    def files_access(self):
+        """Company Files: this user's class grants and ERP's per-class handling (ADR-018)."""
+        return self._get("files/access")
+
+    def files_readable(self, refs, entities):
+        """Which of these ERP files / records the user may read now. ERP decides."""
+        refs = [r for r in refs if re.match(r"^(attachment|column):[\w.:-]{3,200}$", r)][:100]
+        entities = [e for e in entities if re.match(r"^[a-z_]{2,40}:[0-9a-f-]{36}$", e)][:100]
+        if not refs and not entities:
+            return {"refs": [], "entities": []}
+        return self._get("files/readable", [("ref", r) for r in refs] + [("entity", e) for e in entities])
+
     @staticmethod
     def _check(entity_type, entity_id):
         if not TYPE.match(entity_type) or not UUID.match(entity_id):

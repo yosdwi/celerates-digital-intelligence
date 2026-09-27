@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     agent_max_seconds: float = 60
     agent_workers: int = 4
     agent_dataset_days: int = 30  # uploaded Agent datasets (may contain personal data) are purged after this
+    files_sync_seconds: int = 600  # Company Files: how often the worker reconciles the ERP file feed
     agent_turn_days: int = 90  # model turns (prompts with evidence) kept for audit and replay evaluation
     # Models a curator may evaluate against the saved cases (comma-separated LiteLLM names), besides AGENT_MODEL.
     agent_eval_models: str = ""
