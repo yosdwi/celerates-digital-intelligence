@@ -1,7 +1,7 @@
 # 18 — Mobile/PWA shell: three concrete directions
 
 Date: 2026-09-27
-Status: **discussion record and proposal. No mobile code is written or implied by this document.**
+Status: §1–§10 are the discussion record. **§11–§14 (2026-09-27, evening) are the verified ERP inventory, the revised mobile IA and the MS1 scope that is implemented.** The visual foundation is locked to Iteration 1 · Jernih.
 Branch: `audit/erp-production-readiness`, after M6.x (`48a4105`).
 Inputs:
 - the product discussion of 2026-09-27 (summarised in §1);
@@ -329,3 +329,165 @@ This follows the reference image's tab structure and adds Direction B's single f
 - the Beranda structure from 1 and the list density from 3;
 - the Agent's numbered sources from 3 and the Tangkap review from 2;
 - the tab-bar treatment decided separately from the palette.
+
+## 11. Verified ERP module inventory (2026-09-27)
+
+§10 simplified the module set: "Talent", "Kontrak" and "BAST" were drawn as top-level tiles. **The ERP does not have those modules.** This section is the product model taken from the code as it is today.
+
+Sources:
+- `src/lib/modules-config.tsx` (registry);
+- `src/components/sidebar.tsx` and `src/app/page.tsx` (visibility);
+- `src/lib/require-*-access.ts`, `school-access.ts`, `division-map.ts` and `middleware.ts` (authority);
+- every `page.tsx` and `actions.ts` under `src/app`;
+- `src/db/schema.ts`;
+- `src/lib/pq-approval.ts`, `approval-journey.ts` and `operations/*`.
+
+### 11.1 Authority as implemented
+
+- **Pilot gate.** `middleware.ts` admits active **Owners only**. Every non-Owner rule below is already in code, but it is not reachable until multi-role opens (§7).
+- **Division access.** `user_access` rows `{divisionKey, level}` with level `viewer | editor | full` (`requireDivisionAccess`):
+  - `viewer` reads only;
+  - `editor` creates and updates;
+  - `full` also deletes.
+  - The Owner passes every check.
+- **The actions are the authority.** Every mutating server action calls `requireDivisionAccess(<division>, level)` or a module-specific guard. The navigation only decides what is shown.
+- **Account types.** `talent` accounts see only Timesheet and Attendance (self-service). `backoffice` accounts see the rest.
+- **Special guards:**
+  - Timesheet: talents act on their own records; backoffice needs PMO `full`. The converter needs PMO `full` or `canUseTimesheetConverter`.
+  - Attendance: every active user checks in as themselves.
+  - School: `editor`/`full` manage courses; `viewer` learns.
+  - Executive Dashboard: Owner only.
+  - Access Management and Intelligence Review: Owner only.
+  - Company Files: ERP class policy (ADR-018).
+- **Visibility was computed in four places before MS1:**
+  - the sidebar;
+  - desktop Home, with locked cards (`DIVISION_GATED_MODULE_KEYS`, which omits `automation` although its actions are division-gated);
+  - `operations/policy.ts#canReadModule` for signals;
+  - the pilot middleware.
+
+  MS1 replaces the first two with one registry function (§14).
+
+### 11.2 Seven core business modules
+
+| Module (division) | Submodules / routes | Primary records | Primary intent | Key actions (server) | Mobile representation |
+|---|---|---|---|---|---|
+| **Marketing** (`marketing`) | Dashboard `/marketing/dashboard`; Leads `/marketing`, `/marketing/[id]/edit`; Account CRM (Sales-owned) | `leads` | Qualify leads and hand them to Sales | `createLead`, `updateLead`, `convertLeadToOpportunity`, `deleteLead`; sheet sync | Landing with the qualified-lead signal; lead list → detail; **Konversi ke Opportunity** as a sticky action |
+| **Sales** (`sales`) | Dashboard; Opportunity Tracker `/sales/opportunity-tracker`; PQ Tracker `/sales`; Account CRM `/sales/accounts[/id]`; collab: Client Active (TA), Overtime & Business Trip (PMO), Profitability Tracker | `sales_opportunity_trackers`, `opportunities` (PQ), `crm_clients`, contacts, activities | Move opportunities, send the PQ for signature, keep accounts | `createOpportunityTracker`, `updateOptyStatus`, `convertToRequisition`, `updatePipelineStage`, `sendPqForSignature`, `createExtensionRequestFromSales`, CRM `createClient`/`createContact`/`createActivity` | Landing: pipeline summary and signals; opportunity list by stage (segmented); opportunity detail with a PQ status block; account detail with contacts and activity; **Kirim PQ untuk TTD**, **Konversi ke Requisition** |
+| **Talent Acquisition** (`ta`) | Dashboard; Requisition `/ta`; Candidate `/ta/candidates[/id]`; Hiring Pipeline `/ta/pipeline`; Onboarding `/ta/onboarding`; collab: Client Active (TA+Sales) | `requisitions`, `candidates`, `applications`, `onboarding_requests` | Fill requisitions: candidates → pipeline → offer → employee | `createRequisition`, `createCandidate`, `createApplication`, `updateHiringStatus`, `sendOfferingLetterForSignature`, `promoteToEmployee`, `updateClientSubmissionStatus` | Landing with requisitions missing a TA PIC; requisition → candidates; pipeline as stage tabs (not a board) with **Pindahkan tahap** in a sheet; candidate detail (CV via Company Files); onboarding checklist |
+| **Human Resources** (`hr`) | Dashboard; Employee `/hr`, `/hr/[id]`; Extension Request `/hr/extension-requests`; Attendance Log; Attendance Settings (leave types, approval steps); collab: Special Notes (TM-HR), Overtime & Business Trip | `employees`, `employment_contracts`, `bpjs_registrations`, `leave_types`, `attendance_approval_steps` | Keep employee records, acknowledge extensions, run attendance policy | `updateEmployee`, `addContract`, `updateBpjsStatus`, `processExtensionRequest`, leave types and approval-step admin | Employee list → detail (contract, BPJS); extension acknowledge as a review item; settings stay desktop |
+| **Talent Management** (`tm`) | Dashboard; Talents Book `/tm`, `/tm/employee/[id]`; Talent Database & Salary; COGS Calculator; Extension & Increment Request; Special Notes (TM-HR); collab: Profitability | `talent_assignments`, `extension_increment_requests`, `extension_request_special_notes` | Place talents, extend or increment, track notes | `createTalentAssignment`, `createExtensionRequest`, `rejectExtensionRequest`, `ownerOverrideExtensionRequest`, `applyCogsToTalentAssignment`, `createSpecialNote` | Talent list → talent detail (assignment, client, period); **extension request = multi-step review** (approver 1–3 → HR acknowledge); COGS and salary stay desktop |
+| **PMO** (`pmo`) | Dashboard; A.Contract `/pmo/contracts` (+ billing schedule); Talent Document Tracker `/pmo`; TM Invoice `/pmo/invoices`; collab: Dokumen Finance, Overtime & Business Trip, Profitability | `project_contracts`, `project_monthly_billings`, `project_invoices` (with **BAST support document**), `project_documents`, `finance_document_handoffs`, `overtime_business_trip_claims` | Contract setup, billing → invoice → finance handoff, talent documents, claims | `createProjectContract`, `syncBillingScheduleToInvoices`, `createProjectInvoice`, `upsertFinanceHandoff`, `createProjectDocument`, claims `createClaim` → `forwardToSales` → `submitToFinance` → `markInvoiced` | **The densest module.** Landing with four signals (invoice submission, missing invoices, ambiguous billing, missing documents); contract list → contract detail (billing months, invoices, documents); invoice detail with BAST and the finance-handoff state |
+| **Finance** (`finance`) | Dokumen Finance (TM Invoice) `/finance`; collab: Overtime & Business Trip | `finance_document_handoffs` | Receive PMO documents; accept or send back | `acknowledgeFinanceHandoff`, `requestRevisionFinanceHandoff` | Review queue (handoffs awaiting finance) → detail → **Terima** / **Minta revisi** (sticky, with a note) |
+
+### 11.3 Shared and operational modules
+
+| Module | Visibility today | Records / key actions | Mobile representation |
+|---|---|---|---|
+| **Timesheet** `/timesheet`, converter | Talent (own) or PMO `full`; converter by flag | `timesheet_submissions` (`createTimesheetSubmission`, `approveTimesheetSubmission`), holidays, Astra converter | Talent: submit month (self-service). PMO: approval queue. Converter stays desktop |
+| **Attendance** `/attendance`, live, history, time-off | Every user (self-service) | `attendance_logs` (`checkIn`/`checkOut`), `time_off_requests` → `approveTimeOffStep`/`rejectTimeOffStep` | Mobile-first: check-in, time-off request, approvals in Tinjau |
+| **Executive Dashboard** | Owner | read-only KPIs | Landing-style summary only |
+| **Task Board** `/tasks` | All backoffice | `kanban_tasks` (move, comment) | Status tabs + task detail; **Pindahkan** via sheet |
+| **Company Files** `/files` | All backoffice; content by class policy | files registry (M6/M6.x) | Search → file detail/preview; **Tangkap** (camera/upload) |
+| **Tanda Tangan Digital** `/ttd-online` | All (requests addressed to the user) | `signature_requests` (`signRequest`, `rejectRequest`); feeds PQ and offering letters | Signature queue → document → **Tanda tangani** / **Tolak** |
+| **Learning Management** `/school` | Division `school` (viewer = learner) | courses, enrollments, progress, quizzes | My Learning + lesson reader |
+| **Automasi & Chatbot** `/automation` | Division `automation` | reminders, document templates | Desktop only for now |
+| **Feature Request** `/feature-requests` | Hidden from navigation; reached through Masukan (ADR-017) | `feature_requests` | Via the Agent only |
+| Account areas (not modules) | Access Management and Intelligence Review (Owner), Profile, Activity Log, Notifications | — | Under **Akun** |
+
+### 11.4 Cross-module journeys (verified in code)
+
+1. **Lead → Opportunity → Requisition.** Marketing `convertLeadToOpportunity` → Sales tracker → `convertToRequisition` → TA requisition. The `opty_no` business key is shared.
+2. **PQ signature → setup.** Sales `sendPqForSignature` → TTD `signRequest` → `onPqSigned`:
+   - sets the approval date;
+   - once an employee exists, notifies **TM** ("Talent siap di-setup") and **PMO** ("Project siap di-setup ke A.Contract").
+3. **Hiring.** TA requisition → candidate → application (`updateHiringStatus`) → onboarding with the offering letter signed in TTD → `promoteToEmployee` (HR employee) → `onTalentPromoted` → TM Talents Book and PMO A.Contract setup.
+4. **Client submission.** TA Client Active status is shared with Sales.
+5. **Extension / increment.** TM (or Sales) creates the request → named approvers 1–3 → HR `processExtensionRequest` acknowledges. The Owner can override. TM and HR exchange Special Notes.
+6. **Billing → Finance.** PMO billing schedule → monthly billing → `syncBillingScheduleToInvoices` → TM Invoice (BAST support document) → `upsertFinanceHandoff` → Finance `acknowledge` / `requestRevision` → PMO (the `finance-revision` signal).
+7. **Overtime & business trip claims.** PMO `createClaim` → `forwardToSales` → `submitToFinance` → `markInvoiced`, plus talent payment.
+8. **Profitability.** Sales Profitability Tracker, synced from TM assignments; the view is shared with PMO.
+9. **Timesheet.** A talent submits → PMO `full` approves.
+10. **Time off.** An employee requests → the steps HR configured → approve or reject each step → notifications.
+
+### 11.5 Desktop pattern → mobile pattern
+
+| Desktop pattern in the ERP | Mobile pattern |
+|---|---|
+| Module dashboard (KPI cards + charts) | **Module landing**: 3–4 facts, the module's Perlu perhatian signals, submodule entries. Charts later |
+| Tracker tables (leads, trackers, PQ, requisitions, candidates, contracts, invoices, employees, talents) | **List cards**: identifier, title, status pill, two facts. Filters as chips, sort and filter in a **bottom sheet**. No shrunken tables |
+| `[id]/edit` long forms | **Read-first record detail**: facts, related records, Company Files, activity. Quick edits and status changes in a **sheet**; long edit forms stay desktop until converted |
+| Kanban boards (hiring pipeline, task board) | **Stage tabs + list**; move with a sheet |
+| Multi-step approvals (extension request, time off, timesheet, finance handoff, TTD, PQ) | **Tinjau item → detail → sticky approve/reject** with a reason sheet |
+| Admin and power tools (sheet sync, attendance settings, access management, COGS, converter, automation templates) | **Desktop only**: listed under the module as "di desktop" |
+| Self-service (check-in, time-off request, timesheet submit, sign) | **Full-screen mobile-first flows** |
+
+## 12. Revised mobile information architecture
+
+This is traceable to §11. The Jernih visual language is unchanged.
+
+- **Tab bar (locked):** Beranda · Modul · Agent · Tinjau · Akun.
+  - **Agent** opens the existing full-screen Agent (M5/M6), taking context from the current route.
+  - **Tinjau**, in MS1, is the user's existing notifications, which the approval flows already emit. In MS3 it becomes the F6 aggregation: approval steps assigned to me, TTD requests, finance handoffs, Agent proposals.
+  - **Akun** is a sheet: profile, activity log, language, Access Management (Owner), logout.
+- **Beranda:**
+  - greeting and access summary;
+  - the Cari / Tanya / Tangkap bar;
+  - **Perlu perhatian**: the existing deterministic signals, RBAC-filtered (`/api/operations/context`);
+  - **Modul bisnis**: the accessible core modules, in registry order;
+  - **Operasional**: the accessible shared modules;
+  - **Terbaru**: the latest notifications.
+
+  **No fixed icon count and no invented tiles**: the grid is whatever the registry grants. Modules without access are hidden on mobile. Desktop keeps its locked cards.
+
+  The "Hari ini" counts from §10 are dropped until their metrics are defined; this is question 3 in §8, still open.
+- **Modul:** the full directory, grouped *Bisnis* / *Operasional*.
+  - Each module shows its access level (Penuh / Editor / Lihat / Mandiri) and its real submodules, from the registry.
+  - A cross-division submodule shows its owning module (for example Sales › Client Active is TA's).
+  - Admin tools are marked **Desktop**.
+- **Module landing:** in MS1, a generic landing sheet built from the registry: submodules, access level, and the module's signals. MS2 converts representative modules into full landings.
+- **Records:** list → detail → contextual action (sheet or sticky) → **Tanya Agent** with the record's context (the Agent already resolves entity context per route). Delivered from MS2.
+- **Company Files:** a module and the **Tangkap** destination. It stays governed persistent content (ADR-018), never a generic attachment bucket.
+
+**Representative modules for MS2** (hardest first):
+1. **PMO**: contract → billing → invoice (BAST) → finance handoff, the densest cross-module chain.
+2. **TM extension request**: multi-step approval ending in an HR acknowledgement, the Tinjau pattern.
+3. **TA hiring pipeline**: a board converted to stage tabs.
+
+## 13. Review of the §10 high-fidelity work
+
+| Keep (Jernih, locked) | Remap | Discard |
+|---|---|---|
+| Visual language: surface, tinted tiles, Plus Jakarta Sans, radii and borders, tab bar with the raised Agent, Agent conversation (evidence badges, proposal card), record-detail anatomy (fact rows, linked files, sticky actions), capture sheet, Company Files result card | "Kontrak" list/detail → **PMO › A.Contract** (`project_contracts`) with billing and invoices as related records; "BAST" → **supporting document of a TM Invoice** (class **commercial** in the ERP declaration, not "Divisi PMO"); "Talent" tile → three modules (**TA**, **HR**, **TM**); "Files" → **Company Files**; the Modul screen's groups → §12 groups with the real submodules | Top-level "Kontrak", "BAST" and "Talent" tiles; a fixed 8-tile launcher; the "Hari ini" metrics that are not ERP signals (e.g. "Timesheet belum masuk"); Iterations 2 and 3 as directions (their ideas may return as components only) |
+
+No new visual reference screens were needed: the one interaction question (what a module tile opens before MS2 builds real landings) is answered by the registry-driven landing sheet, which uses Jernih's existing sheet anatomy.
+
+## 14. MS1 — implemented scope
+
+1. **One canonical module access mechanism**, `src/lib/module-access.ts`:
+   - A pure function over the session claims returns, per registry module, its group (bisnis / operasional), whether it shows in navigation, and its access (`full | editor | viewer | self | open | none`).
+   - Desktop sidebar, desktop Home (locked cards), mobile Home, mobile Modul and the landing sheet all use it.
+   - Server actions keep their own guards.
+   - A unit test pins it to the previous sidebar/Home behaviour and to `canReadModule` for the division modules.
+2. **Responsive shell:**
+   - Below `md`: no desktop sidebar, no fixed corner controls, no left margin; a mobile tab bar with safe-area insets; the floating Agent trigger replaced by the Agent tab.
+   - At `md` and above: unchanged.
+3. **Mobile Beranda** (Jernih) on `/` below `md`: greeting, bar, Perlu perhatian, registry-driven grids, Terbaru. Desktop `/` is unchanged.
+4. **Mobile Modul** directory (`/modules`) and the **module landing sheet**.
+5. **Tinjau** (`/notifications`): the notification list, full-screen, using the existing actions.
+6. **Akun sheet.**
+7. **Jernih tokens and primitives:**
+   - tokens: colours, radii, shadows, module tints, Plus Jakarta Sans bundled via `@fontsource`;
+   - primitives: `MobileScreen`, `Tile`, `ListCard`, `FactRows`, `BottomSheet`, `StickyActions`, `StatusPill`, `SectionHeader`.
+8. **PWA foundation:**
+   - `manifest.webmanifest` (standalone, Jernih theme) with icons derived from the Celerates logo, maskable included;
+   - apple-touch-icon;
+   - a service worker that only serves an offline page for failed navigations and **never caches authenticated responses**;
+   - public paths allowlisted in the middleware.
+
+**Not in MS1:**
+- real module landings and record screens (MS2);
+- the Tinjau aggregation (MS3);
+- record search in the bar (MS2; the bar opens the Agent);
+- capture sheet (MS2; the camera opens Company Files upload);
+- web push;
+- any M7 work.
