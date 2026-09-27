@@ -53,4 +53,5 @@ The production image already carries Docling 2.129 with RapidOCR and TableFormer
 - A derived index never outlives its source:
   - an ERP deletion or replacement is reconciled at the next sync;
   - a withdrawn managed file disappears from search immediately.
+- **M6.x:** an Agent attachment (owner-only working context) becomes a Company File only when its user saves it explicitly, choosing kind and class under decision 4. The file records `provenance` (migration 010) and has its own lifetime; the attachment is untouched.
 - M7 builds on the file-to-record links (structured file facts, file ↔ ERP insights, CV matching) without changing this access model.

@@ -170,7 +170,7 @@ Start from the final commit of this record.
 
 1. **Deploy**, run `cdi.files_smoke`, and enable backups (per the storage doc).
 2. **Measure OCR** on 10 real scans. Add Tesseract `ind` only if needed.
-3. **M7 — Insight Agent on files**, starting with manpower sheets vs requisitions (tables are already extracted per sheet) and contract end dates vs project status.
+3. **M7 — Insight Agent on files**, starting with manpower sheets vs requisitions (tables are already extracted per sheet) and contract end dates vs project status. **On hold** (2026-09-27): after M6.x, the next increment is the Mobile/PWA shell ([doc 18](../18-mobile-pwa-shell-directions.md)).
 
 ## CI results
 
@@ -184,3 +184,40 @@ GitHub Actions on `audit/erp-production-readiness` for `772ac95` (M6 head, inclu
 | P0 `compose` | failure at `docker compose … up --build -d` (pre-existing, as on the M4/M5 baselines; independent of this increment) |
 
 Follow-up after M6: `fbf09f3` (fix: add RapidOCR native runtime libraries to the Intelligence image) was added while preparing the deployment.
+
+## M6.x — saving an Agent attachment as a Company File
+
+A continuation of M6, not a new milestone. It closes the gap between the two ways a file enters the system.
+
+| | Agent attachment | Company File |
+|---|---|---|
+| What it is | Working context for one conversation | A governed, persistent company asset |
+| Who sees it | Only the user who dropped it | ERP authority ∩ access class ∩ linked record (ADR-018) |
+| Lifetime | Purged after the dataset retention | Versions, ingestion, class retention, hold |
+| How it becomes the other | Only by the explicit flow below | A file is *attached* to a conversation (M6); it is never converted back |
+
+**Flow.**
+
+1. The user drops a file in the Agent. A readable document or table stays an attachment, exactly as in M5.
+2. The attachment bar offers **Simpan ke Company Files**. The form asks for title, **Jenis**, **Kelas akses** and **Divisi pemilik** (the same fields as the Company Files upload, now shared as `components/files/class-fields.tsx`).
+3. On **Simpan**:
+   - `POST /api/files/from-attachment` (ERP BFF, same-origin write) calls Intelligence `POST /api/files/from-attachment`;
+   - Intelligence loads the attachment **only if it belongs to this user**, checks its SHA-256, then creates a `managed` file through the normal `create_managed` path: kind minimum class, identity-pattern hold, ingestion queue;
+   - the new file records `provenance = {from: agent_attachment, dataset_id, name, kind}` (migration `010_file_provenance.sql`; ordinary uploads record `{from: upload}`).
+4. The bar shows **Tersimpan di Company Files** with a link to the file. The file detail shows *Disimpan dari lampiran Agent (…) oleh …*.
+
+**Scans.** A scan cannot be read inside the Agent (no OCR on attachments), so before M6.x it was simply rejected. It now stays in the bar as a local file with the reason *hasil scan; simpan ke Company Files agar dibaca dengan OCR*. Saving it uploads it through the ordinary Company Files upload, where Docling OCR reads it.
+
+**Rules kept.**
+- Nothing is saved implicitly. A model never proposes or sets a class; the user picks it, and it can only be tightened below Owner.
+- **Idempotent** per user and content: saving the same bytes again returns the existing file (`already_saved: true`).
+- The two lifetimes stay independent: purging the attachment does not touch the Company File, and withdrawing the file does not touch the conversation.
+- Another user's attachment id returns 404.
+
+**Evidence.**
+- Python: `test_agent_attachment_is_working_context_until_saved_as_a_company_file` (ownership, class minimum, provenance, idempotency, searchable after ingestion, independent purge). Full suite: 43 passed, 1 skipped; ruff clean.
+- Cross-stack journey: two SOP attachments saved, the second idempotent, unknown attachment 404, the saved SOP found by search.
+- Browser: a scan dropped in the Agent → save form (BAST, PMO) → saved. Screenshot: `evidence/agent-save-to-files.png`.
+- Full harness (unit, PostgreSQL, cross-stack, browser): 15 PASS, exit 0. ERP unit 12/12; ERP build clean.
+
+**Fix found while verifying.** One harness run timed out at the follow-up proposal: the thread re-keys parts while a run is still streaming, which remounted the proposal card and dropped the TA PIC the user had just chosen. This is the same cause as the M5 knowledge-draft fix. `ProposalCard` now keeps the user's edits per proposal id and SHA-256 across remounts, and a changed proposal (new SHA) starts clean.
