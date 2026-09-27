@@ -62,7 +62,7 @@ export async function runBrowserJourney({ base, cookies }) {
     await source.click();
     await page.waitForURL(/\/pmo\/invoices\/.+\/edit$/);
     await trigger.click();
-    await panel.getByRole("button", { name: "Masukan", exact: true }).click();
+    await panel.getByRole("button", { name: "Formulir masukan", exact: true }).click();
     await panel
       .getByLabel("Judul", { exact: true })
       .fill("Synthetic floating feedback");
@@ -79,7 +79,7 @@ export async function runBrowserJourney({ base, cookies }) {
       .getByText("Masukan tersimpan di Feature Request.", { exact: false })
       .waitFor();
     await panel
-      .getByRole("button", { name: "Perlu perhatian", exact: true })
+      .getByRole("button", { name: "← Kembali ke Agent", exact: true })
       .click();
     await page.route("**/api/operations/context?*", (route) =>
       route.fulfill({
