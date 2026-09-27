@@ -11,7 +11,7 @@ export function ActivityLogLink() {
     <Link
       href="/activity-log"
       title="Log Activity"
-      className="fixed top-4 right-[112px] z-40 flex h-9 w-9 items-center justify-center rounded-full bg-white border border-slate-200 text-slate-600 shadow-sm hover:bg-slate-50"
+      className="fixed top-4 right-[112px] z-40 hidden md:flex h-9 w-9 items-center justify-center rounded-full bg-white border border-slate-200 text-slate-600 shadow-sm hover:bg-slate-50"
     >
       <History className="h-4 w-4" />
     </Link>

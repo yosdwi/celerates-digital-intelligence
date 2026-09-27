@@ -8,6 +8,7 @@
 //  • Masukan is understood from free text (reviewed drafts); the same contextual Feature Request form stays as a
 //    fallback, always reachable, and is the path when the Agent is not configured.
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AGENT_OPEN_EVENT } from "@/components/mobile/events";
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
@@ -132,6 +133,15 @@ export function AgentPanel() {
     };
   }, [open]);
   useEffect(() => () => inflight.current?.abort(), []);
+  // The mobile shell opens the same Agent from its tab bar and Beranda (doc 18 §12).
+  useEffect(() => {
+    const openFromShell = () => {
+      setOpen(true);
+      setRefresh((n) => n + 1);
+    };
+    window.addEventListener(AGENT_OPEN_EVENT, openFromShell);
+    return () => window.removeEventListener(AGENT_OPEN_EVENT, openFromShell);
+  }, []);
 
   const startRun = useCallback(
     (skill: RunRequest["skill"], args: Record<string, unknown>, text: string, modality: "text" | "voice" = "text") => {
@@ -262,7 +272,7 @@ export function AgentPanel() {
         }}
         aria-expanded={open}
         aria-controls="celerates-agent"
-        className={`fixed bottom-6 right-6 z-40 h-14 items-center gap-2 rounded-full bg-gradient-to-br from-brand-600 to-brand-800 px-5 text-sm font-semibold text-white shadow-lg hover:from-brand-500 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-600 ${open ? "hidden sm:inline-flex" : "inline-flex"}`}
+        className={`fixed bottom-6 right-6 z-40 h-14 items-center gap-2 rounded-full bg-gradient-to-br from-brand-600 to-brand-800 px-5 text-sm font-semibold text-white shadow-lg hover:from-brand-500 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-600 hidden md:inline-flex`}
       >
         <Sparkles className="h-5 w-5" />
         <span>Celerates Agent</span>

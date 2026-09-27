@@ -1,34 +1,18 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { MODULES } from "@/lib/modules-config";
+import { claimsOf, navModules } from "@/lib/module-access";
+import { MobileHome } from "@/components/mobile/mobile-home";
 import { NAV_LABEL_KEYS } from "@/lib/nav-i18n";
 import { ModuleCard } from "@/components/module-card";
 import { getTranslations } from "next-intl/server";
-
-// Key modul yang benar-benar digerbang per-divisi (cocok dengan DIVISION_PATHS
-// di lib/division-map.ts) -- selain ini (Task Board, TTD Online, dst) kebuka
-// buat semua user yang login, jadi nggak perlu dicek akses.
-const DIVISION_GATED_MODULE_KEYS = new Set(["marketing", "sales", "ta", "hr", "tm", "pmo", "finance", "school"]);
 
 export default async function HomePage() {
   const t = await getTranslations("home");
   const tNav = await getTranslations("nav");
   const session = await getServerSession(authOptions);
-  const isOwner = Boolean((session?.user as any)?.isOwner);
-  const access = ((session?.user as any)?.access ?? []) as { divisionKey: string; level: string }[];
-  const myDivisionKeys = new Set(access.map((a) => a.divisionKey));
-  const hasPmoFull = isOwner || access.some((a) => a.divisionKey === "pmo" && a.level === "full");
-  // Timesheet cuma buat Backoffice dengan akses PMO level Full (Talent nggak
-  // pernah lihat Beranda sama sekali -- middleware sudah redirect mereka
-  // langsung ke /timesheet), sama seperti filter di sidebar.
-  const visibleModules = MODULES.filter((mod) =>
-    mod.key !== "feature-requests" && (mod.key !== "executive" || isOwner) && (mod.key !== "timesheet" || hasPmoFull)
-  );
-
-  function hasModuleAccess(key: string): boolean {
-    if (!DIVISION_GATED_MODULE_KEYS.has(key)) return true;
-    return isOwner || myDivisionKeys.has(key);
-  }
+  // One canonical visibility rule shared with the sidebar and the mobile shell (lib/module-access.ts).
+  // Division modules without access stay listed here, locked, as before.
+  const visibleModules = navModules(claimsOf(session?.user));
 
   function moduleLabel(text: string): string {
     const key = NAV_LABEL_KEYS[text];
@@ -36,7 +20,12 @@ export default async function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-50 to-brand-50/40">
+    <>
+    {/* Phone: the Jernih mobile Beranda (doc 18 §12). Desktop below is unchanged. */}
+    <div className="md:hidden">
+      <MobileHome />
+    </div>
+    <div className="hidden md:block min-h-screen bg-gradient-to-br from-slate-50 via-slate-50 to-brand-50/40">
       <header className="border-b border-slate-200 bg-white/80 backdrop-blur-sm px-8 py-8">
         <p className="text-xs font-semibold uppercase tracking-widest text-brand-500">Celerates ERP</p>
         <h1 className="text-3xl font-bold text-slate-900 mt-1">{t("title")}</h1>
@@ -45,9 +34,8 @@ export default async function HomePage() {
 
       <main className="px-8 py-12 max-w-6xl mx-auto">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {visibleModules.map((mod) => {
+          {visibleModules.map(({ config: mod, href: target, access }) => {
             const Icon = mod.icon;
-            const target = mod.subPages[0]?.href ?? mod.basePath;
             const descKey = `descriptions.${mod.key}`;
             const desc = t.has(descKey) ? t(descKey) : undefined;
 
@@ -76,12 +64,13 @@ export default async function HomePage() {
                 description={desc}
                 icon={<Icon className="h-6 w-6 text-white" />}
                 color={mod.color}
-                hasAccess={hasModuleAccess(mod.key)}
+                hasAccess={access !== "none"}
               />
             );
           })}
         </div>
       </main>
     </div>
+    </>
   );
 }

@@ -25,6 +25,33 @@
   --color-brand-deep: #092236;
   --color-ember: #f15525;
   --color-ember-soft: #fbdccf;
+
+  /* Jernih — the locked mobile visual foundation (doc 18 §10–§14). Mobile surfaces use only these tokens. */
+  --color-j-bg: #f4f6fa;
+  --color-j-surface: #ffffff;
+  --color-j-ink: #0e1726;
+  --color-j-muted: #566072;
+  --color-j-faint: #98a1b0;
+  --color-j-line: #e5e9f0;
+  --color-j-line-soft: #edf0f5;
+  --color-j-field: #e9edf4;
+  --color-j-accent: #2356e8;
+  --color-j-accent-strong: #1a43b8;
+  --color-j-accent-soft: #e8eefd;
+  --color-j-warn: #b45309;
+  --color-j-warn-ink: #6b4a12;
+  --color-j-warn-soft: #fff6e6;
+  --color-j-warn-line: #f6ddb0;
+  --color-j-warn-dot: #f59e0b;
+  --color-j-ok: #0e6b52;
+  --color-j-ok-soft: #e1f4ee;
+  --color-j-danger: #d23a2e;
+  --font-jakarta: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --radius-j-card: 18px;
+  --radius-j-field: 14px;
+  --shadow-j-card: 0 1px 2px rgba(14, 23, 38, 0.04);
+  --shadow-j-raise: 0 8px 18px rgba(35, 86, 232, 0.3);
+  --shadow-j-sheet: 0 -12px 32px rgba(14, 23, 38, 0.18);
 }
 
 /*

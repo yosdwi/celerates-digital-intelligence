@@ -2,7 +2,7 @@
 import { requirePilotActor } from "@/lib/actor";
 import { db } from "@/db";
 import { notifications } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { and, eq, desc } from "drizzle-orm";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
@@ -19,7 +19,11 @@ export async function getMyNotifications() {
 export async function markNotificationRead(id: string) {
   await requirePilotActor();
 
-  await db.update(notifications).set({ is_read: true }).where(eq(notifications.id, id));
+  // Only the recipient can mark their own notification.
+  const session = await getServerSession(authOptions);
+  const userId = (session?.user as any)?.id;
+  if (!userId || typeof id !== "string") return;
+  await db.update(notifications).set({ is_read: true }).where(and(eq(notifications.id, id), eq(notifications.user_id, userId)));
   revalidatePath("/", "layout");
 }
 

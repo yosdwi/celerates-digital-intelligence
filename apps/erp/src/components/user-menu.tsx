@@ -25,7 +25,7 @@ export function UserMenu() {
   const isOwner = (session.user as any).isOwner;
 
   return (
-    <div ref={ref} className="fixed top-4 right-6 z-40">
+    <div ref={ref} className="fixed top-4 right-6 z-40 hidden md:block">
       <button
         onClick={() => setOpen((v) => !v)}
         className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-brand-700 text-white text-sm font-medium shadow-[0_4px_10px_rgba(25,70,103,0.35)] hover:shadow-[0_6px_14px_rgba(25,70,103,0.45)] hover:-translate-y-0.5 transition-all duration-200"

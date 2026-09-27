@@ -175,17 +175,53 @@ export async function agentBrowser({ base, cookies }) {
     await page.keyboard.press('Escape');
     assert.equal(await panel.count(), 0);
     assert.equal(await trigger.evaluate((el) => el === document.activeElement), true);
+    // MS1 mobile shell (doc 18 §14): no sidebar, tab bar, the same Agent opened from the Agent tab, full screen.
     await page.setViewportSize({ width: 390, height: 844 });
-    const pageWidth = await page.evaluate(() => document.documentElement.scrollWidth);
-    await trigger.click();
+    assert.equal(await page.locator('aside').first().isVisible(), false, 'no desktop sidebar on a phone');
+    assert.equal(await trigger.isVisible(), false, 'the floating trigger gives way to the Agent tab');
+    const tabbar = page.locator('[data-mobile-tabbar]');
+    await tabbar.waitFor();
+    await tabbar.locator('[data-tab-agent]').click();
     await panel.getByLabel('Pesan untuk Agent').waitFor();
     const box = await panel.boundingBox();
     assert.ok(box && box.x === 0 && box.width === 390 && box.y === 0, 'on a phone the Agent is a full-screen surface');
-    // The pre-existing ERP layout is not yet mobile-responsive; the Agent panel must not add overflow of its own.
-    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), pageWidth, 'panel adds no horizontal overflow');
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390, 'no horizontal page scroll');
     await page.screenshot({ path: evidenceDir + '/agent-m1-mobile.png' });
+    await page.keyboard.press('Escape');
+
+    // Role-aware Beranda from the registry: the Owner sees the seven business modules and the operational ones.
+    await page.goto(base + '/');
+    const home = page.locator('[data-mobile-home]');
+    await home.waitFor();
+    const tiles = await home.locator('[data-module-tile]').evaluateAll((els) => els.map((e) => e.getAttribute('data-module-tile')));
+    assert.deepEqual(tiles.slice(0, 7), ['marketing', 'sales', 'ta', 'hr', 'tm', 'pmo', 'finance'], 'business modules in registry order');
+    assert.ok(!tiles.includes('feature-requests') && tiles.includes('files') && tiles.includes('executive'), 'operational modules; Feature Request stays behind Masukan');
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390);
+    await page.screenshot({ path: evidenceDir + '/ms1-mobile-home.png' });
+    // Module landing sheet: real submodules, cross-division ownership shown.
+    await home.locator('[data-module-tile="pmo"]').click();
+    const landing = page.locator('[data-module-landing="pmo"]');
+    await landing.locator('[data-submodule="/pmo/contracts"]').waitFor();
+    await landing.getByText('Milik Finance', { exact: true }).waitFor();
+    await page.screenshot({ path: evidenceDir + '/ms1-mobile-landing-pmo.png' });
+    await landing.locator('[data-submodule="/pmo/contracts"]').click();
+    await page.waitForURL('**/pmo/contracts');
+    await page.locator('[data-mobile-context="pmo"]').waitFor();
+    // Modul directory and Tinjau.
+    await tabbar.getByRole('link', { name: 'Modul' }).click();
+    await page.locator('[data-module-directory]').getByText('Talent Management', { exact: true }).waitFor();
+    await page.screenshot({ path: evidenceDir + '/ms1-mobile-modules.png' });
+    await tabbar.getByRole('link', { name: /^Tinjau/ }).click();
+    await page.locator('[data-review-list]').waitFor();
+    // PWA: manifest and icons are public, the service worker registers.
+    const manifest = await page.evaluate(async () => (await fetch('/manifest.webmanifest')).json());
+    assert.equal(manifest.display, 'standalone');
+    assert.ok(manifest.icons.some((i) => i.purpose === 'maskable'));
+    assert.equal(await page.evaluate(async () => !!(await navigator.serviceWorker.getRegistration('/'))), true, 'service worker registered');
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    assert.equal(await page.locator('[data-mobile-tabbar]').isVisible(), false, 'desktop keeps the sidebar layout');
     assert.deepEqual(errors, [], 'no browser runtime exceptions');
-    console.log('PASS: Agent browser — one surface (Ringkasan + one composer, no tabs), Tanyakan with typed evidence, keyword search, free-text Masukan → Feature Request confirmed, form fallback, entity context, follow-up and file import confirmed in ERP, keyboard and full-screen mobile; Company Files explorer, upload queued, file found and asked about in the Agent, scanned attachment saved to Company Files');
+    console.log('PASS: Agent browser — one surface (Ringkasan + one composer, no tabs), Tanyakan with typed evidence, keyword search, free-text Masukan → Feature Request confirmed, form fallback, entity context, follow-up and file import confirmed in ERP, keyboard; mobile shell (no sidebar, tab bar, full-screen Agent, registry Beranda, landing sheet, Modul, Tinjau, PWA manifest + service worker); Company Files explorer, upload queued, file found and asked about in the Agent, scanned attachment saved to Company Files');
   } finally {
     await browser.close();
   }

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronLeft, ChevronRight, Home } from "lucide-react";
 import { MODULES } from "@/lib/modules-config";
+import { claimsOf, navModules } from "@/lib/module-access";
 import { NAV_LABEL_KEYS } from "@/lib/nav-i18n";
 import Image from "next/image";
 import { useSession } from "next-auth/react";
@@ -21,24 +22,11 @@ export function Sidebar() {
     return key ? tNav(key) : text;
   }
 
-  const isOwner = Boolean((session?.user as any)?.isOwner);
   const accountType = ((session?.user as any)?.accountType ?? "backoffice") as string;
-  const canUseTimesheetConverter = Boolean((session?.user as any)?.canUseTimesheetConverter);
-  const access = ((session?.user as any)?.access ?? []) as { divisionKey: string; level: string }[];
   const isTalent = accountType === "talent";
-  const hasPmoFull = isOwner || access.some((a) => a.divisionKey === "pmo" && a.level === "full");
-
-  // Talent cuma boleh lihat modul Timesheet & Attendance (tanpa Beranda/modul lain sama sekali).
-  // Backoffice cuma lihat modul Timesheet kalau punya akses divisi PMO level Full (atau Owner);
-  // Attendance selalu kebuka buat Backoffice divisi apa pun (self-service absen); sisanya sama
-  // seperti sebelumnya (feature-requests disembunyikan, executive cuma buat Owner).
-  const visibleModules = isTalent
-    ? MODULES.filter((mod) => mod.key === "timesheet" || mod.key === "attendance")
-    : MODULES.filter((mod) =>
-        mod.key !== "feature-requests" &&
-        (mod.key !== "executive" || isOwner) &&
-        (mod.key !== "timesheet" || hasPmoFull)
-      );
+  // One canonical visibility rule (lib/module-access.ts, doc 18 §14): talents see Timesheet & Attendance;
+  // Timesheet needs PMO Full (or Owner); Executive is Owner-only; Feature Request is reached through Masukan.
+  const visibleModules = navModules(claimsOf(session?.user));
 
   const activeModule = MODULES.find(
     (m) => pathname === m.basePath || pathname.startsWith(m.basePath + "/")
@@ -49,7 +37,7 @@ export function Sidebar() {
   const firstName = ((session?.user as any)?.fullName ?? session?.user?.name ?? "Sobat Celerates").split(" ")[0];
 
   return (
-    <aside className={`fixed inset-y-0 left-0 border-r border-slate-800 bg-slate-900 flex flex-col transition-all duration-200 z-30 ${collapsed ? "w-16" : "w-64"}`}>
+    <aside className={`hidden md:flex fixed inset-y-0 left-0 border-r border-slate-800 bg-slate-900 flex-col transition-all duration-200 z-30 ${collapsed ? "w-16" : "w-64"}`}>
       <div className={`flex items-center gap-3 px-3 py-6 ${collapsed ? "justify-center px-0" : ""}`}>
         <Link href="/" className="flex items-center gap-3 min-w-0">
           <Image src="/logo-celerates.jpg" alt="Celerates" width={36} height={36} className="rounded-lg shrink-0" />
@@ -76,13 +64,9 @@ export function Sidebar() {
           </Link>
         )}
 
-        {visibleModules.map((mod) => {
+        {visibleModules.map(({ config: mod, subPages, href: target }) => {
           const Icon = mod.icon;
           const isTimesheetModule = mod.key === "timesheet";
-          const subPages = isTimesheetModule && !hasPmoFull && !canUseTimesheetConverter
-            ? mod.subPages.filter((sp) => sp.href !== "/timesheet/converter")
-            : mod.subPages;
-          const target = subPages[0]?.href ?? mod.basePath;
           const isModuleActive = mod.key === activeModule?.key;
 
           // Modul Timesheet dikasih aksen oranye (bukan biru/brand seperti modul

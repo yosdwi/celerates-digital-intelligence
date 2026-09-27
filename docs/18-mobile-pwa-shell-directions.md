@@ -491,3 +491,48 @@ No new visual reference screens were needed: the one interaction question (what 
 - capture sheet (MS2; the camera opens Company Files upload);
 - web push;
 - any M7 work.
+
+## 15. MS1 record (2026-09-27)
+
+![MS1 on a phone](exploration/evidence/mobile-shell/ms1-mobile-shell.png)
+
+Left to right, at 390 × 844 as the Owner: Beranda, the PMO landing sheet, Modul, Tinjau, a PMO desktop page inside the shell (with the module context bar), the Akun sheet, and the Agent. Desktop `/` is unchanged: `exploration/evidence/mobile-shell/ms1-desktop-home-unchanged.png`.
+
+**What changed.** No mobile code existed before MS1.
+
+| Area | Implementation |
+|---|---|
+| Canonical access | `src/lib/module-access.ts` (`resolveModules`, `navModules`, `openModules`, `claimsOf`) now feeds `components/sidebar.tsx`, desktop `app/page.tsx` and every mobile surface |
+| Shell | `app-shell.tsx`: `md:` margins, bottom inset, `MobileContextBar`. Sidebar and corner controls are `hidden md:*`. Toasts sit above the tab bar |
+| Navigation | `components/mobile/tab-bar.tsx`: Beranda · Modul · Agent · Tinjau · Akun, plus the Akun sheet (profile, activity log, Access Management for the Owner, language, sign out) |
+| Surfaces | `mobile-home.tsx` (on `/` below `md`), `module-directory.tsx` (`/modules`), `review-list.tsx` (`/notifications`), `ModuleLandingSheet` |
+| Shared data | `components/mobile/data.tsx`: notifications and the `/api/operations/context?path=/` signals, fetched only for phone widths or on the two mobile pages |
+| Agent | `agent-panel.tsx` opens on the `celerates:agent-open` event. The floating trigger shows at `md` and above only |
+| Tokens and primitives | `globals.css` `--color-j-*`, `--radius-j-*`, `--shadow-j-*`, `--font-jakarta` (Plus Jakarta Sans via `@fontsource-variable`). `components/mobile/primitives.tsx`: `MobileScreen`, `ScreenTitle`, `SectionHeader`, `GroupLabel`, `Card`, `StatusPill`, `ListCard`, `RowList`/`Row`, `FactRows`, `StickyActions`, `BottomSheet`, `buttonClass`. `modules.tsx`: tinted `ModuleTile`/`ModuleGlyph`, `AccessPill` |
+| PWA | `app/manifest.ts`, `public/icons/*` (the "C" mark from the Celerates logo, maskable included), `public/sw.js` (offline fallback for navigations only, no caching of ERP responses), `public/offline.html`, the `viewport` export (cover, theme colour). The middleware allows only these static public paths |
+| i18n | `mobile` namespace in `messages/id.json` and `messages/en.json` |
+| Hardening | `markNotificationRead` now updates only the caller's own notification (it previously accepted any id) |
+
+**Decisions made while implementing.**
+- **A module tile opens its landing sheet, not the first desktop page.** Desktop pages are not converted yet; the sheet gives the real submodules, their ownership and the signals first.
+- **Mobile hides modules without access**, while desktop keeps them locked.
+- **Desktop Home now locks Automasi & Chatbot for users without the `automation` division**, matching its actions. This is the only desktop behaviour change and is invisible in the Owner pilot.
+- **Legacy desktop pages opened on a phone** get the module context bar and no horizontal page scroll. Their tables remain desktop layouts until MS2 converts them.
+
+**Verification.**
+- `tests/module-access.test.ts` pins the canonical function to the previous sidebar and Home rules for Owner, editor/viewer, PMO full, converter-flag, no-access and talent actors, and to `canReadModule` for the division modules.
+- ERP unit: 16/16.
+- `next build`: clean.
+- Full harness (unit, PostgreSQL, cross-stack, browser, model path): 15 PASS, exit 0.
+- The Agent browser journey now checks the mobile shell: no sidebar, tab bar, full-screen Agent from the tab, no horizontal scroll, registry-ordered Beranda, PMO landing sheet with the Finance-owned submodule, context bar, Modul, Tinjau, the manifest, the registered service worker, and the desktop layout restored at 1440 px.
+- Evidence: `implementation/evidence/ms1-mobile-*.png`, `agent-m1-mobile.png`.
+
+**MS2, next.**
+1. Real module landings and list → detail → contextual action for **PMO** first: A.Contract → billing → TM Invoice with BAST → finance handoff. Then the **TM extension request** as the first Tinjau review flow, and **TA pipeline** stage tabs.
+2. Record search in the Beranda bar, over `lib/agent/reads.ts#search`, which is actor-scoped, together with Company Files search.
+3. The capture sheet (Company File vs Agent attachment) and **Tanya Agent** with record context from a detail page.
+4. Then MS3: the Tinjau aggregation (F6).
+
+Open product questions:
+- the "Hari ini" metrics (§8.3);
+- the multi-role access matrix (§7) before the pilot middleware opens.

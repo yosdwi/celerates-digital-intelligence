@@ -27,7 +27,7 @@ export function LanguageSwitcher() {
   }
 
   return (
-    <div className="fixed top-4 right-[116px] z-40 flex h-9 items-center gap-0.5 rounded-full bg-white/75 backdrop-blur-xl border border-white/70 px-1 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+    <div className="fixed top-4 right-[116px] z-40 hidden md:flex h-9 items-center gap-0.5 rounded-full bg-white/75 backdrop-blur-xl border border-white/70 px-1 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
       {OPTIONS.map((opt) => (
         <button
           key={opt.code}
