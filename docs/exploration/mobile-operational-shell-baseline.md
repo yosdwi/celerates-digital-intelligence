@@ -1,5 +1,7 @@
 # Mobile Operational Shell — UX Exploration Baseline
 
+> Continued in [doc 18 — Mobile/PWA shell: three concrete directions](../18-mobile-pwa-shell-directions.md) (2026-09-27).
+
 Date: 2026-09-27  
 Status: **exploration baseline, not a locked implementation spec**  
 Branch context: `audit/erp-production-readiness` after M5.

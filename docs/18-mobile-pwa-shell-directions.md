@@ -1,0 +1,299 @@
+# 18 — Mobile/PWA shell: three concrete directions
+
+Date: 2026-09-27
+Status: **discussion record and proposal. No mobile code is written or implied by this document.**
+Branch: `audit/erp-production-readiness`, after M6.x (`48a4105`).
+Inputs:
+- the product discussion of 2026-09-27 (summarised in §1);
+- the exploration baseline, [mobile-operational-shell-baseline.md](exploration/mobile-operational-shell-baseline.md);
+- the current ERP implementation, inspected in code and captured at phone width (§2).
+
+Sequencing: the Insight Agent (M7) is **on hold**. The Mobile/PWA shell is the next increment once a direction is chosen.
+
+## 1. What was agreed
+
+**Pilot.**
+- Users: Owner and management.
+- The architecture is **role-aware from day one**:
+  - visible modules = the user's authority;
+  - visible content = record and data authority, enforced on the server;
+  - no per-role Home yet.
+- Multi-role use is on the near roadmap but does not block the pilot. Access-rule discovery runs in parallel (§7).
+
+**Three mobile behaviours**, equally first-class:
+1. **Go to a module fast by tapping**: Talent, PMO, Sales, Contract, Timesheet, BAST… as far as RBAC allows.
+2. **Check, review and respond**: records, Agent proposals, follow-ups (*tindak lanjut*) and feedback drafts (*masukan*), with confirm, reject or follow up.
+3. **Find, capture and ask**:
+   - search records and Company Files;
+   - upload or photograph documents;
+   - ask the Agent (questions, voice, cross-module questions, controlled actions).
+
+**UX constraints.**
+- Home is an **operational app home**, not a chatbot.
+- The module launcher is **prominent**.
+- The Agent is **one integrated capability**, easy to reach, **not the Home hero**.
+- Proactive attention (*Perlu perhatian*) does not have to be the top hero.
+- Company Files is a module capability; its placement is open.
+- Not locked: bottom navigation, module arrangement, card hierarchy, role personalisation.
+- The baseline image in the repository is a reference, not the final IA.
+
+## 2. The current ERP at phone width
+
+Captured on 2026-09-27 at 390 × 844, logged in as the Owner, with the synthetic data of the integration harness. The files are in `exploration/evidence/mobile-shell/`.
+
+| Home | TA · Requisition | Company Files | Agent |
+|---|---|---|---|
+| ![](exploration/evidence/mobile-shell/current-home-390.png) | ![](exploration/evidence/mobile-shell/current-ta-requisition-390.png) | ![](exploration/evidence/mobile-shell/current-company-files-390.png) | ![](exploration/evidence/mobile-shell/current-agent-390.png) |
+
+### Findings
+
+1. **The shell is not responsive at all.**
+   - `AppShell` always adds `ml-64` (`ml-16` when collapsed), and `Sidebar` is a fixed `w-64` panel at every width. That leaves about 134 px for content on a phone.
+   - The document overflows horizontally: 463 px on Home, 420 px on Requisition, 397 px on Company Files.
+   - The fixed top-right controls (activity log, language, bell, user menu) overlap the page headers.
+   - This is the first thing any direction must fix.
+2. **The Agent is already a full-screen phone surface** (M5, `sm:` breakpoints in `agent-panel.tsx`). But the page underneath overflows, so the mobile browser widens the layout viewport and the "full-screen" panel is clipped (fourth capture). It will be correct once the shell stops overflowing.
+3. **Module visibility is computed in three places, and they disagree.**
+   - `sidebar.tsx`: Talent accounts see only Timesheet and Attendance. Timesheet requires PMO *full*. Executive is Owner-only.
+   - `app/page.tsx`: the same filters without the Talent rule, plus `DIVISION_GATED_MODULE_KEYS`, which shows locked cards.
+   - `middleware.ts`: the whole app is Owner-only in the pilot.
+   - Server pages enforce access separately (`require-division-access`, `DIVISION_PATHS`, `CROSS_DIVISION_PATHS`).
+   - A role-aware mobile launcher needs **one** function for this, not a fourth copy.
+4. **Module pages are desktop pages:** KPI tiles, wide tables and filter rows. There is no list → detail pattern that works on a phone. This is the largest piece of work in any direction, and it scales with how many modules are made mobile-ready.
+5. **What already exists and can be reused as is:**
+
+| Capability | Where |
+|---|---|
+| Actor-scoped record search, typo-tolerant (`pg_trgm`) | `lib/agent/reads.ts` `search()`; name resolution, ERP migration 0006 |
+| Company Files search, open (logged), upload, and attachment → file | `/api/files/*`, M6 and M6.x |
+| Notifications table and bell | `lib/notifications.ts`, `notification-bell.tsx` |
+| Approval flows with a named approver per step | extension/increment (`approval-journey.ts`), time-off approval, TTD signature requests, PQ/contract setup |
+| Agent proposals and feedback drafts, with confirm/reject | `/api/agent/proposals`, `/api/agent/submissions` |
+| Perlu perhatian signals and follow-ups | `/api/operations/context`, the Agent brief |
+| Push-to-talk voice | `components/agent/voice.tsx`, `/api/agent/transcribe` |
+
+6. **Nothing PWA exists yet.** There is no web manifest, no service worker, no installable icons (only `logo-celerates.jpg` and a favicon), and no `theme-color`. The only metadata is the title `Celerates ERP`.
+
+## 3. Foundation needed by every direction
+
+These items are the same whichever direction is chosen. They are what makes the ERP usable on a phone at all.
+
+**F1 — Responsive app frame.**
+- Below `md`: no sidebar; a compact top bar plus the chosen mobile navigation.
+- At `md` and above: today's sidebar, unchanged.
+- The same routes and URLs on both, so a notification deep link works on either.
+- The fixed corner controls move into the top bar and the account screen.
+
+**F2 — One module-access function.**
+- `moduleAccess(session)` returns, for each module, one of `hidden | read | full`, with the reason. It is built from the existing session claims: `isOwner`, `accountType`, `access[{divisionKey, level}]`, and the cross-division paths.
+- The desktop sidebar, desktop Home, the mobile launcher and the Agent all use it.
+- It decides **visibility only**. Record and data authority stay in the existing server guards and the record-level document route (ADR-018 decision 8).
+
+**F3 — Mobile record pattern.**
+- A list becomes cards with a key identifier, a status pill and one or two facts.
+- A detail page shows ERP facts first, then linked Company Files, then activity.
+- Actions sit in a bottom bar and show only what the user may do. **Tanya tentang ini** opens the Agent with the record as context.
+- The pattern is applied module by module, starting with the pilot's first-class modules (§8).
+
+**F4 — Capture.**
+- Camera or file input always asks where the file goes:
+  - **Company File**: persistent and governed; recommended for scans because it gets OCR;
+  - **Agent attachment**: working context, which can be saved later through M6.x.
+- No new storage path: this is M6 plus M6.x.
+
+**F5 — PWA baseline.**
+- Web manifest: name and short name, `display: standalone`, theme and background colours, 192/512 and maskable icons, apple-touch-icon.
+- The service worker caches **the static shell only**. It bypasses every authenticated request: ERP responses, files and Agent streams are never cached, whatever their headers say.
+- An offline fallback page.
+- Install guidance: Android prompt; iOS via Share → Add to Home Screen.
+- **Web push is later**, not the pilot. On iOS it works only for an installed PWA (16.4+).
+
+**F6 — "Waiting for me" aggregation (*Tinjau*).**
+- One ERP BFF read merges:
+  - approval steps assigned to the user;
+  - time-off and signature requests awaiting them;
+  - their pending Agent proposals and feedback drafts;
+  - unread notifications.
+- Each item carries its source, record reference, deep link and allowed actions.
+- Actions call the owning flow's existing server action or endpoint, so **no new authorisation path** is created.
+- An inline decision is offered only where the owning flow already has a simple decision. Otherwise the item offers **Buka**.
+
+## 4. Three directions
+
+The directions differ in **information architecture**: what Home is, where each behaviour lives, and where the Agent sits. All of them sit on §3.
+
+The wireframes are low fidelity, use synthetic data, and are not a visual system. Source: `exploration/mobile-shell/wireframes.html`; render with `node docs/exploration/mobile-shell/render-captures.mjs`.
+
+### Direction A — Operational Home + tab bar
+
+![Direction A](exploration/evidence/mobile-shell/direction-a-app-home-tabs.png)
+
+**Idea.** Closest to the baseline image.
+- Home shows greeting and role, a "Hari ini" row of 3–4 deterministic ERP counts, the module launcher (8 slots, "Semua"), one compact Perlu perhatian row, and recent activity.
+- Tab bar: **Beranda · Modul · Tanya (centre) · Tinjau · Akun**.
+
+**Where the behaviours live.**
+1. **Go to modules:** the Home launcher and the Modul tab.
+2. **Review and respond:** the Tinjau tab (F6).
+3. **Find, capture, ask:** split. Asking, voice and capture are under Tanya (the Agent). Search sits inside Modul or behind a top-bar icon.
+
+**Strengths.**
+- The most familiar enterprise-app pattern.
+- Every behaviour has a permanent place.
+- "Hari ini" gives management an at-a-glance view.
+
+**Risks.**
+- Five tabs lock the most navigation decisions.
+- The centre Agent button tends to read as the hero, against the agreed constraint.
+- **There are two places to type (search and Tanya).** M5 removed exactly this "where do I type" split inside the Agent.
+- The "Hari ini" counts need per-role definitions early.
+
+### Direction B — Launcher + one Find / Ask / Capture bar
+
+![Direction B](exploration/evidence/mobile-shell/direction-b-launcher-universal-bar.png)
+
+**Idea.**
+- Home is the **module launcher** (12 slots, pinnable, with a role default). Above it sits **one bar** with a camera and a microphone.
+- Typing shows results grouped as **Record · Company Files · Modul**, all already filtered by authority.
+- The last row is always **Tanya Agent: "…"**. A long sentence or a question goes straight to the Agent.
+- One "Menunggu Anda" row links to Tinjau.
+- Tab bar: **Beranda · Tinjau · Akun**.
+
+**Where the behaviours live.**
+1. **Go to modules:** Home itself.
+2. **Review and respond:** the Tinjau tab (F6).
+3. **Find, capture, ask:** the bar, one entry point. The Agent also opens from **Tanya tentang ini** on a record and from Tinjau items.
+
+**Strengths.**
+- Satisfies every UX constraint literally: Home is operational, the launcher is the content, and the Agent is integrated with no tab and no hero.
+- Extends the M5 "one surface, routing to capability" principle from the Agent to the whole app.
+- Locks the fewest decisions, with three tabs.
+- Reuses the existing actor-scoped record search and Company Files search.
+
+**Risks.**
+- The Agent is less visible for people who have never used it. Mitigations: the placeholder *atau tanya*, the microphone icon, and record entry points.
+- The unified result list needs a small merge contract (records + files + modules) and fast search on phone networks.
+- There are no at-a-glance numbers unless an optional row is added later.
+
+### Direction C — Work-first: the response queue is Home
+
+![Direction C](exploration/evidence/mobile-shell/direction-c-work-queue-home.png)
+
+**Idea.**
+- Home is the **Tinjau queue**, with inline actions and a "done when empty" feel.
+- Modules are a horizontal strip plus a full **Modul** sheet grouped by function, with the access level (Penuh/Baca) shown.
+- The Agent is a floating **Tanya** button. Company Files gets its own tab.
+- Tab bar: **Kerja · Modul · Berkas · Akun**.
+
+**Where the behaviours live.**
+1. **Go to modules:** the strip and the sheet.
+2. **Review and respond:** Home.
+3. **Find, capture, ask:** the Berkas tab and the floating button.
+
+**Strengths.**
+- The fastest "open, decide, close" loop for management.
+- The Modul sheet shows role-awareness explicitly.
+
+**Risks.**
+- Conflicts with "module launcher prominent" and "attention is not the hero".
+- Home is nearly empty for users with little to approve, which is most roles once multi-role arrives.
+- Drifts toward a notification feed.
+
+Its **queue card design and the Modul sheet** are worth keeping as components inside A or B.
+
+### What all three share (wireframe "Berlaku untuk semua arah")
+
+![Record and capture](exploration/evidence/mobile-shell/common-record-and-capture.png)
+
+- The record detail pattern (F3).
+- The capture sheet (F4).
+
+## 5. Comparison
+
+| | A · Home + tabs | B · Launcher + one bar | C · Work-first |
+|---|---|---|---|
+| Home is an operational app home | Yes | **Yes, the launcher is Home** | Partly (queue) |
+| Launcher prominent | Yes | **Most** | Secondary |
+| Agent integrated, not hero | Centre tab leans hero | **Yes (bar, record, Tinjau)** | Floating button |
+| Attention not the hero | Yes (one row) | **Yes (one row)** | No, it is the hero |
+| One place to type | No (search + Tanya) | **Yes** | No |
+| Role-aware via F2 | Yes | Yes | Yes, most visible |
+| Navigation decisions locked | 5 tabs | **3 tabs** | 4 tabs |
+| New contracts beyond §3 | "Hari ini" definitions | Search merge | none |
+| Closest to baseline image | **Yes** | Partly | No |
+
+## 6. Recommendation
+
+**Pilot Direction B, and borrow from the others:**
+- from **C**: its queue cards and the grouped **Modul** sheet with access levels, used as B's Tinjau and "Semua";
+- from **A**: an optional "Hari ini" row, added only if the Owner pilot asks for at-a-glance numbers.
+
+**Why:**
+- B is the only direction that meets every agreed constraint without exception.
+- It keeps the M5 lesson of a single entry that routes to a capability.
+- It commits to the fewest navigation decisions while multi-role access is still being discovered.
+
+**What would change this:**
+- Owners repeatedly look for a persistent Agent tab → move to A's tab bar. The foundation is the same, so this is a small change.
+- Management mostly opens the app to approve → promote C's queue to Home.
+
+**Validate before building screens.**
+1. Put the wireframes into a clickable prototype.
+2. Run six tasks with 2–3 Owner/management users:
+   - open a contract;
+   - approve an extension;
+   - confirm an Agent proposal;
+   - find a BAST scan;
+   - photograph and save a document;
+   - ask a cross-module question.
+3. Measure time and misroutes (typing into the wrong place, looking in the wrong tab).
+
+## 7. Parallel track: multi-role access discovery (not a blocker)
+
+Pilot middleware stays Owner-only. F2 and F3 are built so that non-Owner users work the moment the middleware opens. What must be learnt in parallel:
+
+1. **Role inventory.** Which job roles use mobile first: sales, TA, PMO, TM/HR, finance, management other than the Owner, talents.
+2. **For each role:** its division access (`read`/`full`), cross-division paths, and which approvals it receives. Build this from `access_management` data and the approval flows, not from assumptions.
+3. **Record-level gaps.** Where ERP today checks only division, not record ownership (see `docs/erp-audit`). This decides what a non-Owner may see in search results and in Tinjau.
+4. **Talent accounts.** Today they see only Timesheet and Attendance. Is mobile their primary surface (self-service), and does that need a different Home later?
+5. **Output:** an access matrix (role × module × level × record rule) reviewed by the Owner. It feeds F2 unchanged.
+
+## 8. Decisions requested
+
+1. The direction for the pilot: B (recommended), A or C.
+2. The first-class modules for pilot mobile record views (F3). Proposed six, based on the discussion:
+   - Talent (TA/TM);
+   - PMO · Contract;
+   - Sales · Opportunity;
+   - Timesheet;
+   - BAST;
+   - Company Files, which is already mobile-shaped.
+3. Whether the Owner pilot wants "Hari ini" numbers, and which three.
+4. Whether the prototype test (§6) runs before implementation. Recommended.
+
+## 9. Proposed slicing once a direction is chosen (for planning only)
+
+1. **MS1 — Foundation:**
+   - F1 responsive frame;
+   - F2 `moduleAccess`, with desktop sidebar and Home migrated to it;
+   - F5 PWA baseline;
+   - the overflow fixes above, which also un-clip the Agent.
+2. **MS2 — Home and the find/ask/capture entry** for the chosen direction, with F4 capture.
+3. **MS3 — Tinjau:** the F6 aggregation and queue cards.
+4. **MS4 — Mobile record views** for the modules agreed in §8.2, one at a time, each with its read-only list/detail first, then the actions it already has.
+
+Each slice keeps the standing invariants:
+- ERP is the authority, and the model never applies changes;
+- deterministic mode works without models;
+- Perlu perhatian and Masukan do not regress;
+- unit, PostgreSQL, cross-stack and browser tests run at 390 px as well as desktop.
+
+## Captures in this record
+
+| File | What |
+|---|---|
+| `current-home-390.png`, `current-ta-requisition-390.png`, `current-company-files-390.png`, `current-agent-390.png` | The current ERP at 390 × 844 (§2) |
+| `direction-a-app-home-tabs.png` | Direction A wireframes |
+| `direction-b-launcher-universal-bar.png` | Direction B wireframes |
+| `direction-c-work-queue-home.png` | Direction C wireframes |
+| `common-record-and-capture.png` | Record detail and capture, common to all directions |
