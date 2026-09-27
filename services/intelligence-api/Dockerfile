@@ -1,6 +1,10 @@
 FROM python:3.12-slim
 WORKDIR /workspace
 COPY --from=ghcr.io/astral-sh/uv:0.12.17 /uv /usr/local/bin/uv
+# RapidOCR pulls OpenCV; the slim base image does not include its native runtime libraries.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      libxcb1 libgl1 libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
 COPY services/intelligence-api/pyproject.toml services/intelligence-api/uv.lock services/intelligence-api/
 COPY services/intelligence-api/cdi services/intelligence-api/cdi
 RUN uv sync --project services/intelligence-api --frozen --no-dev
