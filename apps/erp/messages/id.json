@@ -2279,6 +2279,136 @@
     "reviewSubtitle": "Persetujuan dan kabar dari alur kerja Anda",
     "markAllRead": "Tandai dibaca",
     "reviewEmpty": "Tidak ada yang menunggu Anda.",
-    "unreadItem": "Belum dibaca"
+    "unreadItem": "Belum dibaca",
+    "list": {
+      "search": "Cari",
+      "sortFilter": "Urutkan & filter",
+      "status": "Status",
+      "sort": "Urutkan",
+      "empty": "Tidak ada yang cocok.",
+      "show": "Tampilkan {count}"
+    },
+    "record": {
+      "open": "Buka",
+      "noFile": "Belum ada berkas"
+    },
+    "pmo": {
+      "contracts": {
+        "title": "A.Contract"
+      },
+      "invoices": {
+        "title": "TM Invoice",
+        "serviceMonth": "Bulan layanan {month}",
+        "plan": "Rencana {date}",
+        "bastPresent": "BAST ada",
+        "bastMissing": "BAST belum ada"
+      },
+      "tabs": {
+        "all": "Semua",
+        "active": "Aktif",
+        "ending": "≤ 30 hari",
+        "followUp": "Perlu tindak lanjut",
+        "ended": "Selesai"
+      },
+      "sort": {
+        "endSoon": "Berakhir paling dekat",
+        "client": "Nama client",
+        "startNew": "Mulai terbaru",
+        "monthNew": "Bulan layanan terbaru"
+      },
+      "status": {
+        "upcoming": "Belum mulai",
+        "active": "Aktif",
+        "ending": "Berakhir {days} hari lagi",
+        "ended": "Selesai",
+        "undated": "Tanpa periode"
+      },
+      "followUp": {
+        "financeReturned": "Dikembalikan Finance",
+        "invoicesOverdue": "{count} invoice overdue",
+        "billingWithoutInvoice": "{count} bulan belum ada invoice",
+        "financeWaiting": "Menunggu Finance"
+      },
+      "invoiceStatus": {
+        "overdue": "Overdue",
+        "planned": "Planned",
+        "submitted": "Submitted",
+        "canceled": "Canceled"
+      },
+      "handoffStatus": {
+        "pending": "Belum diserahkan",
+        "notified": "Menunggu Finance",
+        "received": "Diterima Finance",
+        "needs_revision": "Dikembalikan Finance"
+      },
+      "perMonth": "/bln",
+      "months": "{count} bulan",
+      "seeAll": "Lihat semua",
+      "notes": "Catatan",
+      "askAgent": "Tanya Agent",
+      "askAgentInvoice": "Tanya Agent",
+      "editDesktop": "Ubah di formulir lengkap",
+      "contract": {
+        "label": "Kontrak",
+        "period": "Periode kontrak",
+        "start": "Mulai",
+        "end": "Berakhir",
+        "duration": "Durasi",
+        "commercial": "Nilai komersial",
+        "monthly": "Nilai per bulan",
+        "total": "Nilai total",
+        "salesType": "Tipe penjualan",
+        "pq": "No. PQ",
+        "project": "Proyek & talent",
+        "projectName": "Proyek",
+        "service": "Jenis layanan",
+        "salesPic": "PIC Sales",
+        "headcount": "Target headcount",
+        "talents": "Talent",
+        "billing": "Tagihan bulanan",
+        "noBilling": "Billing Schedule belum dibuat.",
+        "noInvoice": "Belum ada invoice",
+        "noInvoices": "Belum ada TM Invoice.",
+        "documents": "Dokumen proyek",
+        "noDocuments": "Belum ada di Document Tracker.",
+        "documentMeta": "Document Tracker",
+        "elapsed": "Waktu berjalan"
+      },
+      "invoice": {
+        "label": "TM Invoice",
+        "facts": "Invoice",
+        "serviceMonth": "Bulan layanan",
+        "plan": "Rencana invoice",
+        "group": "Grup",
+        "value": "Nilai per bulan",
+        "submitBast": "Submit BAST",
+        "bast": "BAST",
+        "noBast": "Belum ada dokumen BAST.",
+        "bastMeta": "Dokumen pendukung invoice",
+        "link": "Tautan",
+        "overdueRule": "Overdue menurut aturan submission: Planned atau kosong yang melewati tanggal 15 bulan berikutnya. Ini keterlambatan submission, bukan tagihan belum dibayar."
+      },
+      "handoff": {
+        "title": "Serah terima ke Finance",
+        "status": "Status",
+        "notifiedBy": "Diserahkan {name}, {at}",
+        "receivedBy": "Diterima {name}, {at}",
+        "perProject": "Satu serah terima per PQ, bukan per invoice.",
+        "document": "Dokumen untuk Finance",
+        "documentMeta": "Tautan yang diserahkan PMO",
+        "submit": "Serahkan ke Finance",
+        "resubmit": "Serahkan ulang",
+        "docLink": "Tautan dokumen",
+        "notes": "Catatan (opsional)",
+        "consequence": "Kirim menandai invoice ini Submitted dan memberi tahu Finance.",
+        "saveOnly": "Simpan tautan",
+        "send": "Kirim",
+        "verify": "Verifikasi dokumen",
+        "financeNotes": "Catatan Finance",
+        "revisionRule": "Mengembalikan ke PMO wajib disertai alasan.",
+        "return": "Kembalikan",
+        "accept": "Terima"
+      }
+    }
   }
 }

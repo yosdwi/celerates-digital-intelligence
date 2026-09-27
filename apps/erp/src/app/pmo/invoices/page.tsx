@@ -15,11 +15,13 @@ import { StatCard } from "@/components/stat-card";
 import { AddRecordModal } from "@/components/add-record-modal";
 import { Receipt, RefreshCw } from "lucide-react";
 import Link from "next/link";
+import { InvoiceListMobile } from "@/components/mobile/pmo/lists";
 import { Field, SelectField } from "@/components/form-fields";
 
 const STATUS_OPTIONS = [["overdue", "Overdue"], ["submitted", "Submitted"], ["planned", "Invoice Plan"], ["canceled", "Canceled"]] as const;
 
-export default async function InvoicesPage() {
+export default async function InvoicesPage({ searchParams }: { searchParams?: Promise<{ q?: string }> }) {
+  const q = (await searchParams)?.q;
   const t = await getTranslations("pmo.invoices");
 
   const [data, opportunityOptions] = await Promise.all([
@@ -112,7 +114,12 @@ export default async function InvoicesPage() {
   const otherRows = data.filter((d) => !["submitted", "overdue", "planned"].includes(d.status_code ?? ""));
 
   return (
-    <div className="min-h-screen">
+    <>
+    {/* Phone: mobile-native list (doc 18 §16). Desktop below is unchanged. */}
+    <div className="md:hidden">
+      <InvoiceListMobile query={typeof q === "string" ? q.slice(0, 80) : undefined} />
+    </div>
+    <div className="hidden md:block min-h-screen">
       <PageHeader
         icon={Receipt}
         color="bg-purple-500"
@@ -168,5 +175,6 @@ export default async function InvoicesPage() {
         </ExpandableSection>
       </main>
     </div>
+    </>
   );
 }

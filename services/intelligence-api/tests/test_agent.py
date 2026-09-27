@@ -655,6 +655,81 @@ def test_ask_routes_questions_to_rules_records_and_knowledge_without_a_model(mon
         assert not [e for e in custom if e["name"] == "celerates.actions"]
 
 
+CONTRACT = "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
+
+
+class ContractPageERP(AskingERP):
+    def entity(self, entity_type, entity_id):
+        FakeERP.calls.append(("entity", entity_id))
+        return {
+            "entity": {
+                "type": entity_type,
+                "type_label": "Kontrak (A.Contract)",
+                "id": entity_id,
+                "label": "PT Arunika Synthetic · OPTY-9",
+                "href": f"/pmo/contracts/{entity_id}",
+                "record_version": None,
+                "as_of": "2026-09-27T00:00:00Z",
+                "fields": [
+                    {"name": "start_date", "label": "Mulai kontrak", "value": "2025-10-19"},
+                    {"name": "end_date", "label": "Berakhir", "value": "2026-10-18"},
+                ],
+                "commercial": [{"name": "monthly_value_amount", "label": "Nilai per bulan", "state": "terisi"}],
+                "withheld": [{"name": "Catatan (teks bebas)", "sensitivity": "pii"}],
+            }
+        }
+
+
+def test_contextual_ask_uses_the_erp_resolved_page_record(monkeypatch):
+    """MS2 (doc 18 §16): on a record page, "ini" is the record ERP resolved from the route and signed into the
+    delegation. The answer uses governed fields only; commercial values stay presence-only; feedback on the page
+    is offered as reviewed drafts that carry the page (Feature Request context_path, data correction target)."""
+    token = mint(
+        ctx={
+            "path": f"/pmo/contracts/{CONTRACT}",
+            "module": "pmo",
+            "entity": {"type": "project_contract", "id": CONTRACT},
+        }
+    )
+    list_token = mint(ctx={"path": "/pmo/contracts", "module": "pmo"})
+    with TestClient(app) as c:
+        monkeypatch.setattr(settings(), "erp_mode", "http")
+        monkeypatch.setattr(playbooks, "DelegatedERP", ContractPageERP)
+        monkeypatch.setattr(playbooks, "start", lambda run, user, a: playbooks.execute(run, user, a))
+
+        def ask(q, tok=token):
+            run_id = str(uuid4())
+            c.post(
+                "/api/agent/runs",
+                json={"run_id": run_id, "skill": "ask", "args": {"query": q}},
+                headers={"X-ERP-Delegation": tok},
+            )
+            stream = events(c, run_id, tok)
+            assert stream[-1][1]["type"] == "RUN_FINISHED", stream[-1]
+            text = "".join(e["delta"] for _, e in stream if e["type"] == "TEXT_MESSAGE_CONTENT")
+            custom = [e for _, e in stream if e["type"] == "CUSTOM"]
+            return stream[-1][1]["result"], text, custom
+
+        result, text, _ = ask("Kontrak ini berakhir kapan?")
+        assert result["examined"] == f"project_contract/{CONTRACT}"
+        assert "Tentang record yang sedang Anda buka: Kontrak (A.Contract) PT Arunika Synthetic · OPTY-9." in text
+        assert "Berakhir: 2026-10-18" in text
+
+        result, text, _ = ask("berapa nilai kontrak ini?")
+        assert "Nilai per bulan: terisi di ERP; nilai komersial tidak dibagikan ke Agent." in text
+
+        result, text, custom = ask("Tabel ini susah dipakai di HP")
+        assert result["feedback_offered"] is True
+        offered = [e["value"]["items"] for e in custom if e["name"] == "celerates.actions"][0]
+        assert [a["args"]["intent"] for a in offered] == ["data_correction", "feature_request"]
+        assert offered[0]["args"]["entity_type"] == "project_contract" and offered[0]["args"]["entity_id"] == CONTRACT
+
+        # On a list page there is no record: "ini" does not invent one.
+        result, text, custom = ask("Tabel ini susah dipakai di HP", list_token)
+        offered = [e["value"]["items"] for e in custom if e["name"] == "celerates.actions"][0]
+        assert [a["args"]["intent"] for a in offered] == ["feature_request"] and result.get("examined") is None
+
+
 def test_dataset_retention_purges_rows_and_files(monkeypatch):
     from cdi.agent import datasets
     from cdi.storage import storage

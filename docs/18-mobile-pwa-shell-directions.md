@@ -536,3 +536,154 @@ Left to right, at 390 × 844 as the Owner: Beranda, the PMO landing sheet, Modul
 Open product questions:
 - the "Hari ini" metrics (§8.3);
 - the multi-role access matrix (§7) before the pilot middleware opens.
+
+## 16. MS2 — contextual Agent and PMO as the reference workflow (2026-09-27)
+
+![MS2 on a phone](exploration/evidence/mobile-shell/ms2-pmo-journey.png)
+
+Left to right, at 390 × 844 as the Owner:
+- Beranda (launcher-first);
+- A.Contract list and its sort/filter sheet;
+- a contract record;
+- TM Invoice list;
+- an invoice record and its Finance verification sheet;
+- the Agent opened from the contract, showing the context chips.
+
+All data in the captures is synthetic.
+
+### 16.1 Contextual Agent contract
+
+**What travels.** Opening the Agent anywhere means "about this page". The envelope is:
+
+| Field | Source |
+|---|---|
+| route | the page path, normalised by `operationalContext` (query strings dropped; known record ids kept) |
+| module | `operationalContext`, the same module keys as division access |
+| submodule | `submoduleFor(path)`: the longest matching registry submodule, e.g. `/pmo/contracts/<id>` → A.Contract |
+| entity type, id, label | `resolvePageEntity(path)` from the Entity Catalog routes, loaded only if the actor may read that module (`canReadEntityModule`), else none |
+
+**Rules.**
+- ERP derives every field server-side (`pageContext`, `lib/agent/bff.ts`) from the route, under the user's authority. **The client never supplies an entity, a label or record content.**
+- The envelope goes into the signed delegation. Intelligence reads the record only through the governed catalog read: internal fields as values, commercial fields as presence, PII and free text withheld.
+- No screenshots and no page content are sent.
+
+**Visible to the user.** The Agent header shows two chips: `Module › Submodule` and, when there is one, `Record type · label` (`data-agent-context`, `data-agent-entity`).
+
+**Entry points.**
+- The Agent tab: the current route.
+- **Tanya Agent** in a record's sticky actions: the record.
+- The Beranda bar: `/`.
+
+**Deictic questions ("ini / tersebut / this").**
+- With a page record, "ini" means that record. The deterministic path reads it and answers from the fields the question names, e.g. "Berakhir: 2026-10-18".
+- Commercial fields answer "terisi di ERP; nilai komersial tidak dibagikan ke Agent".
+- On a list page there is no record, and none is invented.
+- The model path already receives the same page entity (M5).
+
+**Feedback reuses Masukan (ADR-017).** A page complaint ("Tabel ini susah dipakai di HP", "Field tanggal berakhir harusnya lebih kelihatan") is detected as feedback, and the user picks its kind:
+- **Feature Request**: an ERP proposal carrying `context_path` = this page;
+- **Data correction**: a task on this record, never a direct edit;
+- knowledge correction or Agent feedback, as before.
+
+Nothing is drafted or changed until the user confirms. MS2 adds usability wording ("susah, sulit, ribet, bingung, kurang/tidak jelas, kurang/tidak kelihatan") to the feedback cues.
+
+**Catalog v1.1.** `project_contract` and `project_invoice` are added: dates, status and issue are internal; values are commercial; notes are withheld; documents are never read. Edges link contract ↔ invoices ↔ the PQ.
+
+### 16.2 Mobile list / record / action grammar
+
+This is reusable for Sales, TA, HR, TM and Finance.
+
+| Step | Pattern | Component |
+|---|---|---|
+| Module | Module chip (opens the landing sheet), page title, the module's mobile-native siblings | `ModuleHeader` |
+| List | Search field, status tabs with counts (they double as the compact summary), sort and filter in a bottom sheet, cards with identifier, title, subtitle, 1–3 facts, a status pill and one follow-up flag | `FilterableList` (server-shaped `ListItem`s, no render props) |
+| Record | Back link, eyebrow, title, subtitle, pills; grouped sections of fact rows; related records as tappable rows; documents as cards opened through the authorized document route | `RecordHeader`, `Section`, `FactRows`, `ProgressMeter`, `DocumentCard` |
+| Action | Allowed actions pinned above the tab bar on a phone and inline on desktop. Forms in a bottom sheet with the business consequence stated once | `StickyActions`, `BottomSheet`, `buttonClass` (`styles.ts`) |
+| Agent | **Tanya Agent** in the record's actions | `AskAgentButton` |
+| Authority | A record page checks division read itself and 404s otherwise. Actions keep their own server guards | `requireDivisionRead` (`lib/module-guard.ts`) |
+| Routing | Routes that render their own Jernih surface; other module routes keep the desktop page under the context bar | `isMobileNative(path)` |
+
+**Removed on phones** (the desktop pages are unchanged):
+- the A.Contract and TM Invoice tables and their KPI blocks (2×2 and 5-up);
+- the header sheet-sync toolbars;
+- long subtitles;
+- the add-record modals;
+- document URLs in table cells;
+- the inline finance-handoff mini-form.
+
+**Copy rule.** Explanatory text stays only where it states a rule or a consequence:
+- the submission-overdue rule;
+- "Kirim menandai invoice ini Submitted dan memberi tahu Finance";
+- "Mengembalikan ke PMO wajib disertai alasan";
+- "Satu serah terima per PQ".
+
+### 16.3 PMO reference journey (verified in the browser at 390 px)
+
+1. **Modul › PMO landing sheet → A.Contract.**
+   - The list is cards: client, position · project, period, value per month, a status pill (Aktif / Berakhir N hari lagi / Selesai / Belum mulai) and one follow-up flag.
+   - Follow-up flags, in the order PMO acts on them: Dikembalikan Finance → N invoice overdue → N bulan belum ada invoice → Menunggu Finance.
+   - Tabs: Semua / Aktif / ≤ 30 hari / Perlu tindak lanjut / Selesai. Sort and status also live in the sheet.
+2. **Contract record** (`/pmo/contracts/<id>`, new read-first route):
+   - period with an elapsed meter;
+   - commercial value;
+   - project and talent (talent assignments on this PQ);
+   - **Tagihan bulanan**: each billing month with its invoice state, or "Belum ada invoice";
+   - TM Invoice list;
+   - Document Tracker files (PKS/PO/CR/other with their status);
+   - Finance handoff state and notes.
+   - Sticky actions: **Tanya Agent**, **TM Invoice**. The full edit form stays on desktop (`/edit`).
+3. **Invoice record** (`/pmo/invoices/<id>`):
+   - invoice facts (with the derived overdue rule when it applies);
+   - BAST documents;
+   - Finance handoff;
+   - the linked contract.
+4. **Handoff.**
+   - A PMO editor sees **Serahkan ke Finance** (link and notes; `upsertFinanceHandoff`), which marks the invoice Submitted and notifies Finance.
+   - A Finance editor then sees **Verifikasi dokumen**: **Terima** or **Kembalikan** (reason required), via `acknowledgeFinanceHandoff` / `requestRevisionFinanceHandoff`.
+   - The Owner has both. Each server action re-checks division access and state.
+
+### 16.4 What MS2 proves for the other modules
+
+- A module converts by adding three things:
+  - a server read model (`lib/<module>/mobile-data.ts`);
+  - `ListItem` shaping in a mobile list component;
+  - a read-first record route.
+- The shell, grammar, guard, Agent contract and Masukan need no change.
+- Adding a record route to the Entity Catalog is what makes "ini" work for that module.
+- Beranda is now **launcher-first**:
+  - the business modules the user can open, plus **Semua modul**;
+  - Perlu perhatian and Terbaru below, compact;
+  - operational modules live in Modul;
+  - a talent account, which has no business modules, gets its operational modules instead.
+
+### 16.5 Deferred (explicitly)
+
+- **Editing on mobile.** Contract and invoice forms, billing schedule generation and BAST upload stay on desktop. PMO's mobile write actions are the handoff only.
+- **Other PMO submodules** (Talent Document Tracker, Overtime & Business Trip, Dashboard): they keep the desktop page under the context bar.
+- **The Finance module list** (`/finance`) is still the desktop page. Finance reaches invoices through Tinjau notifications and the invoice record.
+- **Signal ↔ entity mapping for PMO/Finance rules** (`SIGNAL_ENTITY`) stays unset until ERP audit F13 settles its semantics.
+- **Record search in the Beranda bar and the Tinjau aggregation** (MS3).
+
+**Decision needed before expanding to other modules.** Record-level authority for non-Owners. PMO pages gate on division access only (as the desktop does). Sales, TA and HR records may need row-level rules (ownership, PIC) before the pilot middleware opens to non-Owners (§7). The mobile guard is where those rules will plug in.
+
+### 16.6 Verification
+
+- **ERP unit, 16/16.** `agent.test.ts` covers:
+  - catalog v1.1: routes resolve to `project_contract` / `project_invoice`;
+  - `submoduleFor` maps `/pmo/contracts/<id>` to A.Contract;
+  - PGlite reads: the contract label is correct, `end_date` is readable, and values, notes and PII never leave ERP;
+  - the contract → invoices edge;
+  - a TA-only user is refused (403, fails closed).
+- **Python, 44 passed.**
+  - `test_contextual_ask_uses_the_erp_resolved_page_record`: "Kontrak ini berakhir kapan?" answers from the page record; the value question gets presence only; page feedback offers a data correction on the record plus a Feature Request; a list page invents no record.
+  - ruff: clean.
+- **`next build`: clean.**
+- **Full harness: 15 PASS, exit 0.** The Agent browser journey at 390 px:
+  1. launcher Beranda with "Semua modul";
+  2. PMO sheet → A.Contract card list, with no desktop table and no horizontal scroll, and the sort/filter sheet;
+  3. full-screen contract record with all six sections;
+  4. **Tanya Agent** → chips `PMO › A.Contract` and `project_contract`; "Kontrak ini berakhir kapan?" is answered about the open record;
+  5. "Tabel ini susah dipakai di HP" → Masukan → Feature Request from this page → confirmed in ERP;
+  6. related TM Invoice → **Serahkan ke Finance** → *Menunggu Finance* → **Verifikasi → Terima** → *Diterima Finance*;
+  7. desktop layout restored at 1440 px.
+- **Desktop at 1440 px:** the A.Contract page is unchanged (`exploration/evidence/mobile-shell/ms2-desktop-contracts-unchanged.png`). The record route renders as a read-first page in the desktop shell.

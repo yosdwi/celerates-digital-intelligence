@@ -42,7 +42,9 @@ MAX_TEXT = 1000
 CUES = re.compile(
     r"\b(harusnya|seharusnya|sebaiknya|mestinya|semestinya|tolong (?:tambah|perbaiki|ubah|ganti)\w*|perbaiki|"
     r"tambahkan|fitur|bug|error|eror|gagal|tidak bisa|nggak bisa|gak bisa|ga bisa|tidak muncul|salah|keliru|"
-    r"sudah (?:berubah|tidak berlaku|diganti)|kurang tepat|usul|saran|should|wrong|broken|outdated|feature)\b",
+    r"sudah (?:berubah|tidak berlaku|diganti)|kurang tepat|usul|saran|should|wrong|broken|outdated|feature|"
+    # MS2: usability complaints on a page ("tabel ini susah dipakai di HP") are feedback too.
+    r"susah|sulit|ribet|bingung|membingungkan|kurang jelas|tidak jelas|kurang kelihatan|tidak kelihatan|hard to use|confusing)\b",
     re.I,
 )
 AGENT_CUES = re.compile(r"\b(jawaban(mu| kamu| agent| tadi| sebelumnya)?|kamu salah|agent salah|answer)\b", re.I)

@@ -35,7 +35,7 @@ const AgentThread = dynamic(() => import("./agent-thread"), {
 
 type AgentContext = {
   enabled: boolean;
-  context: { path: string; module: string; label: string };
+  context: { path: string; module: string; label: string; submodule?: { label: string; href: string } | null };
   entity: { type: string; type_label: string; id: string; label: string; href: string } | null;
   capabilities?: { reasoning: string; voice: boolean };
   console?: boolean;
@@ -294,8 +294,19 @@ export function AgentPanel() {
               <h2 id="celerates-agent-title" className="text-base font-semibold text-slate-900">
                 Celerates Agent
               </h2>
-              <p className="mt-0.5 truncate text-xs text-slate-500" data-agent-context>
-                {context.label} · {agentContext?.entity ? `${agentContext.entity.type_label} ${agentContext.entity.label}` : "ringkasan modul"}
+              {/* MS2 contextual envelope: what "ini" refers to, resolved by ERP from this page (doc 18 §16). */}
+              <p className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-slate-600" data-agent-context data-agent-entity={agentContext?.entity?.type ?? ""}>
+                <span className="max-w-full truncate rounded-full bg-white px-2 py-0.5 font-semibold ring-1 ring-slate-200">
+                  {context.label}
+                  {agentContext?.context.submodule ? ` › ${agentContext.context.submodule.label}` : ""}
+                </span>
+                {agentContext?.entity ? (
+                  <span className="max-w-full truncate rounded-full bg-brand-50 px-2 py-0.5 font-semibold text-brand-700 ring-1 ring-brand-100" title={`${agentContext.entity.type_label} ${agentContext.entity.label}`}>
+                    {agentContext.entity.type_label} · {agentContext.entity.label}
+                  </span>
+                ) : (
+                  <span className="truncate">ringkasan modul</span>
+                )}
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-1">

@@ -5,6 +5,7 @@ import { sql } from "@/db";
 import { requirePilotActor } from "@/lib/actor";
 import { MODULES, operationalContext } from "@/lib/operations/policy";
 import { CATALOG, hrefFor, resolvePageEntity } from "./catalog";
+import { submoduleFor } from "@/lib/module-access";
 import { delegationConfigured, mintDelegation, type DelegationContext } from "./delegation";
 import { AgentReadError, canReadEntityModule, loadActor, type AgentActor } from "./reads";
 
@@ -70,7 +71,10 @@ export async function pageContext(actor: AgentActor, rawPath: unknown) {
       if (row) entity = { type: def.type, type_label: def.label, id: ref.id, label: row.label, href: hrefFor(def.type, ref.id) };
     }
   }
-  return { context: { ...context, label: MODULES[context.module] }, entity };
+  // MS2 contextual envelope (doc 18 §16): module, submodule and route from the registry, entity from the catalog.
+  // Everything is derived here from the route under the user's authority; nothing is taken from the client.
+  const sub = submoduleFor(context.path);
+  return { context: { ...context, label: MODULES[context.module], submodule: sub ? { label: sub.label, href: sub.href } : null }, entity };
 }
 
 export function delegate(actor: AgentActor, ctx: DelegationContext): string {

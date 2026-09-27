@@ -6,6 +6,7 @@ import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
 import postgres from "postgres";
 import { EventSchemas } from "@ag-ui/core/schemas";
 import { CATALOG, entityTypes, hrefFor, publicCatalog, resolvePageEntity } from "../src/lib/agent/catalog";
+import { submoduleFor } from "../src/lib/module-access";
 import { CONSOLE_AUDIENCE, DelegationError, mintConsoleSignIn, mintDelegation, verifyDelegation } from "../src/lib/agent/delegation";
 import { applyEvent, newRun, toThreadMessages } from "../src/lib/agent/run-state";
 import { readEntity, readEntitySignals, readNeighbours, search, searchTerms, loadActor, AgentReadError } from "../src/lib/agent/reads";
@@ -71,14 +72,21 @@ test("ERP delegation: Ed25519, short-lived, issuer/audience bound, rotation-awar
 });
 
 test("Entity Catalog v1: routes resolve, sensitivity is declared, forbidden fields absent", () => {
-  assert.equal(entityTypes().length, 8);
+  assert.equal(entityTypes().length, 10);
   assert.deepEqual(resolvePageEntity(`/sales/opportunity-tracker/${ID}/edit?x=1`), { type: "sales_opportunity", id: ID });
   assert.deepEqual(resolvePageEntity(`/marketing/${ID}/edit`), { type: "lead", id: ID });
   assert.deepEqual(resolvePageEntity(`/sales/${ID}/edit`), { type: "commercial_pq", id: ID });
   assert.deepEqual(resolvePageEntity(`/ta/${ID}/edit`), { type: "requisition", id: ID });
   assert.deepEqual(resolvePageEntity(`/sales/accounts/${ID}`), { type: "crm_client", id: ID });
   assert.deepEqual(resolvePageEntity(`/tm/employee/${ID}`), { type: "employee", id: ID });
-  for (const path of ["/sales", `/pmo/invoices/${ID}/edit`, `/sales/opportunity-tracker/${ID}/edit/extra`, `/sales/not-a-uuid/edit`, "//evil"])
+  // MS2: the PMO records the mobile workflow opens (mobile detail and desktop edit routes).
+  assert.deepEqual(resolvePageEntity(`/pmo/contracts/${ID}`), { type: "project_contract", id: ID });
+  assert.deepEqual(resolvePageEntity(`/pmo/contracts/${ID}/edit`), { type: "project_contract", id: ID });
+  assert.deepEqual(resolvePageEntity(`/pmo/invoices/${ID}`), { type: "project_invoice", id: ID });
+  assert.deepEqual(submoduleFor(`/pmo/contracts/${ID}`), { module: "pmo", href: "/pmo/contracts", label: "A.Contract" });
+  assert.deepEqual(submoduleFor(`/pmo/invoices/${ID}`)?.label, "TM Invoice");
+  assert.equal(submoduleFor("/"), null);
+  for (const path of ["/sales", `/pmo/invoices/${ID}/edit/extra`, `/pmo/contracts/billing-schedule`, `/sales/opportunity-tracker/${ID}/edit/extra`, `/sales/not-a-uuid/edit`, "//evil"])
     assert.equal(resolvePageEntity(path), null, path);
   assert.equal(hrefFor("task", ID), "/tasks");
   const forbidden = /salary|allowance|religion|ptkp|npwp|nik|bank|password|token|gender|marital|bpjs|signature/i;
@@ -292,6 +300,20 @@ test("delegated catalog reads: sensitivity, relationships, search, signal parity
     // `Perlu perhatian` wording/links snapshot: any change here must be deliberate.
     const metadata = panel.groups.map(({ key, module, title, rule, source, unit, href, action }) => ({ key, module, title, rule, source, unit, href, action }));
     assert.equal(createHash("sha256").update(JSON.stringify(metadata)).digest("hex"), "08eeb5fd7a4b55ef15ae6b64a1c518fe6f08a2b5fc08ef10ff9983c28ebd970a");
+
+    // MS2 contextual envelope: PMO contract/invoice are readable to PMO readers only; values stay presence-only.
+    const [opty] = await sql`INSERT INTO opportunities (opty_no,client_name,project_name,service_type_code,sales_pic_name,price_amount) VALUES ('OPTY-77','PT Arunika Synthetic','Project X','outsourcing','Sales',424242) RETURNING id`;
+    const [contract] = await sql`INSERT INTO project_contracts (opportunity_id,monthly_value_amount,total_value_amount,contract_duration_months,start_date,end_date,notes) VALUES (${opty.id},31313131,375757572,12,'2025-10-19','2026-10-18','PRIVATE CONTRACT NOTE') RETURNING id`;
+    const [invoice] = await sql`INSERT INTO project_invoices (opportunity_id,services_month_start,price_per_month,status_code,notes) VALUES (${opty.id},'2026-08-01',31313131,'planned','PRIVATE INVOICE NOTE') RETURNING id`;
+    const contractRead = await readEntity(sql, ownerActor, "project_contract", contract.id);
+    assert.equal(contractRead.entity.label, "PT Arunika Synthetic · OPTY-77");
+    assert.equal(contractRead.entity.fields.find((f) => f.name === "end_date")?.value, "2026-10-18");
+    assert.doesNotMatch(JSON.stringify(contractRead), /31313131|375757572|PRIVATE/, "contract values and notes never leave ERP");
+    assert.deepEqual(contractRead.entity.commercial.map((c) => c.state), ["terisi", "terisi"]);
+    const contractEdges = (await readNeighbours(sql, ownerActor, "project_contract", contract.id)).edges;
+    assert.deepEqual(contractEdges.find((e) => e.name === "invoices")?.items.map((i) => i.id), [invoice.id]);
+    assert.equal((await readEntity(sql, ownerActor, "project_invoice", invoice.id)).entity.label, "PT Arunika Synthetic · 2026-08");
+    await assert.rejects(readEntity(sql, taActor, "project_contract", contract.id), (e: AgentReadError) => e.status === 403, "fails closed without PMO access");
 
     await sql`UPDATE users SET status='rejected' WHERE id=${member.id}`;
     await assert.rejects(loadActor(sql, member.id), (e: AgentReadError) => e.status === 403, "revoked user loses delegated reads");

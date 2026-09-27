@@ -267,6 +267,29 @@ STOPWORDS = set(
 RECORD_IN_TEXT = re.compile(r"\b(?:REQ|OPTY|TASK|FR|LEAD)-?[A-Z0-9]*-?\d[\w-]*", re.I)
 RECORD_NO = re.compile(r"^(req|opty|task|fr|lead|pq|inv|crm)[-\w]*\d", re.I)
 MAX_RESULT_LINES = 4
+# MS2: "ini / tersebut / this" refers to the record the user is looking at (ERP-resolved page entity, doc 18 §16).
+DEICTIC = re.compile(r"\b(ini|tersebut|this)\b", re.I)
+
+
+def _page_entity(ctx):
+    """The record ERP resolved from the page and signed into the delegation, if any. Never taken from the client."""
+    context = ctx.principal.context if isinstance(ctx.principal.context, dict) else {}
+    entity = context.get("entity")
+    if isinstance(entity, dict) and entity.get("type") and entity.get("id"):
+        return {"type": str(entity["type"]), "id": str(entity["id"])}
+    return None
+
+
+def _field_lines(entity, terms):
+    """Fields of the page record that the question names (deterministic, from the governed read only)."""
+    lines = []
+    for f in entity.get("fields", []):
+        if _overlap(terms, f["label"]):
+            lines.append(f"{f['label']}: {f['value'] or '— (kosong)'}")
+    for c in entity.get("commercial", []):
+        if _overlap(terms, c["label"]) or {"nilai", "harga", "value"} & set(terms):
+            lines.append(f"{c['label']}: {c['state']} di ERP; nilai komersial tidak dibagikan ke Agent.")
+    return lines
 
 
 def _words(text):
@@ -498,9 +521,16 @@ def ask_deterministic(ctx, query, fallback=False, document=None):
     results = found["results"]
     exact = [r for r in results if any(RECORD_NO.match(t) and t in r["label"].lower() for t in terms)]
     focus = exact[0] if len(exact) == 1 else results[0] if len(results) == 1 and not partial else None
+    page_entity = _page_entity(ctx)
+    from_page = bool(page_entity and not exact and (DEICTIC.search(query) or (not results and not found_signals)))
+    if from_page:
+        focus = page_entity
     examined = None
     if focus:
-        _, record_lines, _ = _read_record(ctx, focus["type"], focus["id"])
+        entity, record_lines, _ = _read_record(ctx, focus["type"], focus["id"])
+        if from_page:
+            lines += [f"Tentang record yang sedang Anda buka: {entity['type_label']} {entity['label']}."]
+            lines += _field_lines(entity, terms)
         lines += record_lines
         examined = f"{focus['type']}/{focus['id']}"
     elif results:

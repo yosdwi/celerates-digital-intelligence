@@ -2279,6 +2279,136 @@
     "reviewSubtitle": "Approvals and updates from your workflows",
     "markAllRead": "Mark read",
     "reviewEmpty": "Nothing is waiting for you.",
-    "unreadItem": "Unread"
+    "unreadItem": "Unread",
+    "list": {
+      "search": "Search",
+      "sortFilter": "Sort & filter",
+      "status": "Status",
+      "sort": "Sort",
+      "empty": "Nothing matches.",
+      "show": "Show {count}"
+    },
+    "record": {
+      "open": "Open",
+      "noFile": "No file yet"
+    },
+    "pmo": {
+      "contracts": {
+        "title": "A.Contract"
+      },
+      "invoices": {
+        "title": "TM Invoice",
+        "serviceMonth": "Service month {month}",
+        "plan": "Planned {date}",
+        "bastPresent": "BAST attached",
+        "bastMissing": "No BAST yet"
+      },
+      "tabs": {
+        "all": "All",
+        "active": "Active",
+        "ending": "≤ 30 days",
+        "followUp": "Needs follow-up",
+        "ended": "Ended"
+      },
+      "sort": {
+        "endSoon": "Ending soonest",
+        "client": "Client name",
+        "startNew": "Newest start",
+        "monthNew": "Newest service month"
+      },
+      "status": {
+        "upcoming": "Not started",
+        "active": "Active",
+        "ending": "Ends in {days} days",
+        "ended": "Ended",
+        "undated": "No period"
+      },
+      "followUp": {
+        "financeReturned": "Returned by Finance",
+        "invoicesOverdue": "{count} invoices overdue",
+        "billingWithoutInvoice": "{count} months without invoice",
+        "financeWaiting": "Waiting for Finance"
+      },
+      "invoiceStatus": {
+        "overdue": "Overdue",
+        "planned": "Planned",
+        "submitted": "Submitted",
+        "canceled": "Canceled"
+      },
+      "handoffStatus": {
+        "pending": "Not handed over",
+        "notified": "Waiting for Finance",
+        "received": "Received by Finance",
+        "needs_revision": "Returned by Finance"
+      },
+      "perMonth": "/mo",
+      "months": "{count} months",
+      "seeAll": "See all",
+      "notes": "Notes",
+      "askAgent": "Ask Agent",
+      "askAgentInvoice": "Ask Agent",
+      "editDesktop": "Edit in the full form",
+      "contract": {
+        "label": "Contract",
+        "period": "Contract period",
+        "start": "Start",
+        "end": "End",
+        "duration": "Duration",
+        "commercial": "Commercial value",
+        "monthly": "Monthly value",
+        "total": "Total value",
+        "salesType": "Sales type",
+        "pq": "PQ no.",
+        "project": "Project & talent",
+        "projectName": "Project",
+        "service": "Service type",
+        "salesPic": "Sales PIC",
+        "headcount": "Headcount target",
+        "talents": "Talent",
+        "billing": "Monthly billing",
+        "noBilling": "No billing schedule yet.",
+        "noInvoice": "No invoice",
+        "noInvoices": "No TM Invoice yet.",
+        "documents": "Project documents",
+        "noDocuments": "Not in the Document Tracker yet.",
+        "documentMeta": "Document Tracker",
+        "elapsed": "Elapsed"
+      },
+      "invoice": {
+        "label": "TM Invoice",
+        "facts": "Invoice",
+        "serviceMonth": "Service month",
+        "plan": "Invoice plan",
+        "group": "Group",
+        "value": "Monthly value",
+        "submitBast": "BAST submitted",
+        "bast": "BAST",
+        "noBast": "No BAST document yet.",
+        "bastMeta": "Invoice supporting document",
+        "link": "Link",
+        "overdueRule": "Overdue by the submission rule: Planned or empty past the 15th of the following month. This is late submission, not an unpaid bill."
+      },
+      "handoff": {
+        "title": "Handover to Finance",
+        "status": "Status",
+        "notifiedBy": "Handed over by {name}, {at}",
+        "receivedBy": "Received by {name}, {at}",
+        "perProject": "One handover per PQ, not per invoice.",
+        "document": "Document for Finance",
+        "documentMeta": "Link handed over by PMO",
+        "submit": "Hand over to Finance",
+        "resubmit": "Hand over again",
+        "docLink": "Document link",
+        "notes": "Notes (optional)",
+        "consequence": "Sending marks this invoice Submitted and notifies Finance.",
+        "saveOnly": "Save link",
+        "send": "Send",
+        "verify": "Verify documents",
+        "financeNotes": "Finance notes",
+        "revisionRule": "Returning to PMO requires a reason.",
+        "return": "Return",
+        "accept": "Accept"
+      }
+    }
   }
 }

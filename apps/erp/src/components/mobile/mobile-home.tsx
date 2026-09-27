@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useTranslations } from "next-intl";
-import { Bell, Camera, ChevronRight, Mic, Search } from "lucide-react";
+import { Bell, Camera, ChevronRight, LayoutGrid, Mic, Search } from "lucide-react";
 import type { ResolvedModule } from "@/lib/module-access";
 import { useMobileData } from "./data";
 import { openAgent } from "./events";
@@ -30,7 +30,8 @@ export function MobileHome() {
   const user = session?.user as { fullName?: string; name?: string; isOwner?: boolean } | undefined;
   const first = (user?.fullName ?? user?.name ?? "").split(" ")[0];
   const business = modules.filter((m) => m.group === "bisnis");
-  const operational = modules.filter((m) => m.group === "operasional");
+  // Beranda launches the business modules; the full directory (operational modules too) is one tap away.
+  const launcher = business.length ? business : modules.filter((m) => m.group === "operasional");
   const perModule = useMemo(() => {
     const out: Record<string, number> = {};
     for (const g of signals ?? []) if (g.count > 0) out[g.module] = (out[g.module] ?? 0) + g.count;
@@ -80,6 +81,22 @@ export function MobileHome() {
           </button>
         </div>
 
+        {launcher.length > 0 && (
+          <section aria-labelledby="home-launcher" className="flex flex-col gap-2.5">
+            <SectionHeader id="home-launcher" title={business.length ? t("groupBusiness") : t("groupOperational")} />
+            <div className="grid grid-cols-4 gap-2.5">
+              {launcher.map((m) => (
+                <ModuleTile key={m.key} module={m} signal={perModule[m.key]} onOpen={() => setLanding(m)} />
+              ))}
+              <Link href="/modules" data-module-tile="all" className="flex min-h-[90px] flex-col items-center justify-center gap-1.5 rounded-j-card border border-j-line bg-j-surface px-1 py-2.5 text-center text-xs font-semibold leading-tight text-j-ink shadow-j-card">
+                <span className="flex h-[38px] w-[38px] items-center justify-center rounded-xl bg-[#eef1f5] text-[#3f4a5c]">
+                  <LayoutGrid aria-hidden className="h-[21px] w-[21px]" strokeWidth={1.9} />
+                </span>
+                {t("allModules")}
+              </Link>
+            </div>
+          </section>
+        )}
         {attention.length > 0 && (
           <button type="button" onClick={openAgent} data-home-attention className="flex items-center gap-3 rounded-j-card border border-j-warn-line bg-j-warn-soft px-3.5 py-3 text-left text-j-ink">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-j-warn-dot text-sm font-extrabold text-white">{attention.reduce((n, g) => n + g.count, 0)}</span>
@@ -91,26 +108,6 @@ export function MobileHome() {
           </button>
         )}
 
-        {business.length > 0 && (
-          <section aria-labelledby="home-business" className="flex flex-col gap-2.5">
-            <SectionHeader id="home-business" title={t("groupBusiness")} action={<Link href="/modules" className="text-[13px] font-semibold text-j-accent">{t("allModules")}</Link>} />
-            <div className="grid grid-cols-4 gap-2.5">
-              {business.map((m) => (
-                <ModuleTile key={m.key} module={m} signal={perModule[m.key]} onOpen={() => setLanding(m)} />
-              ))}
-            </div>
-          </section>
-        )}
-        {operational.length > 0 && (
-          <section aria-labelledby="home-operational" className="flex flex-col gap-2.5">
-            <SectionHeader id="home-operational" title={t("groupOperational")} />
-            <div className="grid grid-cols-4 gap-2.5">
-              {operational.map((m) => (
-                <ModuleTile key={m.key} module={m} signal={perModule[m.key]} onOpen={() => setLanding(m)} />
-              ))}
-            </div>
-          </section>
-        )}
         {modules.length === 0 && <Card className="p-4 text-sm text-j-muted">{t("noModules")}</Card>}
 
         <section aria-labelledby="home-recent" className="flex flex-col gap-2">

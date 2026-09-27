@@ -189,13 +189,12 @@ export async function agentBrowser({ base, cookies }) {
     await page.screenshot({ path: evidenceDir + '/agent-m1-mobile.png' });
     await page.keyboard.press('Escape');
 
-    // Role-aware Beranda from the registry: the Owner sees the seven business modules and the operational ones.
+    // Beranda is launcher-first: the seven business modules from the registry, then "Semua modul" (MS2).
     await page.goto(base + '/');
     const home = page.locator('[data-mobile-home]');
     await home.waitFor();
     const tiles = await home.locator('[data-module-tile]').evaluateAll((els) => els.map((e) => e.getAttribute('data-module-tile')));
-    assert.deepEqual(tiles.slice(0, 7), ['marketing', 'sales', 'ta', 'hr', 'tm', 'pmo', 'finance'], 'business modules in registry order');
-    assert.ok(!tiles.includes('feature-requests') && tiles.includes('files') && tiles.includes('executive'), 'operational modules; Feature Request stays behind Masukan');
+    assert.deepEqual(tiles, ['marketing', 'sales', 'ta', 'hr', 'tm', 'pmo', 'finance', 'all'], 'business modules in registry order, then the full directory');
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390);
     await page.screenshot({ path: evidenceDir + '/ms1-mobile-home.png' });
     // Module landing sheet: real submodules, cross-division ownership shown.
@@ -206,7 +205,66 @@ export async function agentBrowser({ base, cookies }) {
     await page.screenshot({ path: evidenceDir + '/ms1-mobile-landing-pmo.png' });
     await landing.locator('[data-submodule="/pmo/contracts"]').click();
     await page.waitForURL('**/pmo/contracts');
-    await page.locator('[data-mobile-context="pmo"]').waitFor();
+
+    // MS2 PMO journey (doc 18 §16): A.Contract as a card list, not a table.
+    await page.locator('[data-module-header="pmo"]').waitFor();
+    const list = page.locator('[data-mobile-list]');
+    await list.waitFor();
+    assert.equal(await page.locator('table:visible').count(), 0, 'no desktop table on a phone');
+    assert.equal(await page.locator('[data-mobile-context]').count(), 0, 'a mobile-native page needs no context bar');
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390);
+    await list.locator('[data-list-filter]').click();
+    await page.getByRole('dialog', { name: 'Urutkan & filter' }).waitFor();
+    await page.keyboard.press('Escape');
+    await page.screenshot({ path: evidenceDir + '/ms2-contracts.png' });
+    // Full-screen record with grouped sections.
+    await list.locator('[data-list-item]').first().click();
+    await page.waitForURL(/\/pmo\/contracts\/[0-9a-f-]{36}$/);
+    const contractPath = new URL(page.url()).pathname;
+    await page.locator('[data-record-header]').waitFor();
+    for (const section of ['period', 'commercial', 'billing', 'invoices', 'documents', 'handoff']) await page.locator(`[data-record-section="${section}"]`).waitFor();
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390);
+    await page.screenshot({ path: evidenceDir + '/ms2-contract-record.png' });
+    // Contextual Agent from the record: ERP resolves "ini" to this contract; the header shows it.
+    await page.locator('[data-sticky-actions] [data-ask-agent]').click();
+    await panel.getByLabel('Pesan untuk Agent').waitFor();
+    const ctxChip = panel.locator('[data-agent-context]');
+    await ctxChip.getByText('PMO › A.Contract', { exact: true }).waitFor();
+    assert.equal(await ctxChip.getAttribute('data-agent-entity'), 'project_contract');
+    await panel.getByLabel('Pesan untuk Agent').fill('Kontrak ini berakhir kapan?');
+    await panel.getByRole('button', { name: 'Kirim' }).click();
+    await panel.getByText('Tentang record yang sedang Anda buka', { exact: false }).last().waitFor({ timeout: 30000 });
+    // Feedback about this page goes through the existing Masukan governance, carrying the page.
+    await panel.getByLabel('Pesan untuk Agent').fill('Tabel ini susah dipakai di HP');
+    await panel.getByRole('button', { name: 'Kirim' }).click();
+    await panel.getByText('Ini terdengar seperti masukan', { exact: false }).last().waitFor({ timeout: 30000 });
+    await panel.getByRole('button', { name: 'Jadikan Feature Request' }).last().click();
+    await panel.getByText(`Saya siapkan sebagai Feature Request dari halaman ${contractPath}`, { exact: false }).last().waitFor({ timeout: 30000 });
+    const ms2Fr = panel.locator('[data-proposal][data-proposal-state="pending"]').last();
+    await page.screenshot({ path: evidenceDir + '/ms2-contract-agent.png' });
+    await ms2Fr.getByRole('button', { name: /^Konfirmasi 1 perubahan/ }).click();
+    await panel.locator('[data-proposal][data-proposal-state="applied"]').last().getByText(/FR-\d+-\d+ dibuat/).waitFor({ timeout: 30000 });
+    await page.keyboard.press('Escape');
+    // TM Invoice → PMO hands over to Finance → Finance accepts, all on the phone with the existing actions.
+    await page.locator('[data-related-invoice]').first().click();
+    await page.waitForURL(/\/pmo\/invoices\/[0-9a-f-]{36}$/);
+    await page.locator('[data-record-section="bast"]').waitFor();
+    // Earlier journeys may already have handed this PQ over; the phone continues from whatever state ERP holds.
+    const handoffState = await page.locator('[data-handoff-state]').getAttribute('data-handoff-state');
+    assert.ok(['pending', 'needs_revision', 'notified'].includes(handoffState), 'handoff open for this run: ' + handoffState);
+    if (handoffState !== 'notified') {
+      await page.locator('[data-action="submit-to-finance"]').click();
+      const handoverSheet = page.getByRole('dialog', { name: /Serahkan (ulang )?ke Finance/ });
+      await handoverSheet.getByLabel('Tautan dokumen').fill('https://drive.google.com/drive/folders/synthetic-ms2');
+      await page.screenshot({ path: evidenceDir + '/ms2-invoice-handover.png' });
+      await handoverSheet.getByRole('button', { name: 'Kirim', exact: true }).click();
+      await page.locator('[data-handoff-state="notified"]').waitFor({ timeout: 30000 });
+    }
+    await page.locator('[data-action="finance-verify"]').click();
+    await page.getByRole('dialog', { name: 'Verifikasi dokumen' }).getByRole('button', { name: 'Terima' }).click();
+    await page.locator('[data-handoff-state="received"]').waitFor({ timeout: 30000 });
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390);
+    await page.screenshot({ path: evidenceDir + '/ms2-invoice-record.png' });
     // Modul directory and Tinjau.
     await tabbar.getByRole('link', { name: 'Modul' }).click();
     await page.locator('[data-module-directory]').getByText('Talent Management', { exact: true }).waitFor();
@@ -221,7 +279,7 @@ export async function agentBrowser({ base, cookies }) {
     await page.setViewportSize({ width: 1440, height: 1000 });
     assert.equal(await page.locator('[data-mobile-tabbar]').isVisible(), false, 'desktop keeps the sidebar layout');
     assert.deepEqual(errors, [], 'no browser runtime exceptions');
-    console.log('PASS: Agent browser — one surface (Ringkasan + one composer, no tabs), Tanyakan with typed evidence, keyword search, free-text Masukan → Feature Request confirmed, form fallback, entity context, follow-up and file import confirmed in ERP, keyboard; mobile shell (no sidebar, tab bar, full-screen Agent, registry Beranda, landing sheet, Modul, Tinjau, PWA manifest + service worker); Company Files explorer, upload queued, file found and asked about in the Agent, scanned attachment saved to Company Files');
+    console.log('PASS: Agent browser — one surface (Ringkasan + one composer, no tabs), Tanyakan with typed evidence, keyword search, free-text Masukan → Feature Request confirmed, form fallback, entity context, follow-up and file import confirmed in ERP, keyboard; mobile shell (no sidebar, tab bar, full-screen Agent, launcher Beranda, landing sheet, Modul, Tinjau, PWA manifest + service worker); MS2 PMO (card list + sort sheet, full-screen contract record, contextual Agent with the record, Masukan → Feature Request from the page, TM Invoice → Finance handover accepted); Company Files explorer, upload queued, file found and asked about in the Agent, scanned attachment saved to Company Files');
   } finally {
     await browser.close();
   }

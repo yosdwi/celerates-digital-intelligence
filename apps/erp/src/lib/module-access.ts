@@ -141,3 +141,20 @@ export function moduleForPath(pathname: string): ModuleConfig | undefined {
     .sort((a, b) => b.basePath.length - a.basePath.length)
     .find((m) => pathname === m.basePath || pathname.startsWith(m.basePath + "/"));
 }
+
+/** The registry submodule a route belongs to (longest matching submodule route), e.g. /pmo/contracts/<id> → A.Contract. */
+export function submoduleFor(pathname: string): { module: string; href: string; label: string } | null {
+  const clean = pathname.split(/[?#]/)[0];
+  let best: { module: string; href: string; label: string } | null = null;
+  for (const m of MODULES)
+    for (const s of m.subPages)
+      if ((clean === s.href || clean.startsWith(s.href + "/")) && (!best || s.href.length > best.href.length))
+        best = { module: m.key, href: s.href, label: s.label };
+  return best;
+}
+
+// Routes that render their own full-screen Jernih surface on a phone (MS1 shell pages, MS2 PMO). Other module
+// routes still show their desktop page inside the shell, under the module context bar.
+const UUID_PART = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+const MOBILE_NATIVE = [/^\/$/, /^\/modules$/, /^\/notifications$/, new RegExp(`^/pmo/(contracts|invoices)(/${UUID_PART})?$`, "i")];
+export const isMobileNative = (pathname: string) => MOBILE_NATIVE.some((r) => r.test(pathname.split(/[?#]/)[0]));

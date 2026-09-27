@@ -37,7 +37,9 @@ export type EntityType =
   | "crm_client"
   | "employee"
   | "task"
-  | "feature_request";
+  | "feature_request"
+  | "project_contract"
+  | "project_invoice";
 
 const f = (name: string, label: string, sensitivity: Sensitivity = "internal", kind: FieldKind = "text"): CatalogField => ({
   name,
@@ -255,6 +257,57 @@ const ENTITIES: CatalogEntity[] = [
       { name: "requisitions", label: "Requisition penugasan", target: "requisition", kind: "fk", sql: "SELECT DISTINCT requisition_id AS id FROM talent_assignments WHERE employee_id=$1 AND requisition_id IS NOT NULL" },
     ],
   },
+  // MS2 (doc 18 §16): PMO records the mobile workflow opens, so the Agent knows "this contract / this invoice".
+  // Contract and invoice values are commercial (presence only). Documents (BAST, PKS) are never read here.
+  {
+    type: "project_contract",
+    label: "Kontrak (A.Contract)",
+    module: "pmo",
+    table: "project_contracts",
+    alias: "pc",
+    display: "(SELECT o.client_name || ' · ' || o.opty_no FROM opportunities o WHERE o.id = pc.opportunity_id)",
+    fields: [
+      f("start_date", "Mulai kontrak", "internal", "date"),
+      f("end_date", "Berakhir", "internal", "date"),
+      f("contract_duration_months", "Durasi (bulan)", "internal", "number"),
+      f("sales_type_code", "Tipe penjualan"),
+      f("monthly_value_amount", "Nilai per bulan", "commercial"),
+      f("total_value_amount", "Nilai total", "commercial"),
+      f("notes", "Catatan (teks bebas)", "pii"),
+    ],
+    search: [],
+    routes: ["/pmo/contracts/{id}", "/pmo/contracts/{id}/edit"],
+    listHref: "/pmo/contracts",
+    edges: [
+      { name: "pq", label: "PQ asal", target: "commercial_pq", kind: "fk", sql: "SELECT opportunity_id AS id FROM project_contracts WHERE id=$1" },
+      { name: "invoices", label: "TM Invoice", target: "project_invoice", kind: "fk", sql: "SELECT i.id FROM project_invoices i JOIN project_contracts c ON c.opportunity_id = i.opportunity_id WHERE c.id=$1" },
+    ],
+  },
+  {
+    type: "project_invoice",
+    label: "TM Invoice",
+    module: "pmo",
+    table: "project_invoices",
+    alias: "pi",
+    display: "(SELECT o.client_name FROM opportunities o WHERE o.id = pi.opportunity_id) || coalesce(' · ' || to_char(pi.services_month_start, 'YYYY-MM'), '')",
+    fields: [
+      f("services_month_start", "Bulan layanan", "internal", "date"),
+      f("invoice_plan_date", "Rencana invoice", "internal", "date"),
+      f("status_code", "Status tersimpan"),
+      f("issue_code", "Kendala"),
+      f("group_name", "Grup"),
+      f("submit_bast_date", "Tanggal submit BAST", "internal", "date"),
+      f("price_per_month", "Nilai per bulan", "commercial"),
+      f("notes", "Catatan (teks bebas)", "pii"),
+    ],
+    search: [],
+    routes: ["/pmo/invoices/{id}", "/pmo/invoices/{id}/edit"],
+    listHref: "/pmo/invoices",
+    edges: [
+      { name: "contract", label: "Kontrak", target: "project_contract", kind: "fk", sql: "SELECT c.id FROM project_contracts c JOIN project_invoices i ON i.opportunity_id = c.opportunity_id WHERE i.id=$1" },
+      { name: "pq", label: "PQ asal", target: "commercial_pq", kind: "fk", sql: "SELECT opportunity_id AS id FROM project_invoices WHERE id=$1" },
+    ],
+  },
   {
     type: "task",
     label: "Task",
@@ -308,7 +361,7 @@ const ENTITIES: CatalogEntity[] = [
   },
 ];
 
-export const CATALOG_VERSION = "entity-catalog-v1";
+export const CATALOG_VERSION = "entity-catalog-v1.1";
 export const CATALOG: ReadonlyMap<EntityType, CatalogEntity> = new Map(ENTITIES.map((e) => [e.type, e]));
 export const entityTypes = () => [...CATALOG.keys()];
 export function entity(type: string): CatalogEntity | undefined {

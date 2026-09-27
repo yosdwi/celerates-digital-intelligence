@@ -8,14 +8,12 @@ import { signOut, useSession } from "next-auth/react";
 import { useLocale, useTranslations } from "next-intl";
 import { Activity, Home, Inbox, LayoutGrid, LogOut, ShieldCheck, Sparkles, UserRound } from "lucide-react";
 import { setLocale } from "@/lib/locale-actions";
-import { moduleForPath } from "@/lib/module-access";
+import { isMobileNative, moduleForPath } from "@/lib/module-access";
 import { useMobileData } from "./data";
 import { ACCOUNT_OPEN_EVENT, openAgent } from "./events";
 import { ModuleGlyph, ModuleLandingSheet, useModuleLabel, useOpenModules } from "./modules";
 import { BottomSheet, Row, RowList } from "./primitives";
 
-/** Routes that render their own full-screen Jernih surface (no module context bar). */
-const OWN_SURFACES = ["/", "/modules", "/notifications"];
 const HIDDEN_ON = ["/login", "/setup", "/register", "/pending-approval", "/onboarding-profile"];
 
 export function MobileTabBar() {
@@ -139,7 +137,7 @@ export function MobileContextBar() {
     return config ? modules.find((m) => m.key === config.key) ?? null : null;
   }, [pathname, modules]);
   useEffect(() => setOpen(false), [pathname]);
-  if (status !== "authenticated" || !current || OWN_SURFACES.includes(pathname)) return null;
+  if (status !== "authenticated" || !current || isMobileNative(pathname)) return null;
   const sub = current.subPages.find((s) => s.href === pathname);
   return (
     <>

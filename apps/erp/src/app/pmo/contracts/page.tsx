@@ -7,6 +7,7 @@ import { OpportunityPicker } from "@/components/opportunity-picker";
 import { ContractsTable } from "./contracts-table";
 import { ExpandableSection } from "@/components/expandable-section";
 import Link from "next/link";
+import { ContractListMobile } from "@/components/mobile/pmo/lists";
 import { RefreshCw, FileSignature } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
@@ -15,7 +16,8 @@ import { PendingContractSetups } from "../pending-contract-setups";
 import { getPendingContractSetups } from "@/lib/pq-approval";
 import { Field, SelectField } from "@/components/form-fields";
 
-export default async function ContractsPage() {
+export default async function ContractsPage({ searchParams }: { searchParams?: Promise<{ q?: string }> }) {
+  const q = (await searchParams)?.q;
   const t = await getTranslations("pmo.contracts.page");
   const [data, opportunityOptions, pendingContractSetups] = await Promise.all([
     db
@@ -57,7 +59,12 @@ export default async function ContractsPage() {
   const totalMonthly = data.reduce((sum, d) => sum + (d.monthly_value_amount ?? 0), 0);
 
   return (
-    <div className="min-h-screen">
+    <>
+    {/* Phone: mobile-native list (doc 18 §16). Desktop below is unchanged. */}
+    <div className="md:hidden">
+      <ContractListMobile query={typeof q === "string" ? q.slice(0, 80) : undefined} />
+    </div>
+    <div className="hidden md:block min-h-screen">
       <PageHeader
         icon={FileSignature}
         color="bg-purple-500"
@@ -102,5 +109,6 @@ export default async function ContractsPage() {
         </ExpandableSection>
       </main>
     </div>
+    </>
   );
 }

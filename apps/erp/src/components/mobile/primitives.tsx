@@ -8,11 +8,15 @@ import { ChevronRight, X } from "lucide-react";
 const cx = (...parts: (string | false | null | undefined)[]) => parts.filter(Boolean).join(" ");
 
 /** A full-screen mobile surface: Jernih ground, safe-area top inset, room for the tab bar. */
-export function MobileScreen({ children, className, label }: { children: React.ReactNode; className?: string; label?: string }) {
+export function MobileScreen({ children, className, label, withActions }: { children: React.ReactNode; className?: string; label?: string; withActions?: boolean }) {
   return (
     <div
       aria-label={label}
-      className={cx("min-h-[100dvh] bg-j-bg font-jakarta text-j-ink", "px-5 pb-[calc(104px+env(safe-area-inset-bottom))] pt-[max(20px,env(safe-area-inset-top))]", className)}
+      className={cx(
+        "min-h-[100dvh] bg-j-bg font-jakarta text-j-ink px-5 pt-[max(20px,env(safe-area-inset-top))] md:min-h-0 md:py-8",
+        withActions ? "pb-[calc(176px+env(safe-area-inset-bottom))]" : "pb-[calc(104px+env(safe-area-inset-bottom))]",
+        className,
+      )}
     >
       <div className="mx-auto flex max-w-xl flex-col gap-4">{children}</div>
     </div>
@@ -46,11 +50,15 @@ export function GroupLabel({ children }: { children: React.ReactNode }) {
   return <h2 className="mt-1 text-xs font-bold uppercase tracking-[0.6px] text-j-muted">{children}</h2>;
 }
 
-export function Card({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <div className={cx("rounded-j-card border border-j-line bg-j-surface shadow-j-card", className)}>{children}</div>;
+export function Card({ children, className, ...rest }: { children: React.ReactNode; className?: string } & Omit<React.HTMLAttributes<HTMLDivElement>, "className" | "children">) {
+  return (
+    <div {...rest} className={cx("rounded-j-card border border-j-line bg-j-surface shadow-j-card", className)}>
+      {children}
+    </div>
+  );
 }
 
-type Tone = "ok" | "warn" | "accent" | "muted" | "danger";
+export type Tone = "ok" | "warn" | "accent" | "muted" | "danger";
 const TONES: Record<Tone, string> = {
   ok: "bg-j-ok-soft text-j-ok",
   warn: "bg-[#fff1dc] text-[#8a4b06]",
@@ -175,10 +183,13 @@ export function FactRows({ rows, label }: { rows: { label: string; value: React.
   );
 }
 
-/** Bottom action bar for a record's allowed actions. Sits above the tab bar's safe area. */
+/** A record's allowed actions: pinned above the tab bar on a phone, inline at the end of the record on desktop. */
 export function StickyActions({ children }: { children: React.ReactNode }) {
   return (
-    <div className="fixed inset-x-0 bottom-0 z-30 flex gap-2.5 border-t border-j-line bg-j-surface px-5 pb-[calc(14px+env(safe-area-inset-bottom))] pt-3 font-jakarta md:hidden">
+    <div
+      data-sticky-actions
+      className="fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] z-20 flex gap-2.5 border-t border-j-line bg-j-surface/95 px-5 py-3 font-jakarta backdrop-blur md:static md:z-auto md:mt-2 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none"
+    >
       {children}
     </div>
   );
@@ -245,7 +256,4 @@ export function BottomSheet({
   );
 }
 
-export const buttonClass = {
-  primary: "flex h-[50px] flex-1 items-center justify-center gap-2 rounded-[14px] bg-j-accent px-4 text-[15px] font-bold text-white",
-  secondary: "flex h-[50px] flex-1 items-center justify-center gap-2 rounded-[14px] border-[1.5px] border-[#c9d4f2] bg-j-surface px-4 text-[15px] font-bold text-j-accent",
-};
+export { buttonClass } from "./styles";
