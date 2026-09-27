@@ -375,6 +375,7 @@ Extracted = {pages:[{no, blocks:[{kind: heading|text|table|ocr, text, rows?: [[c
 - **ERP `/files` (Company Files explorer):**
   - search, filters (kind, class, linked record, origin, date), preview (PDF/images inline and sandboxed; Office as extracted text), versions, links, upload and **Jadikan pengetahuan**.
   - It lives in ERP, not the Intelligence web: it is an operational surface, and it inherits ERP sessions, delegation and the future PWA.
+  - It is a normal module page that users reach by tapping or clicking, without prompting, as in the [mobile shell baseline](exploration/mobile-operational-shell-baseline.md). Whether it becomes a top-level module stays open there.
 - **Record pages:** a **Berkas** panel listing linked files, including ERP attachments.
 - **Brain Console** (curators): ingestion queue and failures, OCR stats, `pending_review` PII holds, access log, class-policy view (read-only; policy is edited in ERP).
 
