@@ -523,3 +523,33 @@ def test_http_surface_upload_search_content_and_console(erp, monkeypatch):
         )
         assert c.get("/api/files/kinds", headers={"X-ERP-Delegation": token}).json()["kinds"]
     assert hashlib  # sha256 of stored objects is verified on read (see files.content)
+
+
+def test_agent_attachment_is_working_context_until_saved_as_a_company_file(erp):
+    """M6.x: an Agent attachment stays owner-only working context; saving it is explicit, reviewed (kind/class),
+    idempotent, and produces an independent governed file that outlives the attachment's retention."""
+    from cdi.agent import datasets
+
+    owner = who(USER, owner=True)
+    sales = who(SECOND, divisions=["sales"])
+    other = who(PMO_USER, divisions=["pmo"])
+    drop = datasets.store(sales, "manpower-astra.xlsx", xlsx([["Posisi", "Jumlah"], ["Backend Engineer", 3]]))
+    with pytest.raises(files.FilesError):  # someone else's attachment
+        files.save_attachment(other, drop["id"], kind="manpower", owner_division="pmo")
+    with pytest.raises(files.FilesError):  # the kind's class is the minimum
+        files.save_attachment(sales, drop["id"], kind="cv", access_class="division", owner_division="sales")
+    saved = files.save_attachment(sales, drop["id"], kind="manpower", owner_division="sales", title="Manpower Astra Q4")
+    assert saved["already_saved"] is False and saved["access_class"] == "division"
+    assert saved["provenance"] == {"from": "agent_attachment", "name": "manpower-astra.xlsx"}
+    again = files.save_attachment(sales, drop["id"], kind="manpower", owner_division="sales")
+    assert again["already_saved"] is True and again["id"] == saved["id"]
+    drain()
+    assert [h["id"] for h in files.search(sales, "backend engineer")] == [saved["id"]]
+    assert not files.search(other, "backend engineer"), "division class: pmo cannot read a sales file"
+    # The attachment's retention does not touch the governed copy.
+    with connect() as conn:
+        conn.execute("UPDATE agent_datasets SET created_at=now()-interval '31 days' WHERE id=%s", (drop["id"],))
+    datasets.purge()
+    assert datasets.load(sales, drop["id"]) is None
+    assert files.content(owner, saved["id"])[0][:2] == b"PK"
+    assert files.search(sales, "backend engineer")

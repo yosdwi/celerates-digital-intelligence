@@ -438,6 +438,19 @@ async function companyFilesJourney({ base, request, db, env, python, cookies }) 
     loose.set('access_class', 'general');
     const looseRes = await request('/api/files', { method: 'POST', body: loose });
     assert.equal(looseRes.status, 201, 'an Owner may choose a looser class (still a person, not a model)');
+    // M6.x: an Agent attachment stays working context until the user explicitly saves it as a Company File.
+    const drop = await uploadFile(request, 'sop-cuti.pdf', pdfBytes(['SOP Cuti Karyawan', 'Cuti diajukan paling lambat tiga hari kerja sebelumnya.']), 'application/pdf');
+    assert.equal(drop.status, 201, JSON.stringify(drop.body));
+    const post = (path, body) => request(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const first = await (await post('/api/files/from-attachment', { dataset_id: drop.body.id, kind: 'sop', title: 'SOP Cuti' })).json();
+    const keptFile = await (await post('/api/files/from-attachment', { dataset_id: drop.body.id, kind: 'sop', title: 'SOP Cuti' })).json();
+    assert.deepEqual([first.already_saved, keptFile.already_saved, keptFile.id], [false, true, first.id], 'the same bytes are saved once per user');
+    const other = await uploadFile(request, 'sop-lembur.pdf', pdfBytes(['SOP Lembur', 'Lembur disetujui atasan langsung.']), 'application/pdf');
+    const kept = await post('/api/files/from-attachment', { dataset_id: other.body.id, kind: 'sop', title: 'SOP Lembur' });
+    assert.equal(kept.status, 201);
+    const keptBody = await kept.json();
+    assert.deepEqual([keptBody.already_saved, keptBody.provenance.from, keptBody.access_class], [false, 'agent_attachment', 'general']);
+    assert.equal((await post('/api/files/from-attachment', { dataset_id: '00000000-0000-4000-8000-000000000000', kind: 'sop' })).status, 404);
     await worker();
     const files = await brain`SELECT origin, kind, access_class, title FROM files ORDER BY title`;
     assert.ok(files.some((f) => f.origin === 'erp' && f.kind === 'cv' && f.access_class === 'personal'), JSON.stringify(files));
@@ -473,12 +486,15 @@ async function companyFilesJourney({ base, request, db, env, python, cookies }) 
     assert.ok(sopRun.evidence.some((e) => e.type === 'file' && /hal\. 1/.test(e.title)), JSON.stringify(sopRun.evidence));
     assert.match(sopRun.text, /Laptop disiapkan tiga hari/);
 
+    const lembur = await (await request('/api/files?q=' + encodeURIComponent('lembur atasan'))).json();
+    assert.equal(lembur.items[0]?.id, keptBody.id, 'the saved attachment is a searchable Company File');
+
     // ERP deletes the CV attachment → the next sync withdraws it and search no longer finds it.
     await db`DELETE FROM attachments WHERE file_path=${cvKey}`;
     await worker();
     const after = await (await request('/api/files?q=' + encodeURIComponent('java spring'))).json();
     assert.ok(!after.items.some((f) => f.id === cvHit.id), 'a derived index never outlives the source');
-    console.log('PASS: Company Files — ERP CV indexed (identity docs excluded), SOP uploaded and OCR-ready pipeline, class-aware search, open via ERP/Intelligence with access log, Agent finds files without carrying personal content, file attached to the conversation, deletion withdraws');
+    console.log('PASS: Company Files — ERP CV indexed (identity docs excluded), SOP uploaded and OCR-ready pipeline, class-aware search, open via ERP/Intelligence with access log, Agent finds files without carrying personal content, file attached to the conversation, Agent attachment saved explicitly as a Company File (idempotent), deletion withdraws');
   } finally {
     await brain.end();
   }

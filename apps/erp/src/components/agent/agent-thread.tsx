@@ -20,6 +20,7 @@ import { AnswerFeedback } from "./answer-feedback";
 import { MappingCard } from "./mapping";
 import { ProposalCard } from "./proposal";
 import { SubmissionCard } from "./submission";
+import { AttachmentBar, type Attachment } from "./attachment-bar";
 import type { Submission } from "@/lib/agent/run-state";
 
 export type Suggestion = { label: string; run: () => void };
@@ -125,8 +126,8 @@ export default function AgentThread({
   /** `Drop anything`: a CSV/XLSX becomes a dataset, then a proposal the user confirms in ERP. */
   onFile: (file: File) => Promise<string | null>;
   onAction: (action: AgentAction) => void;
-  /** A dropped document or a Company File attached to this conversation; questions also search it until detached. */
-  attachment: { id: string; name: string; kind?: "dataset" | "file" } | null;
+  /** What is attached to this conversation (working context); documents and Company Files are also searched. */
+  attachment: Attachment | null;
   onDetach: () => void;
   onAttachFile?: (file: { id: string; name: string }) => void;
 }) {
@@ -201,14 +202,7 @@ export default function AgentThread({
             </AttachFileContext.Provider>
           </ActionContext.Provider>
         </ThreadPrimitive.Viewport>
-        {attachment && (
-          <p className="mx-3 mt-2 flex items-center justify-between gap-2 rounded-lg bg-sky-50 px-2.5 py-1.5 text-xs text-sky-900" data-agent-attachment>
-            <span className="truncate">Berkas terlampir: {attachment.name} — pertanyaan juga mencari di berkas ini</span>
-            <button type="button" onClick={onDetach} aria-label="Lepas berkas" className="shrink-0 font-semibold hover:underline">
-              Lepas
-            </button>
-          </p>
-        )}
+        {attachment && <AttachmentBar attachment={attachment} onDetach={onDetach} />}
         {fileError && (
           <p role="alert" className="mx-3 mb-0 mt-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-900">
             {fileError}

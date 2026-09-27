@@ -224,7 +224,9 @@ def _store_version(conn, file_id, version, name, body, principal, suffix, media)
     )
 
 
-def create_managed(principal, name, body, *, kind, access_class=None, owner_division=None, title=None, link=None):
+def create_managed(
+    principal, name, body, *, kind, access_class=None, owner_division=None, title=None, link=None, provenance=None
+):
     if not body or len(body) > MAX_BYTES:
         raise FilesError("Berkas kosong atau lebih dari 20 MB.", 413)
     suffix, media = extract.sniff(name, body)
@@ -242,7 +244,7 @@ def create_managed(principal, name, body, *, kind, access_class=None, owner_divi
         one(
             conn,
             """INSERT INTO files(id,origin,kind,title,access_class,owner_division,current_version,created_by,
-               created_by_name) VALUES (%s,'managed',%s,%s,%s,%s,1,%s,%s) RETURNING id""",
+               created_by_name,provenance) VALUES (%s,'managed',%s,%s,%s,%s,1,%s,%s,%s) RETURNING id""",
             (
                 file_id,
                 kind,
@@ -251,6 +253,7 @@ def create_managed(principal, name, body, *, kind, access_class=None, owner_divi
                 owner_division,
                 principal.sub,
                 principal.display_name,
+                json(provenance or {"from": "upload"}),
             ),
         )
         _store_version(conn, file_id, 1, name, body, principal, suffix, media)
@@ -261,6 +264,45 @@ def create_managed(principal, name, body, *, kind, access_class=None, owner_divi
                 (file_id, link["type"], link["id"], link.get("label"), link.get("href"), principal.sub),
             )
     return detail(principal, file_id)
+
+
+def save_attachment(principal, dataset_id, *, kind, access_class=None, owner_division=None, title=None):
+    """M6.x: the user explicitly saves an Agent attachment (working context) as a governed Company File.
+
+    The attachment stays what it was: owner-only, conversation-scoped, purged after its retention. The Company File
+    is an independent copy of the same bytes with a class the user chose (kind default is the minimum), its own
+    versions, ingestion and retention, and provenance pointing back to the attachment. Idempotent per user and
+    content: saving the same bytes again returns the existing file."""
+    from .agent import datasets
+
+    row = datasets.load(principal, dataset_id)
+    if not row:
+        raise FilesError("Lampiran tidak ditemukan untuk Anda.", 404)
+    body = storage().get(row["object_key"])
+    if hashlib.sha256(body).hexdigest() != row["sha256"]:
+        raise FilesError("Isi lampiran tidak cocok dengan catatannya.", 409)
+    with connect() as conn:
+        existing = one(
+            conn,
+            """SELECT f.id FROM files f JOIN file_versions v ON v.file_id=f.id
+               WHERE f.origin='managed' AND f.created_by=%s AND f.state<>'withdrawn' AND v.sha256=%s
+               ORDER BY f.created_at LIMIT 1""",
+            (principal.sub, row["sha256"]),
+        )
+    if existing:
+        return {**detail(principal, existing["id"]), "already_saved": True}
+    provenance = {"from": "agent_attachment", "dataset_id": row["id"], "name": row["name"], "kind": row["kind"]}
+    saved = create_managed(
+        principal,
+        row["name"],
+        body,
+        kind=kind,
+        access_class=access_class,
+        owner_division=owner_division,
+        title=title,
+        provenance=provenance,
+    )
+    return {**saved, "already_saved": False}
 
 
 def add_version(principal, file_id, name, body):
@@ -481,6 +523,7 @@ def detail(principal, file_id):
         **card,
         "created_by_name": row["created_by_name"],
         "created_at": row["created_at"],
+        "provenance": {k: row["provenance"].get(k) for k in ("from", "name") if row.get("provenance")},
         "versions": versions,
         "can_manage": row["origin"] == "managed" and _can_manage(principal, row),
     }

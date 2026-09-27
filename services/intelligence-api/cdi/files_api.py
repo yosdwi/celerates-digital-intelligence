@@ -78,6 +78,29 @@ def upload(
     )
 
 
+class SaveAttachment(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    dataset_id: UUID
+    kind: str = Field(max_length=40)
+    access_class: Literal["general", "division", "commercial", "personal"] | None = None
+    owner_division: str | None = Field(default=None, max_length=40)
+    title: str | None = Field(default=None, max_length=200)
+
+
+@router.post("/from-attachment", status_code=201)
+def save_attachment(body: SaveAttachment, user=Depends(delegated_actor)):
+    """M6.x: save an Agent attachment (working context) as a governed Company File, explicitly and reviewed."""
+    return _call(
+        files.save_attachment,
+        user,
+        str(body.dataset_id),
+        kind=body.kind,
+        access_class=body.access_class,
+        owner_division=body.owner_division,
+        title=body.title,
+    )
+
+
 @router.get("")
 def search(
     q: Annotated[str, Query(max_length=200)] = "",

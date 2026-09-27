@@ -157,6 +157,19 @@ export async function agentBrowser({ base, cookies }) {
     await answer.locator('[data-evidence-type="file"]').filter({ hasText: 'hal. 1' }).first().waitFor();
     await page.screenshot({ path: evidenceDir + '/agent-company-file.png' });
     await panel.locator('[data-agent-attachment]').getByRole('button', { name: 'Lepas berkas' }).click();
+    // M6.x: a scan dropped in the Agent cannot be read there; it can be saved as a Company File (read with OCR).
+    const { pdfBytes } = await import('./agent-journey.mjs');
+    await panel.locator('[data-agent-file]').setInputFiles({ name: 'bast-scan.pdf', mimeType: 'application/pdf', buffer: pdfBytes([]) });
+    const scan = panel.locator('[data-agent-attachment="local"]');
+    await scan.waitFor({ timeout: 30000 });
+    await scan.locator('[data-attachment-save]').click();
+    const saveForm = scan.locator('[data-attachment-save-form]');
+    await saveForm.locator('select[name="kind"]').selectOption('bast');
+    await saveForm.locator('select[name="owner_division"]').selectOption('pmo');
+    await page.screenshot({ path: evidenceDir + '/agent-save-to-files.png' });
+    await saveForm.getByRole('button', { name: 'Simpan', exact: true }).click();
+    await scan.locator('[data-attachment-saved]').getByText('Tersimpan di Company Files', { exact: false }).waitFor({ timeout: 30000 });
+    await scan.getByRole('button', { name: 'Lepas berkas' }).click();
 
     // Keyboard and mobile.
     await page.keyboard.press('Escape');
@@ -172,7 +185,7 @@ export async function agentBrowser({ base, cookies }) {
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), pageWidth, 'panel adds no horizontal overflow');
     await page.screenshot({ path: evidenceDir + '/agent-m1-mobile.png' });
     assert.deepEqual(errors, [], 'no browser runtime exceptions');
-    console.log('PASS: Agent browser — one surface (Ringkasan + one composer, no tabs), Tanyakan with typed evidence, keyword search, free-text Masukan → Feature Request confirmed, form fallback, entity context, follow-up and file import confirmed in ERP, keyboard and full-screen mobile; Company Files explorer, upload queued, file found and asked about in the Agent');
+    console.log('PASS: Agent browser — one surface (Ringkasan + one composer, no tabs), Tanyakan with typed evidence, keyword search, free-text Masukan → Feature Request confirmed, form fallback, entity context, follow-up and file import confirmed in ERP, keyboard and full-screen mobile; Company Files explorer, upload queued, file found and asked about in the Agent, scanned attachment saved to Company Files');
   } finally {
     await browser.close();
   }

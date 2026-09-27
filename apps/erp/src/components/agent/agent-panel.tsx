@@ -21,6 +21,7 @@ import type { SignalTrend } from "@/lib/operations/reader";
 import { ContextualFeedback } from "./feedback";
 import { FollowUps } from "./follow-ups";
 import type { Suggestion } from "./agent-thread";
+import type { Attachment } from "./attachment-bar";
 
 const AgentThread = dynamic(() => import("./agent-thread"), {
   ssr: false,
@@ -58,7 +59,7 @@ export function AgentPanel() {
   const [agent, setAgent] = useState<{ path: string; data?: AgentContext }>();
   const [runs, setRuns] = useState<AgentRun[]>([]);
   const [threadId] = useState(() => "thread-" + uuid());
-  const [attachment, setAttachment] = useState<{ id: string; name: string; kind?: "dataset" | "file" } | null>(null);
+  const [attachment, setAttachment] = useState<Attachment | null>(null);
   const inflight = useRef<AbortController | null>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const close = useRef<HTMLButtonElement>(null);
@@ -155,12 +156,23 @@ export function AgentPanel() {
     form.append("file", file);
     const response = await fetch("/api/agent/datasets", { method: "POST", body: form }).catch(() => null);
     const body = await response?.json().catch(() => null);
-    if (!response?.ok || !body?.id) return body?.error ?? "Berkas belum dapat diunggah.";
+    if (!response?.ok || !body?.id) {
+      const message = body?.error ?? "Berkas belum dapat diunggah.";
+      // A scan cannot be read here, but it can still become a Company File, which is read with OCR (M6.x).
+      if (/scan/i.test(message)) {
+        setAttachment({ kind: "local", name: file.name, file, reason: "hasil scan; simpan ke Company Files agar dibaca dengan OCR" });
+        return null;
+      }
+      return message;
+    }
     if (body.kind === "document") {
       // A document stays attached to the conversation: later questions also search it.
-      setAttachment({ id: body.id, name: body.name });
+      setAttachment({ kind: "dataset", id: body.id, name: body.name });
       startRun("read_document", { dataset_id: body.id }, `Baca berkas ${body.name} (${body.pages} halaman)`);
-    } else startRun("import_dataset", { dataset_id: body.id }, `Impor berkas ${body.name} (${body.rows} baris)`);
+    } else {
+      setAttachment({ kind: "table", id: body.id, name: body.name });
+      startRun("import_dataset", { dataset_id: body.id }, `Impor berkas ${body.name} (${body.rows} baris)`);
+    }
     return null;
   };
   const suggestions: Suggestion[] = [];
@@ -312,7 +324,12 @@ export function AgentPanel() {
                   enabled={agentReady}
                   suggestions={suggestions}
                   onSearch={(text, modality) =>
-                    startRun("ask", attachment ? (attachment.kind === "file" ? { query: text, file_id: attachment.id } : { query: text, dataset_id: attachment.id }) : { query: text }, text, modality)
+                    startRun(
+                      "ask",
+                      attachment?.kind === "file" ? { query: text, file_id: attachment.id } : attachment?.kind === "dataset" ? { query: text, dataset_id: attachment.id } : { query: text },
+                      text,
+                      modality,
+                    )
                   }
                   onAttachFile={(file) => setAttachment({ ...file, kind: "file" })}
                   voice={agentContext?.capabilities?.voice === true}

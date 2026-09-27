@@ -4,6 +4,7 @@
 // tells users how widely a file may be read; nothing here can loosen a class except an Owner.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ExternalLink, FileText, Loader2, Search, Upload, X } from "lucide-react";
+import { CLASS, ClassFields, type Cls, type Kinds } from "./class-fields";
 
 type Link = { entity_type: string; entity_id: string; label: string | null; href: string | null };
 type Hit = {
@@ -11,19 +12,10 @@ type Hit = {
   state: string; version: number; links: Link[]; page?: number | null; snippet?: string; content_shared: boolean;
 };
 type Version = { version: number; name: string; media_type: string | null; size_bytes: number | null; created_at: string; ingest_state: string; error: string | null; parser: string | null; pages: number | null; ocr_pages: number | null; tables: number | null; flags: string[] };
-type Detail = Hit & { created_by_name: string | null; created_at: string; versions: Version[]; can_manage: boolean };
-type Cls = "general" | "division" | "commercial" | "personal";
-type Kinds = { kinds: { kind: string; label: string; access_class: Cls }[]; access: { owner: boolean; divisions: string[]; commercial: string[]; personal: string[] } };
+type Detail = Hit & { created_by_name: string | null; created_at: string; versions: Version[]; can_manage: boolean; provenance?: { from?: string; name?: string } };
 
-const CLASS: Record<Cls, { label: string; tone: string; note: string }> = {
-  general: { label: "Umum", tone: "bg-emerald-50 text-emerald-800", note: "Semua pengguna ERP" },
-  division: { label: "Divisi", tone: "bg-sky-50 text-sky-800", note: "Pembaca divisi pemilik" },
-  commercial: { label: "Komersial", tone: "bg-amber-50 text-amber-900", note: "Pemegang akses komersial divisi, dan pembaca record tertaut; isi tidak dibagikan ke model" },
-  personal: { label: "Personal", tone: "bg-rose-50 text-rose-800", note: "Pemegang akses personal divisi, dan pembaca record tertaut; isi tidak dibagikan ke model" },
-};
 const ORIGIN = { managed: "Diunggah di Company Files", erp: "Lampiran ERP", external: "Tautan luar" };
 const STATE: Record<string, string> = { queued: "Menunggu dibaca", running: "Sedang dibaca", indexed: "Dapat dicari", metadata_only: "Metadata saja", failed: "Gagal dibaca" };
-const DIVISIONS = ["marketing", "sales", "ta", "hr", "tm", "pmo", "finance"];
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, { cache: "no-store", ...init });
@@ -108,15 +100,8 @@ export function FilesExplorer({ initialFile, initialQuery }: { initialFile: stri
 }
 
 function UploadForm({ kinds, onClose, onDone }: { kinds: Kinds; onClose: () => void; onDone: (id: string) => void }) {
-  const [kind, setKind] = useState(kinds.kinds[0]?.kind ?? "sop");
-  const spec = kinds.kinds.find((k) => k.kind === kind);
-  const [cls, setCls] = useState<Cls>(spec?.access_class ?? "general");
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
-  const rank = { general: 0, division: 1, commercial: 2, personal: 3 };
-  useEffect(() => setCls(spec?.access_class ?? "general"), [spec?.access_class]);
-  const allowed = (Object.keys(CLASS) as Cls[]).filter((c) => kinds.access.owner || rank[c] >= rank[spec?.access_class ?? "general"]);
-  const divisions = cls === "general" ? [] : kinds.access.owner ? DIVISIONS : cls === "division" ? kinds.access.divisions : kinds.access[cls];
   return (
     <form
       className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4"
@@ -140,11 +125,7 @@ function UploadForm({ kinds, onClose, onDone }: { kinds: Kinds; onClose: () => v
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="text-xs text-slate-600">Berkas<input name="file" type="file" required accept=".pdf,.docx,.xlsx,.csv,.txt,.md,.png,.jpg,.jpeg" className="mt-1 block w-full text-sm" /></label>
         <label className="text-xs text-slate-600">Judul<input name="title" maxLength={200} placeholder="Opsional; nama berkas bila kosong" className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm" /></label>
-        <label className="text-xs text-slate-600">Jenis<select name="kind" value={kind} onChange={(e) => setKind(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm">{kinds.kinds.map((k) => <option key={k.kind} value={k.kind}>{k.label}</option>)}</select></label>
-        <label className="text-xs text-slate-600">Kelas akses<select name="access_class" value={cls} onChange={(e) => setCls(e.target.value as Cls)} className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm">{allowed.map((c) => <option key={c} value={c}>{CLASS[c].label} — {CLASS[c].note}</option>)}</select></label>
-        {cls !== "general" && (
-          <label className="text-xs text-slate-600">Divisi pemilik<select name="owner_division" required className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm">{divisions.map((d) => <option key={d} value={d}>{d.toUpperCase()}</option>)}</select></label>
-        )}
+        <ClassFields kinds={kinds} />
       </div>
       <p className="text-xs text-slate-500">Kelas minimal mengikuti jenis berkas; kelas yang lebih longgar hanya dapat dipilih Owner. Berkas berisi pola dokumen identitas (NIK, NPWP, KTP) ditahan untuk ditinjau. Jangan unggah KTP, KK, atau slip gaji di sini.</p>
       {error && <p role="alert" className="text-sm text-amber-900">{error}</p>}
@@ -194,7 +175,10 @@ function FileDetail({ id, onClose, onChanged }: { id: string; onClose: () => voi
             <div><h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Versi</h3>
               <ul className="mt-1 space-y-1 text-xs text-slate-600">{file.versions.map((v) => <li key={v.version}>v{v.version} · {v.name} · {new Date(v.created_at).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })} · {STATE[v.ingest_state] ?? v.ingest_state}{v.error ? ` (${v.error})` : ""}</li>)}</ul>
             </div>
-            <p className="text-xs text-slate-500">Diunggah oleh {file.created_by_name ?? "—"}. Setiap pembukaan berkas dicatat.</p>
+            <p className="text-xs text-slate-500" data-file-provenance={file.provenance?.from ?? ""}>
+              {file.provenance?.from === "agent_attachment" ? `Disimpan dari lampiran Agent (${file.provenance.name ?? "berkas"}) oleh ` : "Diunggah oleh "}
+              {file.created_by_name ?? "—"}. Setiap pembukaan berkas dicatat.
+            </p>
           </div>
         )}
       </div>
