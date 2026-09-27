@@ -181,3 +181,14 @@ Start from the final commit of this record on `audit/erp-production-readiness`.
    - A PWA manifest and a full-page `/agent` home on mobile.
    - The daily brief as a scheduled snapshot plus a notification.
    - Multi-role rollout once access rules are defined.
+
+## CI results
+
+GitHub Actions on `audit/erp-production-readiness` (push and pull-request runs). `ed70331` was pushed together with `20b5d3d`, so CI ran on the combined head.
+
+| Commit | ERP pilot checks (`verify`) | P0 `api` | P0 `web` | P0 `compose` |
+|---|---|---|---|---|
+| `20b5d3d` routing + one surface (includes `ed70331`) | success | success | success | failure (pre-existing) |
+| `3cfdeb5` this record | success | success | success | failure (pre-existing) |
+
+The `compose` job fails at `docker compose … up --build -d`, as it did on the M4 baseline and before. It is independent of this increment.
