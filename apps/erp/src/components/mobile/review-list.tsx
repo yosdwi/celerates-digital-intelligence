@@ -1,6 +1,8 @@
 "use client";
-// Tinjau, MS1: the user's own notifications (emitted today by approvals, TTD, time off, PQ setup, onboarding).
-// MS3 turns this surface into the F6 aggregation of items awaiting the user (doc 18 §3, §12).
+// Kabar terbaru: the user's own notifications (emitted by approvals, TTD, time off, PQ setup, onboarding).
+// Since MS3 the Tinjau tab is the decision queue (/review); this is its "see all updates" surface (doc 18 §17).
+import Link from "next/link";
+import { ChevronLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useMobileData } from "./data";
@@ -12,10 +14,14 @@ export function ReviewList() {
   const router = useRouter();
   const { notifications, unread, markRead, markAllRead } = useMobileData();
   return (
-    <MobileScreen label={t("tabs.review")}>
+    <MobileScreen label={t("review.updates")}>
       <div data-review-list className="flex flex-col gap-4">
+        <Link href="/review" className="-mb-2 -ml-2 flex h-11 items-center gap-0.5 self-start px-2 text-base font-semibold text-j-accent">
+          <ChevronLeft aria-hidden className="h-[22px] w-[22px]" strokeWidth={2.2} />
+          {t("tabs.review")}
+        </Link>
         <ScreenTitle
-          title={t("tabs.review")}
+          title={t("review.updates")}
           subtitle={t("reviewSubtitle")}
           action={
             unread > 0 ? (

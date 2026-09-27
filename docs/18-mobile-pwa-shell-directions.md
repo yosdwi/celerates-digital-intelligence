@@ -660,9 +660,9 @@ This is reusable for Sales, TA, HR, TM and Finance.
 
 - **Editing on mobile.** Contract and invoice forms, billing schedule generation and BAST upload stay on desktop. PMO's mobile write actions are the handoff only.
 - **Other PMO submodules** (Talent Document Tracker, Overtime & Business Trip, Dashboard): they keep the desktop page under the context bar.
-- **The Finance module list** (`/finance`) is still the desktop page. Finance reaches invoices through Tinjau notifications and the invoice record.
+- **The Finance module list** (`/finance`) is still the desktop page. Finance reaches invoices through Tinjau notifications and the invoice record. *(Delivered in MS3, §17.)*
 - **Signal ↔ entity mapping for PMO/Finance rules** (`SIGNAL_ENTITY`) stays unset until ERP audit F13 settles its semantics.
-- **Record search in the Beranda bar and the Tinjau aggregation** (MS3).
+- **Record search in the Beranda bar and the Tinjau aggregation** (MS3). *(Delivered, §17.)*
 
 **Decision needed before expanding to other modules.** Record-level authority for non-Owners. PMO pages gate on division access only (as the desktop does). Sales, TA and HR records may need row-level rules (ownership, PIC) before the pilot middleware opens to non-Owners (§7). The mobile guard is where those rules will plug in.
 
@@ -687,3 +687,116 @@ This is reusable for Sales, TA, HR, TM and Finance.
   6. related TM Invoice → **Serahkan ke Finance** → *Menunggu Finance* → **Verifikasi → Terima** → *Diterima Finance*;
   7. desktop layout restored at 1440 px.
 - **Desktop at 1440 px:** the A.Contract page is unchanged (`exploration/evidence/mobile-shell/ms2-desktop-contracts-unchanged.png`). The record route renders as a read-first page in the desktop shell.
+
+## 17. MS3 — Tinjau, Beranda search, Tangkap, Finance (2026-09-27)
+
+![MS3 on a phone](exploration/evidence/mobile-shell/ms3-review-search-capture.png)
+
+Left to right, at 390 × 844 as the Owner:
+- Tinjau with three decisions waiting and the tab badge;
+- an Extension/Increment signature step as a record;
+- a Time Off step as a record;
+- Beranda search: pages, records and **Tanya Agent**;
+- the Tangkap sheet saving a photo or file to Company Files;
+- Finance's handoff list.
+
+All data in the captures is synthetic.
+
+**Scope decision (user, 2026-09-27).** Visibility in MS3 is division-level only. Detailed and record-level RBAC is a later discussion (§16.5); every decision still runs through the existing server action and its guard.
+
+### 17.1 Tinjau = "menunggu saya"
+
+Tinjau is the queue of ERP records waiting for **this user's** decision. It never shows inferred tasks, and it is not a notification feed. `reviewQueue(sql, actor)` (`lib/review/queue.ts`) reads five existing flows, oldest waiting first:
+
+| Source | In my queue when | Opens | Decision (existing action) |
+|---|---|---|---|
+| TTD `signature_requests` (Extension/Increment steps, PQ, ad-hoc) | `status = pending` and I am the signer | `/review/signature/<id>` | `signRequest` / `rejectRequest` (TTD Online) |
+| Time Off `time_off_approval_steps` | the request is pending and the lowest pending step is mine | `/review/time-off/<id>` | `approveTimeOffStep` / `rejectTimeOffStep` |
+| `timesheet_submissions` | status `review`, and I am PMO **full** (Owner counts as full) | a sheet on Tinjau | `approveTimesheetSubmission` |
+| `finance_document_handoffs` | `notified` and I am Finance editor+, **or** `needs_revision` and I am PMO editor+ | the project's latest TM Invoice record (§16.3) | `acknowledgeFinanceHandoff` / `requestRevisionFinanceHandoff` / `upsertFinanceHandoff` |
+| `agent_proposals` | mine, `pending`, not expired | `/review/proposal/<id>` (the ERP-held proposal card) | confirm / reject (ADR-010) |
+
+**Rules.**
+- A viewer is never queued for a decision the action would refuse (e.g. a Finance viewer does not see handoffs to verify).
+- The Owner is not queued for other people's signatures or time-off steps. Those belong to the named signer or approver.
+- A signature record opens only for its signer; a time-off record only for an approver in its chain. Anyone else gets 404, even the Owner.
+- **Compensation stays with TM.** An Extension/Increment signer without TM access sees the talent, period, position and journey, but not the increment or salary.
+- Approving is always a second, deliberate tap in a confirmation sheet. Rejecting takes an optional reason, as on desktop.
+- Signing needs a saved signature. If there is none, the sheet says so and links to TTD Online; it does not fail silently.
+
+**Surfaces.**
+- The **Tinjau** tab goes to `/review` and its badge counts waiting decisions (`getReviewCount`), not unread notifications.
+- Beranda shows one compact row, "N menunggu keputusan Anda", when there are any.
+- Notifications become **Kabar terbaru**: a short list under the queue, plus the full list at `/notifications` (the bell still goes there).
+
+### 17.2 Record pattern on approvals
+
+The Extension/Increment step and the Time Off step reuse the §16.2 grammar: `RecordHeader`, `Section`, `FactRows`, `DocumentCard`, and `StickyActions` with **Tolak / Tanda tangani** or **Tolak / Setujui**.
+
+The extension record has three sections:
+- **Usulan perpanjangan**: period, current and proposed position, grade, employment type; compensation only for TM.
+- **Alur persetujuan**: every configured step with its state, and **Giliran Anda** on mine.
+- **Permintaan**: requester, date, notes, and the document or attachments.
+
+After a decision the user returns to Tinjau, and the badge refreshes.
+
+### 17.3 Beranda search
+
+The Beranda field opens `/search`, a full-screen search with four parts:
+1. **Tanya Agent: "…"**, always first. It opens the Agent and starts an ask run with the text (`openAgent({ ask })`).
+2. **Halaman**: submodules of the modules the user can open, from the canonical registry.
+3. **Record**: `/api/search`, which uses the governed Entity Catalog search (`reads.search`). It searches internal display fields only, is module-authorized per entity type, requires every term to match, and falls back to any term only when nothing matches.
+4. **Company Files**: `/api/files?q=`, the existing ADR-018 search, authorized per file. Hidden when Intelligence is unavailable.
+
+The query stays in the URL, so back and forward return to the same results.
+
+### 17.4 Tangkap dokumen
+
+The camera button on Beranda opens a sheet with **Ambil foto** (camera capture) and **Pilih berkas** (PDF, Word, Excel, CSV, image; 20 MB). The user then chooses the destination explicitly:
+- **Company Files**: title plus the same `ClassFields` as the explorer. The kind's minimum class applies, only an Owner can loosen it, and identity-document patterns are held for review. It posts to `/api/files` and confirms with **Buka berkas**.
+- **Tanya Agent**: the file is attached to the Agent conversation as working context (`openAgent({ file })` → the panel's existing `importFile`). It is not filed. A scan or an unreadable file shows as "Belum terbaca" with **Simpan ke Company Files**, as in M6.x.
+
+### 17.5 Finance on a phone
+
+`/finance` renders a card list of every project PMO has handed over:
+- tabs **Perlu verifikasi / Dikembalikan / Diterima**;
+- who handed it over and when, the Finance notes when returned, and the invoice count.
+
+Each card opens the project's latest TM Invoice record, where **Verifikasi dokumen** already lives (§16.3). The desktop Finance page is unchanged.
+
+### 17.6 Also in MS3
+
+- `useOpenModules` returns nothing until the session is known. Before, a first paint could briefly show an anonymous user's operational modules, and "no modules" could flash.
+- `isMobileNative` now includes `/review` (and its three record routes), `/search` and `/finance`, so they render without the desktop context bar.
+- `ClassFields` accepts label and field classes, so the Jernih sheet restyles the same governed fields.
+
+### 17.7 Deferred
+
+- The TA pipeline and the other module conversions (§16.4 pattern).
+- Record-level RBAC (§16.5): still division-level.
+- Signing on the phone with a first-time signature drawn there. Today it links to TTD Online.
+- Attendance check-in and self-service Time Off requests from the phone.
+- A PQ-signature record view (it opens as a plain TTD request record).
+
+### 17.8 Verification
+
+- **ERP unit, 17/17.** The new `review.test.ts` (PGlite) covers:
+  - the queue per user: signer, approver at the current step (not a later one), Finance editor vs viewer, PMO editor, Owner;
+  - expired and other users' proposals excluded;
+  - handoff links to the latest invoice, or the filtered list when there is no invoice;
+  - an extension step titled by its talent;
+  - signature record only for the signer, with compensation withheld outside TM;
+  - time-off record only for the chain, with `my_turn` only for the current approver.
+- **The action-coverage test** still holds: `getReviewCount` begins with `requirePilotActor()`.
+- **Python: 44 passed. ruff: clean. `next build`: clean.**
+- **Full harness: 15 PASS, exit 0.** The Agent browser journey at 390 px adds:
+  1. Tinjau from the tab, with the badge;
+  2. a notified handoff queued for Finance, then verified on the invoice record;
+  3. **Lihat semua** → Kabar terbaru;
+  4. Time Off record → **Setujui** → confirmed, and it leaves the queue;
+  5. Extension record (talent, sections, **Giliran Anda**) → **Tolak** with a reason, and it leaves the queue;
+  6. search "Synthetic Browser" → records → **Tanya Agent** starts the run;
+  7. Tangkap → PDF → Company Files → saved;
+  8. `/finance` card list with no table and no horizontal scroll.
+
+  `agent-journey.mjs` then asserts in the database that the Extension request is `rejected` with the reason on its step, and the Time Off request is `approved`.

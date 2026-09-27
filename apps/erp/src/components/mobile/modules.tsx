@@ -37,8 +37,9 @@ export function useModuleLabel() {
 }
 
 export function useOpenModules(): ResolvedModule[] {
-  const { data } = useSession();
-  return useMemo(() => openModules(claimsOf(data?.user)), [data?.user]);
+  const { data, status } = useSession();
+  // Until the session is known, show nothing rather than the modules of an anonymous back-office user.
+  return useMemo(() => (status === "authenticated" ? openModules(claimsOf(data?.user)) : []), [data?.user, status]);
 }
 
 export function ModuleGlyph({ module, size = "md" }: { module: ResolvedModule; size?: "sm" | "md" }) {

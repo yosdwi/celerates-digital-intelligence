@@ -2249,7 +2249,33 @@
     "roleOwner": "Owner · all modules",
     "roleModules": "Access to {count} modules",
     "askPlaceholder": "Search records, files, or ask…",
-    "capture": "Photograph or upload a document",
+    "capture": {
+      "title": "Capture document",
+      "takePhoto": "Take photo",
+      "pickFile": "Choose file",
+      "hint": "PDF, Word, Excel, CSV or a photo; up to 20 MB. Don't upload ID cards, family cards or payslips.",
+      "tooLarge": "Maximum size is 20 MB.",
+      "change": "Change",
+      "destination": "Destination",
+      "dest": {
+        "files": "Company Files",
+        "agent": "Ask Agent"
+      },
+      "fileTitle": "Title",
+      "fileTitlePlaceholder": "Optional; file name if empty",
+      "loadingKinds": "Loading file kinds…",
+      "filesNote": "The minimum class follows the file kind; only an Owner can choose a looser class. Files with identity-document patterns are held for review.",
+      "agentNote": "The file is attached to your Agent conversation as working context, not saved to Company Files. You can still save it from the Agent.",
+      "save": "Save to Company Files",
+      "saving": "Saving…",
+      "sendToAgent": "Attach to Agent",
+      "failed": "The file couldn't be saved.",
+      "savedTitle": "Saved to Company Files",
+      "savedBody": "The file is being read so it can be searched and asked about.",
+      "openInFiles": "View in Company Files",
+      "done": "Done",
+      "open": "Open file"
+    },
     "voice": "Ask by voice",
     "attentionTitle": "Needs attention · {count} conditions",
     "allModules": "All modules",
@@ -2408,6 +2434,149 @@
         "revisionRule": "Returning to PMO requires a reason.",
         "return": "Return",
         "accept": "Accept"
+      }
+    },
+    "review": {
+      "waiting": "{count} waiting for your decision",
+      "subtitle": "Decisions waiting for you",
+      "filter": "Decision type",
+      "groups": {
+        "all": "All",
+        "sign": "Signatures",
+        "time_off": "Time off",
+        "timesheet": "Timesheet",
+        "finance": "Finance",
+        "agent": "Agent"
+      },
+      "kinds": {
+        "signature": "Signature",
+        "time_off": "Time Off",
+        "timesheet": "Timesheet",
+        "finance_verify": "Finance handoff",
+        "finance_revise": "Returned by Finance",
+        "proposal": "Agent proposal"
+      },
+      "actions": {
+        "signature": "Sign",
+        "time_off": "Approve",
+        "timesheet": "Approve",
+        "finance_verify": "Verify",
+        "finance_revise": "Fix",
+        "proposal": "Confirm"
+      },
+      "steps": {
+        "requester": "Requester",
+        "approval_1": "Approval 1",
+        "approval_2": "Approval 2",
+        "approval_3": "Approval 3",
+        "acknowledge": "Acknowledge"
+      },
+      "stepStatus": {
+        "signed": "Signed",
+        "pending": "Waiting",
+        "rejected": "Rejected",
+        "not_started": "Not yet"
+      },
+      "signatureStatus": {
+        "pending": "Waiting for you",
+        "signed": "Signed",
+        "rejected": "Rejected"
+      },
+      "timeOffStatus": {
+        "pending": "Pending",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "cancelled": "Cancelled"
+      },
+      "since": "waiting {ago}",
+      "proposalItems": "{count, plural, one {# change} other {# changes}} awaiting confirmation",
+      "emptyTitle": "Nothing is waiting for you",
+      "emptyBody": "New approvals, signatures and handoffs will appear here.",
+      "updates": "Latest updates",
+      "openTimesheet": "Open Timesheet",
+      "approve": "Approve",
+      "reject": "Reject",
+      "cancel": "Cancel",
+      "sign": "Sign",
+      "failed": "That didn't work. Try again.",
+      "talent": "Talent",
+      "client": "Client",
+      "period": "Period",
+      "rejectTitle": "Reject request",
+      "reasonOptional": "Reason (optional)",
+      "reasonRequired": "Reason",
+      "signTitle": "Sign document",
+      "signBody": "Your saved signature is applied to this document and the approval moves to the next step.",
+      "noSignature": "You don't have a saved signature yet. Create one in TTD Online, then come back.",
+      "createSignature": "Create signature",
+      "approveTitle": "Approve time off",
+      "approveBody": "Your approval is recorded for this step; the next approver is notified.",
+      "extensionEyebrow": "TM · Extension / Increment",
+      "requestedBy": "Requested by {name}",
+      "yourTurn": "Your turn",
+      "journey": "Approval journey",
+      "request": "Request",
+      "document": "Document",
+      "requester": "Requester",
+      "requestedAt": "Submitted",
+      "rejectReason": "Rejection reason",
+      "documents": "Documents",
+      "mainDocument": "Main document",
+      "attachment": "Attachment",
+      "askAgent": "Ask Agent",
+      "extension": {
+        "title": "Extension proposal",
+        "period": "Proposed period",
+        "currentPosition": "Current position",
+        "position": "Proposed position",
+        "grade": "Grade",
+        "employment": "Employment type",
+        "compensation": "Compensation",
+        "increment": "Increment",
+        "basicSalary": "Proposed basic salary",
+        "compensationWithheld": "Compensation details are visible to the TM division only."
+      },
+      "timeOffEyebrow": "Attendance · Time Off",
+      "timeOff": {
+        "title": "Leave",
+        "dates": "Dates",
+        "days": "Duration",
+        "dayCount": "{count, plural, one {# day} other {# days}}",
+        "delegate": "Delegate",
+        "step": "Step {order}"
+      },
+      "proposalTitle": "Changes proposed by the Agent",
+      "proposalBody": "Review, adjust if needed, then confirm. ERP re-validates every item with your current access.",
+      "extensionShort": "Extension / Increment"
+    },
+    "search": {
+      "back": "Back to Home",
+      "placeholder": "Search records, files, or ask…",
+      "clear": "Clear",
+      "hintTitle": "Search the ERP",
+      "hintBody": "Type a client name, opty number, candidate or file name. Results follow your access; or hand the question to the Agent.",
+      "askAgent": "Ask Agent",
+      "pages": "Pages",
+      "records": "Records",
+      "files": "Company Files",
+      "searching": "Searching…",
+      "recordsError": "Record search couldn't load.",
+      "noRecords": "No matching records you can open.",
+      "recordMeta": "{type} · matched on {field}",
+      "allFiles": "All results in Company Files"
+    },
+    "finance": {
+      "title": "Finance documents",
+      "notified": "Handed over by {name} · {at}",
+      "received": "Accepted by {name} · {at}",
+      "invoices": "{count, plural, one {# TM Invoice} other {# TM Invoices}}",
+      "tabs": {
+        "notified": "Needs verification",
+        "needs_revision": "Returned",
+        "received": "Accepted"
+      },
+      "sort": {
+        "notified": "Latest handed over"
       }
     }
   }

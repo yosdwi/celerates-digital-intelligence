@@ -8,7 +8,7 @@
 //  • Masukan is understood from free text (reviewed drafts); the same contextual Feature Request form stays as a
 //    fallback, always reachable, and is the path when the Agent is not configured.
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AGENT_OPEN_EVENT } from "@/components/mobile/events";
+import { AGENT_OPEN_EVENT, type AgentOpenDetail } from "@/components/mobile/events";
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
@@ -134,8 +134,16 @@ export function AgentPanel() {
   }, [open]);
   useEffect(() => () => inflight.current?.abort(), []);
   // The mobile shell opens the same Agent from its tab bar and Beranda (doc 18 §12).
+  // Beranda search ("Tanya Agent: …") and Tangkap ("Lampirkan ke Agent") open it with an intent (doc 18 §17).
+  const intent = useRef<AgentOpenDetail | null>(null);
+  const [intentTick, setIntentTick] = useState(0);
   useEffect(() => {
-    const openFromShell = () => {
+    const openFromShell = (event: Event) => {
+      const detail = (event as CustomEvent<AgentOpenDetail | undefined>).detail;
+      if (detail?.ask || detail?.file) {
+        intent.current = detail;
+        setIntentTick((n) => n + 1);
+      }
       setOpen(true);
       setRefresh((n) => n + 1);
     };
@@ -193,6 +201,21 @@ export function AgentPanel() {
   }
   for (const group of attention.slice(0, 2)) suggestions.push({ label: `Kenapa perlu perhatian: ${group.title}?`, run: () => ask(group) });
   const agentReady = agentContext?.enabled === true;
+  useEffect(() => {
+    const pending = intent.current;
+    if (!pending || !open || running) return;
+    if (pending.ask) {
+      if (!agentReady) return;
+      intent.current = null;
+      startRun("ask", { query: pending.ask }, pending.ask);
+    } else if (pending.file) {
+      intent.current = null;
+      const file = pending.file;
+      void importFile(file).then((message) => message && setAttachment({ kind: "local", name: file.name, file, reason: message }));
+    }
+    // importFile is recreated each render; the intent is consumed once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [intentTick, open, running, agentReady, startRun]);
   const conversing = runs.length > 0;
   const checkedAt = data ? `${new Date(data.asOf).toLocaleTimeString("id-ID", { timeZone: "Asia/Jakarta", hour: "2-digit", minute: "2-digit" })} WIB` : null;
 

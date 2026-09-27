@@ -8,6 +8,7 @@ import { useSession } from "next-auth/react";
 import { useTranslations } from "next-intl";
 import { Bell, Camera, ChevronRight, LayoutGrid, Mic, Search } from "lucide-react";
 import type { ResolvedModule } from "@/lib/module-access";
+import { CaptureSheet } from "./capture";
 import { useMobileData } from "./data";
 import { openAgent } from "./events";
 import { ModuleLandingSheet, ModuleTile, useOpenModules } from "./modules";
@@ -17,10 +18,11 @@ import { timeAgo } from "./time";
 
 export function MobileHome() {
   const t = useTranslations("mobile");
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const modules = useOpenModules();
-  const { signals, notifications, unread } = useMobileData();
+  const { signals, notifications, unread, reviewCount } = useMobileData();
   const [landing, setLanding] = useState<ResolvedModule | null>(null);
+  const [capture, setCapture] = useState(false);
   const [part, setPart] = useState<"morning" | "afternoon" | "evening" | null>(null);
   useEffect(() => {
     const h = new Date().getHours();
@@ -69,13 +71,13 @@ export function MobileHome() {
         </section>
 
         <div className="flex h-[54px] items-center gap-2.5 rounded-2xl border border-[#e1e6ef] bg-j-surface pl-3.5 pr-2 shadow-j-card">
-          <button type="button" onClick={openAgent} className="flex h-full min-w-0 flex-1 items-center gap-2.5 text-left text-[15px] text-j-muted" data-home-ask>
+          <Link href="/search" className="flex h-full min-w-0 flex-1 items-center gap-2.5 text-left text-[15px] text-j-muted" data-home-search>
             <Search aria-hidden className="h-5 w-5 shrink-0" strokeWidth={1.9} />
             <span className="truncate">{t("askPlaceholder")}</span>
-          </button>
-          <Link href="/files" aria-label={t("capture")} className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#f1f4f9] text-j-ink">
-            <Camera aria-hidden className="h-5 w-5" strokeWidth={1.9} />
           </Link>
+          <button type="button" onClick={() => setCapture(true)} aria-label={t("capture")} data-home-capture className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#f1f4f9] text-j-ink">
+            <Camera aria-hidden className="h-5 w-5" strokeWidth={1.9} />
+          </button>
           <button type="button" onClick={openAgent} aria-label={t("voice")} className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#f1f4f9] text-j-ink">
             <Mic aria-hidden className="h-5 w-5" strokeWidth={1.9} />
           </button>
@@ -97,6 +99,13 @@ export function MobileHome() {
             </div>
           </section>
         )}
+        {reviewCount > 0 && (
+          <Link href="/review" data-home-review className="flex items-center gap-3 rounded-j-card border border-[#c9d4f2] bg-[#f7f9ff] px-3.5 py-3 text-j-ink">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-j-accent text-sm font-extrabold text-white">{reviewCount}</span>
+            <span className="min-w-0 flex-1 text-sm font-bold">{t("review.waiting", { count: reviewCount })}</span>
+            <ChevronRight aria-hidden className="h-[18px] w-[18px] text-j-accent" />
+          </Link>
+        )}
         {attention.length > 0 && (
           <button type="button" onClick={openAgent} data-home-attention className="flex items-center gap-3 rounded-j-card border border-j-warn-line bg-j-warn-soft px-3.5 py-3 text-left text-j-ink">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-j-warn-dot text-sm font-extrabold text-white">{attention.reduce((n, g) => n + g.count, 0)}</span>
@@ -108,7 +117,7 @@ export function MobileHome() {
           </button>
         )}
 
-        {modules.length === 0 && <Card className="p-4 text-sm text-j-muted">{t("noModules")}</Card>}
+        {status === "authenticated" && modules.length === 0 && <Card className="p-4 text-sm text-j-muted">{t("noModules")}</Card>}
 
         <section aria-labelledby="home-recent" className="flex flex-col gap-2">
           <SectionHeader id="home-recent" title={t("recent")} action={<Link href="/notifications" className="text-[13px] font-semibold text-j-accent">{t("seeAll")}</Link>} />
@@ -134,6 +143,7 @@ export function MobileHome() {
         </section>
       </div>
       <ModuleLandingSheet module={landing} signals={signals ?? []} onClose={() => setLanding(null)} />
+      <CaptureSheet open={capture} onClose={() => setCapture(false)} />
     </div>
   );
 }

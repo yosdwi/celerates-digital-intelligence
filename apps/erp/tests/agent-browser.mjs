@@ -193,6 +193,7 @@ export async function agentBrowser({ base, cookies }) {
     await page.goto(base + '/');
     const home = page.locator('[data-mobile-home]');
     await home.waitFor();
+    await home.locator('[data-module-tile="all"]').waitFor();
     const tiles = await home.locator('[data-module-tile]').evaluateAll((els) => els.map((e) => e.getAttribute('data-module-tile')));
     assert.deepEqual(tiles, ['marketing', 'sales', 'ta', 'hr', 'tm', 'pmo', 'finance', 'all'], 'business modules in registry order, then the full directory');
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390);
@@ -260,6 +261,17 @@ export async function agentBrowser({ base, cookies }) {
       await handoverSheet.getByRole('button', { name: 'Kirim', exact: true }).click();
       await page.locator('[data-handoff-state="notified"]').waitFor({ timeout: 30000 });
     }
+    // MS3 Tinjau: a notified handoff is waiting for Finance (the Owner holds Finance), and the tab shows the count.
+    const invoicePath = new URL(page.url()).pathname;
+    await tabbar.locator('[data-tab-review]').click();
+    await page.waitForURL('**/review');
+    const queue = page.locator('[data-review-queue]');
+    await queue.locator('[data-review-item="finance_verify"]').first().waitFor();
+    await tabbar.locator('[data-review-badge]').waitFor();
+    for (const kind of ['signature', 'time_off']) await queue.locator(`[data-review-item="${kind}"]`).waitFor();
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390);
+    await page.screenshot({ path: evidenceDir + '/ms3-review-queue.png' });
+    await page.goto(base + invoicePath);
     await page.locator('[data-action="finance-verify"]').click();
     await page.getByRole('dialog', { name: 'Verifikasi dokumen' }).getByRole('button', { name: 'Terima' }).click();
     await page.locator('[data-handoff-state="received"]').waitFor({ timeout: 30000 });
@@ -270,7 +282,68 @@ export async function agentBrowser({ base, cookies }) {
     await page.locator('[data-module-directory]').getByText('Talent Management', { exact: true }).waitFor();
     await page.screenshot({ path: evidenceDir + '/ms1-mobile-modules.png' });
     await tabbar.getByRole('link', { name: /^Tinjau/ }).click();
+    await page.locator('[data-review-queue]').waitFor();
+    await page.getByRole('link', { name: 'Lihat semua' }).click();
     await page.locator('[data-review-list]').waitFor();
+
+    // MS3 decisions on the phone, through the existing Time Off and TTD actions.
+    await page.goto(base + '/review');
+    await queue.locator('[data-review-item="time_off"] a').first().click();
+    await page.waitForURL(/\/review\/time-off\/[0-9a-f-]{36}$/);
+    await page.locator('[data-record-section="journey"]').waitFor();
+    await page.screenshot({ path: evidenceDir + '/ms3-time-off-record.png' });
+    await page.locator('[data-action="time-off-approve"]').click();
+    await page.getByRole('dialog', { name: 'Setujui Time Off' }).locator('[data-action="time-off-confirm"]').click();
+    await page.waitForURL('**/review');
+    await queue.waitFor();
+    assert.equal(await queue.locator('[data-review-item="time_off"]').count(), 0, 'approved time off leaves the queue');
+    await queue.locator('[data-review-item="signature"] a').first().click();
+    await page.waitForURL(/\/review\/signature\/[0-9a-f-]{36}$/);
+    for (const section of ['proposal', 'journey', 'request']) await page.locator(`[data-record-section="${section}"]`).waitFor();
+    await page.getByText('Dimas Synthetic', { exact: true }).first().waitFor();
+    await page.locator('[data-journey-step="approval_1"]').getByText('Giliran Anda', { exact: true }).waitFor();
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390);
+    await page.screenshot({ path: evidenceDir + '/ms3-extension-record.png', fullPage: true });
+    await page.locator('[data-action="signature-reject"]').click();
+    const rejectSheet = page.getByRole('dialog', { name: 'Tolak permintaan' });
+    await rejectSheet.getByLabel('Alasan (opsional)').fill('Periode belum sesuai PKS');
+    await rejectSheet.locator('[data-action="signature-reject-confirm"]').click();
+    await page.waitForURL('**/review');
+    await queue.waitFor();
+    assert.equal(await queue.locator('[data-review-item="signature"]').count(), 0, 'rejected signature leaves the queue');
+
+    // MS3 Beranda search: records the user may read, and the question handed to the Agent.
+    await page.goto(base + '/');
+    await page.locator('[data-home-search]').click();
+    await page.waitForURL('**/search');
+    await page.locator('[data-search-input]').fill('Synthetic Browser');
+    await page.locator('[data-search-record]').first().waitFor({ timeout: 30000 });
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390);
+    await page.screenshot({ path: evidenceDir + '/ms3-search.png' });
+    await page.locator('[data-search-ask]').click();
+    await panel.getByText('Synthetic Browser', { exact: false }).first().waitFor({ timeout: 30000 });
+    await page.keyboard.press('Escape');
+
+    // MS3 Tangkap: a document from the phone becomes a governed Company File with an explicit kind and class.
+    await page.goto(base + '/');
+    await page.locator('[data-home-capture]').click();
+    const captureSheet = page.getByRole('dialog', { name: 'Tangkap dokumen' });
+    await captureSheet.locator('[data-capture-file]').setInputFiles({ name: 'ms3-sop-capture.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\n% MS3 synthetic capture\n') });
+    await captureSheet.locator('[data-capture-picked]').waitFor();
+    await captureSheet.getByLabel('Judul').fill('SOP capture MS3');
+    await captureSheet.locator('select[name="kind"]').waitFor();
+    await page.screenshot({ path: evidenceDir + '/ms3-capture.png' });
+    await captureSheet.locator('[data-action="capture-save"]').click();
+    await captureSheet.locator('[data-capture-saved]').waitFor({ timeout: 30000 });
+    await page.keyboard.press('Escape');
+
+    // MS3 Finance: the handoff as a card list with state tabs.
+    await page.goto(base + '/finance');
+    await page.locator('[data-module-header="finance"]').waitFor();
+    await page.locator('[data-mobile-list] [data-list-item]').first().waitFor();
+    assert.equal(await page.locator('table:visible').count(), 0, 'no desktop table on a phone');
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390);
+    await page.screenshot({ path: evidenceDir + '/ms3-finance-list.png' });
     // PWA: manifest and icons are public, the service worker registers.
     const manifest = await page.evaluate(async () => (await fetch('/manifest.webmanifest')).json());
     assert.equal(manifest.display, 'standalone');
@@ -279,7 +352,7 @@ export async function agentBrowser({ base, cookies }) {
     await page.setViewportSize({ width: 1440, height: 1000 });
     assert.equal(await page.locator('[data-mobile-tabbar]').isVisible(), false, 'desktop keeps the sidebar layout');
     assert.deepEqual(errors, [], 'no browser runtime exceptions');
-    console.log('PASS: Agent browser — one surface (Ringkasan + one composer, no tabs), Tanyakan with typed evidence, keyword search, free-text Masukan → Feature Request confirmed, form fallback, entity context, follow-up and file import confirmed in ERP, keyboard; mobile shell (no sidebar, tab bar, full-screen Agent, launcher Beranda, landing sheet, Modul, Tinjau, PWA manifest + service worker); MS2 PMO (card list + sort sheet, full-screen contract record, contextual Agent with the record, Masukan → Feature Request from the page, TM Invoice → Finance handover accepted); Company Files explorer, upload queued, file found and asked about in the Agent, scanned attachment saved to Company Files');
+    console.log('PASS: Agent browser — one surface (Ringkasan + one composer, no tabs), Tanyakan with typed evidence, keyword search, free-text Masukan → Feature Request confirmed, form fallback, entity context, follow-up and file import confirmed in ERP, keyboard; mobile shell (no sidebar, tab bar, full-screen Agent, launcher Beranda, landing sheet, Modul, Tinjau, PWA manifest + service worker); MS2 PMO (card list + sort sheet, full-screen contract record, contextual Agent with the record, Masukan → Feature Request from the page, TM Invoice → Finance handover accepted); MS3 (Tinjau queue with badge, Finance handoff item, Time Off approved and Extension signature rejected on the phone, Beranda search → records + Tanya Agent, Tangkap → Company File, Finance handoff list); Company Files explorer, upload queued, file found and asked about in the Agent, scanned attachment saved to Company Files');
   } finally {
     await browser.close();
   }

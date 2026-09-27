@@ -5,6 +5,7 @@ import { createContext, useCallback, useContext, useEffect, useState, useTransit
 import { useSession } from "next-auth/react";
 import { usePathname } from "next/navigation";
 import { getMyNotifications, markAllNotificationsRead, markNotificationRead } from "@/app/notifications/actions";
+import { getReviewCount } from "@/app/review/actions";
 import type { OperationalGroup } from "@/lib/operations/policy";
 
 export type MobileNotification = { id: string; title: string; body: string | null; link: string | null; is_read: boolean; created_at: string | Date };
@@ -12,6 +13,8 @@ type MobileData = {
   active: boolean;
   notifications: MobileNotification[] | null;
   unread: number;
+  /** Records waiting for the user's decision (Tinjau queue). */
+  reviewCount: number;
   signals: OperationalGroup[] | null;
   signalsError: boolean;
   markRead: (id: string) => void;
@@ -39,8 +42,9 @@ export function MobileDataProvider({ children }: { children: React.ReactNode }) 
   const mobile = useIsMobile();
   const pathname = usePathname();
   // Phone-width viewports, plus the two mobile surfaces when opened on a desktop.
-  const active = status === "authenticated" && (mobile || pathname === "/notifications" || pathname === "/modules");
+  const active = status === "authenticated" && (mobile || pathname === "/notifications" || pathname === "/modules" || pathname.startsWith("/review"));
   const [notifications, setNotifications] = useState<MobileNotification[] | null>(null);
+  const [reviewCount, setReviewCount] = useState(0);
   const [signals, setSignals] = useState<OperationalGroup[] | null>(null);
   const [signalsError, setSignalsError] = useState(false);
   const [tick, setTick] = useState(0);
@@ -54,6 +58,9 @@ export function MobileDataProvider({ children }: { children: React.ReactNode }) 
     getMyNotifications()
       .then((rows) => !cancelled && setNotifications(rows as MobileNotification[]))
       .catch(() => !cancelled && setNotifications([]));
+    getReviewCount()
+      .then((n) => !cancelled && setReviewCount(n))
+      .catch(() => undefined);
     const controller = new AbortController();
     fetch("/api/operations/context?path=/", { cache: "no-store", signal: controller.signal })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
@@ -94,7 +101,7 @@ export function MobileDataProvider({ children }: { children: React.ReactNode }) 
   }, []);
 
   const unread = notifications?.filter((n) => !n.is_read).length ?? 0;
-  return <Ctx.Provider value={{ active, notifications, unread, signals, signalsError, markRead, markAllRead, refresh }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ active, notifications, unread, reviewCount, signals, signalsError, markRead, markAllRead, refresh }}>{children}</Ctx.Provider>;
 }
 
 export function useMobileData(): MobileData {

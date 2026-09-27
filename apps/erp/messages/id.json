@@ -2249,7 +2249,33 @@
     "roleOwner": "Owner · semua modul",
     "roleModules": "Akses ke {count} modul",
     "askPlaceholder": "Cari record, berkas, atau tanya…",
-    "capture": "Foto atau unggah dokumen",
+    "capture": {
+      "title": "Tangkap dokumen",
+      "takePhoto": "Ambil foto",
+      "pickFile": "Pilih berkas",
+      "hint": "PDF, Word, Excel, CSV, atau foto; maksimal 20 MB. Jangan unggah KTP, KK, atau slip gaji.",
+      "tooLarge": "Ukuran maksimum 20 MB.",
+      "change": "Ganti",
+      "destination": "Tujuan",
+      "dest": {
+        "files": "Company Files",
+        "agent": "Tanya Agent"
+      },
+      "fileTitle": "Judul",
+      "fileTitlePlaceholder": "Opsional; nama berkas bila kosong",
+      "loadingKinds": "Memuat jenis berkas…",
+      "filesNote": "Kelas minimal mengikuti jenis berkas; kelas yang lebih longgar hanya dapat dipilih Owner. Berkas dengan pola dokumen identitas ditahan untuk ditinjau.",
+      "agentNote": "Berkas dilampirkan ke percakapan Agent sebagai konteks kerja Anda, bukan disimpan ke Company Files. Anda tetap bisa menyimpannya dari Agent.",
+      "save": "Simpan ke Company Files",
+      "saving": "Menyimpan…",
+      "sendToAgent": "Lampirkan ke Agent",
+      "failed": "Berkas belum dapat disimpan.",
+      "savedTitle": "Tersimpan di Company Files",
+      "savedBody": "Berkas sedang dibaca agar bisa dicari dan ditanyakan.",
+      "openInFiles": "Lihat di Company Files",
+      "done": "Selesai",
+      "open": "Buka berkas"
+    },
     "voice": "Tanya dengan suara",
     "attentionTitle": "Perlu perhatian · {count} kondisi",
     "allModules": "Semua modul",
@@ -2408,6 +2434,149 @@
         "revisionRule": "Mengembalikan ke PMO wajib disertai alasan.",
         "return": "Kembalikan",
         "accept": "Terima"
+      }
+    },
+    "review": {
+      "waiting": "{count} menunggu keputusan Anda",
+      "subtitle": "Keputusan yang menunggu Anda",
+      "filter": "Jenis keputusan",
+      "groups": {
+        "all": "Semua",
+        "sign": "Tanda tangan",
+        "time_off": "Cuti",
+        "timesheet": "Timesheet",
+        "finance": "Finance",
+        "agent": "Agent"
+      },
+      "kinds": {
+        "signature": "Tanda tangan",
+        "time_off": "Time Off",
+        "timesheet": "Timesheet",
+        "finance_verify": "Serah terima Finance",
+        "finance_revise": "Dikembalikan Finance",
+        "proposal": "Usulan Agent"
+      },
+      "actions": {
+        "signature": "Tanda tangani",
+        "time_off": "Setujui",
+        "timesheet": "Setujui",
+        "finance_verify": "Verifikasi",
+        "finance_revise": "Perbaiki",
+        "proposal": "Konfirmasi"
+      },
+      "steps": {
+        "requester": "Requester",
+        "approval_1": "Approval 1",
+        "approval_2": "Approval 2",
+        "approval_3": "Approval 3",
+        "acknowledge": "Acknowledge"
+      },
+      "stepStatus": {
+        "signed": "Ditandatangani",
+        "pending": "Menunggu",
+        "rejected": "Ditolak",
+        "not_started": "Belum"
+      },
+      "signatureStatus": {
+        "pending": "Menunggu Anda",
+        "signed": "Ditandatangani",
+        "rejected": "Ditolak"
+      },
+      "timeOffStatus": {
+        "pending": "Menunggu",
+        "approved": "Disetujui",
+        "rejected": "Ditolak",
+        "cancelled": "Dibatalkan"
+      },
+      "since": "menunggu {ago}",
+      "proposalItems": "{count, plural, one {# perubahan} other {# perubahan}} menunggu konfirmasi",
+      "emptyTitle": "Tidak ada yang menunggu Anda",
+      "emptyBody": "Persetujuan, tanda tangan, dan serah terima baru akan muncul di sini.",
+      "updates": "Kabar terbaru",
+      "openTimesheet": "Buka Timesheet",
+      "approve": "Setujui",
+      "reject": "Tolak",
+      "cancel": "Batal",
+      "sign": "Tanda tangani",
+      "failed": "Belum berhasil. Coba lagi.",
+      "talent": "Talent",
+      "client": "Klien",
+      "period": "Periode",
+      "rejectTitle": "Tolak permintaan",
+      "reasonOptional": "Alasan (opsional)",
+      "reasonRequired": "Alasan",
+      "signTitle": "Tanda tangani dokumen",
+      "signBody": "Tanda tangan tersimpan Anda akan dibubuhkan pada dokumen ini dan alur persetujuan lanjut ke langkah berikutnya.",
+      "noSignature": "Anda belum punya tanda tangan tersimpan. Buat dulu di TTD Online, lalu kembali ke sini.",
+      "createSignature": "Buat tanda tangan",
+      "approveTitle": "Setujui Time Off",
+      "approveBody": "Persetujuan Anda dicatat untuk langkah ini; approver berikutnya akan diberi tahu.",
+      "extensionEyebrow": "TM · Extension / Increment",
+      "requestedBy": "Diminta oleh {name}",
+      "yourTurn": "Giliran Anda",
+      "journey": "Alur persetujuan",
+      "request": "Permintaan",
+      "document": "Dokumen",
+      "requester": "Pemohon",
+      "requestedAt": "Diajukan",
+      "rejectReason": "Alasan ditolak",
+      "documents": "Dokumen",
+      "mainDocument": "Dokumen utama",
+      "attachment": "Lampiran",
+      "askAgent": "Tanya Agent",
+      "extension": {
+        "title": "Usulan perpanjangan",
+        "period": "Periode usulan",
+        "currentPosition": "Posisi saat ini",
+        "position": "Posisi usulan",
+        "grade": "Grade",
+        "employment": "Tipe kerja",
+        "compensation": "Kompensasi",
+        "increment": "Increment",
+        "basicSalary": "Gaji pokok usulan",
+        "compensationWithheld": "Rincian kompensasi hanya terlihat oleh divisi TM."
+      },
+      "timeOffEyebrow": "Attendance · Time Off",
+      "timeOff": {
+        "title": "Cuti",
+        "dates": "Tanggal",
+        "days": "Durasi",
+        "dayCount": "{count} hari",
+        "delegate": "Delegasi",
+        "step": "Langkah {order}"
+      },
+      "proposalTitle": "Usulan perubahan dari Agent",
+      "proposalBody": "Periksa, ubah bila perlu, lalu konfirmasi. ERP memvalidasi ulang setiap item dengan akses Anda saat ini.",
+      "extensionShort": "Extension / Increment"
+    },
+    "search": {
+      "back": "Kembali ke Beranda",
+      "placeholder": "Cari record, berkas, atau tanya…",
+      "clear": "Hapus",
+      "hintTitle": "Cari di ERP",
+      "hintBody": "Ketik nama klien, nomor opty, kandidat, atau nama berkas. Hasil mengikuti akses Anda; atau serahkan pertanyaannya ke Agent.",
+      "askAgent": "Tanya Agent",
+      "pages": "Halaman",
+      "records": "Record",
+      "files": "Company Files",
+      "searching": "Mencari…",
+      "recordsError": "Pencarian record belum dapat dimuat.",
+      "noRecords": "Tidak ada record yang cocok dan dapat Anda buka.",
+      "recordMeta": "{type} · cocok di {field}",
+      "allFiles": "Semua hasil di Company Files"
+    },
+    "finance": {
+      "title": "Dokumen Finance",
+      "notified": "Diserahkan {name} · {at}",
+      "received": "Diterima {name} · {at}",
+      "invoices": "{count} TM Invoice",
+      "tabs": {
+        "notified": "Perlu verifikasi",
+        "needs_revision": "Dikembalikan",
+        "received": "Diterima"
+      },
+      "sort": {
+        "notified": "Terbaru diserahkan"
       }
     }
   }

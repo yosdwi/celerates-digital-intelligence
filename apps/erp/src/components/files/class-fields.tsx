@@ -27,7 +27,8 @@ export function useKinds() {
 }
 
 /** Controlled-by-DOM fields named `kind`, `access_class`, `owner_division` (read them from the enclosing form). */
-export function ClassFields({ kinds, initialKind }: { kinds: Kinds; initialKind?: string }) {
+/** `labelClass`/`fieldClass` let a surface restyle the same fields (e.g. the Jernih mobile capture sheet). */
+export function ClassFields({ kinds, initialKind, labelClass = "text-xs text-slate-600", fieldClass = field }: { kinds: Kinds; initialKind?: string; labelClass?: string; fieldClass?: string }) {
   const [kind, setKind] = useState(initialKind && kinds.kinds.some((k) => k.kind === initialKind) ? initialKind : kinds.kinds[0]?.kind ?? "other");
   const spec = kinds.kinds.find((k) => k.kind === kind);
   const [cls, setCls] = useState<Cls>(spec?.access_class ?? "general");
@@ -36,10 +37,10 @@ export function ClassFields({ kinds, initialKind }: { kinds: Kinds; initialKind?
   const divisions = cls === "general" ? [] : kinds.access.owner ? DIVISIONS : cls === "division" ? kinds.access.divisions : kinds.access[cls];
   return (
     <>
-      <label className="text-xs text-slate-600">Jenis<select name="kind" value={kind} onChange={(e) => setKind(e.target.value)} className={field}>{kinds.kinds.map((k) => <option key={k.kind} value={k.kind}>{k.label}</option>)}</select></label>
-      <label className="text-xs text-slate-600">Kelas akses<select name="access_class" value={cls} onChange={(e) => setCls(e.target.value as Cls)} className={field}>{allowed.map((c) => <option key={c} value={c}>{CLASS[c].label} — {CLASS[c].note}</option>)}</select></label>
+      <label className={labelClass}>Jenis<select name="kind" value={kind} onChange={(e) => setKind(e.target.value)} className={fieldClass}>{kinds.kinds.map((k) => <option key={k.kind} value={k.kind}>{k.label}</option>)}</select></label>
+      <label className={labelClass}>Kelas akses<select name="access_class" value={cls} onChange={(e) => setCls(e.target.value as Cls)} className={fieldClass}>{allowed.map((c) => <option key={c} value={c}>{CLASS[c].label} — {CLASS[c].note}</option>)}</select></label>
       {cls !== "general" && (
-        <label className="text-xs text-slate-600">Divisi pemilik<select name="owner_division" required className={field}>{divisions.map((d) => <option key={d} value={d}>{d.toUpperCase()}</option>)}</select></label>
+        <label className={labelClass}>Divisi pemilik<select name="owner_division" required className={fieldClass}>{divisions.map((d) => <option key={d} value={d}>{d.toUpperCase()}</option>)}</select></label>
       )}
     </>
   );

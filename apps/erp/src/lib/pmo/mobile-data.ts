@@ -2,7 +2,7 @@
 // (project_contracts), Billing Schedule (project_monthly_billings), TM Invoice (project_invoices + BAST),
 // Document Tracker (project_documents) and the PMO → Finance handoff (finance_document_handoffs).
 // No new business state: statuses are the stored ones, plus the existing derived submission rule.
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   employees,
@@ -301,4 +301,30 @@ export async function invoiceDetail(id: string, now = new Date()) {
       .then((r) => r[0] ?? null),
   ]);
   return { ...row, issue_label: row.issue ? INVOICE_ISSUE_LABELS[row.issue] ?? row.issue : null, bast, handoff, contract };
+}
+
+/** Finance's view of the PMO → Finance handoff (doc 18 §17): every project PMO has notified, with its latest TM Invoice. */
+export async function handoffCards() {
+  const rows = await db
+    .select({
+      id: financeDocumentHandoffs.id,
+      opportunity_id: financeDocumentHandoffs.opportunity_id,
+      status: financeDocumentHandoffs.status_code,
+      notified_at: financeDocumentHandoffs.notified_at,
+      notified_by_name: financeDocumentHandoffs.notified_by_name,
+      received_at: financeDocumentHandoffs.received_at,
+      received_by_name: financeDocumentHandoffs.received_by_name,
+      finance_notes: financeDocumentHandoffs.finance_notes,
+      client_name: opportunities.client_name,
+      opty_no: opportunities.opty_no,
+      project_name: opportunities.project_name,
+      invoice_id: sql<string | null>`(SELECT pi.id FROM project_invoices pi WHERE pi.opportunity_id = ${financeDocumentHandoffs.opportunity_id} ORDER BY pi.services_month_start DESC NULLS LAST, pi.created_at DESC LIMIT 1)`,
+      invoice_count: sql<number>`(SELECT count(*)::int FROM project_invoices pi WHERE pi.opportunity_id = ${financeDocumentHandoffs.opportunity_id})`,
+    })
+    .from(financeDocumentHandoffs)
+    .leftJoin(opportunities, eq(financeDocumentHandoffs.opportunity_id, opportunities.id))
+    // Only what PMO has actually handed over ("Kasih tau Finance"), as on the desktop Finance page.
+    .where(ne(financeDocumentHandoffs.status_code, "pending"))
+    .orderBy(desc(financeDocumentHandoffs.notified_at));
+  return rows.map((r) => ({ ...r, search: [r.client_name, r.opty_no, r.project_name, r.notified_by_name].filter(Boolean).join(" ").toLowerCase() }));
 }

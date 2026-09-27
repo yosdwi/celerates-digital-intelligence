@@ -106,8 +106,25 @@ export async function agentJourney({ base, request, db, env, python, publicKey, 
     if (process.env.ERP_BROWSER_TEST === '1') {
       // A fresh unassigned requisition for the browser's own `Tindak lanjuti` flow.
       await db`INSERT INTO requisitions (requisition_no,client_name,position_name,ta_pic_name) VALUES ('REQ-BROWSER','PT Synthetic Browser','Data Engineer','')`;
+      // MS3 Tinjau: an Extension/Increment step and a Time Off step waiting for the Owner (doc 18 §17).
+      const [owner] = await db`SELECT id FROM users WHERE email='owner@example.test'`;
+      const [requester] = await db`INSERT INTO users (email,full_name,status,is_owner,account_type) VALUES ('ms3-requester@example.test','Rina Synthetic','active',false,'backoffice') RETURNING id`;
+      const [emp] = await db`INSERT INTO employees (employee_no,position_name) VALUES ('EMP-MS3','Data Engineer') RETURNING id`;
+      const [ext] = await db`INSERT INTO extension_increment_requests (employee_id,requester_name,requester_user_id,approver_1_user_id,propose_start_date,propose_end_date,proposed_position_name,proposed_increment_percent_deal)
+                             VALUES (${emp.id},'Dimas Synthetic',${requester.id},${owner.id},'2026-11-01','2027-10-31','Senior Data Engineer',8) RETURNING id`;
+      await db`INSERT INTO signature_requests (document_title,requested_by_user_id,signer_user_id,status_code,source_type,source_id,step_code,step_order,signed_at)
+               VALUES ('Extension/Increment Request - Dimas Synthetic',${requester.id},${requester.id},'signed','extension_increment_request',${ext.id},'requester',0,now())`;
+      await db`INSERT INTO signature_requests (document_title,requested_by_user_id,signer_user_id,source_type,source_id,step_code,step_order)
+               VALUES ('Extension/Increment Request - Dimas Synthetic',${requester.id},${owner.id},'extension_increment_request',${ext.id},'approval_1',1)`;
+      const [leave] = await db`INSERT INTO leave_types (name) VALUES ('Cuti tahunan (synthetic)') RETURNING id`;
+      const [off] = await db`INSERT INTO time_off_requests (user_id,leave_type_id,start_date,end_date,reason) VALUES (${requester.id},${leave.id},'2026-10-12','2026-10-14','Acara keluarga') RETURNING id`;
+      await db`INSERT INTO time_off_approval_steps (request_id,step_order,approver_user_id) VALUES (${off.id},1,${owner.id})`;
       const { agentBrowser } = await import('./agent-browser.mjs');
       await agentBrowser({ base, cookies: cookies.split('; ').map((pair) => [pair.slice(0, pair.indexOf('=')), pair.slice(pair.indexOf('=') + 1)]) });
+      // The phone decisions went through the existing actions: the journey was rejected, the time off approved.
+      assert.equal((await db`SELECT status_code FROM extension_increment_requests WHERE id=${ext.id}`)[0].status_code, 'rejected');
+      assert.equal((await db`SELECT reject_reason FROM signature_requests WHERE source_id=${ext.id} AND step_code='approval_1'`)[0].reject_reason, 'Periode belum sesuai PKS');
+      assert.equal((await db`SELECT status_code FROM time_off_requests WHERE id=${off.id}`)[0].status_code, 'approved');
     }
     // Same runtime with an Agent model configured (ADR-014). The provider is a local OpenAI-compatible stand-in, so the
     // real LiteLLM → HTTP → validation → tools → ERP path runs without credentials.

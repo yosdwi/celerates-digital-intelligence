@@ -156,5 +156,5 @@ export function submoduleFor(pathname: string): { module: string; href: string; 
 // Routes that render their own full-screen Jernih surface on a phone (MS1 shell pages, MS2 PMO). Other module
 // routes still show their desktop page inside the shell, under the module context bar.
 const UUID_PART = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
-const MOBILE_NATIVE = [/^\/$/, /^\/modules$/, /^\/notifications$/, new RegExp(`^/pmo/(contracts|invoices)(/${UUID_PART})?$`, "i")];
+const MOBILE_NATIVE = [/^\/$/, /^\/modules$/, /^\/notifications$/, /^\/search$/, /^\/finance$/, /^\/review(\/(signature|time-off|proposal)\/[0-9a-f-]{36})?$/i, new RegExp(`^/pmo/(contracts|invoices)(/${UUID_PART})?$`, "i")];
 export const isMobileNative = (pathname: string) => MOBILE_NATIVE.some((r) => r.test(pathname.split(/[?#]/)[0]));

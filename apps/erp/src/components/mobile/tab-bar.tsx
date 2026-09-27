@@ -20,7 +20,7 @@ export function MobileTabBar() {
   const t = useTranslations("mobile");
   const { status } = useSession();
   const pathname = usePathname();
-  const { unread } = useMobileData();
+  const { reviewCount } = useMobileData();
   const [account, setAccount] = useState(false);
   useEffect(() => {
     const open = () => setAccount(true);
@@ -30,7 +30,7 @@ export function MobileTabBar() {
   useEffect(() => setAccount(false), [pathname]);
   if (status !== "authenticated" || HIDDEN_ON.some((p) => pathname === p || pathname.startsWith(p + "/"))) return null;
 
-  const active = pathname === "/" ? "home" : pathname === "/notifications" ? "review" : pathname === "/profile" ? "account" : "modules";
+  const active = pathname === "/" || pathname === "/search" ? "home" : pathname === "/notifications" || pathname === "/review" || pathname.startsWith("/review/") ? "review" : pathname === "/profile" ? "account" : "modules";
   const item = "relative flex min-h-[56px] flex-col items-center justify-start gap-1 pt-1 text-[11px]";
   const tone = (key: string) => (active === key ? "font-bold text-j-accent" : "font-semibold text-j-muted");
   return (
@@ -54,12 +54,12 @@ export function MobileTabBar() {
           </span>
           {t("tabs.agent")}
         </button>
-        <Link href="/notifications" aria-current={active === "review" ? "page" : undefined} className={`${item} ${tone("review")}`}>
+        <Link href="/review" data-tab-review aria-current={active === "review" ? "page" : undefined} className={`${item} ${tone("review")}`}>
           <Inbox aria-hidden className="h-6 w-6" strokeWidth={1.9} fill={active === "review" ? "#e8eefd" : "none"} />
           {t("tabs.review")}
-          {unread > 0 && (
-            <span aria-label={t("unread", { count: unread })} className="absolute left-1/2 top-0 ml-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-j-danger px-1 text-[10px] font-extrabold text-white">
-              {unread > 9 ? "9+" : unread}
+          {reviewCount > 0 && (
+            <span data-review-badge aria-label={t("review.waiting", { count: reviewCount })} className="absolute left-1/2 top-0 ml-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-j-danger px-1 text-[10px] font-extrabold text-white">
+              {reviewCount > 9 ? "9+" : reviewCount}
             </span>
           )}
         </Link>

@@ -10,8 +10,10 @@ import { SmartFileLink } from "@/components/smart-file-link";
 import { HandoffActionPanel } from "./handoff-action-panel";
 import { Landmark } from "lucide-react";
 import { getTranslations } from "next-intl/server";
+import { FinanceListMobile } from "@/components/mobile/finance/list";
 
-export default async function FinancePage() {
+export default async function FinancePage({ searchParams }: { searchParams?: Promise<{ q?: string }> }) {
+  const q = (await searchParams)?.q;
   const t = await getTranslations("finance");
   const session = await getServerSession(authOptions);
   const isOwner = Boolean((session?.user as any)?.isOwner);
@@ -58,7 +60,11 @@ export default async function FinancePage() {
   const waitingReviewCount = rows.filter((r) => r.status_code === "notified").length;
 
   return (
-    <div className="min-h-screen">
+    <>
+    <div className="md:hidden">
+      <FinanceListMobile query={q} />
+    </div>
+    <div className="hidden min-h-screen md:block">
       <PageHeader
         icon={Landmark}
         color="bg-emerald-600"
@@ -133,5 +139,6 @@ export default async function FinancePage() {
         </section>
       </main>
     </div>
+    </>
   );
 }
