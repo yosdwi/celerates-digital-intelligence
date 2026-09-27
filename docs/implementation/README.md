@@ -1,7 +1,8 @@
 # P0 implementation map
 
-**Latest increment:** [Operating Substrate M5 — one Agent surface, Masukan understood from free text](operating-substrate-m5.md)
-(one conversation and composer with Perlu perhatian as the Ringkasan, feedback routed to reviewed drafts, attention brief).
+**Latest increment:** [Operating Substrate M6 — Company Files](operating-substrate-m6.md)
+(governed file registry over ERP attachments and uploads, access classes from ERP policy, page/table/OCR-aware reading, Company Files explorer, files in the Agent; [storage encryption and backups](storage-encryption-and-backups.md)).
+Before that: [M5 — one Agent surface, Masukan understood from free text](operating-substrate-m5.md).
 Before that: [M4 — quality loop, Brain Console sign-in, signal history](operating-substrate-m4.md).
 Before that: [M3 — understanding, documents, voice, Brain Console](operating-substrate-m3.md).
 Before that: [M2 — Ask, Drop, Act](operating-substrate-m2.md) (ask anything, CSV/XLSX import, `Tindak lanjuti` → ERP-held proposals → receipts → outcomes).

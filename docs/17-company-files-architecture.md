@@ -1,6 +1,6 @@
 # Company Files — substrate audit and architecture recommendation (M6)
 
-Status: **proposal for review, not implemented.** Date: 2026-09-27. Baseline: M5 (deployed).
+Status: **implemented in M6** ([record](implementation/operating-substrate-m6.md), [ADR-018](adr/ADR-018-company-files-registry.md)); deviations from this proposal are listed in the record. Date: 2026-09-27. Baseline: M5 (deployed).
 Inputs:
 - the North Star (docs [14](14-celerates-enterprise-intelligence-operating-model.md)–[16](16-operating-substrate-build-reuse-adopt.md));
 - the M5 sequencing, in which M6 = Company Files, M7 = Insight Agent and M8 = operational shell;
@@ -47,7 +47,7 @@ Build **a governed file registry in Intelligence that indexes files wherever the
 | Read | buffered, 20 MB cap | buffered; no stream, range, head, list or presign |
 | Download | `/api/documents?bucket=&path=`: **Owner check only**, no link to any record; inline, CSP sandbox | `/api/documents/{id}/download`: checks the knowledge scope or ERP opportunity; attachment; octet-stream |
 | Deletion / retention | **none**; deleting a row orphans the object | agent datasets purged after 30 d; nothing else |
-| Environment | MinIO locally; S3-compatible Supabase Storage in the pilot (doc `erp-audit/06`) | MinIO (ADR-005); filesystem in CI |
+| Environment | MinIO locally; **in the pilot, self-hosted MinIO on a Railway volume** (verified in M6; doc `erp-audit/06` had assumed Supabase Storage) | MinIO (ADR-005) on a Railway volume; filesystem in CI |
 
 **Conclusion.** Both sides already speak S3, and both keep objects private and proxy downloads. The abstraction is sufficient. What is missing is capability, not a new store:
 - streaming and range reads (preview of large PDFs);
