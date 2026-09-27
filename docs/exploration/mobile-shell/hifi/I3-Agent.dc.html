@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>Iterasi 3 · Agent</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0A1A31}
+a{color:#9DBBFF}a:hover{color:#C4D6FF}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #0A1A31; font-family: 'IBM Plex Sans', sans-serif; color: #E6EDF8;">
+<header style="position: absolute; left: 0; right: 0; top: 0; box-sizing: border-box; padding: 50px 10px 10px; background: #0A1A31; border-bottom: 1px solid #1C3558; display: flex; align-items: center; gap: 4px; z-index: 2;">
+  <a href="I3-Beranda.dc.html" aria-label="Kembali" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: #E6EDF8;">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg></a>
+  <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 1px;">
+    <span style="font-size: 16px; font-weight: 600;">Celerates Agent</span>
+    <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; color: #A9BAD6;">konteks · PKS-2026-014</span>
+  </div>
+  <button type="button" aria-label="Riwayat percakapan" style="width: 44px; height: 44px; border: 0; background: transparent; color: #E6EDF8; display: flex; align-items: center; justify-content: center; padding: 0;">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></button>
+</header>
+
+<main style="padding: 116px 14px 140px; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px;">
+  <a href="I3-Agent.dc.html" style="display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 12px; border-radius: 10px; background: #2A1B0E; border: 1px solid #5C3713; text-decoration: none; color: #FED7AA; font-size: 13px;">
+    <span style="font-family: 'IBM Plex Mono', monospace; font-weight: 600; color: #FDBA74;">3</span><span style="flex-grow: 1;">hal perlu perhatian · 1 berubah</span><span style="font-weight: 600; color: #FDBA74;">Buka</span></a>
+
+  <div style="align-self: flex-end; max-width: 270px; padding: 10px 13px; border-radius: 14px 14px 4px 14px; background: #2F6BFF; color: #FFFFFF; font-size: 14px; line-height: 1.45;">Kontrak Arunika habis kapan, dan apa yang perlu disiapkan?</div>
+
+  <article style="padding: 13px; border-radius: 14px; background: #122A4C; border: 1px solid #23406B; display: flex; flex-direction: column; gap: 10px; font-size: 14px; line-height: 1.55;">
+    <p style="margin: 0;">PKS-2026-014 berakhir <strong>18 Okt 2026</strong> (21 hari lagi); 6 talent aktif, BAST September belum ada.<sup style="color: #9DBBFF; font-size: 10px; font-weight: 700;"> 1</sup></p>
+    <p style="margin: 0;">Pengajuan perpanjangan seharusnya dikirim paling lambat 30 hari sebelum berakhir, jadi sudah terlambat 9 hari.<sup style="color: #86EFAC; font-size: 10px; font-weight: 700;"> 2</sup></p>
+    <div style="border-top: 1px solid #23406B; padding-top: 8px; display: flex; flex-direction: column; gap: 6px; font-size: 12px;">
+      <span style="display: flex; gap: 8px; align-items: center;"><span style="font-family: 'IBM Plex Mono', monospace; color: #9DBBFF; font-weight: 600;">1</span><span style="font-weight: 600; color: #C4D6FF;">Fakta ERP</span><span style="color: #A9BAD6;">Kontrak, talent, BAST</span></span>
+      <span style="display: flex; gap: 8px; align-items: center;"><span style="font-family: 'IBM Plex Mono', monospace; color: #86EFAC; font-weight: 600;">2</span><span style="font-weight: 600; color: #BBF7D0;">Pengetahuan disetujui</span><span style="color: #A9BAD6;">SOP Perpanjangan Kontrak</span></span>
+    </div>
+  </article>
+
+  <section aria-label="Usulan tindakan" style="padding: 13px; border-radius: 14px; background: #0F2342; border: 1.5px solid #3D63A8; display: flex; flex-direction: column; gap: 10px;">
+    <div style="display: flex; justify-content: space-between; align-items: center;"><span style="font-size: 12px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: #9DBBFF;">Usulan tindakan</span><span style="font-size: 11.5px; color: #A9BAD6;">1 siap · 0 perlu diisi</span></div>
+    <label style="display: flex; gap: 10px; align-items: flex-start; font-size: 14px;">
+      <input type="checkbox" checked style="width: 20px; height: 20px; margin: 1px 0 0; accent-color: #2F6BFF;">
+      <span style="display: flex; flex-direction: column; gap: 2px;"><span style="font-weight: 600;">Tindak lanjut perpanjangan</span><span style="font-size: 12.5px; color: #A9BAD6;">PIC Raka Pratama · jatuh tempo 01-10-2026</span></span>
+    </label>
+    <div style="display: flex; gap: 8px;">
+      <button type="button" style="flex-grow: 1; height: 44px; border-radius: 10px; border: 0; background: #2F6BFF; color: #FFFFFF; font-family: inherit; font-size: 14px; font-weight: 600;">Konfirmasi 1 perubahan</button>
+      <button type="button" style="height: 44px; padding: 0 16px; border-radius: 10px; border: 1px solid #3D63A8; background: transparent; color: #E6EDF8; font-family: inherit; font-size: 14px;">Tolak</button>
+    </div>
+    <span style="font-size: 12px; color: #A9BAD6;">Divalidasi ERP untuk akses Anda. Belum ada data berubah.</span>
+  </section>
+</main>
+
+<div style="position: absolute; left: 0; right: 0; bottom: 0; box-sizing: border-box; padding: 10px 12px 28px; background: #0A1A31; border-top: 1px solid #1C3558; display: flex; align-items: center; gap: 8px;">
+  <a href="I3-Capture.dc.html" aria-label="Lampirkan atau foto dokumen" style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 10px; background: #122A4C; color: #E6EDF8; display: flex; align-items: center; justify-content: center;">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m21.4 11.1-9.2 9.2a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.5-8.5"/></svg></a>
+  <input aria-label="Pesan untuk Agent" placeholder="Tanya, minta tindakan, atau masukan…" style="flex-grow: 1; min-width: 0; height: 44px; box-sizing: border-box; padding: 0 12px; border-radius: 10px; border: 1px solid #23406B; background: #122A4C; outline: none; font-family: inherit; font-size: 14px; color: #E6EDF8;">
+  <button type="button" aria-label="Tahan untuk bicara" style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 10px; border: 0; background: #2F6BFF; color: #FFFFFF; display: flex; align-items: center; justify-content: center; padding: 0;">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><path d="M12 18v4"/></svg></button>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

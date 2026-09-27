@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>Iterasi 1 · Company Files</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6FA}
+a{color:#2356E8}a:hover{color:#1A43B8}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #F4F6FA; font-family: 'Plus Jakarta Sans', sans-serif; color: #0E1726;">
+<main style="padding: 58px 20px 100px; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px;">
+  <header style="display: flex; align-items: flex-end; justify-content: space-between;">
+    <div style="display: flex; flex-direction: column; gap: 2px;">
+      <h1 style="margin: 0; font-size: 30px; font-weight: 800; letter-spacing: -0.6px;">Company Files</h1>
+      <p style="margin: 0; font-size: 13px; color: #566072;">Akses mengikuti kelas berkas</p>
+    </div>
+    <a href="I1-Capture.dc.html" aria-label="Unggah atau foto berkas" style="width: 44px; height: 44px; border-radius: 22px; background: #2356E8; color: #FFFFFF; display: flex; align-items: center; justify-content: center;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></a>
+  </header>
+  <div style="display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 12px 0 14px; background: #FFFFFF; border: 1.5px solid #2356E8; border-radius: 14px;">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2356E8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+    <input aria-label="Cari berkas" value="bast arunika" style="flex-grow: 1; border: 0; outline: none; background: transparent; font-family: inherit; font-size: 15px; color: #0E1726;">
+    <button type="button" aria-label="Hapus pencarian" style="width: 28px; height: 28px; border-radius: 14px; border: 0; background: #E9EDF4; color: #566072; display: flex; align-items: center; justify-content: center; padding: 0;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+  </div>
+  <div style="display: flex; gap: 8px; overflow: hidden;">
+    <button type="button" style="flex-shrink: 0; height: 34px; padding: 0 12px; border-radius: 17px; border: 1px solid #E1E6EF; background: #FFFFFF; color: #0E1726; font-family: inherit; font-size: 13px; font-weight: 600;">Semua jenis</button>
+    <button type="button" aria-pressed="true" style="flex-shrink: 0; height: 34px; padding: 0 12px; border-radius: 17px; border: 0; background: #0E1726; color: #FFFFFF; font-family: inherit; font-size: 13px; font-weight: 700;">BAST</button>
+    <button type="button" style="flex-shrink: 0; height: 34px; padding: 0 12px; border-radius: 17px; border: 1px solid #E1E6EF; background: #FFFFFF; color: #0E1726; font-family: inherit; font-size: 13px; font-weight: 600;">Kontrak</button>
+    <button type="button" style="flex-shrink: 0; height: 34px; padding: 0 12px; border-radius: 17px; border: 1px solid #E1E6EF; background: #FFFFFF; color: #0E1726; font-family: inherit; font-size: 13px; font-weight: 600;">SOP</button>
+    <button type="button" style="flex-shrink: 0; height: 34px; padding: 0 12px; border-radius: 17px; border: 1px solid #E1E6EF; background: #FFFFFF; color: #0E1726; font-family: inherit; font-size: 13px; font-weight: 600;">CV</button>
+  </div>
+  <p style="margin: 0; font-size: 12px; font-weight: 600; color: #566072;">3 berkas · diurutkan menurut kecocokan</p>
+
+  <div style="display: flex; flex-direction: column; gap: 10px;">
+    <article style="padding: 14px; border-radius: 18px; background: #FFFFFF; border: 1px solid #E5E9F0; display: flex; flex-direction: column; gap: 10px;">
+      <div style="display: flex; gap: 12px; align-items: flex-start;">
+        <span style="width: 40px; height: 40px; border-radius: 10px; background: #FDEBE8; color: #B3261E; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; flex-shrink: 0;">PDF</span>
+        <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+          <span style="font-size: 15px; font-weight: 700;">BAST Arunika Agustus 2026</span>
+          <span style="font-size: 12px; color: #566072;">BAST · dari ERP · Invoice INV-0912</span>
+        </div>
+        <span style="font-size: 11px; font-weight: 700; color: #1A43B8; background: #E8EEFD; padding: 3px 8px; border-radius: 8px; white-space: nowrap;">Divisi PMO</span>
+      </div>
+      <p style="margin: 0; padding: 10px 12px; border-radius: 12px; background: #F6F8FB; font-size: 13px; line-height: 1.45; color: #2F3947;"><span style="font-weight: 700; color: #566072;">Hal. 2 · OCR</span> — Berita Acara Serah Terima pekerjaan <mark style="background: #FFF1B8; color: #0E1726; border-radius: 3px; padding: 0 2px;">PT Arunika Digital</mark> periode Agustus 2026…</p>
+    </article>
+    <article style="padding: 14px; border-radius: 18px; background: #FFFFFF; border: 1px solid #E5E9F0; display: flex; flex-direction: column; gap: 10px;">
+      <div style="display: flex; gap: 12px; align-items: flex-start;">
+        <span style="width: 40px; height: 40px; border-radius: 10px; background: #FDEBE8; color: #B3261E; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; flex-shrink: 0;">PDF</span>
+        <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+          <span style="font-size: 15px; font-weight: 700;">BAST Arunika Juli 2026</span>
+          <span style="font-size: 12px; color: #566072;">BAST · dari ERP · Invoice INV-0847</span>
+        </div>
+        <span style="font-size: 11px; font-weight: 700; color: #1A43B8; background: #E8EEFD; padding: 3px 8px; border-radius: 8px; white-space: nowrap;">Divisi PMO</span>
+      </div>
+    </article>
+    <article style="padding: 14px; border-radius: 18px; background: #FFFFFF; border: 1px solid #E5E9F0; display: flex; flex-direction: column; gap: 10px;">
+      <div style="display: flex; gap: 12px; align-items: flex-start;">
+        <span style="width: 40px; height: 40px; border-radius: 10px; background: #FDEBE8; color: #B3261E; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; flex-shrink: 0;">PDF</span>
+        <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+          <span style="font-size: 15px; font-weight: 700;">PKS Arunika 2026</span>
+          <span style="font-size: 12px; color: #566072;">Kontrak · isi tidak dibagikan ke Agent</span>
+        </div>
+        <span style="display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: #8A4B06; background: #FFF1DC; padding: 3px 8px; border-radius: 8px; white-space: nowrap;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Komersial</span>
+      </div>
+    </article>
+  </div>
+</main>
+
+<nav aria-label="Navigasi utama" style="position: absolute; left: 0; right: 0; bottom: 0; height: 86px; box-sizing: border-box; padding: 8px 6px 0; background: #FFFFFF; border-top: 1px solid #E5E9F0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));">
+  <a href="Main.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #566072; font-size: 11px; font-weight: 600;">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Beranda</a>
+  <a href="I1-Modul.dc.html" aria-current="page" style="display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #2356E8; font-size: 11px; font-weight: 700;">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="#E8EEFD" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Modul</a>
+  <a href="I1-Agent.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 3px; text-decoration: none; color: #566072; font-size: 11px; font-weight: 600;">
+    <span style="width: 52px; height: 52px; margin-top: -24px; border-radius: 18px; background: #2356E8; border: 4px solid #F4F6FA; box-sizing: border-box; color: #FFFFFF; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 18px rgba(35,86,232,0.30);">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 15l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/></svg>
+    </span>Agent</a>
+  <button type="button" style="position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; border: 0; background: transparent; padding: 0; color: #566072; font-family: inherit; font-size: 11px; font-weight: 600;">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5h13l3.5 7v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6z"/></svg>Tinjau
+    <span style="position: absolute; top: -4px; left: 50%; margin-left: 4px; min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box; border-radius: 9px; background: #D23A2E; color: #FFFFFF; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center;">5</span>
+  </button>
+  <button type="button" style="display: flex; flex-direction: column; align-items: center; gap: 4px; border: 0; background: transparent; padding: 0; color: #566072; font-family: inherit; font-size: 11px; font-weight: 600;">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Akun</button>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

@@ -297,3 +297,35 @@ Each slice keeps the standing invariants:
 | `direction-b-launcher-universal-bar.png` | Direction B wireframes |
 | `direction-c-work-queue-home.png` | Direction C wireframes |
 | `common-record-and-capture.png` | Record detail and capture, common to all directions |
+
+## 10. High-fidelity visual iterations (2026-09-27)
+
+After the direction discussion there are three high-fidelity visual iterations. They build on the existing product and the baseline reference image, and they are meant for **mix-and-match** before implementation. They are visual exploration only: nothing here changes the app.
+
+**The architecture is the same in all three.**
+- Destinations: Beranda · Modul · Agent · Tinjau · Akun.
+- Beranda has one bar for Cari / Tanya / Tangkap, the "Hari ini" deterministic ERP counts, the module launcher (filtered by access), one Perlu perhatian row, and recent activity.
+- Records go list → detail: ERP facts come first, then linked Company Files, the allowed actions, and **Tanya Agent** with the record as context.
+- The Agent is one conversation with evidence badges (Fakta ERP / Pengetahuan disetujui). A proposal needs the user's confirmation before anything changes.
+- Capture always asks where the file goes: a Company File (OCR, access class) or an Agent attachment (temporary).
+
+This follows the reference image's tab structure and adds Direction B's single find/ask/capture bar on Beranda.
+
+**Seven screens per iteration:** Beranda, Modul (navigation), Kontrak list, Kontrak detail, Agent, Company Files, and Tangkap dokumen.
+
+| Iteration | Look | Navigation and Agent entry |
+|---|---|---|
+| 1 · Jernih | Closest to the reference: light, blue accent, tinted module tiles, Plus Jakarta Sans | Standard tab bar with a raised Agent tab in the centre; camera capture with a bottom sheet |
+| 2 · Tenang | Warm neutral ground, deep-teal accent, serif display (Fraunces) over DM Sans, launcher-first | Floating dark tab pill (4 destinations) plus a separate round Agent button; Agent opens as a modal with a floating composer; capture reviewed after the shot |
+| 3 · Navy Pro | Dense and data-forward: navy header band, IBM Plex Sans/Mono, table-like lists | Tab bar with a top indicator and a centre Agent circle; dark Agent with numbered sources; multi-page capture |
+
+![Iteration 1](exploration/evidence/mobile-shell/hifi/iteration-1-jernih.png)
+![Iteration 2](exploration/evidence/mobile-shell/hifi/iteration-2-tenang.png)
+![Iteration 3](exploration/evidence/mobile-shell/hifi/iteration-3-navy-pro.png)
+
+**Source.** `exploration/mobile-shell/hifi/`: one `.dc.html` per screen plus `canvas.json`. This is a copy of the design canvas; the live canvas is the editable version. All data is synthetic and the client names are fictional.
+
+**Pick per element, not only per iteration.** For example:
+- the Beranda structure from 1 and the list density from 3;
+- the Agent's numbered sources from 3 and the Tangkap review from 2;
+- the tab-bar treatment decided separately from the palette.
