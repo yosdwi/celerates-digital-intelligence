@@ -188,6 +188,20 @@ async function modelJourneys({ request, db }) {
   const made = await (await request(`/api/agent/proposals/${brief.proposal.id}/confirm`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sha256: drafted.sha256 }) })).json();
   assert.equal(made.state, 'applied');
   assert.equal((await db`SELECT count(*)::int AS n FROM requisitions WHERE client_name='PT Synthetic Letter'`)[0].n, 1);
+  // One Agent (ADR-017): the model reads free text as feedback, routes it, and the user reviews the draft.
+  const custom = (r, name) => r.stream.filter((s) => s.event.type === 'CUSTOM' && s.event.name === name).map((s) => s.event.value);
+  const correction = await run(request, 'ask', { query: 'SOP TA PIC sudah berubah, sekarang PIC ditetapkan dalam 2 hari kerja' });
+  const routed = custom(correction, 'celerates.provenance')[0];
+  assert.deepEqual([routed.mode, routed.kind, routed.intent], ['model', 'route', 'knowledge_correction'], JSON.stringify(routed));
+  const kdraft = custom(correction, 'celerates.submission')[0];
+  assert.ok(kdraft?.refs.some((r) => r.startsWith('SOP Requisition TA PIC')), 'the corrected knowledge comes from cited evidence');
+  assert.ok(custom(correction, 'celerates.actions')[0].items.some((a) => a.label === 'Bukan ini: Jadikan Feature Request'), 'the user can correct the chosen kind');
+  const cancelled = await (await request(`/api/agent/submissions/${kdraft.id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'cancel' }) })).json();
+  assert.equal(cancelled.state, 'cancelled');
+  const frRoute = await run(request, 'ask', { query: 'Filter customer harusnya multi-select' });
+  const frDraft = await (await request(`/api/agent/proposals/${frRoute.proposal.id}`)).json();
+  assert.deepEqual(frDraft.items.map((i) => [i.kind, i.params.title, i.validation.state]), [['feature_request.create', 'Filter customer multi-select', 'ok']]);
+  await request(`/api/agent/proposals/${frDraft.id}/reject`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
   console.log('PASS: Agent model path — paraphrase understood with cited rule/SOP as inference, ungrounded answer rejected, natural-language action → ERP proposal → confirmed task, dropped request letter → requisition proposal → applied');
 }
 
@@ -353,6 +367,39 @@ async function proposalJourneys({ base, request, db, env, intelligence, requisit
     const typo = await run(request, 'ask', { query: 'Sinthetic Import' });
     assert.ok(typo.evidence.some(e => /Synthetic Import/.test(e.title)), typo.text);
     assert.match(typo.text, /cocok sebagian/);
+    // One Agent surface (ADR-017). The attention brief is a conversational answer; feedback in free text is offered
+    // as kinds (no model: the user picks) and always ends in a draft the user reviews before anything is submitted.
+    const briefing = await run(request, 'ask', { query: 'Apa yang perlu aku perhatikan hari ini?' });
+    assert.match(briefing.text, /kondisi perlu perhatian|Tidak ada kondisi perhatian yang aktif/, briefing.text);
+    const offers = (r) => r.stream.find((s) => s.event.type === 'CUSTOM' && s.event.name === 'celerates.actions')?.event.value.items ?? [];
+    const complaint = await run(request, 'ask', { query: 'Filter customer di halaman ini harusnya multi-select' });
+    assert.match(complaint.text, /^Ini terdengar seperti masukan/);
+    const asFr = offers(complaint).find((a) => a.skill === 'route_feedback' && a.args.intent === 'feature_request');
+    assert.ok(asFr, JSON.stringify(offers(complaint)));
+    assert.equal((await db`SELECT count(*)::int AS n FROM feature_requests WHERE title LIKE 'Filter customer%'`)[0].n, 0, 'nothing is submitted before review');
+    const frRun = await run(request, 'route_feedback', asFr.args);
+    const frProposal = (await json(`/api/agent/proposals/${frRun.proposal.id}`)).body;
+    assert.deepEqual(frProposal.items.map((i) => [i.kind, i.validation.state]), [['feature_request.create', 'ok']]);
+    assert.equal((await post(`/api/agent/proposals/${frProposal.id}/confirm`, { sha256: frProposal.sha256 })).body.state, 'applied');
+    const [fr] = await db`SELECT context_path, request_type_code, requested_by_name FROM feature_requests WHERE title LIKE 'Filter customer%'`;
+    assert.deepEqual([fr.context_path, fr.request_type_code], ['/ta', 'improvement']);
+    const wrong = await run(request, 'ask', { query: `Data ${requisition.requisition_no} salah, headcount harusnya 8` });
+    const fix = offers(wrong).find((a) => a.args?.intent === 'data_correction');
+    assert.equal(fix?.args.entity_id, requisition.id, 'the record named in the message is the one reported');
+    const fixRun = await run(request, 'route_feedback', fix.args);
+    const fixProposal = (await json(`/api/agent/proposals/${fixRun.proposal.id}`)).body;
+    assert.deepEqual(fixProposal.items.map((i) => [i.kind, i.target?.id]), [['task.create', requisition.id]], 'a correction is a task for the data owner, never a direct edit');
+    assert.equal((await post(`/api/agent/proposals/${fixProposal.id}/reject`, {})).body.state, 'rejected');
+    const kc = await run(request, 'route_feedback', { intent: 'knowledge_correction', text: 'SOP Requisition TA PIC sudah berubah: PIC ditetapkan dalam 2 hari kerja' });
+    const draft = kc.stream.find((s) => s.event.type === 'CUSTOM' && s.event.name === 'celerates.submission')?.event.value;
+    assert.ok(draft?.refs.some((r) => r.startsWith('SOP Requisition TA PIC')), JSON.stringify(draft));
+    assert.equal((await brain`SELECT state FROM agent_submissions WHERE id=${draft.id}`)[0].state, 'draft');
+    assert.equal((await fetch(`${base}/api/agent/submissions/${draft.id}`, { method: 'POST', headers: { Cookie: cookies, 'Content-Type': 'application/json', Origin: 'http://evil.test' }, body: JSON.stringify({ action: 'submit' }) })).status, 403, 'cross-origin send refused');
+    const sent = await post(`/api/agent/submissions/${draft.id}`, { action: 'submit', title: 'SOP TA PIC: 2 hari kerja' });
+    assert.equal(sent.status, 200, JSON.stringify(sent.body));
+    assert.equal(sent.body.state, 'submitted');
+    assert.deepEqual({ ...(await brain`SELECT state, title FROM agent_submissions WHERE id=${draft.id}`)[0] }, { state: 'submitted', title: 'SOP TA PIC: 2 hari kerja' });
+    console.log('PASS: One Agent — attention brief in the conversation; free-text feedback → kinds offered → Feature Request confirmed in ERP, data correction as a task for the owner, knowledge correction draft sent to curators');
     console.log('PASS: Agent proposals — follow-up (signal → proposal → confirm → receipt → signal cleared → outcome) and import (file → mapping → per-row validation → confirm → learned mapping)');
   } finally {
     await brain.end();

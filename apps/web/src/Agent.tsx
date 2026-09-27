@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { api } from "./api";
 import { Badge, ErrorBanner, Loading, Metric, Modal, PageHead, SectionTitle, useResource } from "./ui";
-import { CaseForm, EvaluationSection, FeedbackSection, TurnsList, type Candidates, type Feedback, type Turn } from "./Quality";
+import { CaseForm, EvaluationSection, FeedbackSection, SubmissionsSection, TurnsList, type Candidates, type Feedback, type Intents, type Turn } from "./Quality";
 
 type Count = { runs: number };
 type Overview = {
@@ -18,6 +18,7 @@ type Overview = {
   learned_mappings: { command: string; uses: number; updated_at: string; mapping: Record<string, string> }[];
   datasets: { items: { kind: string; files: number; bytes: number; oldest: string }[]; retention_days: number };
   feedback: Feedback;
+  intents: Intents;
 };
 type Run = {
   id: string;
@@ -54,6 +55,7 @@ const SKILL: Record<string, string> = {
   follow_up_signal: "Tindak lanjuti",
   import_dataset: "Impor tabel",
   read_document: "Baca dokumen",
+  route_feedback: "Masukan (dipilih)",
 };
 const pct = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}%` : "—");
 const when = (s: string) => new Date(s).toLocaleString("id-ID", { timeZone: "Asia/Jakarta", dateStyle: "medium", timeStyle: "short" });
@@ -221,6 +223,7 @@ export function AgentConsole() {
             </table>
           </div>
           <FeedbackSection feedback={d.feedback} onOpen={setOpen} />
+          <SubmissionsSection intents={d.intents} onOpen={setOpen} />
           <EvaluationSection key={evalKey} />
           <SectionTitle title="Yang dipelajari" subtitle="Pemetaan kolom yang diingat hanya setelah ERP melaporkan impor diterapkan." />
           <div className="artifact-table-wrap">

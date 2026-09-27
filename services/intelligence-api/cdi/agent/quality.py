@@ -55,8 +55,16 @@ def case_candidates(run_id):
         ref = ledger["refs"].get(key)
         if ref:
             refs.append({"key": key, "ref": ref, "text": text[:160], "cited": key in cited})
-    shape = "proposal" if isinstance(final, dict) and "proposal" in final else "answer"
-    kinds = sorted({i.get("kind") for i in final.get("proposal", {}).get("items", [])}) if shape == "proposal" else []
+    shape = next((k for k in ("proposal", "route") if isinstance(final, dict) and k in final), "answer")
+    if shape == "proposal":
+        kinds = sorted({i.get("kind") for i in final.get("proposal", {}).get("items", [])})
+    elif shape == "route":
+        route = final.get("route") or {}
+        kinds = [route["intent"]] if isinstance(route, dict) and route.get("intent") else []
+        cited = set(route.get("cite", [])) if isinstance(route, dict) and isinstance(route.get("cite"), list) else set()
+        refs = [{**r, "cited": r["key"] in cited} for r in refs]
+    else:
+        kinds = []
     question = json.loads(rows[0]["request"][1]["content"])["question"]
     return {"question": question, "shape": shape, "kinds": kinds, "refs": refs, "turns": len(rows)}
 
@@ -94,7 +102,7 @@ class _FrozenLedger(reasoning.Ledger):
 
 
 def _plan_check(reply, has_document):
-    shapes = [k for k in ("calls", "proposal", "answer") if k in reply]
+    shapes = [k for k in reasoning.SHAPES if k in reply]
     if len(shapes) != 1:
         return False, "shape"
     if "calls" in reply:
@@ -143,6 +151,17 @@ def replay_case(case, model):
             out["grounded"] = True
             out["recall"] = 1.0 if not expect["kinds"] or set(expect["kinds"]) <= set(kinds) else 0.0
             out["answer"] = f"proposal: {', '.join(kinds)}"
+        except reasoning.ReasoningFailed as exc:
+            out.update(grounded=False, recall=0.0, problem=str(exc))
+        return out
+    if expect["shape"] == "route":
+        # Feedback routing: the intent must match and citations must be known (no ERP call, nothing drafted).
+        out["shape_ok"] = "route" in final
+        try:
+            route = reasoning.validate_route(final.get("route"), ledger)
+            out["grounded"] = True
+            out["recall"] = 1.0 if not expect["kinds"] or route["intent"] in expect["kinds"] else 0.0
+            out["answer"] = f"route: {route['intent']} — {route['title']}"[:400]
         except reasoning.ReasoningFailed as exc:
             out.update(grounded=False, recall=0.0, problem=str(exc))
         return out

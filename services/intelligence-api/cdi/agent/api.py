@@ -42,7 +42,7 @@ class SearchArgs(Strict):
 
 
 class AskArgs(Strict):
-    query: str = Field(min_length=2, max_length=300)
+    query: str = Field(min_length=2, max_length=1000)
     dataset_id: UUID | None = None
 
 
@@ -58,6 +58,15 @@ class DatasetArgs(Strict):
     )
 
 
+class RouteArgs(Strict):
+    """The user's choice of feedback kind for their own message (ADR-017)."""
+
+    intent: Literal["feature_request", "data_correction", "knowledge_correction", "agent_feedback"]
+    text: str = Field(min_length=2, max_length=1000)
+    entity_type: str | None = Field(default=None, pattern=r"^[a-z_]{2,40}$")
+    entity_id: UUID | None = None
+
+
 ARGS = {
     "explain_signal": SignalArgs,
     "explain_entity": EntityArgs,
@@ -66,6 +75,7 @@ ARGS = {
     "follow_up_signal": SignalArgs,
     "import_dataset": DatasetArgs,
     "read_document": DocumentArgs,
+    "route_feedback": RouteArgs,
 }
 
 
@@ -73,7 +83,14 @@ class RunRequest(Strict):
     run_id: UUID | None = None
     thread_id: str | None = Field(default=None, pattern=r"^[A-Za-z0-9_-]{8,100}$")
     skill: Literal[
-        "explain_signal", "explain_entity", "search", "ask", "follow_up_signal", "import_dataset", "read_document"
+        "explain_signal",
+        "explain_entity",
+        "search",
+        "ask",
+        "follow_up_signal",
+        "import_dataset",
+        "read_document",
+        "route_feedback",
     ]
     args: dict
     # Voice is transcribed first (POST /transcribe) and the user reviews the text; the run itself is the same.
@@ -257,3 +274,20 @@ def answer_feedback(run_id: UUID, body: Feedback, user=Depends(delegated_actor))
         raise HTTPException(409, "Only completed answers can be rated")
     row = quality.record_feedback(run, user, body.rating, body.reason if body.rating < 0 else None, body.comment)
     return {"recorded": True, "rating": row["rating"]}
+
+
+class Submission(Strict):
+    action: Literal["submit", "cancel"]
+    title: str | None = Field(default=None, max_length=200)
+    body: str | None = Field(default=None, max_length=3000)
+
+
+@router.post("/submissions/{submission_id}")
+def send_submission(submission_id: UUID, body: Submission, user=Depends(delegated_actor)):
+    """The user sends (optionally edited) or cancels their own draft (ADR-017). Nothing in ERP changes."""
+    from . import intents
+
+    row = intents.submit(str(submission_id), user, body.action, body.title, body.body)
+    if not row:
+        raise HTTPException(404, "Draft not found")
+    return {"id": row["id"], "intent": row["intent"], "state": row["state"]}

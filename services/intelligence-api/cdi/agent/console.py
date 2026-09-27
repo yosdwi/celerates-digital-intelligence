@@ -5,7 +5,7 @@ agent_datasets). ERP remains the record of truth for effects; outcomes here are 
 Curator role only: the view shows users' questions and decisions. Dataset contents are never exposed here.
 """
 
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
@@ -123,7 +123,18 @@ def overview(days: Annotated[int, Query(ge=1, le=90)] = 14, user=Depends(curator
                ORDER BY f.updated_at DESC LIMIT 10""",
             (days,),
         )
+        routed = all_rows(
+            conn,
+            """SELECT result->>'intent' AS intent, result->>'chosen_by' AS chosen_by, count(*)::int AS runs,
+                      count(*) FILTER (WHERE result->>'proposal' IS NOT NULL OR result->>'submission' IS NOT NULL)::int
+                        AS drafted
+               FROM agent_runs WHERE result ? 'intent' AND created_at > now() - %s * interval '1 day'
+               GROUP BY 1,2 ORDER BY 3 DESC""",
+            (days,),
+        )
+        waiting = one(conn, "SELECT count(*)::int AS n FROM agent_submissions WHERE state='submitted'")["n"]
     return {
+        "intents": {"items": routed, "waiting_review": waiting},
         "feedback": {**feedback, "recent_negative": complaints},
         "days": days,
         "reasoning": {
@@ -262,3 +273,32 @@ def eval_result(eval_id: UUID, user=Depends(curator)):
     if not row:
         raise HTTPException(404, "Evaluation not found")
     return row
+
+
+# ── submissions from the one Agent surface (ADR-017) ───────────────────────────────────────────────────────────────
+@router.get("/submissions")
+def submissions(user=Depends(curator)):
+    """Knowledge corrections and Agent feedback users sent after reviewing the Agent's draft."""
+    from . import intents
+
+    return {"items": intents.queue()}
+
+
+class ReviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    action: Literal["promote", "close"]
+    note: str | None = Field(default=None, max_length=1000)
+
+
+@router.post("/submissions/{submission_id}")
+def review_submission(submission_id: UUID, body: ReviewRequest, user=Depends(curator)):
+    """`promote` turns a knowledge correction into a *draft* knowledge source; approval stays in Knowledge."""
+    from . import intents
+
+    try:
+        row = intents.review(str(submission_id), user, body.action, body.note)
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    if not row:
+        raise HTTPException(409, "Submission was reviewed meanwhile")
+    return {"id": row["id"], "state": row["state"], "knowledge_source_id": row["knowledge_source_id"]}

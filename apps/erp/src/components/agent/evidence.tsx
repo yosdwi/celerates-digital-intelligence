@@ -104,6 +104,13 @@ export function ProvenanceLine({ value }: { value: Provenance }) {
         Isi usulan disusun model dari {value.read} bukti yang dibaca. ERP sudah memvalidasi setiap item; tidak ada yang berubah sebelum Anda konfirmasi.
       </p>
     );
+  if (value.mode === "model" && value.kind === "route")
+    return (
+      <p className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500" data-provenance="model">
+        <EvidenceBadge type="inference" />
+        Model membaca pesan ini sebagai masukan, bukan pertanyaan. Periksa jenis dan isinya di draf; tidak ada yang dikirim sebelum Anda setuju.
+      </p>
+    );
   if (value.mode === "model")
     return (
       <p className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500" data-provenance="model">

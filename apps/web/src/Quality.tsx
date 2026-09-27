@@ -215,3 +215,83 @@ export function EvaluationSection() {
     </>
   );
 }
+
+// ── Masukan understood from the one Agent surface (ADR-017) ─────────────────────────────────────────────────────────
+export type Intents = { items: { intent: string; chosen_by: string; runs: number; drafted: number }[]; waiting_review: number };
+type SubmissionRow = {
+  id: string;
+  run_id: string;
+  principal_name: string;
+  intent: "knowledge_correction" | "agent_feedback";
+  state: "submitted" | "promoted" | "closed";
+  title: string;
+  body: string;
+  refs: { label: string }[];
+  subject_run_id: string | null;
+  submitted_at: string;
+  reviewed_by: string | null;
+  review_note: string | null;
+};
+const INTENT: Record<string, string> = {
+  feature_request: "Feature Request",
+  data_correction: "Koreksi data",
+  knowledge_correction: "Koreksi pengetahuan",
+  agent_feedback: "Umpan balik Agent",
+};
+const STATE: Record<string, { label: string; tone: "amber" | "green" | undefined }> = {
+  submitted: { label: "menunggu kurator", tone: "amber" },
+  promoted: { label: "jadi draf pengetahuan", tone: "green" },
+  closed: { label: "ditutup", tone: undefined },
+};
+
+export function SubmissionsSection({ intents, onOpen }: { intents: Intents; onOpen: (runId: string) => void }) {
+  const [items, setItems] = useState<SubmissionRow[]>();
+  const [error, setError] = useState("");
+  const load = () => api<{ items: SubmissionRow[] }>("/console/agent/submissions").then((d) => setItems(d.items));
+  useEffect(() => {
+    load().catch((e) => setError(e.message));
+  }, []);
+  const review = (id: string, action: "promote" | "close") =>
+    post(`/console/agent/submissions/${id}`, { action }).then(load).catch((e) => setError((e as Error).message));
+  const routed = intents.items.map((i) => `${INTENT[i.intent] ?? i.intent} ${i.runs}× (${i.chosen_by === "model" ? "model" : "dipilih pengguna"})`).join(" · ");
+  return (
+    <>
+      <SectionTitle
+        title="Masukan dari percakapan"
+        subtitle={`Pesan yang dipahami sebagai masukan, bukan pertanyaan: ${routed || "belum ada"}. Feature Request dan koreksi data menjadi usulan di ERP; koreksi pengetahuan menunggu kurator di sini.`}
+      />
+      <ErrorBanner error={error} />
+      <div className="artifact-table-wrap">
+        <table className="artifact-table" data-console-submissions>
+          <thead>
+            <tr><th>Masukan</th><th>Tentang</th><th>Status</th><th /></tr>
+          </thead>
+          <tbody>
+            {(items ?? []).map((s) => (
+              <tr key={s.id} data-console-submission={s.state}>
+                <td className="break-anywhere">
+                  <Badge>{INTENT[s.intent]}</Badge> <strong>{s.title}</strong>
+                  <br />
+                  <small>{s.body}</small>
+                  <br />
+                  <small>{s.principal_name} · {when(s.submitted_at)}</small>
+                </td>
+                <td className="break-anywhere">{s.refs.map((r) => r.label).join("; ") || (s.subject_run_id ? "jawaban sebelumnya" : "—")}</td>
+                <td><Badge tone={STATE[s.state].tone}>{STATE[s.state].label}</Badge></td>
+                <td>
+                  {s.state === "submitted" && s.intent === "knowledge_correction" && (
+                    <button className="button small" onClick={() => void review(s.id, "promote")}>Jadikan draf pengetahuan</button>
+                  )}{" "}
+                  {s.state === "submitted" && <button className="button secondary small" onClick={() => void review(s.id, "close")}>Tutup</button>}{" "}
+                  <button className="button secondary small" onClick={() => onOpen(s.subject_run_id ?? s.run_id)}>Jejak</button>
+                </td>
+              </tr>
+            ))}
+            {items && !items.length && <tr><td colSpan={4}>Belum ada masukan yang dikirim.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      <p className="page-note">Draf pengetahuan dari koreksi disetujui terpisah di halaman Knowledge oleh kurator dengan token workspace; sebelum itu Agent tidak memakainya.</p>
+    </>
+  );
+}

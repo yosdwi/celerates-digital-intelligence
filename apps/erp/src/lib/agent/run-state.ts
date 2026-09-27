@@ -16,10 +16,12 @@ export type Evidence = {
 };
 /** How the answer text was produced. `model` text is inference over the cited evidence, never a fact source. */
 export type Provenance =
-  | { mode: "model"; kind: "answer" | "proposal"; model: string; cited: string[]; read: number; rounds: number; tokens: number }
+  | { mode: "model"; kind: "answer" | "proposal" | "route"; model: string; cited: string[]; read: number; rounds: number; tokens: number; intent?: string }
   | { mode: "deterministic"; fallback: boolean };
+export type FeedbackIntent = "feature_request" | "data_correction" | "knowledge_correction" | "agent_feedback";
 export type AgentAction =
-  | { label: string; skill: "follow_up_signal"; args: { signal_key: string } }
+  | { label: string; skill: "follow_up_signal" | "explain_signal"; args: { signal_key: string } }
+  | { label: string; skill: "route_feedback"; args: { intent: FeedbackIntent; text: string; entity_type?: string; entity_id?: string } }
   | { label: string; skill: "import_dataset"; args: { dataset_id: string; command: string; mapping: Record<string, string> } };
 /** The column mapping behind an import (ADR-011), shown so the user can inspect or correct it. */
 export type MappingCardData = {
@@ -30,6 +32,7 @@ export type MappingCardData = {
   commands: { kind: string; label: string; params: { name: string; label: string; required: boolean }[] }[];
   open: boolean;
 };
+export type Submission = { id: string; intent: FeedbackIntent; label: string; title: string; body: string; refs: string[] };
 export type ToolTrace = { id: string; name: string; args: string; result?: string; done: boolean };
 export type AgentRun = {
   runId: string;
@@ -45,6 +48,8 @@ export type AgentRun = {
   /** Next steps offered by the playbook. Only allowlisted skills; running one is a new run, never an approval. */
   actions: AgentAction[];
   mapping?: MappingCardData;
+  /** Intelligence-held drafts (knowledge correction, Agent feedback) the user reviews and sends (ADR-017). */
+  submissions: Submission[];
   provenance?: Provenance;
   text: string;
   error?: { message: string; code?: string };
@@ -54,11 +59,32 @@ export type AgentRun = {
 const ANSWER_SKILLS = new Set(["ask", "explain_signal", "explain_entity", "search", "read_document"]);
 
 export function newRun(runId: string, userText: string, skill?: string): AgentRun {
-  return { runId, userText, skill, status: "running", lastSeq: 0, steps: [], tools: [], evidence: [], proposals: [], actions: [], text: "" };
+  return { runId, userText, skill, status: "running", lastSeq: 0, steps: [], tools: [], evidence: [], proposals: [], actions: [], submissions: [], text: "" };
 }
 
 const EVIDENCE_TYPES = new Set<EvidenceType>(["erp_fact", "signal", "knowledge", "document", "observation", "inference"]);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const INTENTS = new Set<FeedbackIntent>(["feature_request", "data_correction", "knowledge_correction", "agent_feedback"]);
+const SIGNAL_KEY = /^[a-z0-9-]{2,60}$/;
+
+/** Server-offered next steps, reduced to the allowlisted skills and argument shapes. Running one is a new run that the
+ * ERP BFF validates again; none is an approval. Imports start only from the mapping card. */
+function offeredAction(a: unknown): AgentAction | null {
+  if (!a || typeof a !== "object") return null;
+  const { label, skill, args } = a as { label?: unknown; skill?: unknown; args?: Record<string, unknown> };
+  const text = String(label ?? "").slice(0, 120);
+  if ((skill === "follow_up_signal" || skill === "explain_signal") && SIGNAL_KEY.test(String(args?.signal_key)))
+    return { label: text, skill, args: { signal_key: String(args!.signal_key) } };
+  if (skill === "route_feedback" && INTENTS.has(args?.intent as FeedbackIntent) && typeof args?.text === "string" && args.text.trim()) {
+    const target = typeof args.entity_type === "string" && /^[a-z_]{2,40}$/.test(args.entity_type) && typeof args.entity_id === "string" && UUID.test(args.entity_id);
+    return {
+      label: text,
+      skill,
+      args: { intent: args.intent as FeedbackIntent, text: args.text.slice(0, 1000), ...(target ? { entity_type: args.entity_type as string, entity_id: args.entity_id as string } : {}) },
+    };
+  }
+  return null;
+}
 
 export function applyEvent(run: AgentRun, event: AgUiEvent, id: string | null = null): AgentRun {
   if (id !== null) {
@@ -95,7 +121,8 @@ export function applyEvent(run: AgentRun, event: AgUiEvent, id: string | null = 
             ...run,
             provenance: {
               mode: "model",
-              kind: v.kind === "proposal" ? "proposal" : "answer",
+              kind: v.kind === "proposal" ? "proposal" : v.kind === "route" ? "route" : "answer",
+              ...(typeof v.intent === "string" && INTENTS.has(v.intent as FeedbackIntent) ? { intent: v.intent } : {}),
               read: Number(v.read) || 0,
               model: String(v.model ?? "model").slice(0, 80),
               cited: Array.isArray(v.cited) ? v.cited.filter((c): c is string => typeof c === "string" && /^[ESD]\d{1,3}$/.test(c)) : [],
@@ -112,13 +139,21 @@ export function applyEvent(run: AgentRun, event: AgUiEvent, id: string | null = 
         return { ...run, mapping: v };
       }
       if (event.name === "celerates.actions") {
-        // Server-offered actions are limited to follow-ups on a rule; imports are started only from the mapping card.
-        type Offered = { label?: unknown; skill?: unknown; args?: { signal_key?: unknown } };
-        const items = ((event.value as { items?: unknown[] })?.items ?? []).filter(
-          (a): a is Offered => !!a && typeof a === "object" && (a as Offered).skill === "follow_up_signal" && /^[a-z0-9-]{2,60}$/.test(String((a as Offered).args?.signal_key)),
-        );
-        const offered: AgentAction[] = items.map((a) => ({ label: String(a.label).slice(0, 120), skill: "follow_up_signal", args: { signal_key: String(a.args!.signal_key) } }));
-        return { ...run, actions: [...run.actions, ...offered].slice(0, 4) };
+        const offered = ((event.value as { items?: unknown[] })?.items ?? []).map(offeredAction).filter((a): a is AgentAction => a !== null);
+        return { ...run, actions: [...run.actions, ...offered].slice(0, 6) };
+      }
+      if (event.name === "celerates.submission") {
+        const v = event.value as Partial<Submission> | undefined;
+        if (!v || typeof v.id !== "string" || !UUID.test(v.id) || !INTENTS.has(v.intent as FeedbackIntent) || run.submissions.some((x) => x.id === v.id)) return run;
+        const submission: Submission = {
+          id: v.id,
+          intent: v.intent as FeedbackIntent,
+          label: String(v.label ?? "Masukan").slice(0, 80),
+          title: String(v.title ?? "").slice(0, 200),
+          body: String(v.body ?? "").slice(0, 3000),
+          refs: Array.isArray(v.refs) ? v.refs.slice(0, 3).map((r) => String(r).slice(0, 200)) : [],
+        };
+        return { ...run, submissions: [...run.submissions, submission] };
       }
       if (event.name !== "celerates.evidence") return run;
       const items = ((event.value as { items?: unknown[] })?.items ?? []).filter(
@@ -158,9 +193,11 @@ export function toThreadMessages(runs: AgentRun[]) {
     if (run.text) content.push({ type: "text", text: run.text });
     if (run.text && run.provenance) content.push({ type: "data-provenance", data: run.provenance });
     for (const proposal of run.proposals) content.push({ type: "data-proposal", data: proposal });
+    for (const submission of run.submissions) content.push({ type: "data-submission", data: submission });
     if (run.mapping && run.status === "succeeded") content.push({ type: "data-mapping", data: run.mapping });
     if (run.actions.length && run.status === "succeeded") content.push({ type: "data-actions", data: { items: run.actions } });
-    if (run.status === "succeeded" && run.text && run.skill && ANSWER_SKILLS.has(run.skill)) content.push({ type: "data-feedback", data: { runId: run.runId } });
+    const answered = run.provenance?.mode !== "model" || run.provenance.kind !== "route";
+    if (run.status === "succeeded" && run.text && run.skill && ANSWER_SKILLS.has(run.skill) && answered && !run.submissions.length) content.push({ type: "data-feedback", data: { runId: run.runId } });
     for (const tool of run.tools)
       content.push({
         type: "tool-call",

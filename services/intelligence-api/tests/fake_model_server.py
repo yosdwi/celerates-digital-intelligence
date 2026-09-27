@@ -39,6 +39,29 @@ def decide(messages):
                 }
             }
         return {"answer": "Berkas ini tidak memuat permintaan kerja [D1].", "cite": ["D1"]}
+    if "sop" in question and ("berubah" in question or "tidak berlaku" in question):
+        # Feedback, not a question (ADR-017): find the knowledge it corrects, then route it as a correction.
+        if not evidence:
+            return {"calls": [{"tool": "knowledge_search", "args": {"query": "SOP TA PIC requisition"}}]}
+        sop = re.search(r"(E\d+): approved knowledge", evidence)
+        return {
+            "route": {
+                "intent": "knowledge_correction",
+                "title": "SOP TA PIC: batas penetapan berubah",
+                "detail": first["question"],
+                "cite": [sop.group(1)] if sop else [],
+            }
+        }
+    if "harusnya" in question and "filter" in question:
+        return {
+            "route": {
+                "intent": "feature_request",
+                "title": "Filter customer multi-select",
+                "detail": first["question"],
+                "type": "improvement",
+                "cite": [],
+            }
+        }
     record = re.search(r"\b(req-[\w-]+)", question)
     if "task" in question and record:
         if not evidence:

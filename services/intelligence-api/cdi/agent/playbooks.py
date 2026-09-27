@@ -14,11 +14,11 @@ from zoneinfo import ZoneInfo
 
 from ..config import settings
 from ..gateway import agent_model_enabled
-from . import datasets, reasoning, runs
+from . import datasets, intents, reasoning, runs
 from .erp_client import DelegatedERP, ERPAgentError
 from .tools import PolicyError, RunContext, invoke
 
-PLAYBOOK_VERSION = "m3-playbooks-v1"
+PLAYBOOK_VERSION = "m5-playbooks-v1"
 MAX_EXAMPLES = 3
 FOLLOW_UP_ITEMS = 10
 IMPORT_ITEMS = 200  # ERP's proposal limit
@@ -265,6 +265,8 @@ def ask(ctx, query, dataset_id=None):
     tools; otherwise, or whenever the model path fails validation, the deterministic router below. A dropped document
     (`dataset_id`) adds its passages as evidence (*Berkas Anda*) to either path."""
     document = _document(ctx, dataset_id)
+    if not document and is_brief(query):
+        return brief(ctx)  # deterministic in both modes: exact counts and observed change, nothing to infer
     if agent_model_enabled():
         try:
             return reasoning.ask_with_model(ctx, query, document=document)
@@ -426,10 +428,26 @@ def ask_deterministic(ctx, query, fallback=False, document=None):
     ctx.recorder.evidence(_knowledge_evidence(passages))
     if passages:
         lines.append(f"Pengetahuan disetujui: {', '.join(p['title'] for p in passages[:3])}.")
-    if not lines:
+    if not lines and not intents.cues(query):
         lines.append(
             f"Belum ada aturan ERP, record, atau pengetahuan disetujui yang cocok dengan “{' '.join(terms)}”. "
             "Coba nomor record, nama client, posisi, atau nama kondisi."
+        )
+    feedback = intents.cues(query)
+    if feedback:
+        # Without a model the Agent does not guess what kind of feedback this is: it offers the kinds, the user picks.
+        target = {"type": focus["type"], "id": focus["id"]} if focus else None
+        actions = (
+            intents.offers(
+                query,
+                target=target,
+                passages=passages,
+                has_previous=intents.previous_answer(ctx.recorder.run) is not None,
+            )
+            + actions
+        )
+        lines.insert(
+            0, "Ini terdengar seperti masukan. Pilih jenisnya di bawah; Anda meninjau drafnya sebelum dikirim."
         )
     if actions:
         ctx.recorder.actions(actions)
@@ -439,6 +457,7 @@ def ask_deterministic(ctx, query, fallback=False, document=None):
     ctx.recorder.message("\n".join(lines))
     return {
         "skill": "ask",
+        "feedback_offered": feedback,
         "reasoning": "deterministic",
         "terms": terms,
         "signals": [g["key"] for g in found_signals],
@@ -461,6 +480,103 @@ CHANGE_WORDS = {
     "change",
     "since",
 }
+
+
+BRIEF_WORDS = {"perhatikan", "perhatian", "prioritas", "prioritaskan", "fokus", "ringkasan", "attention", "brief"}
+BRIEF_FILLER = BRIEF_WORDS | {
+    "perlu",
+    "hari",
+    "today",
+    "penting",
+    "aku",
+    "pagi",
+    "sekarang",
+    "now",
+    "need",
+    "should",
+    "dulu",
+    "utama",
+    "harus",
+    "kerjakan",
+    "mulai",
+}
+BRIEF_ITEMS = 5
+
+
+def is_brief(query):
+    """ "Apa yang perlu aku perhatikan hari ini?" — a request for the attention brief, not about one rule or record."""
+    terms = set(_words(query)) - STOPWORDS
+    return bool(terms & BRIEF_WORDS) and not (terms - BRIEF_FILLER)
+
+
+def brief(ctx):
+    """The proactive summary, in the conversation: live rule counts (ERP facts) ranked by observed change, then by
+    count. Change is an observation from ERP's daily snapshots and is labelled as such."""
+    with ctx.recorder.step("Membaca kondisi perhatian ERP"):
+        signals = invoke(ctx, "erp_signals")["signals"]
+    active = [s for s in signals if s["count"]]
+
+    def rising(s):
+        return (s.get("trend") or {}).get("delta", 0)
+
+    ranked = sorted(active, key=lambda s: (-max(rising(s), 0), -s["count"]))
+    top = ranked[:BRIEF_ITEMS]
+    ctx.recorder.evidence([_signal_evidence(s) for s in top])
+    changed = [s for s in top if s.get("trend") and (s["trend"]["added"] or s["trend"]["resolved"])]
+    ctx.recorder.evidence(
+        [
+            {
+                "type": "observation",
+                "title": f"{s['title']} · sejak {_day(s['trend']['since'])}",
+                "detail": [
+                    f"{s['trend']['previous']} → {s['count']} ({s['trend']['delta']:+d}; "
+                    f"{s['trend']['added']} baru, {s['trend']['resolved']} selesai)"
+                ],
+                "href": s["href"],
+                "source": {"kind": "erp_snapshot", "ref": f"{s['key']}@{s['trend']['since']}"},
+            }
+            for s in changed
+        ]
+    )
+    if not active:
+        lines = [f"Tidak ada kondisi perhatian yang aktif dari {len(signals)} aturan yang diperiksa untuk akses Anda."]
+    else:
+        lines = [
+            f"{len(active)} dari {len(signals)} kondisi perlu perhatian. Urut dari yang bertambah, lalu terbanyak:"
+        ]
+        for i, s in enumerate(top, 1):
+            t = s.get("trend")
+            change = f" (▲{t['delta']} sejak {_day(t['since'])})" if t and t["delta"] > 0 else ""
+            lines.append(f"{i}. {s['title']}: {s['count']} {s['unit']}{change}")
+        if len(active) > len(top):
+            lines.append(f"…dan {len(active) - len(top)} kondisi lain di Ringkasan.")
+        ctx.recorder.actions(
+            [
+                {
+                    "label": f"Tindak lanjuti: {s['title']}",
+                    "skill": "follow_up_signal",
+                    "args": {"signal_key": s["key"]},
+                }
+                for s in top[:2]
+            ]
+            + [
+                {
+                    "label": f"Jelaskan: {top[0]['title']}",
+                    "skill": "explain_signal",
+                    "args": {"signal_key": top[0]["key"]},
+                }
+            ]
+        )
+    ctx.recorder.provenance({"mode": "deterministic", "fallback": False})
+    ctx.recorder.message("\n".join(lines))
+    return {"skill": "ask", "reasoning": "deterministic", "brief": [s["key"] for s in top]}
+
+
+def route_feedback(ctx, intent, text, entity_type=None, entity_id=None):
+    """The user chose what kind of feedback their message is (deterministic path, or a correction of the model's
+    choice). Builds the same reviewable draft as a model route."""
+    target = {"type": entity_type, "id": entity_id} if entity_type and entity_id else None
+    return intents.prepare(ctx, intent, text, target=target, chosen_by="user")
 
 
 def _day(d):
@@ -726,6 +842,7 @@ PLAYBOOKS = {
     "follow_up_signal": follow_up_signal,
     "import_dataset": import_dataset,
     "read_document": read_document,
+    "route_feedback": route_feedback,
 }
 SKILLS = set(PLAYBOOKS)
 

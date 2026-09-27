@@ -1,7 +1,7 @@
 "use client";
-// `Tanya` thread (spike S1): assistant-ui primitives over our own run store via ExternalStoreRuntime.
+// The Agent conversation (ADR-013/017): assistant-ui primitives over our own run store via ExternalStoreRuntime.
 // assistant-ui renders messages/composer only. Run state, transport (AG-UI via ERP BFF) and authority stay ours.
-// Loaded lazily by the Agent panel so pages that never open this tab pay nothing for it.
+// One composer for everything: text, push-to-talk, files and send. Loaded lazily when the Agent panel opens.
 import { createContext, useContext, useRef, useState, type DragEvent, type ReactNode } from "react";
 import {
   AssistantRuntimeProvider,
@@ -19,6 +19,8 @@ import { EvidenceCard, ProvenanceLine, RunError, RunProgress, ToolTrace } from "
 import { AnswerFeedback } from "./answer-feedback";
 import { MappingCard } from "./mapping";
 import { ProposalCard } from "./proposal";
+import { SubmissionCard } from "./submission";
+import type { Submission } from "@/lib/agent/run-state";
 
 export type Suggestion = { label: string; run: () => void };
 
@@ -68,6 +70,7 @@ const PARTS = {
       evidence: ({ data }: DataPart) => <EvidenceCard item={data as unknown as Evidence} />,
       error: ({ data }: DataPart) => <RunError message={String(data.message)} />,
       proposal: ({ data }: DataPart) => <ProposalCard id={String(data.id)} title={String(data.title)} />,
+      submission: ({ data }: DataPart) => <SubmissionCard value={data as unknown as Submission} />,
       actions: ({ data }: DataPart) => <Actions items={data.items as AgentAction[]} />,
       mapping: ({ data }: DataPart) => <Mapping data={data as unknown as MappingCardData} />,
       provenance: ({ data }: DataPart) => <ProvenanceLine value={data as unknown as Provenance} />,
@@ -159,13 +162,13 @@ export default function AgentThread({
   return (
     <AssistantRuntimeProvider runtime={runtime}>
       <ThreadPrimitive.Root className={`flex h-full flex-col ${dragging ? "bg-brand-50/60 ring-2 ring-inset ring-brand-300" : ""}`} {...drop}>
-        <ThreadPrimitive.Viewport className="flex-1 space-y-4 overflow-y-auto overscroll-contain p-5">
+        <ThreadPrimitive.Viewport className="flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-4">
           <ThreadPrimitive.Empty>
             <div className="space-y-3">
-              <p className="text-sm text-slate-600">
+              <p className="text-xs leading-relaxed text-slate-600" data-agent-intro>
                 {enabled
-                  ? "Tanyakan apa saja tentang kondisi, record, atau aturan kerja — misalnya “requisition mana yang belum punya TA PIC?” — atau jatuhkan berkas: tabel CSV/XLSX untuk diimpor, dokumen PDF/DOCX untuk dibaca dan ditanyakan. Jawaban disusun dari fakta ERP dan pengetahuan yang disetujui, dengan buktinya; perubahan data selalu menunggu konfirmasi Anda."
-                  : "Agent belum dikonfigurasi di lingkungan ini. Perlu perhatian dan Masukan tetap dapat digunakan."}
+                  ? "Satu tempat untuk bertanya, meminta tindakan, melampirkan berkas, atau menyampaikan masukan. Jawaban disertai bukti dari ERP dan pengetahuan yang disetujui; perubahan data dan masukan selalu Anda tinjau dulu."
+                  : "Agent belum dikonfigurasi di lingkungan ini. Perlu perhatian dan formulir masukan tetap dapat digunakan."}
               </p>
               {enabled && suggestions.length > 0 && (
                 <div className="flex flex-col gap-2" aria-label="Saran">
@@ -225,12 +228,12 @@ export default function AgentThread({
           </button>
           <ComposerPrimitive.Input
             aria-label="Pesan untuk Agent"
-            placeholder="Tanya kondisi, nomor, client, atau posisi…"
+            placeholder="Tanya, minta tindakan, atau sampaikan masukan…"
             rows={1}
-            maxLength={300}
+            maxLength={1000}
             className="min-h-10 flex-1 resize-none rounded-xl border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 disabled:bg-slate-50"
           />
-          {/* Voice (M2) will sit here as push-to-talk feeding the same run; it can never confirm a write. */}
+          {/* Push-to-talk fills the composer for review; voice can never send or confirm anything by itself. */}
           {voice && (
             <VoiceButton
               disabled={!enabled || running}

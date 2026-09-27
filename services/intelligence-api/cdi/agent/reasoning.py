@@ -32,7 +32,7 @@ MODEL_TIMEOUT = 20
 FALLBACK_RESERVE = 10  # seconds kept for the deterministic answer if the model path fails
 EVIDENCE_CHARS = 700
 JAKARTA = ZoneInfo("Asia/Jakarta")
-PROMPT_VERSION = "agent-ask-v1"
+PROMPT_VERSION = "agent-ask-v2"
 
 # The planner may call these read tools. Argument names and allowed values are fixed here; ERP authorizes each call.
 PLANNER_TOOLS = {
@@ -74,6 +74,9 @@ Reply with exactly one JSON object, one of:
 {"calls": [{"tool": "<name>", "args": {...}}]}   -- read more evidence (at most 4 calls)
 {"proposal": {"title": "...", "items": [{"kind": "<command>", "target": {"type": "...", "id": "..."} | null, "params": {...}}]}}
 {"answer": "...", "cite": ["E1", "S2"]}
+{"route": {"intent": "feature_request|data_correction|knowledge_correction|agent_feedback", "title": "...",
+  "detail": "...", "expected": "...", "type": "improvement|bug_fix|new_feature|data_fix",
+  "reason": "wrong|incomplete|irrelevant|other", "cite": ["E1"]}}   -- the message is feedback, not a question
 Rules:
 - Facts come only from the numbered evidence (S = attention rules, E = tool results, D = the user's attached
   document). Cite every fact as [E1]/[S2]/[D1].
@@ -82,6 +85,12 @@ Rules:
 - Use a proposal only when the user asks to create, assign or record something. Use only the listed commands and
   their parameter names; use record ids exactly as they appear in evidence. The user reviews and confirms every
   proposal in ERP; you cannot change data and must not claim that anything was changed.
+- Use route when the user gives feedback instead of asking or requesting an ERP action: a problem or improvement in
+  the application (feature_request; type and expected are optional); ERP data that is wrong (data_correction: find the
+  record first and cite its E id); approved knowledge that is wrong or outdated (knowledge_correction: cite the
+  knowledge E ids); or your previous answer, shown as `previous` (agent_feedback; reason optional). Title: one short
+  line in the user's language. The user reviews every route before it is sent; do not answer it as a question.
+- `previous` is the previous question and answer in this conversation; use it to resolve references like "nomor 2".
 - Answer in the user's language (Indonesian by default), concisely, at most 6 short lines. No markdown headings."""
 
 
@@ -108,6 +117,7 @@ class Ledger:
         self.items = {}
         self.cards = {}
         self.refs = {}  # evidence id → stable source reference (erp_rule:key, erp:type/id, knowledge:doc, upload:…)
+        self.meta = {}  # evidence id → knowledge passage (for a knowledge correction's scope); not persisted
 
     def add(self, prefix, compact, card=None):
         key = f"{prefix}{sum(1 for k in self.items if k.startswith(prefix)) + 1}"
@@ -260,6 +270,7 @@ def _record(ctx, ledger, tool, args, result):
     elif tool == "knowledge_search":
         for p, card in zip(result["passages"], _knowledge_evidence(result["passages"])):
             keys.append(ledger.add("E", f"approved knowledge '{p['title']}' v{p['version']}: {p['excerpt']}"))
+            ledger.meta[keys[-1]] = p
             cards.append({**card, "cite": keys[-1]})
         if not result["passages"]:
             keys.append(ledger.add("E", f"knowledge '{args['query']}': no approved passages"))
@@ -308,6 +319,57 @@ def _validate_proposal(value, commands):
         params = {k: v for k, v in item.get("params", {}).items() if isinstance(v, (str, int)) and len(str(v)) <= 2000}
         clean.append({"kind": item["kind"], "target": target, "params": params})
     return value["title"].strip()[:200] or "Usulan Agent", clean
+
+
+SHAPES = ("calls", "proposal", "answer", "route")
+ROUTE_INTENTS = ("feature_request", "data_correction", "knowledge_correction", "agent_feedback")
+ERP_REF = re.compile(r"^erp:([a-z_]{2,40})/([0-9a-fA-F-]{36})$")
+
+
+def validate_route(value, ledger):
+    """A feedback route from the model. Intent from a fixed set; citations must exist; the record for a data
+    correction and the knowledge for a knowledge correction come from cited evidence, never from model text."""
+    if not isinstance(value, dict) or value.get("intent") not in ROUTE_INTENTS:
+        raise ReasoningFailed("invalid route intent")
+    title = value.get("title")
+    if not isinstance(title, str) or not 1 <= len(title.strip()) <= 200:
+        raise ReasoningFailed("route title must be a short string")
+    text = {}
+    for name, limit in (("detail", 3000), ("expected", 3000)):
+        v = value.get(name)
+        if v is not None and (not isinstance(v, str) or len(v) > limit):
+            raise ReasoningFailed(f"invalid route {name}")
+        text[name] = v.strip() if isinstance(v, str) and v.strip() else None
+    kind = value.get("type") if value.get("type") in ("improvement", "bug_fix", "new_feature", "data_fix") else None
+    reason = value.get("reason") if value.get("reason") in ("wrong", "incomplete", "irrelevant", "other") else None
+    cite = value.get("cite", [])
+    if not isinstance(cite, list) or not all(isinstance(c, str) for c in cite):
+        raise ReasoningFailed("route cite must be a list of evidence ids")
+    unknown = set(cite) - set(ledger.items)
+    if unknown:
+        raise ReasoningFailed(f"unknown evidence ids: {', '.join(sorted(unknown))}")
+    target = None
+    for key in cite:
+        m = ERP_REF.match(ledger.refs.get(key, ""))
+        if m:
+            target = {"type": m.group(1), "id": m.group(2)}
+            break
+    passages = [ledger.meta[k] for k in cite if k in ledger.meta]
+    refs = None
+    if value["intent"] == "knowledge_correction" and passages:
+        from .intents import _knowledge_refs
+
+        refs = _knowledge_refs(passages)
+    return {
+        "intent": value["intent"],
+        "title": title.strip(),
+        **text,
+        "type": kind,
+        "reason": reason,
+        "cite": sorted(set(cite)),
+        "target": target,
+        "refs": refs,
+    }
 
 
 def _commands_for_prompt(commands):
@@ -367,6 +429,9 @@ def ask_with_model(ctx, query, document=None, opening=None):
     entity = ctx.principal.context.get("entity") if isinstance(ctx.principal.context, dict) else None
     if isinstance(entity, dict):
         page["entity"] = {"type": entity.get("type"), "id": entity.get("id")}
+    from .intents import previous_answer
+
+    previous = previous_answer(ctx.recorder.run) if opening is None else None
     messages = [
         {"role": "system", "content": SYSTEM},
         {
@@ -376,6 +441,7 @@ def ask_with_model(ctx, query, document=None, opening=None):
                     "question": query,
                     "today": today,
                     "page": page,
+                    "previous": {"question": previous["question"], "answer": previous["answer"]} if previous else None,
                     "rules": ledger.text([k for k in ledger.items if k.startswith("S")]),
                     "document": {
                         "name": document["name"],
@@ -398,7 +464,7 @@ def ask_with_model(ctx, query, document=None, opening=None):
     ]
     turns = []
     try:
-        return _loop(ctx, query, document, ledger, usage, messages, by_key, commands, today, turns)
+        return _loop(ctx, query, document, ledger, usage, messages, by_key, commands, today, turns, page)
     except (ReasoningFailed, PolicyError) as exc:
         if turns and not turns[-1]["verdict"].startswith(("rejected", "unavailable")):
             turns[-1]["verdict"] = f"invalid: {exc}"[:300]
@@ -408,7 +474,7 @@ def ask_with_model(ctx, query, document=None, opening=None):
         ctx.recorder.model_turns(turns, ledger.snapshot())
 
 
-def _loop(ctx, query, document, ledger, usage, messages, by_key, commands, today, turns):
+def _loop(ctx, query, document, ledger, usage, messages, by_key, commands, today, turns, page):
     from .playbooks import _proposal_lines
 
     repaired = False
@@ -431,9 +497,9 @@ def _loop(ctx, query, document, ledger, usage, messages, by_key, commands, today
         usage["latency_ms"] += meta["latency_ms"]
         usage["rounds"] += 1
         messages.append({"role": "assistant", "content": json.dumps(reply, ensure_ascii=False)})
-        shapes = [k for k in ("calls", "proposal", "answer") if k in reply]
+        shapes = [k for k in SHAPES if k in reply]
         if len(shapes) != 1:
-            raise ReasoningFailed("model reply must contain exactly one of calls, proposal, answer")
+            raise ReasoningFailed("model reply must contain exactly one of calls, proposal, answer, route")
         turn["verdict"] = shapes[0]
         if "calls" in reply:
             calls = reply["calls"]
@@ -464,6 +530,32 @@ def _loop(ctx, query, document, ledger, usage, messages, by_key, commands, today
                 }
             )
             continue
+        if "route" in reply:
+            route = validate_route(reply["route"], ledger)
+            from .intents import prepare
+
+            target = route["target"]
+            if route["intent"] == "data_correction" and not target and (page.get("entity") or {}).get("id"):
+                target = page["entity"]  # "data ini salah" on a record page
+            usage_prov = {"mode": "model", "kind": "route", "intent": route["intent"], "cited": route["cite"], **usage}
+            ctx.recorder.provenance({**usage_prov, "prompt_version": PROMPT_VERSION})
+            result = prepare(
+                ctx,
+                route["intent"],
+                query,
+                title=route["title"],
+                detail=route["detail"],
+                expected=route["expected"],
+                fr_kind=route["type"],
+                target=target,
+                refs=route["refs"],
+                reason=route["reason"],
+                chosen_by="model",
+            )
+            from .intents import alternatives
+
+            ctx.recorder.actions(alternatives(route["intent"], query, target))
+            return {**result, "reasoning": "model", **_usage(usage)}
         if "proposal" in reply:
             title, items = _validate_proposal(reply["proposal"], commands)
             with ctx.recorder.step("Menyiapkan usulan di ERP"):

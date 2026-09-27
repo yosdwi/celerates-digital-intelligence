@@ -105,7 +105,8 @@ def test_delegated_principal_is_scoped_and_cannot_use_workspace_routes(monkeypat
 
 def test_tools_can_read_or_propose_but_never_write():
     assert REGISTRY and {t.risk for t in REGISTRY.values()} == {"read", "propose"}
-    assert [t.name for t in REGISTRY.values() if t.risk == "propose"] == ["erp_propose"]
+    # Propose = a pending ERP proposal, or the user's own Intelligence-held draft (ADR-017); both need the user.
+    assert {t.name for t in REGISTRY.values() if t.risk == "propose"} == {"erp_propose", "draft_submission"}
     owner = delegation.DelegatedPrincipal(delegation.verify(mint()), "t")
     assert {t.name for t in allowed_tools(owner)} == set(REGISTRY)
     with pytest.raises(ValueError):
@@ -1258,3 +1259,191 @@ def test_what_changed_uses_signal_history_as_observations(monkeypatch):
     ]
     assert [c_["type"] for c_ in cards] == ["observation"] and "Baru: REQ-7 · Engineer" in cards[0]["detail"]
     assert any(e["type"] == "CUSTOM" and e["name"] == "celerates.actions" for _, e in stream)
+
+
+def test_one_agent_routes_feedback_to_reviewed_drafts(monkeypatch):
+    """ADR-017: free text can be feedback. Without a model the user picks the kind; with one, the model routes it.
+    Either way the result is a draft the user reviews: an ERP proposal (Feature Request, data correction as a task)
+    or an Intelligence-held draft (knowledge correction, Agent feedback) that a curator later sees."""
+    import hashlib
+    import sys
+    import types
+
+    from cdi import knowledge
+    from cdi.agent import quality
+
+    curator_token = "q" * 40
+    principals = [
+        {
+            "id": "curator",
+            "token_sha256": hashlib.sha256(curator_token.encode()).hexdigest(),
+            "roles": ["reviewer", "curator"],
+            "divisions": ["sales"],
+        }
+    ]
+    monkeypatch.setattr(settings(), "intelligence_principals_json", json.dumps(principals))
+    monkeypatch.setattr(settings(), "api_access_token", "")
+    monkeypatch.setattr(settings(), "generation_mode", "demo")
+    auth = {"Authorization": "Bearer " + curator_token}
+    token = mint(ctx={"path": "/ta", "module": "ta"})
+    stranger = mint(sub=SECOND)
+    thread = "thread-" + uuid4().hex
+
+    def use_model(replies):
+        model = ScriptedModel(replies)
+        monkeypatch.setitem(sys.modules, "litellm", types.SimpleNamespace(completion=model.completion))
+        monkeypatch.setattr(settings(), "generation_mode", "litellm")
+        monkeypatch.setattr(settings(), "agent_model", "openai/scripted")
+        return model
+
+    with TestClient(app) as c:
+        monkeypatch.setattr(settings(), "erp_mode", "http")
+        monkeypatch.setattr(playbooks, "DelegatedERP", AskingERP)
+        monkeypatch.setattr(playbooks, "start", lambda r, u, a: playbooks.execute(r, u, a))
+
+        def run(skill, args, thread_id=thread):
+            run_id = str(uuid4())
+            created = c.post(
+                "/api/agent/runs",
+                json={"run_id": run_id, "thread_id": thread_id, "skill": skill, "args": args},
+                headers={"X-ERP-Delegation": token},
+            )
+            assert created.status_code == 201, created.text
+            stream = events(c, run_id, token)
+            assert stream[-1][1]["type"] == "RUN_FINISHED", stream[-1]
+            text = "".join(e["delta"] for _, e in stream if e["type"] == "TEXT_MESSAGE_CONTENT")
+            custom = {}
+            for _, e in stream:
+                if e["type"] == "CUSTOM":
+                    custom.setdefault(e["name"], []).append(e["value"])
+            return run_id, stream[-1][1]["result"], text, custom
+
+        # A normal answer first: it becomes the `previous` answer of this conversation.
+        first_id, _, _, _ = run("ask", {"query": "status REQ-7"})
+
+        # Deterministic: feedback-like wording → the kinds are offered, nothing is drafted until the user picks.
+        _, result, text, custom = run("ask", {"query": "Data REQ-7 salah, headcount harusnya 8"})
+        assert result["feedback_offered"] is True and text.startswith("Ini terdengar seperti masukan")
+        offered = custom["celerates.actions"][0]["items"]
+        assert [a["args"]["intent"] for a in offered] == ["data_correction", "feature_request"]
+        assert offered[0]["args"]["entity_type"] == "requisition" and offered[0]["args"]["entity_id"] == REQUISITIONS[0]
+        assert not [p for p in ProposingERP.proposed if p["title"].startswith("Koreksi")]
+
+        # Data correction → an ERP-held task proposal linked to the record, never a direct edit.
+        _, result, text, custom = run("route_feedback", offered[0]["args"])
+        proposal = ProposingERP.proposed[-1]
+        assert result["intent"] == "data_correction" and result["chosen_by"] == "user"
+        assert proposal["items"][0]["kind"] == "task.create"
+        assert proposal["items"][0]["target"] == {"type": "requisition", "id": REQUISITIONS[0]}
+        assert "Data belum diubah" in text and custom["celerates.proposal"]
+        assert custom["celerates.evidence"][0]["items"][0]["type"] == "observation"  # the user chose the kind
+
+        # Feature Request → the existing ERP command, from the page the user is on.
+        _, result, _, _ = run(
+            "route_feedback", {"intent": "feature_request", "text": "Filter customer harusnya multi-select"}
+        )
+        fr = ProposingERP.proposed[-1]["items"][0]
+        assert fr["kind"] == "feature_request.create" and fr["params"]["context_path"] == "/ta"
+        assert fr["params"]["request_type_code"] == "improvement" and fr["params"]["title"].startswith(
+            "Filter customer"
+        )
+
+        # Knowledge correction → the user's draft; only they can send it; then it waits for a curator.
+        _, result, _, custom = run(
+            "route_feedback",
+            {"intent": "knowledge_correction", "text": "SOP TA PIC sudah berubah, sekarang 2 hari kerja"},
+        )
+        sub = custom["celerates.submission"][0]
+        assert sub["intent"] == "knowledge_correction" and result["submission"] == sub["id"]
+        assert (
+            c.post(
+                f"/api/agent/submissions/{sub['id']}", json={"action": "submit"}, headers={"X-ERP-Delegation": stranger}
+            ).status_code
+            == 404
+        )
+        sent = c.post(
+            f"/api/agent/submissions/{sub['id']}",
+            json={"action": "submit", "title": "SOP TA PIC: 2 hari kerja"},
+            headers={"X-ERP-Delegation": token},
+        )
+        assert sent.status_code == 200 and sent.json()["state"] == "submitted"
+        assert c.get("/api/console/agent/submissions", headers={"X-ERP-Delegation": token}).status_code == 401
+        queue = c.get("/api/console/agent/submissions", headers=auth).json()["items"]
+        item = next(i for i in queue if i["id"] == sub["id"])
+        assert item["title"] == "SOP TA PIC: 2 hari kerja" and item["state"] == "submitted"
+        promoted = c.post(f"/api/console/agent/submissions/{sub['id']}", json={"action": "promote"}, headers=auth)
+        assert promoted.status_code == 200, promoted.text
+        while knowledge.tick():  # the worker ingests the draft like any curator upload
+            pass
+        with connect() as conn:
+            doc = one(
+                conn,
+                "SELECT lifecycle, state FROM documents WHERE source_id=%s",
+                (promoted.json()["knowledge_source_id"],),
+            )
+        assert doc == {"lifecycle": "draft", "state": "INGESTED"}, (
+            "a promoted correction is a draft; approval is separate"
+        )
+        assert (
+            c.post(f"/api/console/agent/submissions/{sub['id']}", json={"action": "close"}, headers=auth).status_code
+            == 409
+        )
+        overview = c.get("/api/console/agent", headers=auth).json()
+        assert any(i["intent"] == "knowledge_correction" for i in overview["intents"]["items"])
+
+        # Agent feedback → about the previous answer in this conversation; sending records it on that answer.
+        _, result, _, custom = run("route_feedback", {"intent": "agent_feedback", "text": "Jawaban tadi salah"})
+        assert result["subject_run_id"] == first_id
+        sub = custom["celerates.submission"][0]
+        c.post(f"/api/agent/submissions/{sub['id']}", json={"action": "submit"}, headers={"X-ERP-Delegation": token})
+        with connect() as conn:
+            fb = one(conn, "SELECT rating, reason FROM agent_feedback WHERE run_id=%s", (first_id,))
+        assert fb == {"rating": -1, "reason": "wrong"}
+        _, result, _, custom = run(
+            "route_feedback", {"intent": "agent_feedback", "text": "salah"}, "thread-" + uuid4().hex
+        )
+        assert result["submission"] is None and "celerates.submission" not in custom
+
+        # Brief: deterministic even with a model configured (no model call).
+        model = use_model([])
+        _, result, text, custom = run("ask", {"query": "Apa yang perlu aku perhatikan hari ini?"})
+        assert result["brief"] == ["unassigned-requisitions"] and not model.calls
+        assert "1 dari 2 kondisi perlu perhatian" in text
+        assert "Requisition belum memiliki TA PIC: 2 requisition" in text
+
+        # Model: it reads, then routes; the record comes from cited evidence, and the turn is recorded as "route".
+        model = use_model(
+            [
+                {"calls": [{"tool": "erp_search", "args": {"query": "REQ-7"}}]},
+                {"route": {"intent": "data_correction", "title": "Headcount REQ-7 seharusnya 8", "cite": ["E1"]}},
+            ]
+        )
+        route_id, result, _, custom = run("ask", {"query": "headcount REQ-7 di ERP masih 5, harusnya 8"})
+        assert (
+            result["reasoning"] == "model" and result["intent"] == "data_correction" and result["chosen_by"] == "model"
+        )
+        assert ProposingERP.proposed[-1]["items"][0]["target"] == {"type": "requisition", "id": REQUISITIONS[0]}
+        assert custom["celerates.provenance"][0]["kind"] == "route"
+        turns = quality.turns(route_id)
+        assert [t["verdict"] for t in turns] == ["calls", "route"]
+        opening = json.loads(turns[0]["request"][1]["content"])
+        assert opening["previous"]["question"], "the previous exchange is context for the model"
+        candidates = quality.case_candidates(route_id)
+        assert candidates["shape"] == "route" and candidates["kinds"] == ["data_correction"]
+        case = quality.create_case(route_id, [r["ref"] for r in candidates["refs"] if r["cited"]], None, "curator")
+        use_model(
+            [
+                {"calls": [{"tool": "erp_search", "args": {"query": "REQ-7"}}]},
+                {"route": {"intent": "data_correction", "title": "Koreksi", "cite": ["E1"]}},
+            ]
+        )
+        replay = quality.replay_case(case, "openai/scripted")
+        assert replay["plan_valid"] and replay["shape_ok"] and replay["grounded"] and replay["recall"] == 1.0
+
+        # An invalid route (unknown evidence) falls back to the deterministic router, which offers the kinds.
+        use_model([{"route": {"intent": "knowledge_correction", "title": "x", "cite": ["E9"]}}])
+        _, result, _, custom = run("ask", {"query": "SOP ini sudah tidak berlaku, harusnya diganti"})
+        assert result["reasoning"] == "fallback" and result["feedback_offered"] is True
+        assert "knowledge_correction" in [a["args"]["intent"] for a in custom["celerates.actions"][0]["items"]]
+        with connect() as conn:
+            conn.execute("DELETE FROM agent_eval_cases WHERE id=%s", (case["id"],))

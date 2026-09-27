@@ -156,6 +156,10 @@ class Recorder:
         """An ERP-held proposal the UI renders as a first-class card (it fetches the live proposal from ERP)."""
         self.emit(CustomEvent(name="celerates.proposal", value=value))
 
+    def submission(self, value):
+        """An Intelligence-held draft (knowledge correction, Agent feedback) the user reviews and sends (ADR-017)."""
+        self.emit(CustomEvent(name="celerates.submission", value=value))
+
     def mapping(self, value):
         """The column mapping behind an import, for the user to inspect or correct (a correction is a new run)."""
         self.emit(CustomEvent(name="celerates.mapping", value=value))

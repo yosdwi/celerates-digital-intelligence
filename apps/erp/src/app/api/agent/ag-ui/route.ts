@@ -12,7 +12,7 @@ function lastUserText(messages: unknown): string {
   if (!Array.isArray(messages)) return "";
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i] as { role?: unknown; content?: unknown };
-    if (m?.role === "user" && typeof m.content === "string") return m.content.slice(0, 500);
+    if (m?.role === "user" && typeof m.content === "string") return m.content.slice(0, 1000);
   }
   return "";
 }
@@ -49,14 +49,23 @@ export async function POST(request: NextRequest) {
     }
     else if (skill === "search") args = { query: String(given.query ?? lastUserText(input.messages)).trim().slice(0, 100) };
     else if (skill === "ask") {
-      args = { query: String(given.query ?? lastUserText(input.messages)).trim().slice(0, 300) };
+      args = { query: String(given.query ?? lastUserText(input.messages)).trim().slice(0, 1000) };
       // A document the user attached earlier in this conversation; Intelligence checks it belongs to this user.
       if (typeof given.dataset_id === "string" && UUID.test(given.dataset_id)) args.dataset_id = given.dataset_id.toLowerCase();
     } else if (skill === "read_document") {
       if (typeof given.dataset_id !== "string" || !UUID.test(given.dataset_id)) throw new BffError(422, "Berkas tidak dikenali.");
       args = { dataset_id: given.dataset_id.toLowerCase() };
     }
-    else if (skill === "explain_entity") {
+    else if (skill === "route_feedback") {
+      // The user chose what kind of feedback their own message is (ADR-017). It becomes a draft they review: an
+      // ERP-held proposal (Feature Request, data-correction task) or an Intelligence-held draft. Nothing is sent yet.
+      const intents = ["feature_request", "data_correction", "knowledge_correction", "agent_feedback"];
+      const text = String(given.text ?? "").trim().slice(0, 1000);
+      if (!intents.includes(String(given.intent)) || text.length < 2) throw new BffError(422, "Jenis masukan tidak dikenal.");
+      args = { intent: given.intent, text };
+      if (typeof given.entity_type === "string" && /^[a-z_]{2,40}$/.test(given.entity_type) && typeof given.entity_id === "string" && UUID.test(given.entity_id))
+        args = { ...args, entity_type: given.entity_type, entity_id: given.entity_id.toLowerCase() };
+    } else if (skill === "explain_entity") {
       // Only the entity the user is looking at, and only if ERP resolved it as readable for this user.
       if (!page.entity) throw new BffError(422, "Halaman ini belum memiliki record yang dikenali Agent.");
       args = { entity_type: page.entity.type, entity_id: page.entity.id };

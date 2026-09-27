@@ -157,6 +157,26 @@ test("AG-UI conformance of the event shapes the panel consumes, and the pure run
   };
   assert.equal(done("ask"), true);
   assert.equal(done("follow_up_signal"), false);
+  // One Agent surface (ADR-017): feedback kinds are offered as route_feedback actions with a strict shape; a draft the
+  // user must review is a first-class part; a model route is not an answer to rate.
+  let routed = newRun("r7", "Data REQ-7 salah", "ask");
+  routed = applyEvent(routed, { type: "CUSTOM", name: "celerates.actions", value: { items: [
+    { label: "Laporkan koreksi data", skill: "route_feedback", args: { intent: "data_correction", text: "Data REQ-7 salah", entity_type: "requisition", entity_id: proposalId } },
+    { label: "Kirim langsung", skill: "route_feedback", args: { intent: "apply_now", text: "x" } },
+    { label: "Target palsu", skill: "route_feedback", args: { intent: "feature_request", text: "y", entity_type: "requisition", entity_id: "1 OR 1=1" } },
+    { label: "Jelaskan: X", skill: "explain_signal", args: { signal_key: "unassigned-requisitions" } },
+  ] } });
+  assert.deepEqual(routed.actions.map((a) => a.label), ["Laporkan koreksi data", "Target palsu", "Jelaskan: X"]);
+  assert.deepEqual(routed.actions[1].args, { intent: "feature_request", text: "y" }, "a malformed target is dropped");
+  routed = applyEvent(routed, { type: "CUSTOM", name: "celerates.provenance", value: { mode: "model", kind: "route", intent: "knowledge_correction", model: "m", cited: [] } });
+  routed = applyEvent(routed, { type: "CUSTOM", name: "celerates.submission", value: { id: proposalId, intent: "knowledge_correction", label: "Koreksi pengetahuan", title: "SOP", body: "isi", refs: ["SOP TA · v1"] } });
+  routed = applyEvent(routed, { type: "CUSTOM", name: "celerates.submission", value: { id: "x", intent: "knowledge_correction" } });
+  routed = applyEvent(routed, { type: "TEXT_MESSAGE_CONTENT", delta: "Saya siapkan sebagai koreksi pengetahuan." });
+  routed = applyEvent(routed, { type: "RUN_FINISHED", threadId: "t", runId: "r7" });
+  assert.equal(routed.provenance?.mode === "model" && routed.provenance.kind, "route");
+  assert.equal(routed.submissions.length, 1, "malformed drafts ignored");
+  const routedParts = (toThreadMessages([routed])[1].content as { type: string }[]).map((p) => p.type);
+  assert.ok(routedParts.includes("data-submission") && !routedParts.includes("data-feedback"));
   assert.deepEqual(modelParts.map((p) => p.type).slice(-2), ["text", "data-provenance"]);
   assert.equal(parts[2].data?.id, proposalId);
   let failed = applyEvent(newRun("r2", "x"), { type: "RUN_ERROR", message: "Tidak boleh", code: "ERP_403" });
