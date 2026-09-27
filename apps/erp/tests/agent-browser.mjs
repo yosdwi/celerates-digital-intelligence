@@ -123,6 +123,41 @@ export async function agentBrowser({ base, cookies }) {
     await panel.locator('[data-proposal][data-proposal-state="applied"]').last().getByText(/TASK-\d+ dibuat/).waitFor({ timeout: 30000 });
     await page.screenshot({ path: evidenceDir + '/agent-import-mapping.png' });
 
+    // Company Files (ADR-018): the explorer finds indexed files with their class; an upload is queued for reading;
+    // the Agent finds a file and the user asks about it in the same conversation.
+    await page.keyboard.press('Escape');
+    await page.goto(base + '/files?q=onboarding');
+    const results = page.locator('[data-files-results]');
+    await results.getByText('sop-onboarding', { exact: false }).first().waitFor({ timeout: 30000 });
+    await results.locator('[data-file-class="general"]').first().waitFor();
+    await results.locator('[data-file-row]').first().click();
+    const detail = page.locator('[data-file-detail]');
+    await detail.locator('[data-file-ingest="indexed"]').waitFor();
+    assert.match(await detail.locator('[data-file-open]').getAttribute('href'), /^\/api\/files\/[0-9a-f-]+\/content\?preview=1$/);
+    await page.screenshot({ path: evidenceDir + '/files-explorer.png' });
+    await page.getByRole('button', { name: 'Tutup detail' }).click();
+    await page.getByRole('button', { name: 'Unggah', exact: true }).click();
+    const upload = page.locator('[data-files-upload]');
+    await upload.locator('input[type=file]').setInputFiles({ name: 'template-bast.txt', mimeType: 'text/plain', buffer: Buffer.from('Template BAST: isi periode, lingkup pekerjaan, dan tanda tangan kedua pihak.') });
+    await upload.getByLabel('Jenis').selectOption('template');
+    await upload.getByRole('button', { name: 'Unggah' }).click();
+    await page.locator('[data-file-detail] [data-file-ingest="queued"]').waitFor({ timeout: 30000 });
+    await page.getByRole('button', { name: 'Tutup detail' }).click();
+    await trigger.click();
+    await panel.getByLabel('Pesan untuk Agent').fill('cari berkas sop onboarding');
+    await panel.getByRole('button', { name: 'Kirim' }).click();
+    const fileCard = panel.locator('[data-evidence-type="file"]').filter({ hasText: 'sop-onboarding' }).first();
+    await fileCard.waitFor({ timeout: 30000 });
+    await fileCard.locator('[data-file-ask]').click();
+    await panel.locator('[data-agent-attachment]').getByText('sop-onboarding', { exact: false }).waitFor();
+    await panel.getByLabel('Pesan untuk Agent').fill('kapan laptop disiapkan?');
+    await panel.getByRole('button', { name: 'Kirim' }).click();
+    const answer = panel.locator('[data-agent-message]').last();
+    await answer.getByText(/Dari sop-onboarding/).waitFor({ timeout: 30000 });
+    await answer.locator('[data-evidence-type="file"]').filter({ hasText: 'hal. 1' }).first().waitFor();
+    await page.screenshot({ path: evidenceDir + '/agent-company-file.png' });
+    await panel.locator('[data-agent-attachment]').getByRole('button', { name: 'Lepas berkas' }).click();
+
     // Keyboard and mobile.
     await page.keyboard.press('Escape');
     assert.equal(await panel.count(), 0);
@@ -137,7 +172,7 @@ export async function agentBrowser({ base, cookies }) {
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), pageWidth, 'panel adds no horizontal overflow');
     await page.screenshot({ path: evidenceDir + '/agent-m1-mobile.png' });
     assert.deepEqual(errors, [], 'no browser runtime exceptions');
-    console.log('PASS: Agent browser — one surface (Ringkasan + one composer, no tabs), Tanyakan with typed evidence, keyword search, free-text Masukan → Feature Request confirmed, form fallback, entity context, follow-up and file import confirmed in ERP, keyboard and full-screen mobile');
+    console.log('PASS: Agent browser — one surface (Ringkasan + one composer, no tabs), Tanyakan with typed evidence, keyword search, free-text Masukan → Feature Request confirmed, form fallback, entity context, follow-up and file import confirmed in ERP, keyboard and full-screen mobile; Company Files explorer, upload queued, file found and asked about in the Agent');
   } finally {
     await browser.close();
   }
@@ -192,6 +227,7 @@ export async function agentModelBrowser({ base, cookies }) {
     await panel.getByRole('button', { name: 'Kirim' }).click();
     const draft = panel.locator('[data-agent-submission="knowledge_correction"]').last();
     await draft.waitFor({ timeout: 30000 });
+    await panel.locator('[data-agent-message]').last().locator('[data-provenance]').waitFor({ timeout: 30000 });
     await draft.getByText('SOP Requisition TA PIC', { exact: false }).waitFor();
     await draft.getByLabel('Judul').fill('SOP TA PIC: 2 hari kerja (browser)');
     await page.screenshot({ path: evidenceDir + '/agent-knowledge-correction.png' });

@@ -301,3 +301,66 @@ test("delegated catalog reads: sensitivity, relationships, search, signal parity
     await pg.close();
   }
 });
+
+test("Company Files: ERP declares its files, never identity documents, and decides who may read them (ADR-018)", async () => {
+  // @ts-expect-error JS runner
+  const { migrate } = await import("../scripts/migrate.mjs");
+  const { fileFeed, fileAccess, readable, objectModule, resolveRef, classSettings } = await import("../src/lib/files/sources");
+  const pg = await PGlite.create();
+  const server = new PGLiteSocketServer({ db: pg, port: 55446, host: "127.0.0.1" });
+  await server.start();
+  const url = process.env.FILES_DATABASE_URL || "postgres://postgres:postgres@127.0.0.1:55446/postgres";
+  const sql = postgres(url, { max: process.env.FILES_DATABASE_URL ? 4 : 1, prepare: false });
+  try {
+    await migrate(url);
+    assert.deepEqual((await classSettings(sql)).commercial, { model_visibility: "none", indexing: "lexical", retention_days: 365 });
+    const [candidate] = await sql`INSERT INTO candidates (candidate_no,candidate_name,ta_pic_name,cv_asli_url) VALUES ('CAND-9','Budi Synthetic','Rina','cand/cv-1.pdf') RETURNING id`;
+    const [opty] = await sql`INSERT INTO opportunities (opty_no,client_name,project_name,service_type_code,sales_pic_name,po_doc_url) VALUES ('OPTY-9','PT Synthetic','Proyek','outsourcing','Sari','https://drive.example/po') RETURNING id`;
+    const [invoice] = await sql`INSERT INTO project_invoices (opportunity_id,bast_support_doc_url) VALUES (${opty.id},'invoice/bast-1.pdf') RETURNING id`;
+    const [cv] = await sql`INSERT INTO attachments (source_type,source_id,kind,file_name,file_path) VALUES ('candidate_cv_asli',${candidate.id},'file','cv-budi.pdf','candidate_cv_asli/x/cv-2.pdf') RETURNING id`;
+    await sql`INSERT INTO attachments (source_type,source_id,kind,file_name,file_path) VALUES ('onboarding_ktp',${candidate.id},'file','ktp.jpg','onboarding/ktp.jpg')`;
+    await sql`INSERT INTO attachments (source_type,source_id,kind,file_name,file_path) VALUES ('kanban_task',${candidate.id},'file','notes.pdf','task/notes.pdf')`;
+
+    const { items, next } = await fileFeed(sql, "", 50);
+    assert.equal(next, null);
+    const byRef = new Map(items.map((i) => [i!.ref, i!]));
+    assert.deepEqual([...byRef.keys()].sort(), [
+      `attachment:${cv.id}`,
+      `column:candidates.cv_asli_url:${candidate.id}`,
+      `column:opportunities.po_doc_url:${opty.id}`,
+      `column:project_invoices.bast_support_doc_url:${invoice.id}`,
+    ].sort(), "identity documents and undeclared attachments are not Company Files");
+    const bast = byRef.get(`column:project_invoices.bast_support_doc_url:${invoice.id}`)!;
+    assert.deepEqual([bast.origin, bast.kind, bast.access_class, bast.owner_division, bast.name], ["erp", "bast", "commercial", "pmo", "BAST.pdf"]);
+    assert.equal(bast.entity.type, "invoice");
+    assert.match(bast.open_url, /^\/api\/documents\?bucket=candidate-documents&path=invoice%2Fbast-1\.pdf$/);
+    const po = byRef.get(`column:opportunities.po_doc_url:${opty.id}`)!;
+    assert.deepEqual([po.origin, po.url], ["external", "https://drive.example/po"]);
+    assert.equal(byRef.get(`attachment:${cv.id}`)!.entity.label, "CAND-9 · Budi Synthetic");
+    assert.equal(await resolveRef(sql, "attachment:" + (await sql`SELECT id FROM attachments WHERE source_type='onboarding_ktp'`)[0].id), null);
+
+    const [taUser] = await sql`INSERT INTO users (email,full_name,status,is_owner,account_type) VALUES ('ta-files@example.test','TA Editor','active',false,'backoffice') RETURNING id`;
+    const [salesUser] = await sql`INSERT INTO users (email,full_name,status,is_owner,account_type) VALUES ('sales-files@example.test','Sales Viewer','active',false,'backoffice') RETURNING id`;
+    await sql`INSERT INTO user_access (user_id,division_id,level) SELECT ${taUser.id}, id, 'editor' FROM divisions WHERE key='ta'`;
+    await sql`INSERT INTO user_access (user_id,division_id,level) SELECT ${salesUser.id}, id, 'viewer' FROM divisions WHERE key='sales'`;
+    const actor = (id: string, access: { divisionKey: string; level: string }[], owner = false) => ({ id, status: "active", isOwner: owner, accountType: "backoffice", access });
+    const ta = actor(taUser.id, [{ divisionKey: "ta", level: "editor" }]);
+    const sales = actor(salesUser.id, [{ divisionKey: "sales", level: "viewer" }]);
+    const taAccess = await fileAccess(sql, ta);
+    assert.deepEqual([taAccess.personal, taAccess.commercial, taAccess.divisions], [["ta"], [], ["ta"]]);
+    assert.deepEqual((await fileAccess(sql, sales)).commercial, [], "a viewer does not hold the commercial class");
+    const refs = [`attachment:${cv.id}`, `column:project_invoices.bast_support_doc_url:${invoice.id}`];
+    assert.deepEqual((await readable(sql, ta, refs, [])).refs, [`attachment:${cv.id}`]);
+    assert.deepEqual((await readable(sql, sales, refs, [{ type: "opportunity", id: opty.id }])), { refs: [], entities: [`opportunity:${opty.id}`] });
+    assert.deepEqual((await readable(sql, actor(taUser.id, [], true), refs, [])).refs, refs, "Owners read every declared file");
+    // `/api/documents` resolves an object to the record that owns it.
+    assert.equal(await objectModule(sql, "candidate-documents", "candidate_cv_asli/x/cv-2.pdf"), "ta");
+    assert.equal(await objectModule(sql, "candidate-documents", "invoice/bast-1.pdf"), "pmo");
+    assert.equal(await objectModule(sql, "candidate-documents", "onboarding/ktp.jpg"), "ta");
+    assert.equal(await objectModule(sql, "candidate-documents", "nobody/refers/to-this.pdf"), null);
+  } finally {
+    await sql.end();
+    await server.stop();
+    await pg.close();
+  }
+});

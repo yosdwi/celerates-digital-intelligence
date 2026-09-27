@@ -9,6 +9,7 @@ const BADGE: Record<EvidenceType, { label: string; className: string }> = {
   signal: { label: "Sinyal", className: "bg-amber-50 text-amber-900 ring-amber-200" },
   knowledge: { label: "Pengetahuan disetujui", className: "bg-violet-50 text-violet-800 ring-violet-200" },
   document: { label: "Berkas Anda", className: "bg-sky-50 text-sky-800 ring-sky-200" },
+  file: { label: "Berkas perusahaan", className: "bg-indigo-50 text-indigo-800 ring-indigo-200" },
   observation: { label: "Observasi", className: "bg-slate-100 text-slate-700 ring-slate-200" },
   inference: { label: "Inferensi", className: "bg-pink-50 text-pink-800 ring-pink-200" },
 };
@@ -27,8 +28,9 @@ function sourceLine(item: Evidence) {
   return bits.join(" · ");
 }
 
-export function EvidenceCard({ item }: { item: Evidence }) {
+export function EvidenceCard({ item, onAskFile }: { item: Evidence; onAskFile?: (file: { id: string; name: string }) => void }) {
   const meta = sourceLine(item);
+  const file = item.type === "file" && typeof item.source?.file_id === "string" ? { id: item.source.file_id as string, name: item.title } : null;
   return (
     <article className="rounded-xl border border-slate-200 bg-white p-3" data-evidence-type={item.type}>
       <div className="flex items-start justify-between gap-2">
@@ -48,11 +50,18 @@ export function EvidenceCard({ item }: { item: Evidence }) {
       {!!item.withheld?.length && <p className="mt-2 text-[11px] text-slate-500">Tidak dibagikan ke Agent: {item.withheld.join(", ")}</p>}
       <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-slate-500">
         <span>{meta}</span>
-        {item.href && (
-          <Link href={item.href} className="font-semibold text-brand-600 hover:underline">
-            Buka di ERP →
-          </Link>
-        )}
+        <span className="flex gap-3">
+          {file && item.source?.shared === true && onAskFile && (
+            <button type="button" onClick={() => onAskFile(file)} className="font-semibold text-brand-600 hover:underline" data-file-ask>
+              Tanyakan isi berkas
+            </button>
+          )}
+          {item.href && (
+            <Link href={item.href} className="font-semibold text-brand-600 hover:underline">
+              {file ? "Buka berkas →" : "Buka di ERP →"}
+            </Link>
+          )}
+        </span>
       </div>
     </article>
   );

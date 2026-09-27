@@ -52,6 +52,8 @@ export async function POST(request: NextRequest) {
       args = { query: String(given.query ?? lastUserText(input.messages)).trim().slice(0, 1000) };
       // A document the user attached earlier in this conversation; Intelligence checks it belongs to this user.
       if (typeof given.dataset_id === "string" && UUID.test(given.dataset_id)) args.dataset_id = given.dataset_id.toLowerCase();
+      // A Company File attached to the conversation; Intelligence authorizes it and applies its class policy.
+      else if (typeof given.file_id === "string" && UUID.test(given.file_id)) args.file_id = given.file_id.toLowerCase();
     } else if (skill === "read_document") {
       if (typeof given.dataset_id !== "string" || !UUID.test(given.dataset_id)) throw new BffError(422, "Berkas tidak dikenali.");
       args = { dataset_id: given.dataset_id.toLowerCase() };

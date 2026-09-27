@@ -2,7 +2,7 @@
 // Unit-tested without a browser. Evidence types are the doc 14/15 vocabulary shown as badges.
 import type { AgUiEvent } from "./ag-ui-client";
 
-export type EvidenceType = "erp_fact" | "signal" | "knowledge" | "document" | "observation" | "inference";
+export type EvidenceType = "erp_fact" | "signal" | "knowledge" | "document" | "file" | "observation" | "inference";
 export type Evidence = {
   type: EvidenceType;
   title: string;
@@ -62,7 +62,7 @@ export function newRun(runId: string, userText: string, skill?: string): AgentRu
   return { runId, userText, skill, status: "running", lastSeq: 0, steps: [], tools: [], evidence: [], proposals: [], actions: [], submissions: [], text: "" };
 }
 
-const EVIDENCE_TYPES = new Set<EvidenceType>(["erp_fact", "signal", "knowledge", "document", "observation", "inference"]);
+const EVIDENCE_TYPES = new Set<EvidenceType>(["erp_fact", "signal", "knowledge", "document", "file", "observation", "inference"]);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const INTENTS = new Set<FeedbackIntent>(["feature_request", "data_correction", "knowledge_correction", "agent_feedback"]);
 const SIGNAL_KEY = /^[a-z0-9-]{2,60}$/;

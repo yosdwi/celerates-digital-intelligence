@@ -9,6 +9,7 @@ import { DelegationError, verifyDelegation } from "./delegation";
 import { AgentReadError, loadActor, readEntity, readEntitySignals, readNeighbours, search } from "./reads";
 import { createProposal, getProposal, ProposalError } from "./proposals";
 import { publicCommands } from "./commands";
+import { fileAccess, readable as readableFiles } from "@/lib/files/sources";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TYPE = /^[a-z_]{2,40}$/;
@@ -38,6 +39,17 @@ export async function handleAgent(request: NextRequest, path: string[], sql: Sql
       return await createProposal(sql, { ...actor, id: actor.id, name: actor.name }, key, body);
     }
     if (a === "catalog" && path.length === 2) return { ...publicCatalog(), commands: publicCommands() };
+    if (a === "files" && b === "access" && path.length === 3) return await fileAccess(sql, actor);
+    if (a === "files" && b === "readable" && path.length === 3) {
+      // Company Files (ADR-018): which of these files and records this user may read now. ERP decides.
+      const params = request.nextUrl.searchParams;
+      const refs = params.getAll("ref").filter((r) => /^(attachment|column):[\w.:-]{3,200}$/.test(r));
+      const entities = params
+        .getAll("entity")
+        .map((e) => ({ type: e.split(":")[0], id: e.split(":")[1] ?? "" }))
+        .filter((e) => TYPE.test(e.type) && UUID.test(e.id));
+      return await readableFiles(sql, actor, refs, entities);
+    }
     if (a === "proposals" && b && UUID.test(b) && path.length === 3) return await getProposal(sql, actor, b.toLowerCase());
     if (a === "signals" && b && KEY.test(b) && path.length === 3) {
       const items = Number(request.nextUrl.searchParams.get("items") || 5);

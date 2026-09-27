@@ -102,6 +102,7 @@ export async function agentJourney({ base, request, db, env, python, publicKey, 
     const persisted = await (await fetch(`${intelligence}/api/agent/runs/${runId}`)).status;
     assert.equal(persisted, 401, 'run status requires delegation');
     await proposalJourneys({ base, request, db, env, intelligence, requisition, cookies });
+    await companyFilesJourney({ base, request, db, env: agentEnv, python, cookies });
     if (process.env.ERP_BROWSER_TEST === '1') {
       // A fresh unassigned requisition for the browser's own `Tindak lanjuti` flow.
       await db`INSERT INTO requisitions (requisition_no,client_name,position_name,ta_pic_name) VALUES ('REQ-BROWSER','PT Synthetic Browser','Data Engineer','')`;
@@ -401,6 +402,83 @@ async function proposalJourneys({ base, request, db, env, intelligence, requisit
     assert.deepEqual({ ...(await brain`SELECT state, title FROM agent_submissions WHERE id=${draft.id}`)[0] }, { state: 'submitted', title: 'SOP TA PIC: 2 hari kerja' });
     console.log('PASS: One Agent — attention brief in the conversation; free-text feedback → kinds offered → Feature Request confirmed in ERP, data correction as a task for the owner, knowledge correction draft sent to curators');
     console.log('PASS: Agent proposals — follow-up (signal → proposal → confirm → receipt → signal cleared → outcome) and import (file → mapping → per-row validation → confirm → learned mapping)');
+  } finally {
+    await brain.end();
+  }
+}
+
+/** Company Files (ADR-018): ERP-declared files and uploads, indexed by the worker, found and opened under ERP policy. */
+async function companyFilesJourney({ base, request, db, env, python, cookies }) {
+  const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3');
+  const brain = postgres(env.DATABASE_URL, { max: 1, prepare: false });
+  const worker = async () => {
+    const child = spawn(python, ['-c', 'from cdi import files\nprint(files.sync_erp())\nwhile files.tick():\n    pass'], { env, stdio: ['ignore', 'inherit', 'inherit'] });
+    await new Promise((resolve, reject) => child.on('exit', (c) => (c === 0 ? resolve() : reject(Error('files worker failed: ' + c)))));
+  };
+  try {
+    // An ERP candidate CV (attachment in ERP storage), a KTP scan (identity) and a BAST link, as ERP already stores them.
+    const s3 = new S3Client({ endpoint: process.env.S3_ENDPOINT, region: 'us-east-1', forcePathStyle: true, credentials: { accessKeyId: process.env.S3_ACCESS_KEY_ID, secretAccessKey: process.env.S3_SECRET_ACCESS_KEY } });
+    const [candidate] = await db`INSERT INTO candidates (candidate_no,candidate_name,ta_pic_name) VALUES ('CAND-FILES','Budi Synthetic','Rina') RETURNING id`;
+    const cvKey = `candidate_cv_asli/${candidate.id}/cv-journey.pdf`;
+    const cvBody = pdfBytes(['CURRICULUM VITAE Budi Synthetic', 'Java Spring Boot 7 tahun di PT Synthetic Astra']);
+    await s3.send(new PutObjectCommand({ Bucket: `${process.env.S3_BUCKET_PREFIX}-candidate-documents`, Key: cvKey, Body: cvBody, ContentType: 'application/pdf' }));
+    await db`INSERT INTO attachments (source_type,source_id,kind,file_name,file_path) VALUES ('candidate_cv_asli',${candidate.id},'file','cv-budi.pdf',${cvKey})`;
+    await db`INSERT INTO attachments (source_type,source_id,kind,file_name,file_path) VALUES ('onboarding_ktp',${candidate.id},'file','ktp-budi.jpg','onboarding/ktp-budi.jpg')`;
+
+    // An upload to Company Files through the ERP BFF (managed), then the worker: ERP feed sync + ingestion.
+    const form = new FormData();
+    form.set('file', new Blob([pdfBytes(['SOP Onboarding Karyawan', 'Laptop disiapkan tiga hari sebelum hari pertama.'])], { type: 'application/pdf' }), 'sop-onboarding.pdf');
+    form.set('kind', 'sop');
+    const up = await request('/api/files', { method: 'POST', body: form });
+    assert.equal(up.status, 201, await up.clone().text());
+    const sop = await up.json();
+    const loose = new FormData();
+    loose.set('file', new Blob([pdfBytes(['CV'])], { type: 'application/pdf' }), 'cv.pdf');
+    loose.set('kind', 'cv');
+    loose.set('access_class', 'general');
+    const looseRes = await request('/api/files', { method: 'POST', body: loose });
+    assert.equal(looseRes.status, 201, 'an Owner may choose a looser class (still a person, not a model)');
+    await worker();
+    const files = await brain`SELECT origin, kind, access_class, title FROM files ORDER BY title`;
+    assert.ok(files.some((f) => f.origin === 'erp' && f.kind === 'cv' && f.access_class === 'personal'), JSON.stringify(files));
+    assert.ok(!files.some((f) => /ktp/i.test(f.title)), 'identity documents never reach the registry');
+    const versions = await brain`SELECT f.kind, v.ingest_state FROM files f JOIN file_versions v ON v.file_id=f.id`;
+    assert.ok(versions.every((v) => ['indexed', 'metadata_only'].includes(v.ingest_state)), JSON.stringify(versions));
+
+    // Search and open through ERP.
+    const found = await (await request('/api/files?q=' + encodeURIComponent('java spring'))).json();
+    const cvHit = found.items.find((f) => f.kind === 'cv' && f.origin === 'erp');
+    assert.ok(cvHit && /Java/.test(cvHit.snippet) && cvHit.links[0].label === 'CAND-FILES · Budi Synthetic', JSON.stringify(found));
+    const opened = await request(`/api/files/${cvHit.id}/content?preview=1`);
+    assert.equal(opened.status, 303);
+    assert.match(opened.headers.get('location'), /\/api\/documents\?bucket=candidate-documents&path=/);
+    const location = new URL(opened.headers.get('location'));
+    const cvPdf = await request(location.pathname + location.search);
+    assert.equal(cvPdf.status, 200);
+    assert.equal(Buffer.from(await cvPdf.arrayBuffer()).subarray(0, 5).toString(), '%PDF-');
+    const sopBytes = await request(`/api/files/${sop.id}/content?preview=1`);
+    assert.equal(sopBytes.status, 200);
+    assert.equal(sopBytes.headers.get('content-type'), 'application/pdf');
+    assert.match(sopBytes.headers.get('content-security-policy'), /sandbox/);
+    assert.equal((await request('/api/documents?bucket=candidate-documents&path=' + encodeURIComponent(cvKey))).status, 200, 'the CV resolves to its candidate (TA)');
+    const log = await brain`SELECT action, via FROM file_access_log ORDER BY at`;
+    assert.deepEqual(log.map((l) => l.action), ['preview', 'preview'], 'every open is logged');
+
+    // The Agent finds the CV, but personal content never enters the run; a general file can be asked about.
+    const cvRun = await run(request, 'ask', { query: 'cari CV java spring' });
+    const card = cvRun.evidence.find((e) => e.type === 'file' && e.source.file_id === cvHit.id);
+    assert.ok(card && card.source.shared === false, JSON.stringify(cvRun.evidence));
+    assert.doesNotMatch(JSON.stringify(cvRun.stream), /Spring Boot 7 tahun/, 'personal content never enters the Agent run');
+    const sopRun = await run(request, 'ask', { query: 'kapan laptop disiapkan?', file_id: sop.id });
+    assert.ok(sopRun.evidence.some((e) => e.type === 'file' && /hal\. 1/.test(e.title)), JSON.stringify(sopRun.evidence));
+    assert.match(sopRun.text, /Laptop disiapkan tiga hari/);
+
+    // ERP deletes the CV attachment → the next sync withdraws it and search no longer finds it.
+    await db`DELETE FROM attachments WHERE file_path=${cvKey}`;
+    await worker();
+    const after = await (await request('/api/files?q=' + encodeURIComponent('java spring'))).json();
+    assert.ok(!after.items.some((f) => f.id === cvHit.id), 'a derived index never outlives the source');
+    console.log('PASS: Company Files — ERP CV indexed (identity docs excluded), SOP uploaded and OCR-ready pipeline, class-aware search, open via ERP/Intelligence with access log, Agent finds files without carrying personal content, file attached to the conversation, deletion withdraws');
   } finally {
     await brain.end();
   }

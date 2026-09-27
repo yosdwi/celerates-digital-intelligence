@@ -58,7 +58,7 @@ export function AgentPanel() {
   const [agent, setAgent] = useState<{ path: string; data?: AgentContext }>();
   const [runs, setRuns] = useState<AgentRun[]>([]);
   const [threadId] = useState(() => "thread-" + uuid());
-  const [attachment, setAttachment] = useState<{ id: string; name: string } | null>(null);
+  const [attachment, setAttachment] = useState<{ id: string; name: string; kind?: "dataset" | "file" } | null>(null);
   const inflight = useRef<AbortController | null>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const close = useRef<HTMLButtonElement>(null);
@@ -311,7 +311,10 @@ export function AgentPanel() {
                   running={running}
                   enabled={agentReady}
                   suggestions={suggestions}
-                  onSearch={(text, modality) => startRun("ask", attachment ? { query: text, dataset_id: attachment.id } : { query: text }, text, modality)}
+                  onSearch={(text, modality) =>
+                    startRun("ask", attachment ? (attachment.kind === "file" ? { query: text, file_id: attachment.id } : { query: text, dataset_id: attachment.id }) : { query: text }, text, modality)
+                  }
+                  onAttachFile={(file) => setAttachment({ ...file, kind: "file" })}
                   voice={agentContext?.capabilities?.voice === true}
                   onFile={importFile}
                   attachment={attachment}

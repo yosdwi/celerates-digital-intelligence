@@ -14,10 +14,19 @@ const AFTER: Record<Submission["intent"], string> = {
   data_correction: "Terkirim.",
 };
 
+// Edits survive a remount (the thread re-keys parts while a run is still streaming).
+const drafts = new Map<string, { title: string; body: string; state: "draft" | "sending" | "submitted" | "cancelled" }>();
+
 export function SubmissionCard({ value }: { value: Submission }) {
-  const [title, setTitle] = useState(value.title);
-  const [body, setBody] = useState(value.body);
-  const [state, setState] = useState<"draft" | "sending" | "submitted" | "cancelled">("draft");
+  const saved = drafts.get(value.id);
+  const [title, setTitleState] = useState(saved?.title ?? value.title);
+  const [body, setBodyState] = useState(saved?.body ?? value.body);
+  const [state, setStateValue] = useState<"draft" | "sending" | "submitted" | "cancelled">(saved?.state ?? "draft");
+  const remember = (patch: Partial<{ title: string; body: string; state: "draft" | "sending" | "submitted" | "cancelled" }>) =>
+    drafts.set(value.id, { title, body, state, ...drafts.get(value.id), ...patch });
+  const setTitle = (v: string) => { remember({ title: v }); setTitleState(v); };
+  const setBody = (v: string) => { remember({ body: v }); setBodyState(v); };
+  const setState = (v: "draft" | "sending" | "submitted" | "cancelled") => { remember({ state: v }); setStateValue(v); };
   const [error, setError] = useState("");
   async function send(action: "submit" | "cancel") {
     setState("sending");

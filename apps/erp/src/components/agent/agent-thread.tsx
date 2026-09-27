@@ -57,6 +57,12 @@ function Actions({ items }: { items: AgentAction[] }) {
   );
 }
 
+// Company Files (ADR-018): a file card can be attached to the conversation ("Tanyakan isi berkas").
+const AttachFileContext = createContext<((file: { id: string; name: string }) => void) | undefined>(undefined);
+function Card({ item }: { item: Evidence }) {
+  return <EvidenceCard item={item} onAskFile={useContext(AttachFileContext)} />;
+}
+
 function Mapping({ data }: { data: MappingCardData }) {
   return <MappingCard data={data} onRun={useContext(ActionContext)} />;
 }
@@ -67,7 +73,7 @@ const PARTS = {
   data: {
     by_name: {
       progress: ({ data }: DataPart) => <RunProgress steps={data.steps as { name: string; done: boolean }[]} running={data.running === true} />,
-      evidence: ({ data }: DataPart) => <EvidenceCard item={data as unknown as Evidence} />,
+      evidence: ({ data }: DataPart) => <Card item={data as unknown as Evidence} />,
       error: ({ data }: DataPart) => <RunError message={String(data.message)} />,
       proposal: ({ data }: DataPart) => <ProposalCard id={String(data.id)} title={String(data.title)} />,
       submission: ({ data }: DataPart) => <SubmissionCard value={data as unknown as Submission} />,
@@ -106,6 +112,7 @@ export default function AgentThread({
   onAction,
   attachment,
   onDetach,
+  onAttachFile,
   voice,
 }: {
   runs: AgentRun[];
@@ -118,9 +125,10 @@ export default function AgentThread({
   /** `Drop anything`: a CSV/XLSX becomes a dataset, then a proposal the user confirms in ERP. */
   onFile: (file: File) => Promise<string | null>;
   onAction: (action: AgentAction) => void;
-  /** A dropped document attached to this conversation; questions also search it until detached. */
-  attachment: { id: string; name: string } | null;
+  /** A dropped document or a Company File attached to this conversation; questions also search it until detached. */
+  attachment: { id: string; name: string; kind?: "dataset" | "file" } | null;
   onDetach: () => void;
+  onAttachFile?: (file: { id: string; name: string }) => void;
 }) {
   const picker = useRef<HTMLInputElement>(null);
   // Set when the composer text came from a transcript; the run is then recorded with modality "voice".
@@ -188,7 +196,9 @@ export default function AgentThread({
             </div>
           </ThreadPrimitive.Empty>
           <ActionContext.Provider value={onAction}>
-            <ThreadPrimitive.Messages components={{ UserMessage, AssistantMessage }} />
+            <AttachFileContext.Provider value={onAttachFile}>
+              <ThreadPrimitive.Messages components={{ UserMessage, AssistantMessage }} />
+            </AttachFileContext.Provider>
           </ActionContext.Provider>
         </ThreadPrimitive.Viewport>
         {attachment && (

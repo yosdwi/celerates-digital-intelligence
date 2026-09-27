@@ -1,4 +1,4 @@
-import { Megaphone, TrendingUp, Users, UserCog, Briefcase, FileSpreadsheet, Landmark, Gauge, KanbanSquare, PenTool, Lightbulb, GraduationCap, Clock, Bot, Fingerprint, LucideIcon } from "lucide-react";
+import { Megaphone, TrendingUp, Users, UserCog, Briefcase, FileSpreadsheet, Landmark, Gauge, KanbanSquare, PenTool, Lightbulb, GraduationCap, Clock, Bot, Fingerprint, FolderOpen, LucideIcon } from "lucide-react";
 
 export type SubPage = { href: string; label: string; collab?: boolean; collabColor?: "teal" | "orange" };
 export type ModuleConfig = {
@@ -109,6 +109,10 @@ export const MODULES: ModuleConfig[] = [
   {
     key: "tasks", label: "Task Board", icon: KanbanSquare, color: "bg-cyan-600", enabled: true,
     basePath: "/tasks", subPages: [{ href: "/tasks", label: "Board" }],
+  },
+  {
+    key: "files", label: "Company Files", icon: FolderOpen, color: "bg-indigo-600", enabled: true,
+    basePath: "/files", subPages: [{ href: "/files", label: "Cari & kelola berkas" }],
   },
   {
     key: "ttd", label: "Tanda Tangan Digital", icon: PenTool, color: "bg-teal-600", enabled: true,
