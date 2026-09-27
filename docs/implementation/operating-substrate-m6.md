@@ -171,3 +171,16 @@ Start from the final commit of this record.
 1. **Deploy**, run `cdi.files_smoke`, and enable backups (per the storage doc).
 2. **Measure OCR** on 10 real scans. Add Tesseract `ind` only if needed.
 3. **M7 — Insight Agent on files**, starting with manpower sheets vs requisitions (tables are already extracted per sheet) and contract end dates vs project status.
+
+## CI results
+
+GitHub Actions on `audit/erp-production-readiness` for `772ac95` (M6 head, including `75dddf7` and `0014ed3`), on both push and pull-request runs:
+
+| Check | Result |
+|---|---|
+| ERP pilot checks (`verify`) | success |
+| P0 `api` | success |
+| P0 `web` | success |
+| P0 `compose` | failure at `docker compose … up --build -d` (pre-existing, as on the M4/M5 baselines; independent of this increment) |
+
+Follow-up after M6: `fbf09f3` (fix: add RapidOCR native runtime libraries to the Intelligence image) was added while preparing the deployment.
