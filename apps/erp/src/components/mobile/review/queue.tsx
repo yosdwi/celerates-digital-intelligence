@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { CalendarDays, CheckCircle2, ChevronRight, Clock3, FileSignature, Landmark, Sparkles, UserRound } from "lucide-react";
+import { BellRing, CalendarDays, ClipboardCheck, CheckCircle2, ChevronRight, Clock3, FileSignature, Landmark, Sparkles, UserRound } from "lucide-react";
 import { approveTimesheetSubmission } from "@/app/timesheet/actions";
 import type { ReviewItem, ReviewKind } from "@/lib/review/queue";
 import { fmtDate } from "@/lib/pmo/mobile-format";
@@ -15,12 +15,12 @@ import { BottomSheet, Card, FactRows, MobileScreen, ScreenTitle, SectionHeader, 
 import { buttonClass } from "../styles";
 import { timeAgo } from "../time";
 
-type Group = "all" | "sign" | "time_off" | "timesheet" | "finance" | "agent";
-const GROUP_OF: Record<ReviewKind, Group> = { signature: "sign", time_off: "time_off", timesheet: "timesheet", finance_verify: "finance", finance_revise: "finance", proposal: "agent" };
-const TONE: Record<ReviewKind, Tone> = { signature: "accent", time_off: "accent", timesheet: "accent", finance_verify: "accent", finance_revise: "danger", proposal: "warn" };
-const ICON: Record<ReviewKind, typeof FileSignature> = { signature: FileSignature, time_off: CalendarDays, timesheet: Clock3, finance_verify: Landmark, finance_revise: Landmark, proposal: Sparkles };
+type Group = "all" | "sign" | "time_off" | "timesheet" | "finance" | "readiness" | "agent";
+const GROUP_OF: Record<ReviewKind, Group> = { signature: "sign", time_off: "time_off", timesheet: "timesheet", finance_verify: "finance", finance_revise: "finance", proposal: "agent", correction: "readiness", campaign: "readiness" };
+const TONE: Record<ReviewKind, Tone> = { signature: "accent", time_off: "accent", timesheet: "accent", finance_verify: "accent", finance_revise: "danger", proposal: "warn", correction: "accent", campaign: "warn" };
+const ICON: Record<ReviewKind, typeof FileSignature> = { signature: FileSignature, time_off: CalendarDays, timesheet: Clock3, finance_verify: Landmark, finance_revise: Landmark, proposal: Sparkles, correction: ClipboardCheck, campaign: BellRing };
 
-export function ReviewQueue({ items, initialOpen }: { items: ReviewItem[]; initialOpen?: string | null }) {
+export function ReviewQueue({ items, initialOpen, conformUnavailable }: { items: ReviewItem[]; initialOpen?: string | null; conformUnavailable?: boolean }) {
   const t = useTranslations("mobile.review");
   const tm = useTranslations("mobile");
   const locale = useLocale();
@@ -36,12 +36,15 @@ export function ReviewQueue({ items, initialOpen }: { items: ReviewItem[]; initi
     for (const i of items) c[GROUP_OF[i.kind]] = (c[GROUP_OF[i.kind]] ?? 0) + 1;
     return c;
   }, [items]);
-  const groups = (["all", "sign", "time_off", "timesheet", "finance", "agent"] as Group[]).filter((g) => g === "all" || counts[g]);
+  const groups = (["all", "sign", "time_off", "timesheet", "finance", "readiness", "agent"] as Group[]).filter((g) => g === "all" || counts[g]);
   const shown = group === "all" ? items : items.filter((i) => GROUP_OF[i.kind] === group);
-  const period = (i: ReviewItem) => (i.meta.start ? `${fmtDate(String(i.meta.start), locale)} – ${fmtDate(String(i.meta.end ?? i.meta.start), locale)}` : null);
+  const period = (i: ReviewItem) =>
+    !i.meta.start ? null : i.meta.end ? `${fmtDate(String(i.meta.start), locale)} – ${fmtDate(String(i.meta.end), locale)}` : fmtDate(String(i.meta.start), locale);
   const subtitle = (i: ReviewItem) => {
     if (i.kind === "signature") return [i.meta.extension ? t("extensionShort") : null, i.meta.step ? t("steps." + i.meta.step) : null].filter(Boolean).join(" · ") || null;
     if (i.kind === "proposal") return t("proposalItems", { count: Number(i.meta.items ?? 0) });
+    if (i.kind === "correction") return t(`correctionType.${String(i.meta.type)}`);
+    if (i.kind === "campaign") return t("campaignRecipients", { count: Number(i.meta.recipients ?? 0) });
     if (i.kind === "finance_revise") return (i.meta.notes as string | null) ?? i.subtitle;
     return i.subtitle;
   };
@@ -50,6 +53,7 @@ export function ReviewQueue({ items, initialOpen }: { items: ReviewItem[]; initi
     <MobileScreen label={tm("tabs.review")}>
       <div data-review-queue className="flex flex-col gap-4">
         <ScreenTitle title={tm("tabs.review")} subtitle={items.length ? t("waiting", { count: items.length }) : t("subtitle")} />
+        {conformUnavailable && <Card className="p-3 text-[13px] text-[#8a4b06]" data-conform-unavailable>{t("conformUnavailable")}</Card>}
         {groups.length > 1 && (
           <div role="tablist" aria-label={t("filter")} className="-mx-5 flex gap-2 overflow-x-auto px-5 [scrollbar-width:none]">
             {groups.map((g) => (

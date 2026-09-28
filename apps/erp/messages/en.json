@@ -2446,7 +2446,8 @@
         "time_off": "Time off",
         "timesheet": "Timesheet",
         "finance": "Finance",
-        "agent": "Agent"
+        "agent": "Agent",
+        "readiness": "Readiness"
       },
       "kinds": {
         "signature": "Signature",
@@ -2454,7 +2455,9 @@
         "timesheet": "Timesheet",
         "finance_verify": "Finance handoff",
         "finance_revise": "Returned by Finance",
-        "proposal": "Agent proposal"
+        "proposal": "Agent proposal",
+        "correction": "Attendance correction",
+        "campaign": "Reminder campaign"
       },
       "actions": {
         "signature": "Sign",
@@ -2462,7 +2465,9 @@
         "timesheet": "Approve",
         "finance_verify": "Verify",
         "finance_revise": "Fix",
-        "proposal": "Confirm"
+        "proposal": "Confirm",
+        "correction": "Review",
+        "campaign": "Approve"
       },
       "steps": {
         "requester": "Requester",
@@ -2547,7 +2552,18 @@
       },
       "proposalTitle": "Changes proposed by the Agent",
       "proposalBody": "Review, adjust if needed, then confirm. ERP re-validates every item with your current access.",
-      "extensionShort": "Extension / Increment"
+      "extensionShort": "Extension / Increment",
+      "correctionType": {
+        "missing_clock_in": "Clock-in correction",
+        "missing_clock_out": "Clock-out correction",
+        "missing_both_worked": "Worked, forgot to punch",
+        "absence": "Absence"
+      },
+      "campaignRecipients": "{count} Talent in the audience",
+      "conformUnavailable": "ConForm items (corrections, campaigns) couldn't load.",
+      "correctionEyebrow": "PMO · Talent attendance correction",
+      "correctionApproveTitle": "Approve correction",
+      "correctionApproveBody": "ConForm applies this correction to the closing projection and the canonical CSV. Raw data is never changed."
     },
     "search": {
       "back": "Back to Home",
@@ -2578,6 +2594,258 @@
       "sort": {
         "notified": "Latest handed over"
       }
+    }
+  },
+  "talent": {
+    "title": "My Requirements",
+    "account": "Account",
+    "accountNote": "Your Celerates access covers only your own operational requirements.",
+    "logout": "Sign out",
+    "hello": "Hi, {name}",
+    "subtitle": "Your operational requirements for closing.",
+    "unlinked": "Your account is not linked to operational data yet. Contact PMO.",
+    "unavailable": "Requirements couldn't load. Try again shortly.",
+    "needsTitle": "To complete",
+    "waitingTitle": "Waiting for PMO",
+    "clearTitle": "All complete",
+    "clearBody": "Nothing needs your action right now.",
+    "attendance": "Attendance",
+    "gap": {
+      "missing_clock_in": "Clock-in missing",
+      "missing_clock_out": "Clock-out missing",
+      "missing_both": "Clock-in and clock-out missing"
+    },
+    "rejected": "Rejected",
+    "needs": "To complete",
+    "waiting": "Waiting for PMO",
+    "scope": "Only your own data is shown.",
+    "nothingForDate": "Nothing to complete for this date.",
+    "recorded": "Recorded",
+    "missing": "Not recorded",
+    "yourSubmission": "Your submission",
+    "submissionStatus": "Status",
+    "correctionStatus": {
+      "pending": "Waiting for PMO review",
+      "approved": "Approved",
+      "rejected": "Rejected"
+    },
+    "rejectionReason": "Rejected by PMO: {reason}. Please resubmit.",
+    "waitingBody": "Your submission was received and is waiting for PMO review.",
+    "go": {
+      "invalidTitle": "This link can't be used",
+      "invalidBody": "This link was already used or has expired. Ask PMO for a new one.",
+      "otherTitle": "Link for another account",
+      "otherBody": "You are signed in with another account. Sign out, then open this link again.",
+      "opening": "Opening My Requirements…"
+    },
+    "fix": {
+      "open": "Complete",
+      "title": "Complete attendance",
+      "close": "Done",
+      "sending": "Sending…",
+      "submit": "Send to PMO",
+      "alreadyOpen": "Already waiting for PMO",
+      "submitted": "Sent to PMO",
+      "doneBody": "PMO will review your submission.",
+      "what": "What happened?",
+      "actions": {
+        "worked": "I worked",
+        "sakit": "Sick",
+        "izin": "Permit",
+        "cuti": "Leave",
+        "libur": "Day off"
+      },
+      "checkIn": "Clock-in",
+      "checkOut": "Clock-out",
+      "evidence": "Evidence photo",
+      "evidenceHint": "Take or choose a photo (max 5 MB)",
+      "note": "Note (optional)",
+      "rule": "PMO reviews submissions. Raw attendance is never changed."
+    }
+  },
+  "conform": {
+    "title": "Operational Readiness",
+    "cycle": "Payroll cycle",
+    "prevCycle": "Previous cycle",
+    "nextCycle": "Next cycle",
+    "unconfigured": "The ConForm integration is not configured in this environment.",
+    "unavailable": "ConForm can't be reached.",
+    "daysNeed": "{count, plural, one {# day needs action} other {# days need action}}",
+    "daysWaiting": "{count, plural, one {# day waiting} other {# days waiting}}",
+    "waNotBound": "WhatsApp not bound",
+    "waBound": "WhatsApp bound",
+    "status": {
+      "NEEDS_TALENT_ACTION": "Needs Talent action",
+      "WAITING_SUBMITTED": "Waiting for PMO",
+      "COMPLETE": "Complete"
+    },
+    "summary": {
+      "complete": "Complete",
+      "needs_talent_action": "Needs Talent action",
+      "waiting_submitted": "Waiting for PMO",
+      "unverified": "Unverified"
+    },
+    "pendingCorrections": "{count, plural, one {# correction} other {# corrections}} waiting in Review",
+    "bastGate": "BAST gate (calendar month)",
+    "team": {
+      "developer": "Developer",
+      "iotoperation": "IoT Operations",
+      "label": "Team"
+    },
+    "ready": "Ready",
+    "notReady": "Not ready",
+    "talents": "Talent",
+    "tabs": {
+      "all": "All"
+    },
+    "sort": {
+      "need": "Most in need",
+      "name": "Name"
+    },
+    "sources": "Source freshness",
+    "never": "never",
+    "evaluatedThrough": "Evaluated through {date}",
+    "actions": "Closing actions",
+    "bast": {
+      "title": "Generate BAST",
+      "subtitle": "ConForm canonical generator",
+      "status": {
+        "pending": "Queued…",
+        "running": "Generating in ConForm…",
+        "succeeded": "BAST generated.",
+        "failed": "Generation failed.",
+        "cancelled": "Cancelled.",
+        "stale": "The job stopped responding; try again."
+      },
+      "download": "Download PDF",
+      "note": "BAST uses the calendar month {month}. Final requires every Talent ready, unless forced with a reason.",
+      "mode": "Mode",
+      "preview": "Preview",
+      "final": "Final",
+      "force": "Force (not ready)",
+      "reason": "Force reason",
+      "generate": "Generate"
+    },
+    "csv": {
+      "title": "Export attendance CSV",
+      "subtitle": "ConForm canonical exporter",
+      "note": "Canonical CSV for {cycle}; approved corrections applied. The export is recorded in ConForm.",
+      "download": "Download CSV"
+    },
+    "campaign": {
+      "title": "Talent reminders",
+      "subtitle": "{count} Talent need action",
+      "counts": "{sent} sent · {pending} pending",
+      "explain": "Create a draft campaign for the {count} Talent who need action in {cycle}. It must be approved in Review before any message is sent.",
+      "rules": "Personal WhatsApp messages with a Celerates link, sent in bounded batches during working hours, only while the gap remains.",
+      "create": "Create draft campaign",
+      "eyebrow": "Reminder campaign",
+      "createdBy": "Created by {name}",
+      "audience": "Audience (snapshot)",
+      "empty": "No Talent needs a reminder.",
+      "message": "Message",
+      "policy": "Sending policy",
+      "window": "Sending hours",
+      "batch": "Batch",
+      "batchValue": "{size} messages per {minutes} minutes",
+      "retry": "Max attempts",
+      "willSend": "To send / sent",
+      "approvedBy": "Approved by",
+      "approvedAt": "Approved",
+      "cancel": "Cancel",
+      "approve": "Approve",
+      "pause": "Pause",
+      "resume": "Resume",
+      "stop": "Stop",
+      "approveTitle": "Approve campaign",
+      "back": "Back",
+      "approveBody": "{count} Talent will receive a personal message with a single-use Celerates link (valid 72 hours). Talent without a Celerates account are skipped."
+    },
+    "campaignState": {
+      "draft": "Draft",
+      "running": "Running",
+      "paused": "Paused",
+      "completed": "Completed",
+      "stopped": "Stopped"
+    },
+    "summaryGroup": {
+      "title": "Summary to PMO group",
+      "subtitle": "One aggregate message with a Celerates link",
+      "noGroup": "The PMO closing group is not set in ConForm.",
+      "duplicate": "Today's summary was already sent.",
+      "sent": "Summary sent.",
+      "send": "Send summary"
+    },
+    "kill": {
+      "title": "Sending kill switch",
+      "on": "All WhatsApp sending is stopped.",
+      "off": "Sending is active.",
+      "resume": "Re-enable",
+      "stop": "Stop all"
+    },
+    "requirements": "Open requirements",
+    "noRequirements": "Nothing open in this cycle.",
+    "gap": {
+      "missing_clock_in": "Clock-in missing",
+      "missing_clock_out": "Clock-out missing",
+      "missing_both": "Clock-in and clock-out missing"
+    },
+    "account": {
+      "title": "Celerates account",
+      "email": "Email",
+      "linkedAt": "Linked since",
+      "ownerOnly": "Only an Owner can link a Talent account.",
+      "note": "Reminder links are issued only for Talent with a linked Celerates account.",
+      "notLinked": "This Talent has no Celerates account yet.",
+      "link": "Create & link account"
+    },
+    "reviewability": {
+      "talent_not_in_cycle": "Talent inactive",
+      "attendance_not_in_projection": "Not in projection",
+      "source_unavailable": "Source unavailable",
+      "request_not_current": "Not the latest request",
+      "source_changed": "Data changed",
+      "evidence_not_found": "Evidence missing",
+      "unknown": "Not reviewable"
+    },
+    "correctionStatus": {
+      "pending": "Pending",
+      "approved": "Approved",
+      "rejected": "Rejected"
+    },
+    "correction": {
+      "day": "Day",
+      "date": "Date",
+      "recordedIn": "Recorded clock-in",
+      "recordedOut": "Recorded clock-out",
+      "proposedIn": "Proposed clock-in",
+      "proposedOut": "Proposed clock-out",
+      "absence": "Type",
+      "reviewedBy": "Reviewed by",
+      "evidence": "Evidence"
+    },
+    "recipient": {
+      "will_send": "Will send",
+      "no_account": "No account",
+      "not_bound": "WhatsApp not bound",
+      "pending": "Pending",
+      "sending": "Sending",
+      "sent": "Sent",
+      "failed_retryable": "Failed, will retry",
+      "failed_final": "Failed",
+      "unknown": "Unknown outcome",
+      "skipped_resolved": "Already complete",
+      "skipped_recent": "Reminded recently",
+      "skipped_link_expired": "Link expired",
+      "skipped_no_account": "No account",
+      "skipped_not_bound": "WhatsApp not bound",
+      "skipped_stopped": "Stopped"
+    },
+    "pauseReason": {
+      "transport_unavailable": "WhatsApp unavailable",
+      "transport_auth_failed": "Transport refused",
+      "delivery_unknown": "Delivery outcome unknown",
+      "paused_by_pmo": "Paused by PMO"
     }
   }
 }

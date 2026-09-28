@@ -2446,7 +2446,8 @@
         "time_off": "Cuti",
         "timesheet": "Timesheet",
         "finance": "Finance",
-        "agent": "Agent"
+        "agent": "Agent",
+        "readiness": "Readiness"
       },
       "kinds": {
         "signature": "Tanda tangan",
@@ -2454,7 +2455,9 @@
         "timesheet": "Timesheet",
         "finance_verify": "Serah terima Finance",
         "finance_revise": "Dikembalikan Finance",
-        "proposal": "Usulan Agent"
+        "proposal": "Usulan Agent",
+        "correction": "Koreksi attendance",
+        "campaign": "Kampanye pengingat"
       },
       "actions": {
         "signature": "Tanda tangani",
@@ -2462,7 +2465,9 @@
         "timesheet": "Setujui",
         "finance_verify": "Verifikasi",
         "finance_revise": "Perbaiki",
-        "proposal": "Konfirmasi"
+        "proposal": "Konfirmasi",
+        "correction": "Tinjau",
+        "campaign": "Setujui"
       },
       "steps": {
         "requester": "Requester",
@@ -2547,7 +2552,18 @@
       },
       "proposalTitle": "Usulan perubahan dari Agent",
       "proposalBody": "Periksa, ubah bila perlu, lalu konfirmasi. ERP memvalidasi ulang setiap item dengan akses Anda saat ini.",
-      "extensionShort": "Extension / Increment"
+      "extensionShort": "Extension / Increment",
+      "correctionType": {
+        "missing_clock_in": "Koreksi jam masuk",
+        "missing_clock_out": "Koreksi jam pulang",
+        "missing_both_worked": "Bekerja, lupa absen",
+        "absence": "Tidak hadir"
+      },
+      "campaignRecipients": "{count} Talent dalam audiens",
+      "conformUnavailable": "Item ConForm (koreksi, kampanye) belum dapat dimuat.",
+      "correctionEyebrow": "PMO · Koreksi attendance Talent",
+      "correctionApproveTitle": "Setujui koreksi",
+      "correctionApproveBody": "ConForm menerapkan koreksi ini ke proyeksi closing dan CSV kanonis. Data mentah tidak diubah."
     },
     "search": {
       "back": "Kembali ke Beranda",
@@ -2578,6 +2594,258 @@
       "sort": {
         "notified": "Terbaru diserahkan"
       }
+    }
+  },
+  "talent": {
+    "title": "Kelengkapan Saya",
+    "account": "Akun",
+    "accountNote": "Akses Celerates Anda hanya untuk kelengkapan operasional Anda sendiri.",
+    "logout": "Keluar",
+    "hello": "Halo, {name}",
+    "subtitle": "Kelengkapan operasional Anda untuk closing.",
+    "unlinked": "Akun Anda belum terhubung ke data operasional. Hubungi PMO.",
+    "unavailable": "Data kelengkapan belum dapat dimuat. Coba lagi sebentar lagi.",
+    "needsTitle": "Perlu dilengkapi",
+    "waitingTitle": "Menunggu PMO",
+    "clearTitle": "Semua lengkap",
+    "clearBody": "Tidak ada yang perlu Anda lengkapi saat ini.",
+    "attendance": "Attendance",
+    "gap": {
+      "missing_clock_in": "Jam masuk belum tercatat",
+      "missing_clock_out": "Jam pulang belum tercatat",
+      "missing_both": "Jam masuk dan pulang belum tercatat"
+    },
+    "rejected": "Ditolak",
+    "needs": "Perlu dilengkapi",
+    "waiting": "Menunggu PMO",
+    "scope": "Hanya data Anda sendiri yang ditampilkan.",
+    "nothingForDate": "Tidak ada yang perlu dilengkapi untuk tanggal ini.",
+    "recorded": "Tercatat di sistem",
+    "missing": "Belum tercatat",
+    "yourSubmission": "Pengajuan Anda",
+    "submissionStatus": "Status",
+    "correctionStatus": {
+      "pending": "Menunggu review PMO",
+      "approved": "Disetujui",
+      "rejected": "Ditolak"
+    },
+    "rejectionReason": "Ditolak PMO: {reason}. Silakan ajukan ulang.",
+    "waitingBody": "Pengajuan Anda sudah diterima dan menunggu review PMO.",
+    "go": {
+      "invalidTitle": "Tautan tidak dapat dipakai",
+      "invalidBody": "Tautan ini sudah dipakai atau kedaluwarsa. Minta tautan baru dari PMO.",
+      "otherTitle": "Tautan untuk akun lain",
+      "otherBody": "Anda sedang masuk dengan akun lain. Keluar dulu, lalu buka tautan ini lagi.",
+      "opening": "Membuka Kelengkapan Saya…"
+    },
+    "fix": {
+      "open": "Lengkapi",
+      "title": "Lengkapi attendance",
+      "close": "Selesai",
+      "sending": "Mengirim…",
+      "submit": "Kirim ke PMO",
+      "alreadyOpen": "Pengajuan sudah menunggu PMO",
+      "submitted": "Terkirim ke PMO",
+      "doneBody": "PMO akan meninjau pengajuan Anda.",
+      "what": "Apa yang terjadi?",
+      "actions": {
+        "worked": "Saya bekerja",
+        "sakit": "Sakit",
+        "izin": "Izin",
+        "cuti": "Cuti",
+        "libur": "Libur"
+      },
+      "checkIn": "Jam masuk",
+      "checkOut": "Jam pulang",
+      "evidence": "Foto bukti",
+      "evidenceHint": "Ambil atau pilih foto (maks. 5 MB)",
+      "note": "Catatan (opsional)",
+      "rule": "Pengajuan ditinjau PMO. Data mentah attendance tidak diubah."
+    }
+  },
+  "conform": {
+    "title": "Operational Readiness",
+    "cycle": "Periode payroll",
+    "prevCycle": "Periode sebelumnya",
+    "nextCycle": "Periode berikutnya",
+    "unconfigured": "Integrasi ConForm belum dikonfigurasi di lingkungan ini.",
+    "unavailable": "ConForm belum dapat dihubungi.",
+    "daysNeed": "{count} hari perlu aksi",
+    "daysWaiting": "{count} hari menunggu PMO",
+    "waNotBound": "WA belum terhubung",
+    "waBound": "WA terhubung",
+    "status": {
+      "NEEDS_TALENT_ACTION": "Perlu aksi Talent",
+      "WAITING_SUBMITTED": "Menunggu PMO",
+      "COMPLETE": "Lengkap"
+    },
+    "summary": {
+      "complete": "Lengkap",
+      "needs_talent_action": "Perlu aksi Talent",
+      "waiting_submitted": "Menunggu PMO",
+      "unverified": "Belum terverifikasi"
+    },
+    "pendingCorrections": "{count} koreksi menunggu review di Tinjau",
+    "bastGate": "Gerbang BAST (bulan kalender)",
+    "team": {
+      "developer": "Developer",
+      "iotoperation": "IoT Operations",
+      "label": "Tim"
+    },
+    "ready": "Siap",
+    "notReady": "Belum siap",
+    "talents": "Talent",
+    "tabs": {
+      "all": "Semua"
+    },
+    "sort": {
+      "need": "Paling butuh aksi",
+      "name": "Nama"
+    },
+    "sources": "Kesegaran sumber",
+    "never": "belum pernah",
+    "evaluatedThrough": "Dievaluasi sampai {date}",
+    "actions": "Aksi closing",
+    "bast": {
+      "title": "Generate BAST",
+      "subtitle": "Generator kanonis ConForm",
+      "status": {
+        "pending": "Menunggu antrean…",
+        "running": "Sedang dibuat di ConForm…",
+        "succeeded": "BAST selesai dibuat.",
+        "failed": "Pembuatan gagal.",
+        "cancelled": "Dibatalkan.",
+        "stale": "Pekerjaan tidak merespons; coba lagi."
+      },
+      "download": "Unduh PDF",
+      "note": "BAST memakai bulan kalender {month}. Final memerlukan semua Talent siap, kecuali force dengan alasan.",
+      "mode": "Mode",
+      "preview": "Preview",
+      "final": "Final",
+      "force": "Force (belum siap)",
+      "reason": "Alasan force",
+      "generate": "Generate"
+    },
+    "csv": {
+      "title": "Export attendance CSV",
+      "subtitle": "Exporter kanonis ConForm",
+      "note": "CSV kanonis untuk {cycle}; koreksi yang disetujui sudah diterapkan. Export tercatat di ConForm.",
+      "download": "Unduh CSV"
+    },
+    "campaign": {
+      "title": "Pengingat Talent",
+      "subtitle": "{count} Talent perlu aksi",
+      "counts": "{sent} terkirim · {pending} menunggu",
+      "explain": "Buat draf kampanye untuk {count} Talent yang perlu aksi pada {cycle}. Draf harus disetujui di Tinjau sebelum ada pesan terkirim.",
+      "rules": "Pesan pribadi WhatsApp berisi tautan Celerates. Dikirim bertahap dalam jam kerja, hanya selama kekurangan masih ada.",
+      "create": "Buat draf kampanye",
+      "eyebrow": "Kampanye pengingat",
+      "createdBy": "Dibuat oleh {name}",
+      "audience": "Audiens (snapshot)",
+      "empty": "Tidak ada Talent yang perlu diingatkan.",
+      "message": "Pesan",
+      "policy": "Kebijakan pengiriman",
+      "window": "Jam kirim",
+      "batch": "Batch",
+      "batchValue": "{size} pesan per {minutes} menit",
+      "retry": "Maks. percobaan",
+      "willSend": "Akan / sudah dikirim",
+      "approvedBy": "Disetujui oleh",
+      "approvedAt": "Disetujui",
+      "cancel": "Batalkan",
+      "approve": "Setujui",
+      "pause": "Jeda",
+      "resume": "Lanjutkan",
+      "stop": "Hentikan",
+      "approveTitle": "Setujui kampanye",
+      "back": "Kembali",
+      "approveBody": "{count} Talent akan menerima pesan pribadi berisi tautan Celerates satu kali pakai (berlaku 72 jam). Talent tanpa akun Celerates dilewati."
+    },
+    "campaignState": {
+      "draft": "Draf",
+      "running": "Berjalan",
+      "paused": "Dijeda",
+      "completed": "Selesai",
+      "stopped": "Dihentikan"
+    },
+    "summaryGroup": {
+      "title": "Ringkasan ke grup PMO",
+      "subtitle": "Satu pesan agregat dengan tautan Celerates",
+      "noGroup": "Grup closing PMO belum diatur di ConForm.",
+      "duplicate": "Ringkasan hari ini sudah terkirim.",
+      "sent": "Ringkasan terkirim.",
+      "send": "Kirim ringkasan"
+    },
+    "kill": {
+      "title": "Kill switch pengiriman",
+      "on": "Semua pengiriman WhatsApp dihentikan.",
+      "off": "Pengiriman aktif.",
+      "resume": "Aktifkan lagi",
+      "stop": "Hentikan semua"
+    },
+    "requirements": "Kekurangan",
+    "noRequirements": "Tidak ada kekurangan pada periode ini.",
+    "gap": {
+      "missing_clock_in": "Jam masuk belum tercatat",
+      "missing_clock_out": "Jam pulang belum tercatat",
+      "missing_both": "Jam masuk dan pulang belum tercatat"
+    },
+    "account": {
+      "title": "Akun Celerates",
+      "email": "Email",
+      "linkedAt": "Terhubung sejak",
+      "ownerOnly": "Hanya Owner yang dapat menghubungkan akun Talent.",
+      "note": "Tautan pengingat hanya dibuat untuk Talent dengan akun Celerates yang terhubung.",
+      "notLinked": "Talent ini belum punya akun Celerates.",
+      "link": "Buat & hubungkan akun"
+    },
+    "reviewability": {
+      "talent_not_in_cycle": "Talent tidak aktif",
+      "attendance_not_in_projection": "Tidak di proyeksi",
+      "source_unavailable": "Sumber tidak tersedia",
+      "request_not_current": "Bukan pengajuan terbaru",
+      "source_changed": "Data berubah",
+      "evidence_not_found": "Bukti tidak ada",
+      "unknown": "Tidak dapat ditinjau"
+    },
+    "correctionStatus": {
+      "pending": "Menunggu",
+      "approved": "Disetujui",
+      "rejected": "Ditolak"
+    },
+    "correction": {
+      "day": "Hari",
+      "date": "Tanggal",
+      "recordedIn": "Masuk tercatat",
+      "recordedOut": "Pulang tercatat",
+      "proposedIn": "Masuk diajukan",
+      "proposedOut": "Pulang diajukan",
+      "absence": "Jenis",
+      "reviewedBy": "Ditinjau oleh",
+      "evidence": "Bukti"
+    },
+    "recipient": {
+      "will_send": "Akan dikirim",
+      "no_account": "Belum ada akun",
+      "not_bound": "WA belum terhubung",
+      "pending": "Menunggu",
+      "sending": "Mengirim",
+      "sent": "Terkirim",
+      "failed_retryable": "Gagal, dicoba lagi",
+      "failed_final": "Gagal",
+      "unknown": "Status tidak pasti",
+      "skipped_resolved": "Sudah lengkap",
+      "skipped_recent": "Baru diingatkan",
+      "skipped_link_expired": "Tautan kedaluwarsa",
+      "skipped_no_account": "Belum ada akun",
+      "skipped_not_bound": "WA belum terhubung",
+      "skipped_stopped": "Dihentikan"
+    },
+    "pauseReason": {
+      "transport_unavailable": "WhatsApp tidak tersedia",
+      "transport_auth_failed": "Transport ditolak",
+      "delivery_unknown": "Status kirim tidak pasti",
+      "paused_by_pmo": "Dijeda PMO"
     }
   }
 }

@@ -74,6 +74,7 @@ export const MODULES: ModuleConfig[] = [
       { href: "/pmo/contracts", label: "A.Contract" },
       { href: "/pmo", label: "Talent Document Tracker" },
       { href: "/pmo/invoices", label: "TM Invoice" },
+      { href: "/pmo/readiness", label: "Operational Readiness" },
       { href: "/finance", label: "Dokumen Finance (TM Invoice)", collab: true },
       { href: "/pmo/overtime-business-trip", label: "Overtime & Business Trip", collab: true, collabColor: "orange" },
       { href: "/sales/profitability-tracker", label: "Profitability Tracker", collab: true },

@@ -4,7 +4,7 @@
 import type { Sql } from "postgres";
 import { divisionLevel, type AccessClaims } from "@/lib/module-access";
 
-export type ReviewKind = "signature" | "time_off" | "timesheet" | "finance_verify" | "finance_revise" | "proposal";
+export type ReviewKind = "signature" | "time_off" | "timesheet" | "finance_verify" | "finance_revise" | "proposal" | "correction" | "campaign";
 export type ReviewActor = AccessClaims & { id: string };
 export type ReviewItem = {
   key: string;
