@@ -1,4 +1,4 @@
-// Canonical attendance CSV (doc 19 §7): produced by ConForm's exporter, audited there with the Celerates actor,
+// Canonical attendance CSV (doc 21 §7): produced by ConForm's exporter, audited there with the Celerates actor,
 // and handed to the PMO from Celerates. Celerates never builds the file.
 import { NextRequest, NextResponse } from "next/server";
 import { assertSameOrigin, BffError } from "@/lib/agent/bff";

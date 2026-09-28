@@ -1,4 +1,4 @@
-// Tinjau items owned by ConForm (doc 19 §7): Talent attendance corrections (PMO editor+) and draft reminder
+// Tinjau items owned by ConForm (doc 21 §7): Talent attendance corrections (PMO editor+) and draft reminder
 // campaigns awaiting approval (PMO full). ConForm is read live; if it is unreachable Tinjau still shows ERP items.
 import { divisionLevel } from "@/lib/module-access";
 import { conform, conformConfigured, type CampaignSummary, type Correction } from "@/lib/conform/client";

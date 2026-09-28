@@ -1,4 +1,4 @@
-// PMO ↔ ConForm, server side (doc 19 §4, §7). Division-level authority is checked here before any ConForm call;
+// PMO ↔ ConForm, server side (doc 21 §4, §7). Division-level authority is checked here before any ConForm call;
 // ConForm then re-validates its own business state. Nothing ConForm owns is computed or copied in Celerates.
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";

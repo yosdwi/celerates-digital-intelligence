@@ -1,4 +1,4 @@
-// PMO › Operational Readiness (doc 19 §7). ConForm's live closing projection for a Payroll cycle, the BAST gate per
+// PMO › Operational Readiness (doc 21 §7). ConForm's live closing projection for a Payroll cycle, the BAST gate per
 // team, source freshness and the actions PMO takes here: BAST, canonical CSV, reminder campaign, group summary.
 import Link from "next/link";
 import { getLocale, getTranslations } from "next-intl/server";

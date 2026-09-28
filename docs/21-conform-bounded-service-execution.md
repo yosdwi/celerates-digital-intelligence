@@ -1,6 +1,6 @@
-# 19. ConForm as a bounded operational service behind Celerates
+# 21. ConForm as a bounded operational service behind Celerates — execution record
 
-Status: accepted for implementation (2026-09-28). Decision: [ADR-019](adr/ADR-019-conform-bounded-operational-service.md). Wire contract (provider-owned): `yosdwi/celerates-bast-digital` → `docs/celerates-integration-v1.md`.
+Status: implemented (2026-09-28). Planning record: [doc 19](19-conform-operational-readiness-integration.md) — this document is its execution handoff; decisions D1, D4, D5, D6 and D7 were locked by the 2026-09-28 request (Kelengkapan Saya; BAST under PMO › Operational Readiness; governed system-derived audiences only; reuse `whatsapp-web.js`; federated bounded integration). D2 (task-evidence review) and D3 (operational timesheet) stay open and untouched. Deployment: [doc 20](20-vps-production-like-pilot-deployment.md) co-locates the services using the same two `CONFORM_*` variables. Decision: [ADR-019](adr/ADR-019-conform-bounded-operational-service.md). Wire contract (provider-owned): `yosdwi/celerates-bast-digital` → `docs/celerates-integration-v1.md`.
 
 Inspected before writing:
 - Celerates `audit/erp-production-readiness` @ `49049b2`;

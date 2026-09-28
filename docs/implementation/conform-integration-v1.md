@@ -1,6 +1,6 @@
 # ConForm integration v1: implementation record (2026-09-28)
 
-This records the increment decided in [ADR-019](../adr/ADR-019-conform-bounded-operational-service.md) and specified in [doc 19](../19-conform-operational-readiness.md). The provider contract is in `celerates-bast-digital/docs/celerates-integration-v1.md`.
+This records the increment decided in [ADR-019](../adr/ADR-019-conform-bounded-operational-service.md) and specified in [doc 21](../21-conform-bounded-service-execution.md). The provider contract is in `celerates-bast-digital/docs/celerates-integration-v1.md`.
 
 ## Inspected
 

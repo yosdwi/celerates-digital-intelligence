@@ -1,4 +1,4 @@
-// A Talent attendance correction as a Tinjau record (doc 19 §7). The decision is taken here by a PMO editor and
+// A Talent attendance correction as a Tinjau record (doc 21 §7). The decision is taken here by a PMO editor and
 // applied by ConForm, which re-validates the correction and the raw attendance first.
 import { notFound } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";

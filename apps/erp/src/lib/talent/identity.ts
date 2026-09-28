@@ -1,4 +1,4 @@
-// Talent identity and deep-link grants (doc 19 §3, ADR-019 §4).
+// Talent identity and deep-link grants (doc 21 §3, ADR-019 §4).
 // Celerates owns: Celerates user ↔ ConForm employee link, and the grants that turn a WhatsApp reminder into a
 // normal Celerates session. WhatsApp itself never authenticates anyone here, and no JID is stored.
 import { createHash, randomBytes } from "node:crypto";

@@ -1,4 +1,4 @@
-// A reminder campaign as a Tinjau record (doc 19 §8): the audience snapshot with eligibility, the message, the
+// A reminder campaign as a Tinjau record (doc 21 §8): the audience snapshot with eligibility, the message, the
 // sending policy and the delivery progress. Approval (PMO full) is where Celerates issues the personal links.
 import { notFound } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";

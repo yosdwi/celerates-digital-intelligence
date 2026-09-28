@@ -1,5 +1,7 @@
 # 19 — ConForm / BAST Digital integration into Celerates
 
+> **Status update (2026-09-28):** executed. D1, D4, D5, D6 and D7 were locked by the product request and implemented as described in [doc 21](21-conform-bounded-service-execution.md) and [ADR-019](adr/ADR-019-conform-bounded-operational-service.md) (ConForm branch `feat/celerates-integration-v1`). D2 and D3 remain open; the first slice uses only the attendance-correction lifecycle.
+
 Date: 2026-09-28  
 Status: **product/architecture knowledge pack and planning record; not an implementation authorization**  
 Target repository: `yosdwi/celerates-digital-intelligence`  

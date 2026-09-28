@@ -1,6 +1,6 @@
 # ADR-019: ConForm is a bounded operational service; Celerates is the only user-facing product
 
-Status: accepted (2026-09-28). Requirements, identity, RBAC, journeys and retirement plan: [doc 19](../19-conform-operational-readiness.md). The provider-owned wire contract is `celerates-bast-digital/docs/celerates-integration-v1.md`. This ADR keeps ADR-001–018 unchanged and **amends the pilot access policy** (`src/lib/access-policy.ts`) in one bounded way: §4 below.
+Status: accepted (2026-09-28). Requirements, identity, RBAC, journeys and retirement plan: [doc 21](../21-conform-bounded-service-execution.md). The provider-owned wire contract is `celerates-bast-digital/docs/celerates-integration-v1.md`. This ADR keeps ADR-001–018 unchanged and **amends the pilot access policy** (`src/lib/access-policy.ts`) in one bounded way: §4 below.
 
 ## Context
 
@@ -20,7 +20,7 @@ Rebuilding these rules in Celerates would fork operational truth. Merging the co
 
 1. **Celerates is the single user-facing operational product.**
    - Talent and PMO closing work happens in Celerates (Kelengkapan Saya, PMO › Operational Readiness, Tinjau).
-   - ConForm Web, Talent Mobile and NocoDB become internal and rollback tools, retired in stages (doc 19 §11).
+   - ConForm Web, Talent Mobile and NocoDB become internal and rollback tools, retired in stages (doc 21 §11).
 2. **ConForm is an independent bounded service with a versioned API.**
    - The API is `/api/celerates/v1`. ConForm keeps ownership of readiness, corrections, evidence, BAST, CSV, WhatsApp identity and delivery.
    - Celerates calls it through one server-side client, configured only by `CONFORM_BASE_URL` and `CONFORM_SERVICE_TOKEN`.
@@ -35,7 +35,7 @@ Rebuilding these rules in Celerates would fork operational truth. Merging the co
    - WhatsApp is only a delivery channel: it never authenticates anyone to Celerates, and the JID never reaches Celerates.
 5. **Backoffice non-Owners stay closed during the pilot.** The PMO rules are already written to division levels (PMO read / editor / full) so they apply unchanged once the pilot middleware opens to PMO users after record-level review.
 6. **WhatsApp campaigns are governed in ConForm.**
-   - Campaigns have an audience snapshot, eligibility, dedupe, a blocker re-check, bounded batches, sending windows, pacing, limited retry, approval, pause/resume/stop, a kill switch, auto-pause on transport failure, and an audit trail (doc 19 §8).
+   - Campaigns have an audience snapshot, eligibility, dedupe, a blocker re-check, bounded batches, sending windows, pacing, limited retry, approval, pause/resume/stop, a kill switch, auto-pause on transport failure, and an audit trail (doc 21 §8).
    - The transport is unchanged. There is no Meta Cloud API migration and no anti-ban evasion.
 7. **Agent governance is unchanged.**
    - The Agent is PMO-only. It gets no ConForm write tools, and no model-generated SQL reaches ConForm.
@@ -44,6 +44,6 @@ Rebuilding these rules in Celerates would fork operational truth. Merging the co
 ## Consequences
 
 - There are two deployables with a stable contract between them. ConForm owns contract changes: a breaking change needs `/v2` and a Celerates change behind the same client.
-- Talent requirements follow ConForm's Payroll cycle (21st to 20th, correction-aware). The calendar-month BAST gate stays ConForm's own. The two can differ after a rejected correction, which is a known ConForm defect listed in doc 19 §12.
+- Talent requirements follow ConForm's Payroll cycle (21st to 20th, correction-aware). The calendar-month BAST gate stays ConForm's own. The two can differ after a rejected correction, which is a known ConForm defect listed in doc 21 §12.
 - The action-coverage test accepts `requireTalentActor()` as a first-statement guard for Talent server actions.
 - The ERP schema gains two tables: `talent_identity_links` and `talent_link_grants`.

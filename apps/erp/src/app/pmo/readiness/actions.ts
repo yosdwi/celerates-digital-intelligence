@@ -1,5 +1,5 @@
 "use server";
-// Operational Readiness actions (doc 19 §7). Each checks PMO division level, then asks ConForm, which owns and
+// Operational Readiness actions (doc 21 §7). Each checks PMO division level, then asks ConForm, which owns and
 // re-validates the business state. Campaign approval is where Celerates mints the per-Talent deep-link grants.
 import { revalidatePath } from "next/cache";
 import { sql } from "@/db";
@@ -170,7 +170,7 @@ export async function bastJobStatus(jobId: string): Promise<Result<BastJob>> {
   }
 }
 
-/** Owner links a Talent's Celerates account to their ConForm employee record (doc 19 §3). */
+/** Owner links a Talent's Celerates account to their ConForm employee record (doc 21 §3). */
 export async function linkTalent(employeeId: string, email: string): Promise<Result<{ created: boolean }>> {
   await requirePilotActor();
   try {

@@ -1,4 +1,4 @@
-// One requirement as a full-screen record (doc 19 §6): the recorded punches, status, and the "Lengkapi" sheet.
+// One requirement as a full-screen record (doc 21 §6): the recorded punches, status, and the "Lengkapi" sheet.
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";

@@ -1,5 +1,5 @@
 "use client";
-// Tinjau decisions for ConForm-owned records (doc 19 §7–8). Both call server actions that check PMO level and then
+// Tinjau decisions for ConForm-owned records (doc 21 §7–8). Both call server actions that check PMO level and then
 // ConForm, which applies and re-validates. Approving is always a second, deliberate tap.
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";

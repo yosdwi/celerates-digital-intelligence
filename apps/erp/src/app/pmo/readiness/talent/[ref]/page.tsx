@@ -1,4 +1,4 @@
-// Talent drill-down (doc 19 §7): ConForm requirements and corrections for one Talent, whether WhatsApp is bound,
+// Talent drill-down (doc 21 §7): ConForm requirements and corrections for one Talent, whether WhatsApp is bound,
 // and the Celerates account link (Owner links; the link is what makes a reminder a personal Celerates deep link).
 import { notFound } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";

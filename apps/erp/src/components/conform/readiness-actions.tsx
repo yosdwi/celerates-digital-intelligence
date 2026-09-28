@@ -1,5 +1,5 @@
 "use client";
-// Operational Readiness actions (doc 19 §7): canonical BAST via ConForm, canonical attendance CSV via ConForm,
+// Operational Readiness actions (doc 21 §7): canonical BAST via ConForm, canonical attendance CSV via ConForm,
 // a Talent reminder campaign (approved in Tinjau), the PMO group summary, and the Owner's kill switch.
 import Link from "next/link";
 import { useRouter } from "next/navigation";

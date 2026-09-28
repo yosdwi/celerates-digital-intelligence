@@ -1,4 +1,4 @@
-// The canonical BAST PDF of one ConForm generation job, downloaded through Celerates (doc 19 §7).
+// The canonical BAST PDF of one ConForm generation job, downloaded through Celerates (doc 21 §7).
 import { NextResponse } from "next/server";
 import { conform } from "@/lib/conform/client";
 import { describeConformError, pmoActor } from "@/lib/conform/pmo";

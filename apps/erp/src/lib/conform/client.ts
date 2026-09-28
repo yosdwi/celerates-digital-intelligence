@@ -1,4 +1,4 @@
-// The one server-side client for ConForm's Celerates integration API v1 (doc 19 §5, ADR-019).
+// The one server-side client for ConForm's Celerates integration API v1 (doc 21 §5, ADR-019).
 // Configured only by CONFORM_BASE_URL and CONFORM_SERVICE_TOKEN; moving ConForm next to Celerates is a config change.
 // The browser never sees the token or the ConForm URL. Every mutation names the Celerates actor.
 import { randomUUID } from "node:crypto";

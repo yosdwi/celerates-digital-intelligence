@@ -1,4 +1,4 @@
-// Personal deep link from a WhatsApp reminder (doc 19 §3). GET never consumes the grant (link previews are harmless).
+// Personal deep link from a WhatsApp reminder (doc 21 §3). GET never consumes the grant (link previews are harmless).
 // Same user already signed in → consume and continue. Another account signed in → fail closed, nothing consumed.
 // No session → the browser redeems the grant in an explicit sign-in call and continues to the target.
 import { redirect } from "next/navigation";

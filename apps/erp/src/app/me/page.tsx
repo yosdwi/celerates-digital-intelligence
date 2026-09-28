@@ -1,4 +1,4 @@
-// Kelengkapan Saya (doc 19 §6): the Talent's own open operational requirements, from ConForm's live projection.
+// Kelengkapan Saya (doc 21 §6): the Talent's own open operational requirements, from ConForm's live projection.
 // Action-first, not a reduced backoffice menu. Only the linked ConForm employee is ever queried.
 import Image from "next/image";
 import Link from "next/link";

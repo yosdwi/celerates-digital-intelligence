@@ -1,5 +1,5 @@
 "use client";
-// Talent client pieces (doc 19 §6), Jernih: the account sheet and the "Lengkapi" correction sheet.
+// Talent client pieces (doc 21 §6), Jernih: the account sheet and the "Lengkapi" correction sheet.
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { signOut } from "next-auth/react";

@@ -1,4 +1,4 @@
-// Cross-repository closed loop (doc 19 §10): real ConForm (celerates-bast-digital) behind CONFORM_BASE_URL, a
+// Cross-repository closed loop (doc 21 §10): real ConForm (celerates-bast-digital) behind CONFORM_BASE_URL, a
 // recording WhatsApp bridge that speaks the bridge's HTTP contract, and a PDF renderer that speaks ConForm's
 // /internal/render-pdf contract. Runs only when CONFORM_REPO and CONFORM_DATABASE_URL are set.
 import assert from 'node:assert/strict';

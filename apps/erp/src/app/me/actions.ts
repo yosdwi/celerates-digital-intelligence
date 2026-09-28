@@ -1,5 +1,5 @@
 "use server";
-// Talent self-service (doc 19 §6). The ConForm employee is always taken from the caller's active identity link;
+// Talent self-service (doc 21 §6). The ConForm employee is always taken from the caller's active identity link;
 // ConForm re-validates that the day still needs a correction before it stores anything.
 import { revalidatePath } from "next/cache";
 import { conform, ConformError } from "@/lib/conform/client";
