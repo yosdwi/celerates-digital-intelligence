@@ -126,6 +126,7 @@ try {
     const {agentJourney}=await import('./agent-journey.mjs');
     await agentJourney({base,request,db,env:intelligenceEnv,python,publicKey:delegationPublicKey,tracker,requisition:req,readToken,cookies:[...jar].map(([k,v])=>k+'='+v).join('; ')});
   }
+  if(process.env.CONFORM_REPO&&process.env.ERP_BROWSER_TEST==='1'){const {conformJourney}=await import('./conform-journey.mjs');await conformJourney({base,db,cookies:[...jar]});}
   await db`UPDATE users SET status='rejected'  WHERE email='owner@example.test'`;
   assert.equal((await request('/api/operations/context?path=/finance')).status,403,'revoked session cannot read operational context');
   assert.equal((await request('/api/agent/context?path=/sales')).status,403,'revoked session cannot use the Agent');
