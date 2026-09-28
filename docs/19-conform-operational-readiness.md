@@ -167,7 +167,7 @@ The typed client lives server-side only: `apps/erp/src/lib/conform/client.ts`.
 2. The talent list uses status tabs. The drill-down shows requirements, corrections, WhatsApp bound yes/no, and the Celerates account link.
 3. **Tinjau** gains two kinds:
    - **Koreksi attendance**: the ConForm pending corrections, each with a reviewable flag. The record shows the day, the raw vs proposed punches, the evidence image and the Talent's note, with **Tolak** (reason required) and **Setujui**.
-   - **Kampanye pengingat**: draft campaigns. The record shows the audience with eligibility, the message preview, the window, batch size and cooldown, with **Setujui & jadwalkan** or **Batalkan**.
+   - **Kampanye pengingat**: draft campaigns. The record shows the audience with eligibility, the message preview, the window, batch size and cooldown, with **Setujui** (schedules it) or **Batalkan**.
 4. **Actions on the readiness page.**
    - Generate BAST: team, preview or final, and force with a reason. The job is polled and the PDF is downloaded from Celerates.
    - Export attendance CSV: the team, streamed from ConForm's canonical exporter.
@@ -261,3 +261,8 @@ These are also tracked in the implementation record. The first two fix existing 
 - **ConForm bot DM replies** still issue ConForm Talent Mobile links. Stage 1 needs a Celerates grant request from ConForm.
 - **`CELERATES_PUBLIC_URL` must be configured in ConForm** so it rejects links outside Celerates.
 - **Non-Owner PMO access** needs the pilot middleware opened per ADR-019 §5 after record-level review.
+- **Talent sessions use the global NextAuth lifetime (30 days).** A shorter Talent-specific maxAge, and revoking sessions on unlink, are needed before rollout.
+- **Campaign approval is not yet four-eyes.** The creator (PMO editor) and approver (PMO full) may be the same person; the Owner is both during the pilot.
+- **Policy fields are API-only.** The sending window, batch and cooldown use ConForm defaults (08–18 WIB, 10 per 10 minutes); Celerates does not yet edit them.
+- **Middleware redirects can land on the bind host.** Next normalizes same-origin middleware redirects onto its bind host. Talent pages avoid this, but the pre-existing Owner login redirect should be verified behind the Railway proxy.
+- **Cloudflare Access in front of ConForm must admit the Celerates service** on `/api/celerates/v1/*` (for example with a service token), in addition to the bearer token.
