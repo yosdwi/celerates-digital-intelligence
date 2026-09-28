@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { requirePilotActor } from "@/lib/actor";
+import { requireTalentSession } from "@/lib/talent/actor";
 import "@fontsource-variable/plus-jakarta-sans";
 import "./globals.css";
 import { getLocale, getMessages, getTimeZone } from "next-intl/server";
@@ -35,7 +36,13 @@ export const viewport: Viewport = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  if ((await headers()).get("x-erp-protected") === "1") await requirePilotActor();
+  const requestHeaders = await headers();
+  if (requestHeaders.get("x-erp-protected") === "1") await requirePilotActor();
+  // A Talent gets only their own surfaces (ADR-019 §4): no sidebar, Agent, module tabs or backoffice widgets.
+  const talent = requestHeaders.get("x-erp-talent") === "1";
+  if (talent) await requireTalentSession();
+  // Deep-link exchange pages render bare too, whoever (if anyone) is signed in.
+  const bare = talent || requestHeaders.get("x-erp-link") === "1";
   const locale = await getLocale();
   const messages = await getMessages();
   const timeZone = await getTimeZone();
@@ -44,6 +51,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang={locale}>
       <body className="text-slate-900" suppressHydrationWarning>
       <Providers locale={locale} messages={messages} timeZone={timeZone}>
+  {bare ? (
+    <main className="min-h-[100dvh] bg-j-bg">
+      {children}
+      <PwaRegister />
+    </main>
+  ) : (
   <SidebarCollapseProvider>
   <MobileDataProvider>
     <Sidebar />
@@ -57,6 +70,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <PwaRegister />
   </MobileDataProvider>
   </SidebarCollapseProvider>
+  )}
 </Providers>
       </body>
     </html>

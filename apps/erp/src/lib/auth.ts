@@ -7,6 +7,8 @@ import { users, userAccess, divisions, googleTokens } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { isBetaWhitelisted } from "@/lib/beta";
+import { sql } from "@/db";
+import { redeemGrant } from "@/lib/talent/identity";
 
 
 async function loadUserClaims(email: string) {
@@ -65,6 +67,19 @@ export const authOptions: NextAuthOptions = {
         if (!valid) return null;
 
         return { id: user.id, email: user.email, name: user.full_name };
+      },
+    }),
+    // ADR-019 §4: a Talent session starts only by redeeming a single-use, expiring deep-link grant bound to an
+    // active, linked Talent account. The grant is consumed here, in the explicit sign-in call -- never on GET.
+    CredentialsProvider({
+      id: "talent-link",
+      name: "Tautan Talent",
+      credentials: { code: { label: "Kode", type: "text" } },
+      async authorize(credentials) {
+        const code = credentials?.code ?? "";
+        const redeemed = await redeemGrant(sql, code);
+        if (!redeemed) return null;
+        return { id: redeemed.userId, email: redeemed.email, name: redeemed.name };
       },
     }),
   ],
