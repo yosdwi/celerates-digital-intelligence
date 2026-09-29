@@ -53,3 +53,66 @@ export async function submitAttendanceCorrection(formData: FormData): Promise<Co
     return { ok: false, error: "Pengajuan belum terkirim. Coba lagi." };
   }
 }
+
+export type TaskUploadResult = { ok: true; status: "staged" | "already_present" } | { ok: false; error: string };
+
+/** Stage one task evidence photo in ConForm (doc 22 R5.2). The employee comes from the caller's identity link. */
+export async function uploadTaskEvidence(formData: FormData): Promise<TaskUploadResult> {
+  await requireTalentActor();
+  const actor = await requireTalentActor();
+  const taskKey = String(formData.get("task_key") ?? "");
+  const year = Number(formData.get("year"));
+  const month = Number(formData.get("month"));
+  const caption = String(formData.get("caption") ?? "").trim().slice(0, 500);
+  const nonce = String(formData.get("nonce") ?? "");
+  const file = formData.get("file");
+  if (!taskKey || taskKey.length > 200 || !Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12 || !NONCE.test(nonce)) return { ok: false, error: "Permintaan tidak valid." };
+  if (!(file instanceof File) || file.size === 0) return { ok: false, error: "Lampirkan foto bukti." };
+  if (file.size > MAX_BYTES) return { ok: false, error: "Ukuran foto maksimal 5 MB." };
+  if (!/^image\/(png|jpeg|webp)$/.test(file.type)) return { ok: false, error: "Gunakan foto JPG, PNG, atau WebP." };
+  const out = new FormData();
+  out.set("employee_id", actor.link.conform_employee_id);
+  out.set("year", String(year));
+  out.set("month", String(month));
+  out.set("caption", caption);
+  out.set("file", file, file.name.slice(-100) || "bukti.jpg");
+  try {
+    const result = await conform.postForm<{ status: "staged" | "already_present" }>(`/talents/tasks/${encodeURIComponent(taskKey)}/evidence`, out, {
+      actor: talentActorTag(actor),
+      idempotencyKey: `task:${actor.userId.slice(0, 8)}:${nonce}`,
+      timeoutMs: 30000,
+    });
+    revalidatePath("/me/tasks");
+    return { ok: true, status: result.status };
+  } catch (error) {
+    if (error instanceof ConformError) {
+      if (error.code === "task_not_found" || error.code === "task_changed") return { ok: false, error: "Task ini sudah berubah. Muat ulang halaman." };
+      return { ok: false, error: error.message };
+    }
+    return { ok: false, error: "Bukti belum tersimpan. Coba lagi." };
+  }
+}
+
+/** Submit every staged task evidence of the month to ConForm (no PMO approval; doc 22 R5.2). */
+export async function submitTaskEvidence(year: number, month: number, nonce: string): Promise<{ ok: true; count: number } | { ok: false; error: string }> {
+  await requireTalentActor();
+  const actor = await requireTalentActor();
+  if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12 || !NONCE.test(nonce)) return { ok: false, error: "Permintaan tidak valid." };
+  try {
+    const result = await conform.post<{ status: string; count: number }>(
+      "/talents/tasks/submit",
+      { employee_id: actor.link.conform_employee_id, year, month },
+      { actor: talentActorTag(actor), idempotencyKey: `task-submit:${actor.userId.slice(0, 8)}:${nonce}` },
+    );
+    revalidatePath("/me/tasks");
+    revalidatePath("/me");
+    return { ok: true, count: result.count };
+  } catch (error) {
+    if (error instanceof ConformError) {
+      if (error.code === "nothing_staged") return { ok: false, error: "Belum ada bukti baru untuk diajukan." };
+      if (error.code === "task_changed") return { ok: false, error: "Task sudah berubah. Muat ulang halaman lalu ajukan lagi." };
+      return { ok: false, error: error.message };
+    }
+    return { ok: false, error: "Pengajuan belum terkirim. Coba lagi." };
+  }
+}

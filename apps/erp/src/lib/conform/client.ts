@@ -143,7 +143,7 @@ export type Correction = {
   rejection_reason?: string | null;
   cycle?: Cycle;
 };
-export type CampaignRecipient = { id: string; employee_id: string; nrp: string; name: string; eligibility: "eligible" | "not_bound"; actionable_days: number; state: string; attempt_count: number; last_error: string | null; sent_at: string | null; has_link: boolean };
+export type CampaignRecipient = { id: string; employee_id: string; nrp: string; name: string; eligibility: "eligible" | "not_bound"; actionable_days: number; missing_tasks?: number; state: string; attempt_count: number; last_error: string | null; sent_at: string | null; has_link: boolean };
 export type Campaign = {
   id: string;
   kind: "talent_attendance";
@@ -164,3 +164,27 @@ export type Campaign = {
 };
 export type CampaignSummary = { id: string; state: Campaign["state"]; cycle: Cycle; created_by: string; created_at: string; approved_by: string | null; pause_reason: string | null; counts: Record<string, number> };
 export type BastJob = { id: string; status: "pending" | "running" | "succeeded" | "failed" | "cancelled" | "stale"; report_type: string; year: number; month: number; mode: string; forced: boolean; requested_by: string; result: { artifact_name?: string; fingerprint?: string } | null; error_code: string | null; created_at: string; finished_at: string | null };
+
+/** Doc 22 §1: the Talent's daily attendance log for a Payroll cycle (read-through; ConForm is the record). */
+export type AttendanceDayState = "complete" | "needs_action" | "waiting_review" | "excused" | "unverified" | "not_required";
+export type TalentAttendanceDay = {
+  work_date: string;
+  check_in: string | null;
+  check_out: string | null;
+  origin: "pipeline" | "manual" | null;
+  state: AttendanceDayState;
+  gap: Requirement["gap"] | null;
+  reason: string;
+  evidence_count: number;
+  correction: Requirement["correction"];
+};
+export type TalentAttendance = { employee_id: string; cycle: Cycle; source: string; evaluated_through: string | null; days: TalentAttendanceDay[] };
+
+/** Doc 22 §2: tasks for a calendar month, with evidence counts (no PMO approval). */
+export type TalentTask = { task_key: string; title: string; work_date: string; task_source: string; status: string; evidence_count: number; staged_count: number; complete: boolean };
+export type TalentTasks = {
+  employee_id: string;
+  period: { year: number; month: number; start: string; end: string; label: string };
+  summary: { total: number; complete: number; missing: number; staged: number };
+  items: TalentTask[];
+};

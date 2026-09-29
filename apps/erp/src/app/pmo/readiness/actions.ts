@@ -6,7 +6,7 @@ import { sql } from "@/db";
 import { requireActor, requireOwner } from "@/lib/actor";
 import { conform, ConformError, type BastJob, type Campaign } from "@/lib/conform/client";
 import { conformCampaign, conformLookup, describeConformError, pmoActor } from "@/lib/conform/pmo";
-import { activeLinksForEmployees, GRANT_DEFAULT_TTL_SECONDS, issueGrant, linkTalentAccount, TalentLinkError } from "@/lib/talent/identity";
+import { activeLinksForEmployees, issueGrant, issueGrantForEmployee, linkTalentAccount, TalentLinkError } from "@/lib/talent/identity";
 
 type Result<T = undefined> = { ok: true; data: T } | { ok: false; error: string };
 const NONCE = /^[A-Za-z0-9_-]{8,64}$/;
@@ -72,12 +72,12 @@ export async function approveCampaign(id: string): Promise<Result<{ linked: numb
     const eligible = campaign.recipients.filter((r) => r.eligibility === "eligible");
     const links = await activeLinksForEmployees(sql, eligible.map((r) => r.employee_id));
     const target = `/me?year=${campaign.cycle.year}&month=${campaign.cycle.month}`;
-    const payload: { employee_id: string; url: string; expires_at: string }[] = [];
+    const payload: { employee_id: string; url: string; expires_at: string | null }[] = [];
     for (const recipient of eligible) {
       const link = links.get(recipient.employee_id);
       if (!link) continue;
-      const grant = await issueGrant(sql, { userId: link.user_id, targetPath: target, purpose: "campaign", ttlSeconds: GRANT_DEFAULT_TTL_SECONDS, campaignRef: id, createdBy: actor.userId });
-      payload.push({ employee_id: recipient.employee_id, url: `${base}/go/${grant.code}`, expires_at: grant.expiresAt.toISOString() });
+      const grant = await issueGrant(sql, { userId: link.user_id, targetPath: target, purpose: "campaign", campaignRef: id, createdBy: actor.userId });
+      payload.push({ employee_id: recipient.employee_id, url: `${base}/go/${grant.code}`, expires_at: grant.expiresAt?.toISOString() ?? null });
     }
     await conform.post<Campaign>(`/campaigns/${id}/approve`, { links: payload }, { actor: actor.tag, idempotencyKey: `approve:${id}` });
     revalidatePath("/review");
@@ -180,6 +180,45 @@ export async function linkTalent(employeeId: string, email: string): Promise<Res
     revalidatePath(`/pmo/readiness/talent/${encodeURIComponent(employeeId)}`);
     return { ok: true, data: { created: result.created } };
   } catch (error) {
+    return fail(error);
+  }
+}
+
+/**
+ * "Kirim pengingat" (doc 22 R6.2): one personal WhatsApp DM to one Talent with a fresh Celerates link. The grant is
+ * issued inside a transaction that only commits once ConForm accepted the message, so a refused send never
+ * invalidates the link the Talent already has. ConForm applies the kill switch, binding and the 10-minute dedupe.
+ */
+export async function sendTalentMessage(employeeId: string, year: number, month: number, nonce: string): Promise<Result<{ status: string }>> {
+  await requireActor();
+  try {
+    const actor = await pmoActor("editor");
+    if (!employeeId || employeeId.length > 120 || !Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12 || !NONCE.test(nonce))
+      return { ok: false, error: "Permintaan tidak valid." };
+    const base = publicBase();
+    if (!/^https?:\/\//.test(base)) return { ok: false, error: "CELERATES_PUBLIC_URL belum dikonfigurasi." };
+    const status = await sql.begin(async (tx) => {
+      const grant = await issueGrantForEmployee(tx, { employeeId, targetPath: `/me?year=${year}&month=${month}`, purpose: "direct", createdBy: actor.userId });
+      if (!grant) throw new TalentLinkError("no_account", "Talent ini belum punya akun Celerates. Hubungkan akunnya dulu.");
+      const result = await conform.post<{ status: string }>(
+        "/talents/messages",
+        { employee_id: employeeId, year, month, link: { url: `${base}/go/${grant.code}`, expires_at: null } },
+        { actor: actor.tag, idempotencyKey: `direct:${employeeId.slice(0, 60)}:${nonce}`.replace(/[^A-Za-z0-9:_.-]/g, "_").slice(0, 160) },
+      );
+      return result.status;
+    });
+    return { ok: true, data: { status } };
+  } catch (error) {
+    if (error instanceof ConformError) {
+      const known: Record<string, string> = {
+        kill_switch: "Pengiriman WhatsApp sedang dihentikan (kill switch).",
+        not_bound: "WhatsApp Talent ini belum terhubung di ConForm.",
+        recently_sent: "Talent ini baru saja dikirimi pesan. Tunggu 10 menit.",
+        transport_unavailable: "Layanan WhatsApp sedang tidak tersedia. Coba lagi nanti.",
+        transport_auth_failed: "Layanan WhatsApp menolak kredensial. Periksa bridge di ConForm.",
+      };
+      if (known[error.code]) return { ok: false, error: known[error.code] };
+    }
     return fail(error);
   }
 }

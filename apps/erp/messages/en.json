@@ -2633,7 +2633,7 @@
     "waitingBody": "Your submission was received and is waiting for PMO review.",
     "go": {
       "invalidTitle": "This link can't be used",
-      "invalidBody": "This link was already used or has expired. Ask PMO for a new one.",
+      "invalidBody": "This link was already used or replaced by a newer one. Send \"masuk\" to the WhatsApp bot for a new link, or contact PMO.",
       "otherTitle": "Link for another account",
       "otherBody": "You are signed in with another account. Sign out, then open this link again.",
       "opening": "Opening My Requirements…"
@@ -2661,6 +2661,70 @@
       "evidenceHint": "Take or choose a photo (max 5 MB)",
       "note": "Note (optional)",
       "rule": "PMO reviews submissions. Raw attendance is never changed."
+    },
+    "nav": {
+      "label": "Talent menu",
+      "home": "Checklist",
+      "attendance": "Attendance",
+      "tasks": "Task"
+    },
+    "log": {
+      "title": "Attendance",
+      "prev": "Previous cycle",
+      "next": "Next cycle",
+      "unavailable": "Attendance could not be loaded. Try again shortly.",
+      "empty": "No attendance data in this cycle yet.",
+      "summary": {
+        "complete": "{count} complete",
+        "needs": "{count} need action",
+        "waiting": "{count} waiting for PMO"
+      },
+      "state": {
+        "complete": "Complete",
+        "needs_action": "Needs action",
+        "waiting_review": "Waiting for PMO",
+        "excused": "Excused",
+        "unverified": "Unverified",
+        "not_required": "Day off",
+        "rejected": "Rejected"
+      },
+      "absence": "{type, select, sakit {Sick} izin {Leave} cuti {Annual leave} libur {Day off} other {Excused}}",
+      "offDay": "No schedule",
+      "corrected": "corrected {time}",
+      "sourceNote": "Source: client attendance (PAMA) via ConForm, evaluated through {through}."
+    },
+    "tasks": {
+      "title": "Task",
+      "prev": "Previous month",
+      "next": "Next month",
+      "unavailable": "Tasks could not be loaded. Try again shortly.",
+      "empty": "No tasks this month.",
+      "complete": "{count} complete",
+      "missing": "{count} missing evidence",
+      "staged": "{count} ready to submit",
+      "state": {
+        "complete": "Complete",
+        "staged": "Ready",
+        "missing": "No evidence"
+      },
+      "add": "Add evidence",
+      "addMore": "Add evidence ({count} ready)",
+      "sheetTitle": "Task evidence",
+      "evidence": "Evidence photo",
+      "evidenceHint": "Take or choose a photo (max 5 MB)",
+      "caption": "Caption (optional)",
+      "save": "Save evidence",
+      "sending": "Sending…",
+      "close": "Done",
+      "stagedDone": "Evidence saved",
+      "alreadyPresent": "This evidence is already there",
+      "stagedBody": "Press \"Submit\" once all evidence is added.",
+      "submit": "Submit {count} evidence",
+      "submitted": "{count} tasks submitted to ConForm.",
+      "note": "Task evidence needs no PMO approval; submitted evidence is used for BAST.",
+      "summaryTitle": "Task {period}",
+      "summaryMissing": "{missing} of {total} tasks missing evidence",
+      "summaryDone": "All {total} tasks have evidence"
     }
   },
   "conform": {
@@ -2846,6 +2910,27 @@
       "transport_auth_failed": "Transport refused",
       "delivery_unknown": "Delivery outcome unknown",
       "paused_by_pmo": "Paused by PMO"
-    }
+    },
+    "attendanceLog": "Attendance log",
+    "tasksTitle": "Task {period}",
+    "tasks": {
+      "total": "Total tasks",
+      "complete": "With evidence",
+      "missing": "Missing evidence"
+    },
+    "direct": {
+      "button": "Send reminder",
+      "title": "Send WhatsApp reminder",
+      "body": "{name} will receive one personal WhatsApp message with a Celerates link.",
+      "open": "Open: {needs} attendance days, {tasks} tasks without evidence.",
+      "clear": "Nothing open; the message still carries the sign-in link.",
+      "rules": "The Talent's older link stops working. The kill switch and a 10-minute gap apply.",
+      "send": "Send",
+      "cancel": "Cancel",
+      "close": "Done",
+      "sent": "Message sent.",
+      "unknown": "Message handed over; delivery is not confirmed."
+    },
+    "tasksMissing": "{count} tasks without evidence"
   }
 }

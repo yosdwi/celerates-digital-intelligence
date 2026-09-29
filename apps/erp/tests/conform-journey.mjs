@@ -124,6 +124,9 @@ export async function conformJourney({ base, db, cookies }) {
     gapDay ??= day;
     await cdb`INSERT INTO attendance (record_key, employee_id, work_date, check_in, check_out) VALUES (${`attendance:${day}:${EMPLOYEE_ID}`}, ${EMPLOYEE_ID}, ${day}, ${day === gapDay ? null : '08:00'}, '17:00')`;
   }
+  const taskDay = `${cycle.year}-${String(cycle.month).padStart(2, '0')}-01`;
+  await cdb`INSERT INTO bast_evidence_rules (scope_key, task_category, evidence_required, updated_by) VALUES ('default', 'E2E Delivery', true, 'e2e') ON CONFLICT (scope_key, task_category) DO UPDATE SET evidence_required = true`;
+  await cdb`INSERT INTO tasks (record_key, employee_id, work_date, title, status, category, task_source, source_id) VALUES ('task:e2e:1', ${EMPLOYEE_ID}, ${taskDay}, 'Synthetic deployment checklist', 'Closed', 'E2E Delivery', 'redmine', 'E2E-1')`;
   await cdb`INSERT INTO workflow_notification_settings (scope_key, payroll_closing_group_jid, updated_by) VALUES ('default', ${GROUP_JID}, 'e2e') ON CONFLICT (scope_key) DO UPDATE SET payroll_closing_group_jid = EXCLUDED.payroll_closing_group_jid`;
   await cdb`INSERT INTO source_sync_state (source_key, last_success_at) VALUES ('attendance', now() - interval '2 hours') ON CONFLICT (source_key) DO UPDATE SET last_success_at = EXCLUDED.last_success_at`;
 
@@ -210,6 +213,30 @@ export async function conformJourney({ base, db, cookies }) {
     await sheet.locator('[data-fix-done]').waitFor({ timeout: 30000 });
     await talent.goto(`${base}/me?${q}`);
     await talent.locator(`[data-requirement="${gapDay}"][data-requirement-state="waiting_review"]`).waitFor();
+    // Absensi: the day log from ConForm (PAMA) shows the corrected day waiting for PMO.
+    await talent.goto(`${base}/me/attendance?${q}`);
+    await talent.locator(`[data-attendance-day="${gapDay}"][data-attendance-state="waiting_review"]`).waitFor();
+    assert.ok((await talent.locator('[data-attendance-state="complete"]').count()) > 0, 'recorded days come from ConForm');
+    assert.equal(await talent.evaluate(() => document.documentElement.scrollWidth), 390, 'no horizontal scroll');
+    await talent.screenshot({ path: evidenceDir + '/conform-talent-attendance.png', fullPage: true });
+    // Task: stage evidence, then submit (no PMO approval).
+    await talent.goto(`${base}/me/tasks?${q}`);
+    await talent.locator('[data-task="task:e2e:1"][data-task-complete="0"]').waitFor();
+    await talent.locator('[data-task="task:e2e:1"] [data-action="task-evidence"]').click();
+    const taskSheet = talent.getByRole('dialog', { name: 'Bukti task' });
+    await taskSheet.locator('[data-task-file]').setInputFiles({ name: 'task.png', mimeType: 'image/png', buffer: PNG });
+    await talent.locator('[data-action="task-evidence-submit"]').click();
+    await taskSheet.locator('[data-task-staged]').waitFor({ timeout: 30000 });
+    await talent.keyboard.press('Escape');
+    await talent.goto(`${base}/me/tasks?${q}`);
+    await talent.screenshot({ path: evidenceDir + '/conform-talent-tasks.png', fullPage: true });
+    await talent.locator('[data-action="task-submit"]').click();
+    await talent.locator('[data-task-submitted]').waitFor({ timeout: 30000 });
+    await talent.goto(`${base}/me/tasks?${q}`);
+    await talent.locator('[data-task="task:e2e:1"][data-task-complete="1"]').waitFor();
+    const [evidence] = await cdb`SELECT count(*)::int AS n FROM task_evidence e JOIN tasks t ON t.id = e.task_id WHERE t.record_key = 'task:e2e:1'`;
+    assert.equal(evidence.n, 1, 'task evidence submitted to ConForm');
+
     // A Talent cannot reach backoffice pages or APIs.
     const forbidden = await talent.goto(`${base}/pmo/readiness`);
     assert.equal(forbidden.status(), 403, 'backoffice pages are refused to a Talent');
@@ -221,7 +248,7 @@ export async function conformJourney({ base, db, cookies }) {
     await reuse.goto(link);
     await reuse.locator('[data-link-notice="invalid"]').waitFor();
     const code = randomBytes(32).toString('base64url');
-    await db`INSERT INTO talent_link_grants (token_sha256, user_id, target_path, purpose, expires_at) VALUES (${createHash('sha256').update(code).digest('hex')}, ${talentUser.id}, '/me', 'manual', now() + interval '1 hour')`;
+    await db`INSERT INTO talent_link_grants (token_sha256, user_id, target_path, purpose, expires_at) VALUES (${createHash('sha256').update(code).digest('hex')}, ${talentUser.id}, '/me', 'manual', NULL)`;
     await page.goto(`${base}/go/${code}`);
     await page.locator('[data-link-notice="other-account"]').waitFor();
     assert.equal((await db`SELECT used_at FROM talent_link_grants WHERE token_sha256=${createHash('sha256').update(code).digest('hex')}`)[0].used_at, null, 'not consumed by another account');
@@ -249,6 +276,40 @@ export async function conformJourney({ base, db, cookies }) {
     await talent.goto(`${base}/me?${q}`);
     await talent.locator('[data-talent-clear]').waitFor();
     await talent.screenshot({ path: evidenceDir + '/conform-talent-clear.png' });
+
+    // --- PMO "Kirim pengingat": one personal DM with a fresh link; the Talent's older unused link stops working ------
+    const stale = randomBytes(32).toString('base64url');
+    await db`INSERT INTO talent_link_grants (token_sha256, user_id, target_path, purpose, expires_at) VALUES (${createHash('sha256').update(stale).digest('hex')}, ${talentUser.id}, '/me', 'manual', NULL)`;
+    await page.goto(`${base}/pmo/readiness/talent/${encodeURIComponent(EMPLOYEE_ID)}?${q}`);
+    await page.locator(`[data-attendance-day="${gapDay}"]`).waitFor();
+    await page.locator('[data-action="talent-message"]').click();
+    await page.locator('[data-action="talent-message-confirm"]').click();
+    await page.locator('[data-talent-message-sent]').waitFor({ timeout: 30000 });
+    await page.screenshot({ path: evidenceDir + '/conform-pmo-talent-message.png', fullPage: true });
+    const direct = sent.filter((m) => !m.group && m.request_id.startsWith('celerates-direct:'));
+    assert.equal(direct.length, 1);
+    assert.equal(direct[0].jid, TALENT_JID);
+    assert.doesNotMatch(direct[0].text, /MTG-TF|E2E0001|6281200000001/, 'no ids or phone numbers in the message');
+    const directLink = direct[0].text.match(/https?:\/\/\S+\/go\/[A-Za-z0-9_-]+/)?.[0];
+    assert.ok(directLink && directLink.startsWith(base));
+    assert.equal((await db`SELECT superseded_at FROM talent_link_grants WHERE token_sha256=${createHash('sha256').update(stale).digest('hex')}`)[0].superseded_at === null, false, 'older unused link superseded');
+    await page.locator('[data-action="talent-message"]').click();
+    await page.locator('[data-action="talent-message-confirm"]').click();
+    await page.getByText('Talent ini baru saja dikirimi pesan. Tunggu 10 menit.').waitFor();
+    const fresh = await (await browser.newContext(phone)).newPage();
+    await fresh.goto(directLink);
+    await fresh.waitForURL(`**/me?${q}`);
+    await fresh.locator('[data-talent-home]').waitFor();
+
+    // --- WhatsApp re-entry ("masuk"): ConForm asks Celerates for a fresh link with the shared service token ----------
+    const internal = (body, token = serviceToken) => fetch(`${base}/api/internal/talent/links`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    assert.equal((await internal({ employee_id: EMPLOYEE_ID }, 'x'.repeat(48))).status, 401);
+    assert.equal((await internal({ employee_id: 'MTG-TF/UNKNOWN' })).status, 404);
+    const reentry = await (await internal({ employee_id: EMPLOYEE_ID })).json();
+    assert.ok(reentry.url.startsWith(`${base}/go/`) && reentry.expires_at === null, JSON.stringify(reentry));
+    const again = await (await browser.newContext(phone)).newPage();
+    await again.goto(reentry.url);
+    await again.waitForURL(`${base}/me`);
 
     // A new campaign excludes the resolved Talent.
     await page.goto(`${base}/pmo/readiness?${q}`);
@@ -301,7 +362,7 @@ export async function conformJourney({ base, db, cookies }) {
     await page.locator('[data-readiness-summary]').waitFor();
     await page.screenshot({ path: evidenceDir + '/conform-pmo-readiness-desktop.png' });
     assert.deepEqual(errors, [], 'no browser runtime exceptions');
-    console.log(`PASS: ConForm closed loop — ConForm gap → approved Celerates campaign → personal WhatsApp deep link → Talent correction in Celerates → PMO approval in Tinjau → ConForm re-projection (complete) → next campaign excludes → canonical CSV carries 08:00; BAST preview generated by ConForm and downloaded in Celerates; PMO group summary; single-use grant, other-account fail-closed, Talent confined to /me`);
+    console.log(`PASS: ConForm closed loop — ConForm gap → approved Celerates campaign → personal WhatsApp deep link → Talent correction in Celerates → PMO approval in Tinjau → ConForm re-projection (complete) → next campaign excludes → canonical CSV carries 08:00; BAST preview generated by ConForm and downloaded in Celerates; PMO group summary; single-use grant, other-account fail-closed, Talent confined to /me; Absensi from ConForm; task evidence staged and submitted; PMO direct reminder (supersedes older link, 10-minute dedupe); WhatsApp re-entry link`);
   } catch (error) {
     console.error(conformLog.slice(-6000));
     throw error;

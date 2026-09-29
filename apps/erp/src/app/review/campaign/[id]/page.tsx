@@ -54,7 +54,7 @@ export default async function CampaignReviewPage({ params }: { params: Promise<{
                   <li key={r.id} className="flex items-center justify-between gap-3 py-2.5 text-sm" data-recipient={r.employee_id} data-recipient-state={state}>
                     <span className="min-w-0">
                       <span className="block font-semibold">{r.name}</span>
-                      <span className="block truncate text-xs text-j-muted">{r.nrp} · {t("daysNeed", { count: r.actionable_days })}</span>
+                      <span className="block truncate text-xs text-j-muted">{r.nrp} · {t("daysNeed", { count: r.actionable_days })}{r.missing_tasks ? ` · ${t("tasksMissing", { count: r.missing_tasks })}` : ""}</span>
                     </span>
                     <StatusPill tone={STATE_TONE[state] ?? (state === "will_send" ? "accent" : "muted")}>{t(`recipient.${state}`)}</StatusPill>
                   </li>

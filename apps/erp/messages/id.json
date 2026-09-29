@@ -2633,7 +2633,7 @@
     "waitingBody": "Pengajuan Anda sudah diterima dan menunggu review PMO.",
     "go": {
       "invalidTitle": "Tautan tidak dapat dipakai",
-      "invalidBody": "Tautan ini sudah dipakai atau kedaluwarsa. Minta tautan baru dari PMO.",
+      "invalidBody": "Tautan ini sudah dipakai atau sudah diganti tautan yang lebih baru. Kirim \"masuk\" ke bot WhatsApp untuk tautan baru, atau hubungi PMO.",
       "otherTitle": "Tautan untuk akun lain",
       "otherBody": "Anda sedang masuk dengan akun lain. Keluar dulu, lalu buka tautan ini lagi.",
       "opening": "Membuka Kelengkapan Saya…"
@@ -2661,6 +2661,70 @@
       "evidenceHint": "Ambil atau pilih foto (maks. 5 MB)",
       "note": "Catatan (opsional)",
       "rule": "Pengajuan ditinjau PMO. Data mentah attendance tidak diubah."
+    },
+    "nav": {
+      "label": "Menu Talent",
+      "home": "Kelengkapan",
+      "attendance": "Absensi",
+      "tasks": "Task"
+    },
+    "log": {
+      "title": "Absensi",
+      "prev": "Siklus sebelumnya",
+      "next": "Siklus berikutnya",
+      "unavailable": "Data absensi belum dapat dimuat. Coba lagi sebentar lagi.",
+      "empty": "Belum ada data absensi pada siklus ini.",
+      "summary": {
+        "complete": "{count} hari lengkap",
+        "needs": "{count} perlu dilengkapi",
+        "waiting": "{count} menunggu PMO"
+      },
+      "state": {
+        "complete": "Lengkap",
+        "needs_action": "Perlu dilengkapi",
+        "waiting_review": "Menunggu PMO",
+        "excused": "Izin",
+        "unverified": "Belum terverifikasi",
+        "not_required": "Libur",
+        "rejected": "Ditolak"
+      },
+      "absence": "{type, select, sakit {Sakit} izin {Izin} cuti {Cuti} libur {Libur} other {Izin}}",
+      "offDay": "Tidak ada jadwal",
+      "corrected": "dikoreksi {time}",
+      "sourceNote": "Sumber: attendance client (PAMA) melalui ConForm, dievaluasi sampai {through}."
+    },
+    "tasks": {
+      "title": "Task",
+      "prev": "Bulan sebelumnya",
+      "next": "Bulan berikutnya",
+      "unavailable": "Data task belum dapat dimuat. Coba lagi sebentar lagi.",
+      "empty": "Tidak ada task pada bulan ini.",
+      "complete": "{count} lengkap",
+      "missing": "{count} belum ada bukti",
+      "staged": "{count} siap diajukan",
+      "state": {
+        "complete": "Lengkap",
+        "staged": "Siap diajukan",
+        "missing": "Belum ada bukti"
+      },
+      "add": "Tambah bukti",
+      "addMore": "Tambah bukti ({count} siap)",
+      "sheetTitle": "Bukti task",
+      "evidence": "Foto bukti",
+      "evidenceHint": "Ambil atau pilih foto (maks. 5 MB)",
+      "caption": "Keterangan (opsional)",
+      "save": "Simpan bukti",
+      "sending": "Mengirim…",
+      "close": "Selesai",
+      "stagedDone": "Bukti tersimpan",
+      "alreadyPresent": "Bukti ini sudah ada",
+      "stagedBody": "Tekan \"Ajukan\" setelah semua bukti lengkap.",
+      "submit": "Ajukan {count} bukti",
+      "submitted": "{count} task diajukan ke ConForm.",
+      "note": "Bukti task tidak perlu persetujuan PMO; bukti yang diajukan langsung dipakai untuk BAST.",
+      "summaryTitle": "Task {period}",
+      "summaryMissing": "{missing} dari {total} task belum ada bukti",
+      "summaryDone": "Semua {total} task sudah ada bukti"
     }
   },
   "conform": {
@@ -2846,6 +2910,27 @@
       "transport_auth_failed": "Transport ditolak",
       "delivery_unknown": "Status kirim tidak pasti",
       "paused_by_pmo": "Dijeda PMO"
-    }
+    },
+    "attendanceLog": "Log absensi",
+    "tasksTitle": "Task {period}",
+    "tasks": {
+      "total": "Total task",
+      "complete": "Sudah ada bukti",
+      "missing": "Belum ada bukti"
+    },
+    "direct": {
+      "button": "Kirim pengingat",
+      "title": "Kirim pengingat WhatsApp",
+      "body": "{name} akan menerima satu pesan WhatsApp pribadi berisi tautan Celerates.",
+      "open": "Terbuka: {needs} hari absensi, {tasks} task tanpa bukti.",
+      "clear": "Tidak ada yang terbuka; pesan tetap berisi tautan masuk.",
+      "rules": "Tautan lama Talent otomatis tidak berlaku. Kill switch dan jeda 10 menit berlaku.",
+      "send": "Kirim",
+      "cancel": "Batal",
+      "close": "Selesai",
+      "sent": "Pesan terkirim.",
+      "unknown": "Pesan diteruskan, status pengiriman belum pasti."
+    },
+    "tasksMissing": "{count} task tanpa bukti"
   }
 }

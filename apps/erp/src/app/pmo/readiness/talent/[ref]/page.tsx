@@ -4,13 +4,16 @@ import { notFound } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import { sql } from "@/db";
 import { requireDivisionRead } from "@/lib/module-guard";
-import { ConformError, type TalentLookup, type TalentRequirements } from "@/lib/conform/client";
-import { conformLookup, conformRequirements, cycleLabelFor, jakartaToday } from "@/lib/conform/pmo";
+import { ConformError, type TalentLookup, type TalentRequirements, type TalentTasks } from "@/lib/conform/client";
+import { canPmo, conformLookup, conformRequirements, conformTasks, cycleLabelFor, jakartaToday } from "@/lib/conform/pmo";
+import { conformSource, type AttendanceLog } from "@/lib/attendance/source";
 import { fmtDate } from "@/lib/pmo/mobile-format";
 import { activeLinksForEmployees } from "@/lib/talent/identity";
 import { Card, FactRows, MobileScreen, StatusPill } from "@/components/mobile/primitives";
 import { RecordHeader, Section } from "@/components/mobile/record";
 import { LinkTalentForm } from "@/components/conform/link-talent";
+import { TalentMessageButton } from "@/components/conform/talent-message";
+import { AttendanceRow } from "@/components/talent/attendance-row";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +33,19 @@ export default async function ReadinessTalentPage({ params, searchParams }: { pa
     if (error instanceof ConformError && error.status === 404) notFound();
     throw error;
   }
+  // Secondary reads degrade on their own: the record still renders when ConForm cannot serve the log or tasks.
+  const [log, tasks] = await Promise.all([
+    conformSource(employeeId).log(cycle.year, cycle.month).catch((error: unknown): AttendanceLog | null => {
+      if (error instanceof ConformError) return null;
+      throw error;
+    }),
+    conformTasks(employeeId, data.cycle.year, data.cycle.month).catch((error: unknown): TalentTasks | null => {
+      if (error instanceof ConformError) return null;
+      throw error;
+    }),
+  ]);
   const link = (await activeLinksForEmployees(sql, [employeeId])).get(employeeId) ?? null;
+  const needs = data.requirements.filter((r) => r.state === "needs_action").length;
   const account = link ? await sql`SELECT email FROM users WHERE id=${link.user_id}` : [];
 
   return (
@@ -62,6 +77,39 @@ export default async function ReadinessTalentPage({ params, searchParams }: { pa
               ))}
             </ul>
           </Card>
+        )}
+      </Section>
+      {link && talent.whatsapp_bound && canPmo(levels.pmo ?? null, "editor") && (
+        <div className="flex" data-record-section="message">
+          <TalentMessageButton employeeId={employeeId} name={talent.name} year={cycle.year} month={cycle.month} needs={needs} missingTasks={tasks?.summary.missing ?? 0} />
+        </div>
+      )}
+      <Section id="attendance" title={t("attendanceLog")}>
+        {!log ? (
+          <Card className="p-3.5 text-sm text-j-muted">{t("unavailable")}</Card>
+        ) : (
+          <Card className="px-3.5 py-1">
+            <ul className="divide-y divide-j-line-soft">
+              {[...log.days].reverse().filter((d) => d.state !== "not_required" || d.checkIn || d.checkOut).map((day) => (
+                <li key={day.workDate}>
+                  <AttendanceRow day={day} locale={locale} href={null} />
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
+      </Section>
+      <Section id="tasks" title={t("tasksTitle", { period: tasks?.period.label ?? "" })}>
+        {!tasks ? (
+          <Card className="p-3.5 text-sm text-j-muted">{t("unavailable")}</Card>
+        ) : (
+          <FactRows
+            rows={[
+              { label: t("tasks.total"), value: String(tasks.summary.total) },
+              { label: t("tasks.complete"), value: String(tasks.summary.complete) },
+              { label: t("tasks.missing"), value: String(tasks.summary.missing) },
+            ]}
+          />
         )}
       </Section>
       <Section id="account" title={t("account.title")}>
