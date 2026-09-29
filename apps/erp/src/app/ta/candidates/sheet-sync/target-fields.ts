@@ -1,0 +1,15 @@
+export const TARGET_FIELDS = [
+    { key: "candidate_date", label: "Candidate Date" },
+    { key: "candidate_name", label: "Candidate Name", required: true },
+    { key: "position_name", label: "Positions" },
+    { key: "level_code", label: "Level" },
+    { key: "wa_number", label: "WA Number" },
+    { key: "email", label: "Email" },
+    { key: "current_salary_amount", label: "Current Salary" },
+    { key: "expected_salary_amount", label: "Expected Salary" },
+    { key: "ta_pic_name", label: "TA PIC", required: true },
+    { key: "cv_asli_url", label: "CV Asli (Link)" },
+    { key: "candidate_source_code", label: "Candidate Source" },
+    { key: "candidate_open_status_code", label: "Candidate Open Status" },
+    { key: "notes", label: "Details / Remarks" },
+  ];

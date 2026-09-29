@@ -1,0 +1,261 @@
+"use client";
+// The Agent conversation (ADR-013/017): assistant-ui primitives over our own run store via ExternalStoreRuntime.
+// assistant-ui renders messages/composer only. Run state, transport (AG-UI via ERP BFF) and authority stay ours.
+// One composer for everything: text, push-to-talk, files and send. Loaded lazily when the Agent panel opens.
+import { createContext, useContext, useRef, useState, type DragEvent, type ReactNode } from "react";
+import {
+  AssistantRuntimeProvider,
+  ComposerPrimitive,
+  MessagePrimitive,
+  ThreadPrimitive,
+  useExternalStoreRuntime,
+  type AppendMessage,
+  type ThreadMessageLike,
+} from "@assistant-ui/react";
+import { Loader2, Paperclip, SendHorizontal, Sparkles } from "lucide-react";
+import { VoiceButton } from "./voice";
+import { toThreadMessages, type AgentAction, type AgentRun, type Evidence, type MappingCardData, type Provenance } from "@/lib/agent/run-state";
+import { EvidenceCard, ProvenanceLine, RunError, RunProgress, ToolTrace } from "./evidence";
+import { AnswerFeedback } from "./answer-feedback";
+import { MappingCard } from "./mapping";
+import { ProposalCard } from "./proposal";
+import { SubmissionCard } from "./submission";
+import { AttachmentBar, type Attachment } from "./attachment-bar";
+import type { Submission } from "@/lib/agent/run-state";
+
+export type Suggestion = { label: string; run: () => void };
+
+function UserMessage() {
+  return (
+    <MessagePrimitive.Root className="flex justify-end">
+      <div className="max-w-[85%] rounded-2xl rounded-br-md bg-brand-600 px-3 py-2 text-sm text-white">
+        <MessagePrimitive.Parts />
+      </div>
+    </MessagePrimitive.Root>
+  );
+}
+
+// Part renderers are module-level so their component identity is stable. Inline renderers would be new component
+// types on every render, remounting parts and resetting an open proposal card's selections.
+const ActionContext = createContext<(action: AgentAction) => void>(() => undefined);
+
+function Actions({ items }: { items: AgentAction[] }) {
+  const onAction = useContext(ActionContext);
+  return (
+    <div className="flex flex-wrap gap-2" aria-label="Langkah berikutnya">
+      {items.map((action) => (
+        <button
+          key={action.label}
+          type="button"
+          onClick={() => onAction(action)}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-brand-100 bg-brand-50 px-2.5 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-100"
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+          {action.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Company Files (ADR-018): a file card can be attached to the conversation ("Tanyakan isi berkas").
+const AttachFileContext = createContext<((file: { id: string; name: string }) => void) | undefined>(undefined);
+function Card({ item }: { item: Evidence }) {
+  return <EvidenceCard item={item} onAskFile={useContext(AttachFileContext)} />;
+}
+
+function Mapping({ data }: { data: MappingCardData }) {
+  return <MappingCard data={data} onRun={useContext(ActionContext)} />;
+}
+
+type DataPart = { data: Record<string, unknown> };
+const PARTS = {
+  Text: ({ text }: { text: string }) => <p className="whitespace-pre-line text-sm leading-relaxed text-slate-800">{text}</p>,
+  data: {
+    by_name: {
+      progress: ({ data }: DataPart) => <RunProgress steps={data.steps as { name: string; done: boolean }[]} running={data.running === true} />,
+      evidence: ({ data }: DataPart) => <Card item={data as unknown as Evidence} />,
+      error: ({ data }: DataPart) => <RunError message={String(data.message)} />,
+      proposal: ({ data }: DataPart) => <ProposalCard id={String(data.id)} title={String(data.title)} />,
+      submission: ({ data }: DataPart) => <SubmissionCard value={data as unknown as Submission} />,
+      actions: ({ data }: DataPart) => <Actions items={data.items as AgentAction[]} />,
+      mapping: ({ data }: DataPart) => <Mapping data={data as unknown as MappingCardData} />,
+      provenance: ({ data }: DataPart) => <ProvenanceLine value={data as unknown as Provenance} />,
+      feedback: ({ data }: DataPart) => <AnswerFeedback runId={String(data.runId)} />,
+    },
+  },
+  tools: {
+    Fallback: ({ toolName, result }: { toolName: string; result?: unknown }) => <ToolTrace toolName={toolName} result={result} />,
+  },
+  ToolGroup: ({ children }: { children?: ReactNode }) => (
+    <details className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
+      <summary className="cursor-pointer">Jejak alat Agent</summary>
+      <ul className="mt-2 space-y-1">{children}</ul>
+    </details>
+  ),
+};
+
+function AssistantMessage() {
+  return (
+    <MessagePrimitive.Root className="space-y-2" data-agent-message>
+      <MessagePrimitive.Parts components={PARTS} />
+    </MessagePrimitive.Root>
+  );
+}
+
+export default function AgentThread({
+  runs,
+  running,
+  enabled,
+  suggestions,
+  onSearch,
+  onFile,
+  onAction,
+  attachment,
+  onDetach,
+  onAttachFile,
+  voice,
+}: {
+  runs: AgentRun[];
+  running: boolean;
+  enabled: boolean;
+  suggestions: Suggestion[];
+  onSearch: (text: string, modality: "text" | "voice") => void;
+  /** Push-to-talk is offered only when Intelligence has a transcription model (ADR-012). */
+  voice: boolean;
+  /** `Drop anything`: a CSV/XLSX becomes a dataset, then a proposal the user confirms in ERP. */
+  onFile: (file: File) => Promise<string | null>;
+  onAction: (action: AgentAction) => void;
+  /** What is attached to this conversation (working context); documents and Company Files are also searched. */
+  attachment: Attachment | null;
+  onDetach: () => void;
+  onAttachFile?: (file: { id: string; name: string }) => void;
+}) {
+  const picker = useRef<HTMLInputElement>(null);
+  // Set when the composer text came from a transcript; the run is then recorded with modality "voice".
+  const fromVoice = useRef(false);
+  const [uploading, setUploading] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const accept = async (file: File | undefined) => {
+    if (!file || !enabled || running || uploading) return;
+    setUploading(true);
+    setFileError(await onFile(file));
+    setUploading(false);
+  };
+  const drop = {
+    onDragOver: (e: DragEvent) => {
+      if (!enabled || !e.dataTransfer.types.includes("Files")) return;
+      e.preventDefault();
+      setDragging(true);
+    },
+    onDragLeave: () => setDragging(false),
+    onDrop: (e: DragEvent) => {
+      if (!enabled) return;
+      e.preventDefault();
+      setDragging(false);
+      void accept(e.dataTransfer.files[0]);
+    },
+  };
+  const runtime = useExternalStoreRuntime<ThreadMessageLike>({
+    messages: toThreadMessages(runs) as ThreadMessageLike[],
+    isRunning: running,
+    isDisabled: !enabled,
+    convertMessage: (message) => message,
+    onNew: async (message: AppendMessage) => {
+      const text = message.content.map((part) => (part.type === "text" ? part.text : "")).join(" ").trim();
+      if (text) onSearch(text, fromVoice.current ? "voice" : "text");
+      fromVoice.current = false;
+    },
+  });
+  return (
+    <AssistantRuntimeProvider runtime={runtime}>
+      <ThreadPrimitive.Root className={`flex h-full flex-col ${dragging ? "bg-brand-50/60 ring-2 ring-inset ring-brand-300" : ""}`} {...drop}>
+        <ThreadPrimitive.Viewport className="flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-4">
+          <ThreadPrimitive.Empty>
+            <div className="space-y-3">
+              <p className="text-xs leading-relaxed text-slate-600" data-agent-intro>
+                {enabled
+                  ? "Satu tempat untuk bertanya, meminta tindakan, melampirkan berkas, atau menyampaikan masukan. Jawaban disertai bukti dari ERP dan pengetahuan yang disetujui; perubahan data dan masukan selalu Anda tinjau dulu."
+                  : "Agent belum dikonfigurasi di lingkungan ini. Perlu perhatian dan formulir masukan tetap dapat digunakan."}
+              </p>
+              {enabled && suggestions.length > 0 && (
+                <div className="flex flex-col gap-2" aria-label="Saran">
+                  {suggestions.map((s) => (
+                    <button
+                      key={s.label}
+                      type="button"
+                      onClick={s.run}
+                      className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-left text-xs font-medium text-slate-700 hover:border-brand-300 hover:text-brand-700"
+                    >
+                      <Sparkles className="h-3.5 w-3.5 shrink-0 text-brand-600" />
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </ThreadPrimitive.Empty>
+          <ActionContext.Provider value={onAction}>
+            <AttachFileContext.Provider value={onAttachFile}>
+              <ThreadPrimitive.Messages components={{ UserMessage, AssistantMessage }} />
+            </AttachFileContext.Provider>
+          </ActionContext.Provider>
+        </ThreadPrimitive.Viewport>
+        {attachment && <AttachmentBar attachment={attachment} onDetach={onDetach} />}
+        {fileError && (
+          <p role="alert" className="mx-3 mb-0 mt-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-900">
+            {fileError}
+          </p>
+        )}
+        <ComposerPrimitive.Root className="flex items-end gap-2 border-t border-slate-100 p-3">
+          <input
+            ref={picker}
+            type="file"
+            accept=".csv,.xlsx,.pdf,.docx,.txt,.md"
+            className="hidden"
+            data-agent-file
+            onChange={(e) => {
+              void accept(e.target.files?.[0]);
+              e.target.value = "";
+            }}
+          />
+          <button
+            type="button"
+            aria-label="Lampirkan berkas"
+            title="Lampirkan tabel (CSV/XLSX) untuk impor, atau dokumen (PDF/DOCX/TXT/MD) untuk ditanyakan"
+            disabled={!enabled || running || uploading}
+            onClick={() => picker.current?.click()}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-300 text-slate-600 hover:border-brand-300 hover:text-brand-700 disabled:opacity-40"
+          >
+            {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+          </button>
+          <ComposerPrimitive.Input
+            aria-label="Pesan untuk Agent"
+            placeholder="Tanya, minta tindakan, atau sampaikan masukan…"
+            rows={1}
+            maxLength={1000}
+            className="min-h-10 flex-1 resize-none rounded-xl border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 disabled:bg-slate-50"
+          />
+          {/* Push-to-talk fills the composer for review; voice can never send or confirm anything by itself. */}
+          {voice && (
+            <VoiceButton
+              disabled={!enabled || running}
+              onTranscript={(text) => {
+                fromVoice.current = true;
+                runtime.thread.composer.setText(text);
+              }}
+              onError={setFileError}
+            />
+          )}
+          <ComposerPrimitive.Send
+            aria-label="Kirim"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 text-white disabled:opacity-40"
+          >
+            <SendHorizontal className="h-4 w-4" />
+          </ComposerPrimitive.Send>
+        </ComposerPrimitive.Root>
+      </ThreadPrimitive.Root>
+    </AssistantRuntimeProvider>
+  );
+}

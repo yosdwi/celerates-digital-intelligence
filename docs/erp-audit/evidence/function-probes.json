@@ -1,0 +1,45 @@
+{
+  "scope": "Transpiled original functions, mocked dependencies, no HTTP exploit or live services tested",
+  "observations": [
+    {
+      "id": "AUTH-REJECTED",
+      "description": "Division guard accepts a rejected session with retained editor access",
+      "result": "observation confirmed"
+    },
+    {
+      "id": "AUTH-VIEWER-DENIED",
+      "description": "Existing division guard correctly denies a viewer mutation",
+      "result": "observation confirmed"
+    },
+    {
+      "id": "STORAGE-PATH",
+      "description": "Document action forwards an arbitrary known object path without requesting an actor or resource authorization",
+      "result": "observation confirmed"
+    },
+    {
+      "id": "CRON-REDIRECT",
+      "description": "Middleware redirects a machine cron request without a session to login",
+      "result": "observation confirmed"
+    },
+    {
+      "id": "FEEDBACK-TALENT",
+      "description": "Active talent is redirected away from the existing feedback route",
+      "result": "observation confirmed"
+    },
+    {
+      "id": "REMINDER-DUE",
+      "description": "A 23:59 reminder is due at 00:00 on the same day and remains due on a repeated poll",
+      "result": "observation confirmed"
+    },
+    {
+      "id": "FEEDBACK-UPDATE",
+      "description": "Non-owner update reaches the database for an arbitrary feedback ID without reading requester ownership",
+      "result": "observation confirmed"
+    },
+    {
+      "id": "ATTACHMENT-DELETE",
+      "description": "Feedback delete action forwards an arbitrary attachment ID without checking its parent or actor",
+      "result": "observation confirmed"
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "v": 3,
+  "createdOnFiles": {"v": 1, "at": "2026-09-27T12:20:00Z"},
+  "title": "Celerates Mobile — iterasi visual",
+  "launch": {"view": "canvas"},
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {"x": 0, "y": 0, "w": 390, "h": 844, "title": "1 · Beranda", "is_interactive": true},
+    "I1-Modul.dc.html": {"x": 470, "y": 0, "w": 390, "h": 844, "title": "1 · Modul (navigasi)", "is_interactive": true},
+    "I1-Kontrak.dc.html": {"x": 940, "y": 0, "w": 390, "h": 844, "title": "1 · Daftar Kontrak", "is_interactive": true},
+    "I1-Detail.dc.html": {"x": 1410, "y": 0, "w": 390, "h": 844, "title": "1 · Detail Kontrak", "is_interactive": true},
+    "I1-Agent.dc.html": {"x": 1880, "y": 0, "w": 390, "h": 844, "title": "1 · Agent", "is_interactive": true},
+    "I1-Files.dc.html": {"x": 2350, "y": 0, "w": 390, "h": 844, "title": "1 · Company Files", "is_interactive": true},
+    "I1-Capture.dc.html": {"x": 2820, "y": 0, "w": 390, "h": 844, "title": "1 · Tangkap dokumen", "is_interactive": true},
+    "I2-Beranda.dc.html": {"x": 0, "y": 1264, "w": 390, "h": 844, "title": "2 · Beranda", "is_interactive": true},
+    "I2-Modul.dc.html": {"x": 470, "y": 1264, "w": 390, "h": 844, "title": "2 · Modul (navigasi)", "is_interactive": true},
+    "I2-Kontrak.dc.html": {"x": 940, "y": 1264, "w": 390, "h": 844, "title": "2 · Daftar Kontrak", "is_interactive": true},
+    "I2-Detail.dc.html": {"x": 1410, "y": 1264, "w": 390, "h": 844, "title": "2 · Detail Kontrak", "is_interactive": true},
+    "I2-Agent.dc.html": {"x": 1880, "y": 1264, "w": 390, "h": 844, "title": "2 · Agent", "is_interactive": true},
+    "I2-Files.dc.html": {"x": 2350, "y": 1264, "w": 390, "h": 844, "title": "2 · Company Files", "is_interactive": true},
+    "I2-Capture.dc.html": {"x": 2820, "y": 1264, "w": 390, "h": 844, "title": "2 · Tangkap dokumen", "is_interactive": true},
+    "I3-Beranda.dc.html": {"x": 0, "y": 2528, "w": 390, "h": 844, "title": "3 · Beranda", "is_interactive": true},
+    "I3-Modul.dc.html": {"x": 470, "y": 2528, "w": 390, "h": 844, "title": "3 · Modul (navigasi)", "is_interactive": true},
+    "I3-Kontrak.dc.html": {"x": 940, "y": 2528, "w": 390, "h": 844, "title": "3 · Daftar Kontrak", "is_interactive": true},
+    "I3-Detail.dc.html": {"x": 1410, "y": 2528, "w": 390, "h": 844, "title": "3 · Detail Kontrak", "is_interactive": true},
+    "I3-Agent.dc.html": {"x": 1880, "y": 2528, "w": 390, "h": 844, "title": "3 · Agent", "is_interactive": true},
+    "I3-Files.dc.html": {"x": 2350, "y": 2528, "w": 390, "h": 844, "title": "3 · Company Files", "is_interactive": true},
+    "I3-Capture.dc.html": {"x": 2820, "y": 2528, "w": 390, "h": 844, "title": "3 · Tangkap dokumen", "is_interactive": true}
+  },
+  "order": [
+    "Main.dc.html", "I1-Modul.dc.html", "I1-Kontrak.dc.html", "I1-Detail.dc.html", "I1-Agent.dc.html", "I1-Files.dc.html", "I1-Capture.dc.html",
+    "I2-Beranda.dc.html", "I2-Modul.dc.html", "I2-Kontrak.dc.html", "I2-Detail.dc.html", "I2-Agent.dc.html", "I2-Files.dc.html", "I2-Capture.dc.html",
+    "I3-Beranda.dc.html", "I3-Modul.dc.html", "I3-Kontrak.dc.html", "I3-Detail.dc.html", "I3-Agent.dc.html", "I3-Files.dc.html", "I3-Capture.dc.html"
+  ],
+  "notes": {
+    "row1": {"x": 0, "y": -300, "text": "Iterasi 1 · Jernih — paling dekat dengan referensi", "kind": "title1", "maxW": 3210},
+    "row2": {"x": 0, "y": 964, "text": "Iterasi 2 · Tenang — hangat, launcher dulu, tab bar melayang", "kind": "title1", "maxW": 3210},
+    "row3": {"x": 0, "y": 2228, "text": "Iterasi 3 · Navy Pro — padat, untuk manajemen", "kind": "title1", "maxW": 3210},
+    "arch": {"x": -600, "y": 0, "w": 480, "maxH": 760, "fill": "blue", "size": "m", "text": "Arsitektur tetap di ketiga iterasi\n\n• Tujuan navigasi: Beranda · Modul · Agent · Tinjau · Akun\n• Beranda: satu bilah Cari / Tanya / Tangkap, angka \"Hari ini\" (fakta ERP), launcher modul sesuai akses, satu baris Perlu perhatian, aktivitas terbaru\n• Modul: daftar lengkap per fungsi, tingkat akses (Penuh/Baca) dari ERP\n• Record: daftar → detail; fakta ERP dulu, berkas terkait, aksi yang diizinkan, \"Tanya Agent\" dengan konteks record\n• Agent: satu percakapan; badge Fakta ERP / Pengetahuan disetujui / Inferensi; usulan selalu lewat konfirmasi\n• Company Files + Tangkap: foto/berkas memilih tujuan — Company File (OCR, kelas akses) atau lampiran Agent (sementara)\n\nYang divariasikan: bahasa visual, kepadatan, dan cara tab bar serta Agent ditampilkan. Mix-and-match per layar atau per elemen.\n\nData sintetis; nama klien fiktif."}
+  },
+  "designSystems": []
+}

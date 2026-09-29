@@ -1,5 +1,7 @@
 # Technology Stack Baseline
 
+> Detailed component responsibilities and the relationship between LangGraph, PostgreSQL/pgvector/FTS, LiteLLM/OpenRouter, and Langfuse are documented in [`06-intelligence-stack-explained.md`](./06-intelligence-stack-explained.md). See also the visual diagram [`architecture/11-intelligence-runtime-components.mmd`](./architecture/11-intelligence-runtime-components.mmd).
+
 ## Stack at a glance
 
 | Concern | Baseline |

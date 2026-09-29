@@ -1,0 +1,302 @@
+[
+  {
+    "symbol": "leads",
+    "table": "leads",
+    "line": 5
+  },
+  {
+    "symbol": "salesOpportunityTrackers",
+    "table": "sales_opportunity_trackers",
+    "line": 42
+  },
+  {
+    "symbol": "opportunities",
+    "table": "opportunities",
+    "line": 71
+  },
+  {
+    "symbol": "requisitions",
+    "table": "requisitions",
+    "line": 108
+  },
+  {
+    "symbol": "candidates",
+    "table": "candidates",
+    "line": 133
+  },
+  {
+    "symbol": "applications",
+    "table": "applications",
+    "line": 155
+  },
+  {
+    "symbol": "onboardingRequests",
+    "table": "onboarding_requests",
+    "line": 193
+  },
+  {
+    "symbol": "employees",
+    "table": "employees",
+    "line": 274
+  },
+  {
+    "symbol": "employmentContracts",
+    "table": "employment_contracts",
+    "line": 295
+  },
+  {
+    "symbol": "bpjsRegistrations",
+    "table": "bpjs_registrations",
+    "line": 315
+  },
+  {
+    "symbol": "pics",
+    "table": "pics",
+    "line": 332
+  },
+  {
+    "symbol": "divisions",
+    "table": "divisions",
+    "line": 340
+  },
+  {
+    "symbol": "users",
+    "table": "users",
+    "line": 349
+  },
+  {
+    "symbol": "userAccess",
+    "table": "user_access",
+    "line": 372
+  },
+  {
+    "symbol": "talentAssignments",
+    "table": "talent_assignments",
+    "line": 384
+  },
+  {
+    "symbol": "extensionIncrementRequests",
+    "table": "extension_increment_requests",
+    "line": 456
+  },
+  {
+    "symbol": "extensionRequestSpecialNotes",
+    "table": "extension_request_special_notes",
+    "line": 512
+  },
+  {
+    "symbol": "projectDocuments",
+    "table": "project_documents",
+    "line": 530
+  },
+  {
+    "symbol": "projectContracts",
+    "table": "project_contracts",
+    "line": 556
+  },
+  {
+    "symbol": "projectInvoices",
+    "table": "project_invoices",
+    "line": 571
+  },
+  {
+    "symbol": "financeDocumentHandoffs",
+    "table": "finance_document_handoffs",
+    "line": 595
+  },
+  {
+    "symbol": "projectMonthlyBillings",
+    "table": "project_monthly_billings",
+    "line": 611
+  },
+  {
+    "symbol": "companyHolidays",
+    "table": "company_holidays",
+    "line": 626
+  },
+  {
+    "symbol": "timesheetEntries",
+    "table": "timesheet_entries",
+    "line": 648
+  },
+  {
+    "symbol": "timesheetExports",
+    "table": "timesheet_exports",
+    "line": 672
+  },
+  {
+    "symbol": "timesheetSubmissions",
+    "table": "timesheet_submissions",
+    "line": 692
+  },
+  {
+    "symbol": "attendanceLogs",
+    "table": "attendance_logs",
+    "line": 706
+  },
+  {
+    "symbol": "leaveTypes",
+    "table": "leave_types",
+    "line": 727
+  },
+  {
+    "symbol": "attendanceApprovalSteps",
+    "table": "attendance_approval_steps",
+    "line": 742
+  },
+  {
+    "symbol": "timeOffRequests",
+    "table": "time_off_requests",
+    "line": 751
+  },
+  {
+    "symbol": "timeOffApprovalSteps",
+    "table": "time_off_approval_steps",
+    "line": 766
+  },
+  {
+    "symbol": "activityLogs",
+    "table": "activity_logs",
+    "line": 778
+  },
+  {
+    "symbol": "notifications",
+    "table": "notifications",
+    "line": 791
+  },
+  {
+    "symbol": "signatures",
+    "table": "signatures",
+    "line": 803
+  },
+  {
+    "symbol": "signatureRequests",
+    "table": "signature_requests",
+    "line": 813
+  },
+  {
+    "symbol": "attachments",
+    "table": "attachments",
+    "line": 840
+  },
+  {
+    "symbol": "featureRequests",
+    "table": "feature_requests",
+    "line": 859
+  },
+  {
+    "symbol": "schoolCourses",
+    "table": "school_courses",
+    "line": 890
+  },
+  {
+    "symbol": "schoolModules",
+    "table": "school_modules",
+    "line": 907
+  },
+  {
+    "symbol": "schoolLessons",
+    "table": "school_lessons",
+    "line": 917
+  },
+  {
+    "symbol": "schoolQuizzes",
+    "table": "school_quizzes",
+    "line": 930
+  },
+  {
+    "symbol": "schoolQuizQuestions",
+    "table": "school_quiz_questions",
+    "line": 939
+  },
+  {
+    "symbol": "schoolQuizOptions",
+    "table": "school_quiz_options",
+    "line": 949
+  },
+  {
+    "symbol": "schoolEnrollments",
+    "table": "school_enrollments",
+    "line": 959
+  },
+  {
+    "symbol": "schoolLessonProgress",
+    "table": "school_lesson_progress",
+    "line": 973
+  },
+  {
+    "symbol": "kanbanTasks",
+    "table": "kanban_tasks",
+    "line": 988
+  },
+  {
+    "symbol": "kanbanTaskComments",
+    "table": "kanban_task_comments",
+    "line": 1009
+  },
+  {
+    "symbol": "googleTokens",
+    "table": "google_tokens",
+    "line": 1019
+  },
+  {
+    "symbol": "sheetConnections",
+    "table": "sheet_connections",
+    "line": 1030
+  },
+  {
+    "symbol": "clients",
+    "table": "clients",
+    "line": 1044
+  },
+  {
+    "symbol": "overtimeBusinessTripClaims",
+    "table": "overtime_business_trip_claims",
+    "line": 1057
+  },
+  {
+    "symbol": "profitabilityEntries",
+    "table": "profitability_entries",
+    "line": 1119
+  },
+  {
+    "symbol": "automationReminders",
+    "table": "automation_reminders",
+    "line": 1149
+  },
+  {
+    "symbol": "automationReminderRecipients",
+    "table": "automation_reminder_recipients",
+    "line": 1161
+  },
+  {
+    "symbol": "automationReminderLogs",
+    "table": "automation_reminder_logs",
+    "line": 1171
+  },
+  {
+    "symbol": "automationDocumentTemplates",
+    "table": "automation_document_templates",
+    "line": 1183
+  },
+  {
+    "symbol": "automationGeneratedDocuments",
+    "table": "automation_generated_documents",
+    "line": 1192
+  },
+  {
+    "symbol": "crmClients",
+    "table": "crm_clients",
+    "line": 1208
+  },
+  {
+    "symbol": "crmClientContacts",
+    "table": "crm_client_contacts",
+    "line": 1220
+  },
+  {
+    "symbol": "crmClientActivities",
+    "table": "crm_client_activities",
+    "line": 1233
+  }
+]

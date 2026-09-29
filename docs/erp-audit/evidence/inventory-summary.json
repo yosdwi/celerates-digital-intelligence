@@ -1,0 +1,9 @@
+{
+  "files": 420,
+  "tables": 60,
+  "routes": 2,
+  "pages": 87,
+  "sheet_sync_modules": 10,
+  "limited_secret_pattern_hits": [],
+  "warning": "Heuristic pattern scan only; not comprehensive secret clearance."
+}

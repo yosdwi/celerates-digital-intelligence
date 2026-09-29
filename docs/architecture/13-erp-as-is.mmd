@@ -1,0 +1,10 @@
+flowchart TD
+  User[ERP user] --> Web[Next.js pages and Server Actions]
+  Web --> Auth[NextAuth and division guards]
+  Web --> DB[(ERP PostgreSQL)]
+  Web --> Files[Supabase object storage]
+  Web --> Sheets[Google Sheets]
+  Sheets --> Web
+  Web --> Mail[Resend email]
+  Cron[Unregistered reminder trigger] -. blocked by session middleware .-> Web
+  DB --> Logs[Activity and reminder records]

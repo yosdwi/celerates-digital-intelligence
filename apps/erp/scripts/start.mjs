@@ -1,0 +1,12 @@
+import { migrate } from './migrate.mjs';
+import { initStorage } from './init-storage.mjs';
+import { spawn } from 'node:child_process';
+for (const name of ['DATABASE_URL','NEXTAUTH_URL','S3_ENDPOINT','S3_ACCESS_KEY_ID','S3_SECRET_ACCESS_KEY']) if (!process.env[name]) throw new Error(`${name} is required`);
+if ((process.env.NEXTAUTH_SECRET || '').length < 32) throw new Error('NEXTAUTH_SECRET must contain at least 32 characters');
+if (!/^[a-f0-9]{64}$/i.test(process.env.PII_ENCRYPTION_KEY || '')) throw new Error('PII_ENCRYPTION_KEY must be 32 bytes of hex');
+if (process.env.SETUP_TOKEN && process.env.SETUP_TOKEN.length < 32) throw new Error('SETUP_TOKEN must contain at least 32 characters');
+await migrate();
+await initStorage();
+const child = spawn(process.execPath, ['server.js'], { stdio: 'inherit', env: { ...process.env, HOSTNAME: '0.0.0.0', PORT: process.env.PORT || '3000' } });
+for (const signal of ['SIGTERM','SIGINT']) process.on(signal, () => child.kill(signal));
+child.on('exit', code => process.exit(code ?? 1));

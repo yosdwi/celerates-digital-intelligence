@@ -1,0 +1,388 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { createHash, generateKeyPairSync } from "node:crypto";
+import { PGlite } from "@electric-sql/pglite";
+import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
+import postgres from "postgres";
+import { EventSchemas } from "@ag-ui/core/schemas";
+import { CATALOG, entityTypes, hrefFor, publicCatalog, resolvePageEntity } from "../src/lib/agent/catalog";
+import { submoduleFor } from "../src/lib/module-access";
+import { CONSOLE_AUDIENCE, DelegationError, mintConsoleSignIn, mintDelegation, verifyDelegation } from "../src/lib/agent/delegation";
+import { applyEvent, newRun, toThreadMessages } from "../src/lib/agent/run-state";
+import { readEntity, readEntitySignals, readNeighbours, search, searchTerms, loadActor, AgentReadError } from "../src/lib/agent/reads";
+import { readOperationalContext, readSignal, checkSignals, signalTrends } from "../src/lib/operations/reader";
+
+const ID = "5b0f2c7e-1d2a-4f3b-9c8d-7e6f5a4b3c2d";
+function keys() {
+  const { privateKey, publicKey } = generateKeyPairSync("ed25519");
+  return {
+    private: privateKey.export({ type: "pkcs8", format: "pem" }).toString(),
+    public: publicKey.export({ type: "spki", format: "pem" }).toString(),
+  };
+}
+const user = { id: ID, name: "Synthetic Owner", owner: true, access: [] };
+const ctx = { path: "/sales", module: "sales", entity: null };
+
+test("ERP delegation: Ed25519, short-lived, issuer/audience bound, rotation-aware", () => {
+  const current = keys();
+  const previous = keys();
+  process.env.AGENT_DELEGATION_PRIVATE_KEY = current.private.replace(/\n/g, "\\n");
+  process.env.AGENT_DELEGATION_KID = "k2";
+  process.env.INTELLIGENCE_ENVIRONMENT = "unit";
+  const token = mintDelegation(user, ctx);
+  const claims = verifyDelegation(token);
+  // Brain Console sign-in (ADR-016): Owner only, console audience and scope, 2 hours; never an Agent delegation.
+  const signIn = mintConsoleSignIn({ id: ID, name: "Owner", owner: true });
+  const signInClaims = JSON.parse(Buffer.from(signIn.split(".")[1], "base64url").toString());
+  assert.equal(signInClaims.aud, CONSOLE_AUDIENCE);
+  assert.deepEqual(signInClaims.scope, ["console"]);
+  assert.equal(signInClaims.exp - signInClaims.iat, 7200);
+  assert.throws(() => verifyDelegation(signIn), DelegationError, "a console sign-in is not a delegation");
+  assert.throws(() => mintConsoleSignIn({ id: ID, name: "Viewer", owner: false }), DelegationError);
+  assert.equal(claims.sub, ID);
+  assert.equal(claims.iss, "celerates-erp:unit");
+  assert.equal(claims.aud, "celerates-intelligence");
+  assert.ok(claims.exp - claims.iat <= 300);
+  const [head, body, sig] = token.split(".");
+  const forged = JSON.parse(Buffer.from(body, "base64url").toString());
+  forged.sub = "6c1a3d8f-2e3b-4a4c-8d9e-8f7a6b5c4d3e";
+  for (const bad of [
+    `${head}.${Buffer.from(JSON.stringify(forged)).toString("base64url")}.${sig}`,
+    `${Buffer.from(JSON.stringify({ alg: "none", typ: "JWT", kid: "k2" })).toString("base64url")}.${body}.`,
+    "not.a.token",
+    null,
+  ])
+    assert.throws(() => verifyDelegation(bad), DelegationError);
+  assert.throws(() => verifyDelegation(token, Math.floor(Date.now() / 1000) + 3600), DelegationError, "expired");
+  process.env.INTELLIGENCE_ENVIRONMENT = "other";
+  assert.throws(() => verifyDelegation(token), DelegationError, "issuer bound to environment");
+  process.env.INTELLIGENCE_ENVIRONMENT = "unit";
+  // Rotation: a token from the previous key verifies only while that key is listed.
+  process.env.AGENT_DELEGATION_PRIVATE_KEY = previous.private;
+  process.env.AGENT_DELEGATION_KID = "k1";
+  const old = mintDelegation(user, ctx);
+  process.env.AGENT_DELEGATION_PRIVATE_KEY = current.private;
+  process.env.AGENT_DELEGATION_KID = "k2";
+  assert.throws(() => verifyDelegation(old), DelegationError);
+  process.env.AGENT_DELEGATION_PREVIOUS_PUBLIC_KEYS = JSON.stringify({ k1: previous.public });
+  assert.equal(verifyDelegation(old).sub, ID);
+  delete process.env.AGENT_DELEGATION_PREVIOUS_PUBLIC_KEYS;
+  delete process.env.AGENT_DELEGATION_PRIVATE_KEY;
+  assert.throws(() => mintDelegation(user, ctx), DelegationError, "unconfigured fails closed");
+});
+
+test("Entity Catalog v1: routes resolve, sensitivity is declared, forbidden fields absent", () => {
+  assert.equal(entityTypes().length, 10);
+  assert.deepEqual(resolvePageEntity(`/sales/opportunity-tracker/${ID}/edit?x=1`), { type: "sales_opportunity", id: ID });
+  assert.deepEqual(resolvePageEntity(`/marketing/${ID}/edit`), { type: "lead", id: ID });
+  assert.deepEqual(resolvePageEntity(`/sales/${ID}/edit`), { type: "commercial_pq", id: ID });
+  assert.deepEqual(resolvePageEntity(`/ta/${ID}/edit`), { type: "requisition", id: ID });
+  assert.deepEqual(resolvePageEntity(`/sales/accounts/${ID}`), { type: "crm_client", id: ID });
+  assert.deepEqual(resolvePageEntity(`/tm/employee/${ID}`), { type: "employee", id: ID });
+  // MS2: the PMO records the mobile workflow opens (mobile detail and desktop edit routes).
+  assert.deepEqual(resolvePageEntity(`/pmo/contracts/${ID}`), { type: "project_contract", id: ID });
+  assert.deepEqual(resolvePageEntity(`/pmo/contracts/${ID}/edit`), { type: "project_contract", id: ID });
+  assert.deepEqual(resolvePageEntity(`/pmo/invoices/${ID}`), { type: "project_invoice", id: ID });
+  assert.deepEqual(submoduleFor(`/pmo/contracts/${ID}`), { module: "pmo", href: "/pmo/contracts", label: "A.Contract" });
+  assert.deepEqual(submoduleFor(`/pmo/invoices/${ID}`)?.label, "TM Invoice");
+  assert.equal(submoduleFor("/"), null);
+  for (const path of ["/sales", `/pmo/invoices/${ID}/edit/extra`, `/pmo/contracts/billing-schedule`, `/sales/opportunity-tracker/${ID}/edit/extra`, `/sales/not-a-uuid/edit`, "//evil"])
+    assert.equal(resolvePageEntity(path), null, path);
+  assert.equal(hrefFor("task", ID), "/tasks");
+  const forbidden = /salary|allowance|religion|ptkp|npwp|nik|bank|password|token|gender|marital|bpjs|signature/i;
+  for (const def of CATALOG.values()) {
+    for (const field of def.fields) assert.doesNotMatch(field.name, forbidden, `${def.type}.${field.name}`);
+    for (const name of def.search) assert.equal(def.fields.find((f) => f.name === name)?.sensitivity, "internal", `${def.type} search ${name}`);
+    for (const edge of def.edges) assert.ok(CATALOG.has(edge.target), `${def.type} → ${edge.target}`);
+    for (const field of def.fields.filter((f) => /price|amount|deal/.test(f.name))) assert.equal(field.sensitivity, "commercial");
+  }
+  assert.doesNotMatch(JSON.stringify(publicCatalog()), /SELECT|FROM |WHERE /, "no SQL leaves ERP");
+});
+
+test("AG-UI conformance of the event shapes the panel consumes, and the pure run reducer", () => {
+  const events = [
+    { type: "RUN_STARTED", threadId: "thread-1", runId: "r1" },
+    { type: "STEP_STARTED", stepName: "Membaca sinyal ERP" },
+    { type: "TOOL_CALL_START", toolCallId: "t1", toolCallName: "erp_signal_detail" },
+    { type: "TOOL_CALL_ARGS", toolCallId: "t1", delta: '{"signal_key":"qualified-trackers"}' },
+    { type: "TOOL_CALL_END", toolCallId: "t1" },
+    { type: "TOOL_CALL_RESULT", messageId: "t1:result", toolCallId: "t1", role: "tool", content: "{}" },
+    { type: "STEP_FINISHED", stepName: "Membaca sinyal ERP" },
+    { type: "CUSTOM", name: "celerates.evidence", value: { items: [{ type: "signal", title: "S", detail: ["rule"] }, { type: "made_up", title: "x", detail: [] }] } },
+    { type: "TEXT_MESSAGE_START", messageId: "m1", role: "assistant" },
+    { type: "TEXT_MESSAGE_CONTENT", messageId: "m1", delta: "Ringkasan" },
+    { type: "TEXT_MESSAGE_END", messageId: "m1" },
+    { type: "RUN_FINISHED", threadId: "thread-1", runId: "r1", result: { ok: true } },
+  ];
+  for (const event of events) EventSchemas.parse(event);
+  let run = newRun("r1", "Tanyakan");
+  events.forEach((event, i) => (run = applyEvent(run, event, String(i + 1))));
+  assert.equal(run.status, "succeeded");
+  assert.equal(run.text, "Ringkasan");
+  assert.deepEqual(run.evidence.map((e) => e.type), ["signal"], "unknown evidence types dropped");
+  const replayed = events.reduce((r, event, i) => applyEvent(r, event, String(i + 1)), run);
+  assert.equal(replayed.text, "Ringkasan", "resume replay is idempotent");
+  const [userMessage, assistant] = toThreadMessages([run]);
+  assert.equal(userMessage.role, "user");
+  const kinds = (assistant.content as { type: string }[]).map((p) => p.type);
+  assert.deepEqual(kinds, ["data-progress", "data-evidence", "text", "tool-call"]);
+  // ERP-held proposals are first-class parts; malformed or repeated proposal events are ignored.
+  const proposalId = "0f0e0d0c-0b0a-4908-8706-050403020100";
+  let proposed = newRun("r3", "Tindak lanjuti");
+  for (const value of [{ id: proposalId, title: "Usulan" }, { id: proposalId, title: "Usulan" }, { id: "not-a-uuid" }])
+    proposed = applyEvent(proposed, { type: "CUSTOM", name: "celerates.proposal", value });
+  proposed = applyEvent(proposed, { type: "CUSTOM", name: "celerates.evidence", value: { items: [{ type: "document", title: "f.csv", detail: [] }] } });
+  assert.deepEqual(proposed.proposals, [{ id: proposalId, title: "Usulan" }]);
+  const parts = (toThreadMessages([proposed])[1].content as { type: string; data?: { id?: string } }[]);
+  assert.deepEqual(parts.map((p) => p.type), ["data-progress", "data-evidence", "data-proposal"]);
+  // Next-step actions: allowlisted skills only, shown once the run succeeded.
+  let asked = newRun("r4", "Berapa requisition tanpa TA PIC?");
+  asked = applyEvent(asked, { type: "CUSTOM", name: "celerates.actions", value: { items: [
+    { label: "Tindak lanjuti: X", skill: "follow_up_signal", args: { signal_key: "unassigned-requisitions" } },
+    { label: "Hapus", skill: "apply_command", args: { signal_key: "x" } },
+    { label: "Bad", skill: "follow_up_signal", args: { signal_key: "DROP TABLE" } },
+  ] } });
+  assert.deepEqual(asked.actions.map((a) => a.label), ["Tindak lanjuti: X"]);
+  assert.ok(!(toThreadMessages([asked])[1].content as { type: string }[]).some((p) => p.type === "data-actions"), "not while running");
+  asked = applyEvent(asked, { type: "CUSTOM", name: "celerates.mapping", value: { dataset_id: proposalId, command: "task.create", columns: ["A"], mapping: {}, commands: [], open: true } });
+  asked = applyEvent(asked, { type: "CUSTOM", name: "celerates.mapping", value: { dataset_id: "x", columns: [], commands: [] } });
+  assert.equal(asked.mapping?.dataset_id, proposalId, "malformed mapping cards ignored");
+  asked = applyEvent(asked, { type: "RUN_FINISHED", threadId: "t", runId: "r4" });
+  assert.deepEqual((toThreadMessages([asked])[1].content as { type: string }[]).map((p) => p.type).slice(-2), ["data-mapping", "data-actions"]);
+  // Provenance: model text is labelled inference with its citations; malformed citation ids are dropped.
+  let modelRun = newRun("r5", "q");
+  modelRun = applyEvent(modelRun, { type: "CUSTOM", name: "celerates.provenance", value: { mode: "model", model: "openai/x", cited: ["E1", "S2", "<b>"], rounds: 2, tokens: 10 } });
+  modelRun = applyEvent(modelRun, { type: "TEXT_MESSAGE_CONTENT", delta: "Jawaban [E1]" });
+  modelRun = applyEvent(modelRun, { type: "RUN_FINISHED", threadId: "t", runId: "r5" });
+  assert.deepEqual(modelRun.provenance, { mode: "model", kind: "answer", read: 0, model: "openai/x", cited: ["E1", "S2"], rounds: 2, tokens: 10 });
+  const modelParts = toThreadMessages([modelRun])[1].content as { type: string }[];
+  // Feedback is offered on completed answers only, not on proposal-making skills.
+  const done = (skill: string) => {
+    let r = newRun("r6", "q", skill);
+    r = applyEvent(r, { type: "TEXT_MESSAGE_CONTENT", delta: "x" });
+    r = applyEvent(r, { type: "RUN_FINISHED", threadId: "t", runId: "r6" });
+    return (toThreadMessages([r])[1].content as { type: string }[]).some((p) => p.type === "data-feedback");
+  };
+  assert.equal(done("ask"), true);
+  assert.equal(done("follow_up_signal"), false);
+  // One Agent surface (ADR-017): feedback kinds are offered as route_feedback actions with a strict shape; a draft the
+  // user must review is a first-class part; a model route is not an answer to rate.
+  let routed = newRun("r7", "Data REQ-7 salah", "ask");
+  routed = applyEvent(routed, { type: "CUSTOM", name: "celerates.actions", value: { items: [
+    { label: "Laporkan koreksi data", skill: "route_feedback", args: { intent: "data_correction", text: "Data REQ-7 salah", entity_type: "requisition", entity_id: proposalId } },
+    { label: "Kirim langsung", skill: "route_feedback", args: { intent: "apply_now", text: "x" } },
+    { label: "Target palsu", skill: "route_feedback", args: { intent: "feature_request", text: "y", entity_type: "requisition", entity_id: "1 OR 1=1" } },
+    { label: "Jelaskan: X", skill: "explain_signal", args: { signal_key: "unassigned-requisitions" } },
+  ] } });
+  assert.deepEqual(routed.actions.map((a) => a.label), ["Laporkan koreksi data", "Target palsu", "Jelaskan: X"]);
+  assert.deepEqual(routed.actions[1].args, { intent: "feature_request", text: "y" }, "a malformed target is dropped");
+  routed = applyEvent(routed, { type: "CUSTOM", name: "celerates.provenance", value: { mode: "model", kind: "route", intent: "knowledge_correction", model: "m", cited: [] } });
+  routed = applyEvent(routed, { type: "CUSTOM", name: "celerates.submission", value: { id: proposalId, intent: "knowledge_correction", label: "Koreksi pengetahuan", title: "SOP", body: "isi", refs: ["SOP TA · v1"] } });
+  routed = applyEvent(routed, { type: "CUSTOM", name: "celerates.submission", value: { id: "x", intent: "knowledge_correction" } });
+  routed = applyEvent(routed, { type: "TEXT_MESSAGE_CONTENT", delta: "Saya siapkan sebagai koreksi pengetahuan." });
+  routed = applyEvent(routed, { type: "RUN_FINISHED", threadId: "t", runId: "r7" });
+  assert.equal(routed.provenance?.mode === "model" && routed.provenance.kind, "route");
+  assert.equal(routed.submissions.length, 1, "malformed drafts ignored");
+  const routedParts = (toThreadMessages([routed])[1].content as { type: string }[]).map((p) => p.type);
+  assert.ok(routedParts.includes("data-submission") && !routedParts.includes("data-feedback"));
+  assert.deepEqual(modelParts.map((p) => p.type).slice(-2), ["text", "data-provenance"]);
+  assert.equal(parts[2].data?.id, proposalId);
+  let failed = applyEvent(newRun("r2", "x"), { type: "RUN_ERROR", message: "Tidak boleh", code: "ERP_403" });
+  failed = applyEvent(failed, { type: "TEXT_MESSAGE_CONTENT", delta: "late" });
+  assert.equal(failed.status, "failed");
+  assert.equal(failed.text, "", "no content after terminal error");
+});
+
+test("delegated catalog reads: sensitivity, relationships, search, signal parity and module authorization", async () => {
+  // @ts-expect-error JS runner
+  const { migrate } = await import("../scripts/migrate.mjs");
+  const pg = await PGlite.create();
+  const server = new PGLiteSocketServer({ db: pg, port: 55442, host: "127.0.0.1" });
+  await server.start();
+  const url = process.env.AGENT_DATABASE_URL || "postgres://postgres:postgres@127.0.0.1:55442/postgres";
+  const sql = postgres(url, { max: process.env.AGENT_DATABASE_URL ? 4 : 1, prepare: false });
+  try {
+    await migrate(url);
+    const [owner] = await sql`INSERT INTO users (email,full_name,status,is_owner) VALUES ('agent-owner@example.test','Owner','active',true) RETURNING id`;
+    const [member] = await sql`INSERT INTO users (email,full_name,status,is_owner,account_type) VALUES ('ta@example.test','TA Viewer','active',false,'backoffice') RETURNING id`;
+    const [ta] = await sql`SELECT id FROM divisions WHERE key='ta'`;
+    await sql`INSERT INTO user_access (user_id,division_id,level) VALUES (${member.id},${ta.id},'viewer')`;
+    const [lead] = await sql`INSERT INTO leads (lead_no,client_name,contact_name,service_type_code,lead_source_code,category_code,sales_pic_name,is_qualified,contact_email,price_amount,notes) VALUES ('LEAD-9','PT Astra Synthetic','PRIVATE PERSON','outsourcing','inbound','new','Sales',true,'PRIVATE@EMAIL',99999999,'PRIVATE NOTE') RETURNING id`;
+    const [tracker] = await sql`INSERT INTO sales_opportunity_trackers (lead_id,opty_no,client_name,sales_pic_name,sales_qualified,price_amount,progress_notes) VALUES (${lead.id},'OPTY-9','PT Astra Synthetic','Sales',true,123456789,'PRIVATE PROGRESS') RETURNING id`;
+    await sql`INSERT INTO crm_clients (name,status_code) VALUES ('pt astra synthetic','active')`;
+    const [req] = await sql`INSERT INTO requisitions (requisition_no,client_name,position_name,ta_pic_name) VALUES ('REQ-9','PT Astra Synthetic','Engineer','') RETURNING id`;
+    const ownerActor = await loadActor(sql, owner.id);
+    const taActor = await loadActor(sql, member.id);
+
+    const read = await readEntity(sql, ownerActor, "sales_opportunity", tracker.id);
+    const text = JSON.stringify(read);
+    assert.doesNotMatch(text, /PRIVATE|123456789/, "pii/free text and commercial values never leave ERP");
+    assert.equal(read.entity.record_version, 1);
+    assert.deepEqual(read.entity.commercial.find((c) => c.name === "price_amount"), { name: "price_amount", label: "Harga", state: "terisi" });
+    assert.ok(read.entity.withheld.some((w) => w.name.startsWith("Catatan progres")));
+    assert.equal(read.entity.fields.find((f) => f.name === "sales_qualified")?.value, "Ya");
+    assert.doesNotMatch(JSON.stringify(await readEntity(sql, ownerActor, "lead", lead.id)), /PRIVATE|99999999/);
+
+    const edges = (await readNeighbours(sql, ownerActor, "sales_opportunity", tracker.id)).edges;
+    const edge = (name: string) => edges.find((e) => e.name === name)!;
+    assert.equal(edge("lead").count, 1);
+    assert.equal(edge("requisitions").count, 0, "absence is evidence");
+    assert.equal(edge("pqs").count, 0);
+    assert.equal(edge("account").kind, "name_match");
+    assert.equal(edge("account").count, 1, "case/whitespace-normalized name match");
+
+    const found = await search(sql, ownerActor, "astra");
+    assert.deepEqual(new Set(found.results.map((r) => r.type)), new Set(["lead", "sales_opportunity", "requisition", "crm_client"]));
+    assert.doesNotMatch(JSON.stringify(found), /PRIVATE/);
+    assert.equal((await search(sql, ownerActor, "100%_")).results.length, 0, "LIKE wildcards are literal");
+    // Multi-term: every term must match some field of the same record (client + position across columns).
+    const both = await search(sql, ownerActor, "Astra, engineer?");
+    assert.deepEqual(both.terms, ["astra", "engineer"]);
+    assert.deepEqual(both.results.map((r) => r.type), ["requisition"]);
+    assert.equal((await search(sql, ownerActor, "astra zzzq")).results.length, 0);
+    const loose = await search(sql, ownerActor, "astra zzzq", "any");
+    assert.ok(loose.results.length >= 4 && loose.results.every((r) => r.score === 1), "any-mode ranks partial matches");
+    // Name resolution: legal forms are ignored in search and in name-match relations ("PT Astra Synthetic Tbk").
+    assert.deepEqual(searchTerms("PT. Astra Tbk"), ["astra"]);
+    assert.deepEqual(searchTerms("PT"), ["pt"], "a lone legal form is still searchable");
+    await sql`INSERT INTO crm_clients (name,status_code) VALUES ('Astra Synthetic, Tbk.','active')`;
+    const accounts = (await readNeighbours(sql, ownerActor, "sales_opportunity", tracker.id)).edges.find((e) => e.name === "account")!;
+    assert.equal(accounts.count, 2, "legal-form and punctuation-insensitive name match");
+    // Typos: fuzzy (pg_trgm) where installed; otherwise it degrades to any-term search, never an error.
+    const [{ trgm }] = await sql`SELECT count(*)::int AS trgm FROM pg_extension WHERE extname='pg_trgm'`;
+    const typo = await search(sql, ownerActor, "Astrra", "fuzzy");
+    if (trgm) {
+      assert.equal(typo.mode, "fuzzy");
+      assert.ok(typo.results.some((r) => r.type === "requisition" && /mirip/.test(r.matched_field)), JSON.stringify(typo.results));
+    } else assert.equal(typo.mode, "any");
+
+    await assert.rejects(readEntity(sql, taActor, "sales_opportunity", tracker.id), (e: AgentReadError) => e.status === 403);
+    assert.equal((await readEntity(sql, taActor, "requisition", req.id)).entity.id, req.id);
+    const taEdges = (await readNeighbours(sql, taActor, "requisition", req.id)).edges;
+    assert.equal(taEdges.find((e) => e.name === "tracker")?.withheld, "MODULE_FORBIDDEN", "no cross-module leak via relations");
+    assert.deepEqual(new Set((await search(sql, taActor, "astra")).results.map((r) => r.type)), new Set(["requisition"]));
+    await assert.rejects(readEntity(sql, ownerActor, "salary", tracker.id), (e: AgentReadError) => e.status === 404);
+    await assert.rejects(readEntity(sql, ownerActor, "lead", ID), (e: AgentReadError) => e.status === 404);
+
+    // Signal parity: the Agent reads exactly what `Perlu perhatian` shows.
+    const now = new Date("2026-09-26T03:00:00Z");
+    const panel = await readOperationalContext(sql, { ...ownerActor }, "/", now);
+    for (const group of panel.groups) {
+      const signal = await readSignal(sql, ownerActor, group.key, now);
+      assert.ok(signal);
+      const { entity_type, remedy, as_of, ...same } = signal;
+      assert.deepEqual(same, group, `signal ${group.key} equals panel group`);
+      assert.equal(as_of, now.toISOString());
+      assert.ok(remedy === "task.create" || remedy === "requisition.assign_ta_pic", "every rule has an ERP-declared remedy");
+      void entity_type;
+    }
+    assert.equal(await readSignal(sql, taActor, "qualified-trackers", now), null, "module-gated");
+    const matches = await readEntitySignals(sql, ownerActor, "sales_opportunity", tracker.id);
+    assert.deepEqual(matches.signals.map((s) => [s.key, s.matches]), [["qualified-trackers", true]]);
+    const unassigned = await checkSignals(sql, ownerActor, "requisition", [req.id]);
+    assert.deepEqual(unassigned[0].matches, [req.id]);
+
+    // Signal history (observation): today's snapshot vs the last earlier day observed.
+    await sql`INSERT INTO operational_signal_snapshots (day, rule_key, count, ids) VALUES ('2026-09-20','unassigned-requisitions',0,'[]'::jsonb), ('2026-09-24','qualified-trackers',3,${JSON.stringify([tracker.id, ID, "gone-1"])}::jsonb)`;
+    const trends = await signalTrends(sql, panel.groups, now);
+    assert.deepEqual(trends["unassigned-requisitions"], { since: "2026-09-20", previous: 0, delta: 1, added: 1, resolved: 0, added_items: [panel.groups.find((g) => g.key === "unassigned-requisitions")!.items[0]] });
+    assert.deepEqual({ ...trends["qualified-trackers"], added_items: [] }, { since: "2026-09-24", previous: 3, delta: -2, added: 0, resolved: 2, added_items: [] });
+    assert.equal(trends["missing-invoices"], undefined, "no earlier day observed → no trend");
+    const [{ captured }] = await sql`SELECT max(captured_at) AS captured FROM operational_signal_snapshots WHERE day='2026-09-26'`;
+    await signalTrends(sql, panel.groups, now);
+    const [{ again }] = await sql`SELECT max(captured_at) AS again FROM operational_signal_snapshots WHERE day='2026-09-26'`;
+    assert.equal(String(again), String(captured), "snapshots refresh at most every 15 minutes while the count is unchanged");
+    const moved = panel.groups.map((g) => (g.key === "unassigned-requisitions" ? { ...g, count: g.count + 1 } : g));
+    await signalTrends(sql, moved, now);
+    const [{ stored }] = await sql`SELECT count AS stored FROM operational_signal_snapshots WHERE day='2026-09-26' AND rule_key='unassigned-requisitions'`;
+    assert.equal(stored, moved.find((g) => g.key === "unassigned-requisitions")!.count, "a changed count refreshes the snapshot at once");
+
+    // `Perlu perhatian` wording/links snapshot: any change here must be deliberate.
+    const metadata = panel.groups.map(({ key, module, title, rule, source, unit, href, action }) => ({ key, module, title, rule, source, unit, href, action }));
+    assert.equal(createHash("sha256").update(JSON.stringify(metadata)).digest("hex"), "08eeb5fd7a4b55ef15ae6b64a1c518fe6f08a2b5fc08ef10ff9983c28ebd970a");
+
+    // MS2 contextual envelope: PMO contract/invoice are readable to PMO readers only; values stay presence-only.
+    const [opty] = await sql`INSERT INTO opportunities (opty_no,client_name,project_name,service_type_code,sales_pic_name,price_amount) VALUES ('OPTY-77','PT Arunika Synthetic','Project X','outsourcing','Sales',424242) RETURNING id`;
+    const [contract] = await sql`INSERT INTO project_contracts (opportunity_id,monthly_value_amount,total_value_amount,contract_duration_months,start_date,end_date,notes) VALUES (${opty.id},31313131,375757572,12,'2025-10-19','2026-10-18','PRIVATE CONTRACT NOTE') RETURNING id`;
+    const [invoice] = await sql`INSERT INTO project_invoices (opportunity_id,services_month_start,price_per_month,status_code,notes) VALUES (${opty.id},'2026-08-01',31313131,'planned','PRIVATE INVOICE NOTE') RETURNING id`;
+    const contractRead = await readEntity(sql, ownerActor, "project_contract", contract.id);
+    assert.equal(contractRead.entity.label, "PT Arunika Synthetic · OPTY-77");
+    assert.equal(contractRead.entity.fields.find((f) => f.name === "end_date")?.value, "2026-10-18");
+    assert.doesNotMatch(JSON.stringify(contractRead), /31313131|375757572|PRIVATE/, "contract values and notes never leave ERP");
+    assert.deepEqual(contractRead.entity.commercial.map((c) => c.state), ["terisi", "terisi"]);
+    const contractEdges = (await readNeighbours(sql, ownerActor, "project_contract", contract.id)).edges;
+    assert.deepEqual(contractEdges.find((e) => e.name === "invoices")?.items.map((i) => i.id), [invoice.id]);
+    assert.equal((await readEntity(sql, ownerActor, "project_invoice", invoice.id)).entity.label, "PT Arunika Synthetic · 2026-08");
+    await assert.rejects(readEntity(sql, taActor, "project_contract", contract.id), (e: AgentReadError) => e.status === 403, "fails closed without PMO access");
+
+    await sql`UPDATE users SET status='rejected' WHERE id=${member.id}`;
+    await assert.rejects(loadActor(sql, member.id), (e: AgentReadError) => e.status === 403, "revoked user loses delegated reads");
+  } finally {
+    await sql.end();
+    await server.stop();
+    await pg.close();
+  }
+});
+
+test("Company Files: ERP declares its files, never identity documents, and decides who may read them (ADR-018)", async () => {
+  // @ts-expect-error JS runner
+  const { migrate } = await import("../scripts/migrate.mjs");
+  const { fileFeed, fileAccess, readable, objectModule, resolveRef, classSettings } = await import("../src/lib/files/sources");
+  const pg = await PGlite.create();
+  const server = new PGLiteSocketServer({ db: pg, port: 55446, host: "127.0.0.1" });
+  await server.start();
+  const url = process.env.FILES_DATABASE_URL || "postgres://postgres:postgres@127.0.0.1:55446/postgres";
+  const sql = postgres(url, { max: process.env.FILES_DATABASE_URL ? 4 : 1, prepare: false });
+  try {
+    await migrate(url);
+    assert.deepEqual((await classSettings(sql)).commercial, { model_visibility: "none", indexing: "lexical", retention_days: 365 });
+    const [candidate] = await sql`INSERT INTO candidates (candidate_no,candidate_name,ta_pic_name,cv_asli_url) VALUES ('CAND-9','Budi Synthetic','Rina','cand/cv-1.pdf') RETURNING id`;
+    const [opty] = await sql`INSERT INTO opportunities (opty_no,client_name,project_name,service_type_code,sales_pic_name,po_doc_url) VALUES ('OPTY-9','PT Synthetic','Proyek','outsourcing','Sari','https://drive.example/po') RETURNING id`;
+    const [invoice] = await sql`INSERT INTO project_invoices (opportunity_id,bast_support_doc_url) VALUES (${opty.id},'invoice/bast-1.pdf') RETURNING id`;
+    const [cv] = await sql`INSERT INTO attachments (source_type,source_id,kind,file_name,file_path) VALUES ('candidate_cv_asli',${candidate.id},'file','cv-budi.pdf','candidate_cv_asli/x/cv-2.pdf') RETURNING id`;
+    await sql`INSERT INTO attachments (source_type,source_id,kind,file_name,file_path) VALUES ('onboarding_ktp',${candidate.id},'file','ktp.jpg','onboarding/ktp.jpg')`;
+    await sql`INSERT INTO attachments (source_type,source_id,kind,file_name,file_path) VALUES ('kanban_task',${candidate.id},'file','notes.pdf','task/notes.pdf')`;
+
+    const { items, next } = await fileFeed(sql, "", 50);
+    assert.equal(next, null);
+    const byRef = new Map(items.map((i) => [i!.ref, i!]));
+    assert.deepEqual([...byRef.keys()].sort(), [
+      `attachment:${cv.id}`,
+      `column:candidates.cv_asli_url:${candidate.id}`,
+      `column:opportunities.po_doc_url:${opty.id}`,
+      `column:project_invoices.bast_support_doc_url:${invoice.id}`,
+    ].sort(), "identity documents and undeclared attachments are not Company Files");
+    const bast = byRef.get(`column:project_invoices.bast_support_doc_url:${invoice.id}`)!;
+    assert.deepEqual([bast.origin, bast.kind, bast.access_class, bast.owner_division, bast.name], ["erp", "bast", "commercial", "pmo", "BAST.pdf"]);
+    assert.equal(bast.entity.type, "invoice");
+    assert.match(bast.open_url, /^\/api\/documents\?bucket=candidate-documents&path=invoice%2Fbast-1\.pdf$/);
+    const po = byRef.get(`column:opportunities.po_doc_url:${opty.id}`)!;
+    assert.deepEqual([po.origin, po.url], ["external", "https://drive.example/po"]);
+    assert.equal(byRef.get(`attachment:${cv.id}`)!.entity.label, "CAND-9 · Budi Synthetic");
+    assert.equal(await resolveRef(sql, "attachment:" + (await sql`SELECT id FROM attachments WHERE source_type='onboarding_ktp'`)[0].id), null);
+
+    const [taUser] = await sql`INSERT INTO users (email,full_name,status,is_owner,account_type) VALUES ('ta-files@example.test','TA Editor','active',false,'backoffice') RETURNING id`;
+    const [salesUser] = await sql`INSERT INTO users (email,full_name,status,is_owner,account_type) VALUES ('sales-files@example.test','Sales Viewer','active',false,'backoffice') RETURNING id`;
+    await sql`INSERT INTO user_access (user_id,division_id,level) SELECT ${taUser.id}, id, 'editor' FROM divisions WHERE key='ta'`;
+    await sql`INSERT INTO user_access (user_id,division_id,level) SELECT ${salesUser.id}, id, 'viewer' FROM divisions WHERE key='sales'`;
+    const actor = (id: string, access: { divisionKey: string; level: string }[], owner = false) => ({ id, status: "active", isOwner: owner, accountType: "backoffice", access });
+    const ta = actor(taUser.id, [{ divisionKey: "ta", level: "editor" }]);
+    const sales = actor(salesUser.id, [{ divisionKey: "sales", level: "viewer" }]);
+    const taAccess = await fileAccess(sql, ta);
+    assert.deepEqual([taAccess.personal, taAccess.commercial, taAccess.divisions], [["ta"], [], ["ta"]]);
+    assert.deepEqual((await fileAccess(sql, sales)).commercial, [], "a viewer does not hold the commercial class");
+    const refs = [`attachment:${cv.id}`, `column:project_invoices.bast_support_doc_url:${invoice.id}`];
+    assert.deepEqual((await readable(sql, ta, refs, [])).refs, [`attachment:${cv.id}`]);
+    assert.deepEqual((await readable(sql, sales, refs, [{ type: "opportunity", id: opty.id }])), { refs: [], entities: [`opportunity:${opty.id}`] });
+    assert.deepEqual((await readable(sql, actor(taUser.id, [], true), refs, [])).refs, refs, "Owners read every declared file");
+    // `/api/documents` resolves an object to the record that owns it.
+    assert.equal(await objectModule(sql, "candidate-documents", "candidate_cv_asli/x/cv-2.pdf"), "ta");
+    assert.equal(await objectModule(sql, "candidate-documents", "invoice/bast-1.pdf"), "pmo");
+    assert.equal(await objectModule(sql, "candidate-documents", "onboarding/ktp.jpg"), "ta");
+    assert.equal(await objectModule(sql, "candidate-documents", "nobody/refers/to-this.pdf"), null);
+  } finally {
+    await sql.end();
+    await server.stop();
+    await pg.close();
+  }
+});

@@ -1,0 +1,13 @@
+# Optional proxy profile. Replace model names through provider configuration as needed.
+model_list:
+  - model_name: reasoning-strong
+    litellm_params:
+      model: os.environ/PROVIDER_REASONING_MODEL
+      api_key: os.environ/PROVIDER_API_KEY
+  - model_name: embedding-default
+    litellm_params:
+      model: os.environ/PROVIDER_EMBEDDING_MODEL
+      api_key: os.environ/PROVIDER_API_KEY
+litellm_settings:
+  num_retries: 2
+  request_timeout: 60

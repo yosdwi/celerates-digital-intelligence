@@ -1,0 +1,13 @@
+flowchart TD
+  Reviewers[Invited reviewers and BA] --> Edge[HTTPS domain and access controls]
+  Edge --> Web[Railway ERP web]
+  Web --> DB[(Dedicated ERP PostgreSQL volume)]
+  Web --> Objects[Private ERP object storage]
+  Job[Railway one-shot job] --> DB
+  Job --> Mail[Approved outbound provider]
+  DB --> Backup[Verified independent recovery copies]
+  Objects --> Backup
+  Web --> Boundary[ERP READ EVENT ACTION boundary]
+  Boundary --> Adapter[Python integration adapter]
+  Adapter --> Intelligence[Separate Intelligence runtime and stores]
+  Staging[Isolated staging] -. promotes tested image only .-> Web

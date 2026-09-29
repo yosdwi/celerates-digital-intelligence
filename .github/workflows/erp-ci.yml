@@ -1,0 +1,74 @@
+name: ERP pilot checks
+on:
+  push:
+    paths: ['apps/erp/**', 'services/intelligence-api/**', 'infra/postgres/migrations/**', 'infra/erp-compose.yml', '.github/workflows/erp-ci.yml']
+  pull_request:
+    paths: ['apps/erp/**', 'services/intelligence-api/**', 'infra/postgres/migrations/**', 'infra/erp-compose.yml', '.github/workflows/erp-ci.yml']
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: erp
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: erp_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U erp -d erp_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    defaults:
+      run:
+        working-directory: apps/erp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: apps/erp/package-lock.json
+      - uses: astral-sh/setup-uv@v6
+        with: {version: "0.12.17"}
+      - run: uv sync --project ../../services/intelligence-api --extra test --frozen
+      - run: npm ci
+      - run: psql "$TEST_DATABASE_URL" -c "CREATE DATABASE erp_operations_test"
+        env:
+          TEST_DATABASE_URL: postgres://erp:ci-only-password@127.0.0.1:5432/erp_test
+      - run: psql "$TEST_DATABASE_URL" -c "CREATE DATABASE intelligence_contract_test"
+        env:
+          TEST_DATABASE_URL: postgres://erp:ci-only-password@127.0.0.1:5432/erp_test
+      - run: psql "$TEST_DATABASE_URL" -c "CREATE DATABASE erp_http_test"
+        env:
+          TEST_DATABASE_URL: postgres://erp:ci-only-password@127.0.0.1:5432/erp_test
+      - run: psql "$TEST_DATABASE_URL" -c "CREATE DATABASE erp_agent_test"
+        env:
+          TEST_DATABASE_URL: postgres://erp:ci-only-password@127.0.0.1:5432/erp_test
+      - run: psql "$TEST_DATABASE_URL" -c "CREATE DATABASE erp_proposals_test"
+        env:
+          TEST_DATABASE_URL: postgres://erp:ci-only-password@127.0.0.1:5432/erp_test
+      - run: npm test
+        env:
+          TEST_DATABASE_URL: postgres://erp:ci-only-password@127.0.0.1:5432/erp_test
+          OPERATIONS_DATABASE_URL: postgres://erp:ci-only-password@127.0.0.1:5432/erp_operations_test
+          AGENT_DATABASE_URL: postgres://erp:ci-only-password@127.0.0.1:5432/erp_agent_test
+          PROPOSALS_DATABASE_URL: postgres://erp:ci-only-password@127.0.0.1:5432/erp_proposals_test
+      - run: npm run typecheck
+      - run: npm ci && npm run build
+        working-directory: apps/web
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/http-smoke.mjs
+        env:
+          ERP_BROWSER_TEST: "1"
+          FOUNDATION_BROWSER_TEST: "1"
+          ERP_HTTP_DATABASE_URL: postgres://erp:ci-only-password@127.0.0.1:5432/erp_http_test
+          INTELLIGENCE_DATABASE_URL: postgres://erp:ci-only-password@127.0.0.1:5432/intelligence_contract_test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: foundation-and-agent-browser-evidence
+          path: docs/implementation/evidence/*.png
+      - run: docker build -t celerates-erp:ci .

@@ -1,0 +1,319 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:celerates:erp-intelligence:v1:envelopes",
+  "title": "Proposed common envelopes, not a complete endpoint implementation specification",
+  "$defs": {
+    "resource_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "enum": [
+            "sales_opportunity",
+            "customer",
+            "commercial_pq",
+            "employee",
+            "talent_skill",
+            "project",
+            "allocation",
+            "contract",
+            "bast",
+            "invoice",
+            "timesheet",
+            "capability",
+            "capacity",
+            "approval",
+            "workflow_state",
+            "task",
+            "user_case",
+            "service_case",
+            "reminder_occurrence",
+            "artifact",
+            "document"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "required": [
+        "type",
+        "id"
+      ]
+    },
+    "aggregate": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "enum": [
+            "sales_opportunity",
+            "customer",
+            "commercial_pq",
+            "employee",
+            "talent_skill",
+            "project",
+            "allocation",
+            "contract",
+            "bast",
+            "invoice",
+            "timesheet",
+            "capability",
+            "capacity",
+            "approval",
+            "workflow_state",
+            "task",
+            "user_case",
+            "service_case",
+            "reminder_occurrence",
+            "artifact",
+            "document"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "type",
+        "id",
+        "version"
+      ]
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0"
+        },
+        "event_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "event_type": {
+          "enum": [
+            "opportunity.changed.v1",
+            "approval.changed.v1",
+            "bast.pending.v1",
+            "bast.updated.v1",
+            "contract.expiry_proximity.v1",
+            "project.milestone.changed.v1",
+            "workflow.milestone.changed.v1",
+            "user.case.changed.v1",
+            "service.case.changed.v1",
+            "record.deleted.v1",
+            "access.revoked.v1"
+          ]
+        },
+        "aggregate": {
+          "$ref": "#/$defs/aggregate"
+        },
+        "occurred_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "correlation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "change_kind": {
+          "enum": [
+            "created",
+            "updated",
+            "deleted",
+            "revoked",
+            "derived"
+          ]
+        },
+        "changed_fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "resource_ref": {
+          "type": "string",
+          "pattern": "^/api/integration/v1/resources/"
+        }
+      },
+      "required": [
+        "schema_version",
+        "event_id",
+        "event_type",
+        "aggregate",
+        "occurred_at",
+        "correlation_id",
+        "change_kind",
+        "changed_fields",
+        "resource_ref"
+      ]
+    },
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0"
+        },
+        "kind": {
+          "enum": [
+            "task.create",
+            "task.update",
+            "case.create",
+            "workflow.status.update",
+            "artifact.persist_approved_reference",
+            "reminder.acknowledge",
+            "reminder.escalate",
+            "document.attach_generated_reference"
+          ]
+        },
+        "target": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/resource_ref"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "expected_version": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "approval_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "payload": {
+          "type": "object",
+          "description": "Envelope only. Each command requires a separate strict payload schema before implementation."
+        }
+      },
+      "required": [
+        "schema_version",
+        "kind",
+        "target",
+        "expected_version",
+        "approval_id",
+        "payload"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "task.create",
+                  "case.create"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "target": {
+                "type": "null"
+              },
+              "expected_version": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "target": {
+                "$ref": "#/$defs/resource_ref"
+              },
+              "expected_version": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "read": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0"
+        },
+        "resource": {
+          "$ref": "#/$defs/resource_ref"
+        },
+        "record_version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "as_of": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "source_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/resource_ref"
+          }
+        },
+        "quality": {
+          "enum": [
+            "verified",
+            "partial",
+            "unknown"
+          ]
+        },
+        "quality_reasons": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "correlation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "data": {
+          "type": "object",
+          "description": "Projection-specific DTO schemas must be added before provider implementation."
+        }
+      },
+      "required": [
+        "schema_version",
+        "resource",
+        "record_version",
+        "as_of",
+        "source_refs",
+        "quality",
+        "quality_reasons",
+        "correlation_id",
+        "data"
+      ]
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/event"
+    },
+    {
+      "$ref": "#/$defs/command"
+    },
+    {
+      "$ref": "#/$defs/read"
+    }
+  ]
+}

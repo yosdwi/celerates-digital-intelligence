@@ -1,0 +1,10 @@
+{
+  "name": "Celerates — register source through Python intake",
+  "active": false,
+  "nodes": [
+    {"id":"intake-trigger","name":"Source submitted","type":"n8n-nodes-base.webhook","typeVersion":2,"position":[260,300],"parameters":{"httpMethod":"POST","path":"celerates-source","responseMode":"lastNode","authentication":"headerAuth"},"credentials":{"httpHeaderAuth":{"name":"Configure inbound webhook secret"}}},
+    {"id":"register-source","name":"Register with Intelligence API","type":"n8n-nodes-base.httpRequest","typeVersion":4.2,"position":[540,300],"parameters":{"method":"POST","url":"=http://intelligence-api:8000/api/opportunities/{{ encodeURIComponent($json.body.opportunity_id) }}/documents","authentication":"genericCredentialType","genericAuthType":"httpHeaderAuth","sendBody":true,"specifyBody":"json","jsonBody":"={{ JSON.stringify({name: $json.body.name, text: $json.body.text, source_url: $json.body.source_url || null}) }}","options":{}},"credentials":{"httpHeaderAuth":{"name":"Configure Intelligence API bearer token"}}}
+  ],
+  "connections":{"Source submitted":{"main":[[{"node":"Register with Intelligence API","type":"main","index":0}]]}},
+  "settings":{"executionOrder":"v1"}
+}

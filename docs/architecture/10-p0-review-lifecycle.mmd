@@ -1,0 +1,17 @@
+stateDiagram-v2
+    [*] --> NEW
+    NEW --> QUEUED: Source registered and analysis requested
+    QUEUED --> INGESTING: Worker claims job
+    INGESTING --> ANALYZING: Sources indexed
+    ANALYZING --> REVIEW_REQUIRED: Eleven artifacts persisted
+    REVIEW_REQUIRED --> REVIEW_REQUIRED: Edit and version review
+    REVIEW_REQUIRED --> RESUMING: Explicit human decision
+    RESUMING --> READY_FOR_SALES: All versions approved and ERP acknowledges
+    RESUMING --> CLARIFICATION_REQUIRED: ERP acknowledges clarification
+    CLARIFICATION_REQUIRED --> QUEUED: New evidence and new run
+    READY_FOR_SALES --> QUEUED: New analysis preserves prior run
+    INGESTING --> FAILED: Parser or storage error
+    ANALYZING --> FAILED: Retrieval or model error
+    RESUMING --> FAILED: ERP action not acknowledged
+    FAILED --> QUEUED: Retry analysis checkpoint
+    FAILED --> RESUMING: Retry approved outcome

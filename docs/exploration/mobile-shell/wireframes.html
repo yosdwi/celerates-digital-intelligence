@@ -1,0 +1,398 @@
+<!doctype html>
+<!-- Low-fidelity wireframes for doc 18 (Mobile/PWA shell directions). Exploration only: not an implementation,
+     not a locked IA, not a visual system. Rendered to PNG by render-captures.mjs. All data is synthetic. -->
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mobile shell wireframes</title>
+<style>
+  :root { --ink:#0f172a; --muted:#64748b; --line:#e2e8f0; --bg:#f1f5f9; --card:#fff; --accent:#1d4ed8; --accent-soft:#dbeafe; --warn:#b45309; --warn-soft:#fef3c7; --ok:#047857; --ok-soft:#d1fae5; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#e5e7eb; font-family:-apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; color:var(--ink); }
+  section.direction { display:inline-block; padding:28px 32px 36px; background:#fff; margin:0; }
+  .dir-head { max-width:860px; margin-bottom:18px; }
+  .dir-head .tag { display:inline-block; font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--accent); }
+  .dir-head h1 { font-size:24px; margin:4px 0 6px; }
+  .dir-head p { margin:0; font-size:14px; color:var(--muted); line-height:1.45; }
+  .row { display:flex; gap:28px; align-items:flex-start; }
+  .screen { display:flex; flex-direction:column; gap:8px; }
+  .caption { font-size:13px; color:var(--muted); max-width:390px; line-height:1.4; }
+  .caption b { color:var(--ink); }
+  .phone { width:390px; height:844px; border-radius:46px; border:10px solid #111827; background:var(--bg); position:relative; overflow:hidden; }
+  .status { height:44px; display:flex; justify-content:space-between; align-items:center; padding:0 26px; font-size:14px; font-weight:600; }
+  .top { display:flex; align-items:center; justify-content:space-between; padding:6px 16px 10px; }
+  .brand { display:flex; align-items:center; gap:8px; font-weight:700; }
+  .logo { width:28px; height:28px; border-radius:8px; background:var(--ink); color:#fff; font-size:13px; display:grid; place-items:center; }
+  .icons { display:flex; gap:10px; }
+  .ico { width:34px; height:34px; border-radius:50%; background:#fff; border:1px solid var(--line); display:grid; place-items:center; font-size:14px; color:var(--muted); position:relative; }
+  .badge { position:absolute; top:-3px; right:-3px; min-width:16px; height:16px; border-radius:8px; background:#dc2626; color:#fff; font-size:10px; font-weight:700; display:grid; place-items:center; padding:0 4px; }
+  .content { padding:0 16px; }
+  .hello { font-size:22px; font-weight:700; margin:2px 0 2px; }
+  .sub { font-size:13px; color:var(--muted); }
+  .chip { display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:600; border-radius:999px; padding:3px 8px; background:#fff; border:1px solid var(--line); color:var(--muted); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:12px; }
+  .h { font-size:13px; font-weight:700; display:flex; justify-content:space-between; align-items:center; margin:14px 0 8px; }
+  .h a { font-size:12px; font-weight:600; color:var(--accent); text-decoration:none; }
+  .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; text-align:center; }
+  .stat b { display:block; font-size:20px; }
+  .stat span { font-size:10.5px; color:var(--muted); line-height:1.2; display:block; }
+  .grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px 6px; text-align:center; }
+  .mod { display:flex; flex-direction:column; align-items:center; gap:5px; font-size:11px; font-weight:600; }
+  .tile { width:52px; height:52px; border-radius:16px; display:grid; place-items:center; font-size:15px; font-weight:800; color:#fff; }
+  .t1{background:#d97706}.t2{background:#7c3aed}.t3{background:#2563eb}.t4{background:#0f766e}.t5{background:#9333ea}.t6{background:#be123c}.t7{background:#4338ca}.t8{background:#475569}
+  .big .tile { width:62px; height:62px; border-radius:18px; font-size:17px; }
+  .item { display:flex; gap:10px; align-items:flex-start; padding:10px 0; border-top:1px solid var(--line); font-size:12.5px; }
+  .item:first-child { border-top:0; padding-top:0; }
+  .dot { width:8px; height:8px; border-radius:50%; margin-top:5px; flex:none; }
+  .meta { font-size:11px; color:var(--muted); margin-top:2px; }
+  .attn { display:flex; align-items:center; gap:10px; background:var(--warn-soft); border:1px solid #fde68a; border-radius:14px; padding:10px 12px; font-size:12.5px; }
+  .attn b { color:var(--warn); }
+  .tabbar { position:absolute; left:0; right:0; bottom:0; height:82px; background:#fff; border-top:1px solid var(--line); display:flex; justify-content:space-around; align-items:flex-start; padding-top:10px; }
+  .tab { display:flex; flex-direction:column; align-items:center; gap:3px; font-size:10.5px; color:var(--muted); font-weight:600; position:relative; width:64px; }
+  .tab .g { width:24px; height:24px; border-radius:7px; border:2px solid currentColor; }
+  .tab.on { color:var(--accent); }
+  .tab.on .g { background:var(--accent-soft); }
+  .tab .badge { top:-4px; right:14px; }
+  .agentbtn { width:48px; height:48px; border-radius:16px; background:var(--ink); color:#fff; display:grid; place-items:center; font-size:18px; margin-top:-8px; }
+  .search { display:flex; align-items:center; gap:8px; background:#fff; border:1.5px solid #cbd5e1; border-radius:16px; padding:12px 12px; font-size:14px; color:var(--muted); }
+  .search .grow { flex:1; }
+  .search .act { width:30px; height:30px; border-radius:10px; background:var(--bg); display:grid; place-items:center; font-size:13px; color:var(--ink); }
+  .search.typing { border-color:var(--accent); color:var(--ink); }
+  .group { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:14px 0 6px; }
+  .res { display:flex; gap:10px; align-items:center; background:#fff; border:1px solid var(--line); border-radius:12px; padding:10px; margin-bottom:6px; font-size:12.5px; }
+  .res .k { width:34px; height:34px; border-radius:10px; display:grid; place-items:center; font-size:11px; font-weight:800; color:#fff; flex:none; }
+  .res .grow { flex:1; min-width:0; }
+  .pill { font-size:10px; font-weight:700; border-radius:6px; padding:2px 6px; }
+  .p-warn{background:var(--warn-soft);color:var(--warn)} .p-ok{background:var(--ok-soft);color:var(--ok)} .p-acc{background:var(--accent-soft);color:var(--accent)} .p-mute{background:#f1f5f9;color:var(--muted)}
+  .ask { display:flex; gap:10px; align-items:center; border:1.5px dashed #93c5fd; background:#eff6ff; border-radius:12px; padding:10px; font-size:12.5px; }
+  .ask .k { width:34px; height:34px; border-radius:10px; background:var(--ink); color:#fff; display:grid; place-items:center; flex:none; }
+  .seg { display:flex; gap:6px; overflow:hidden; margin:4px 0 10px; }
+  .seg span { font-size:12px; font-weight:600; border-radius:999px; padding:6px 10px; background:#fff; border:1px solid var(--line); color:var(--muted); white-space:nowrap; }
+  .seg span.on { background:var(--ink); color:#fff; border-color:var(--ink); }
+  .task { background:#fff; border:1px solid var(--line); border-radius:16px; padding:12px; margin-bottom:8px; font-size:12.5px; }
+  .task .top2 { display:flex; justify-content:space-between; gap:8px; }
+  .task .t { font-weight:700; font-size:13px; }
+  .task .src { font-size:10.5px; color:var(--muted); margin-top:6px; display:flex; gap:6px; flex-wrap:wrap; }
+  .btns { display:flex; gap:6px; margin-top:10px; }
+  .btn { font-size:12px; font-weight:700; border-radius:10px; padding:7px 12px; border:1px solid var(--line); background:#fff; }
+  .btn.pri { background:var(--ink); color:#fff; border-color:var(--ink); }
+  .strip { display:flex; gap:8px; overflow:hidden; margin:6px 0 4px; }
+  .strip .mod { flex:none; width:58px; }
+  .strip .tile { width:46px; height:46px; border-radius:14px; font-size:13px; }
+  .fab { position:absolute; right:16px; bottom:98px; height:50px; border-radius:25px; background:var(--ink); color:#fff; display:flex; align-items:center; gap:8px; padding:0 18px 0 14px; font-size:13.5px; font-weight:700; box-shadow:0 8px 20px rgba(15,23,42,.25); }
+  .sheet { position:absolute; left:0; right:0; bottom:0; top:120px; background:#fff; border-radius:24px 24px 0 0; box-shadow:0 -10px 30px rgba(15,23,42,.18); padding:10px 16px; }
+  .grab { width:40px; height:5px; border-radius:3px; background:#cbd5e1; margin:0 auto 10px; }
+  .scrim { position:absolute; inset:0; background:rgba(15,23,42,.35); }
+  .list-mod { display:flex; align-items:center; gap:10px; padding:9px 0; border-top:1px solid var(--line); font-size:13px; font-weight:600; }
+  .list-mod .tile { width:36px; height:36px; border-radius:11px; font-size:11px; }
+  .list-mod .grow { flex:1; }
+  .kv { display:grid; grid-template-columns:110px 1fr; gap:6px 8px; font-size:12.5px; }
+  .kv div:nth-child(odd) { color:var(--muted); }
+  .back { font-size:13px; color:var(--accent); font-weight:600; }
+  .actions { position:absolute; left:0; right:0; bottom:0; background:#fff; border-top:1px solid var(--line); padding:12px 16px 26px; display:flex; gap:8px; }
+  .actions .btn { flex:1; text-align:center; padding:11px 8px; font-size:13px; }
+  .note { font-size:10.5px; color:var(--muted); display:flex; gap:6px; align-items:center; }
+</style>
+</head>
+<body>
+
+<!-- ============ Direction A ============ -->
+<section class="direction" id="A">
+  <div class="dir-head">
+    <span class="tag">Arah A</span>
+    <h1>Beranda operasional + tab bar</h1>
+    <p>Paling dekat dengan baseline. Beranda = ringkasan hari ini + launcher modul. Tiap perilaku mobile punya tempat tetap di tab bar: <b>Modul</b>, <b>Tinjau</b>, dan tombol <b>Tanya</b> di tengah untuk Agent (tanya, suara, foto/berkas). Perlu perhatian cukup satu baris ringkas.</p>
+  </div>
+  <div class="row">
+    <div class="screen">
+      <div class="phone">
+        <div class="status"><span>9:41</span><span>●●● ▰</span></div>
+        <div class="top"><div class="brand"><div class="logo">C</div>Celerates</div><div class="icons"><div class="ico">🔔<span class="badge">5</span></div><div class="ico">Y</div></div></div>
+        <div class="content">
+          <div class="hello">Selamat pagi, Yoses</div>
+          <div class="sub">Sabtu, 27 Sep · <span class="chip">Owner · semua modul</span></div>
+          <div class="h">Hari ini <a>Detail</a></div>
+          <div class="card stats">
+            <div class="stat"><b>3</b><span>Perlu keputusan</span></div>
+            <div class="stat"><b>2</b><span>Tindak lanjut jatuh tempo</span></div>
+            <div class="stat"><b>1</b><span>Kontrak habis ≤ 30 hari</span></div>
+            <div class="stat"><b>4</b><span>Timesheet belum masuk</span></div>
+          </div>
+          <div class="h">Modul <a>Semua</a></div>
+          <div class="grid">
+            <div class="mod"><div class="tile t1">TA</div>Talent Acq.</div>
+            <div class="mod"><div class="tile t2">PMO</div>PMO</div>
+            <div class="mod"><div class="tile t3">S</div>Sales</div>
+            <div class="mod"><div class="tile t4">K</div>Kontrak</div>
+            <div class="mod"><div class="tile t5">TS</div>Timesheet</div>
+            <div class="mod"><div class="tile t6">B</div>BAST</div>
+            <div class="mod"><div class="tile t7">F</div>Files</div>
+            <div class="mod"><div class="tile t8">⋯</div>Lainnya</div>
+          </div>
+          <div class="h">Perlu perhatian</div>
+          <div class="attn"><b>3 kondisi</b><span style="flex:1">2 requisition tanpa TA PIC · 1 kontrak mendekati akhir</span><span>›</span></div>
+          <div class="h">Terbaru <a>Lihat semua</a></div>
+          <div class="card">
+            <div class="item"><span class="dot" style="background:#16a34a"></span><div>PKS PT Synthetic Astra disetujui<div class="meta">Kontrak · 10 menit lalu</div></div></div>
+            <div class="item"><span class="dot" style="background:#2563eb"></span><div>BAST Maret diunggah ke Company Files<div class="meta">PMO · 1 jam lalu</div></div></div>
+          </div>
+        </div>
+        <div class="tabbar">
+          <div class="tab on"><div class="g"></div>Beranda</div>
+          <div class="tab"><div class="g"></div>Modul</div>
+          <div class="tab"><div class="agentbtn">✦</div>Tanya</div>
+          <div class="tab"><div class="g"></div><span class="badge">5</span>Tinjau</div>
+          <div class="tab"><div class="g"></div>Akun</div>
+        </div>
+      </div>
+      <div class="caption"><b>A1 · Beranda.</b> Angka "Hari ini" adalah fakta ERP deterministik (bukan inferensi model) dan tiap angka membuka daftar di modulnya. Launcher = modul yang boleh diakses user.</div>
+    </div>
+    <div class="screen">
+      <div class="phone">
+        <div class="status"><span>9:41</span><span>●●● ▰</span></div>
+        <div class="top"><div class="brand" style="font-size:20px">Tinjau</div><div class="icons"><div class="ico">⌕</div></div></div>
+        <div class="content">
+          <div class="seg"><span class="on">Semua 5</span><span>Persetujuan 2</span><span>Usulan Agent 2</span><span>Masukan 1</span></div>
+          <div class="task">
+            <div class="top2"><div class="t">Extension request — Andi S.</div><span class="pill p-warn">Persetujuan</span></div>
+            <div>Perpanjangan 6 bulan di PT Synthetic Astra, rate tetap.</div>
+            <div class="src"><span>Talent Management</span>·<span>diajukan TM, 2 hari lalu</span></div>
+            <div class="btns"><span class="btn pri">Setujui</span><span class="btn">Tolak</span><span class="btn">Buka</span></div>
+          </div>
+          <div class="task">
+            <div class="top2"><div class="t">Tetapkan TA PIC untuk 2 requisition</div><span class="pill p-acc">Usulan Agent</span></div>
+            <div>1 siap, 1 perlu dilengkapi. Tidak ada data berubah sebelum Anda konfirmasi.</div>
+            <div class="src"><span>Sinyal: requisition tanpa TA PIC</span>·<span>divalidasi ERP</span></div>
+            <div class="btns"><span class="btn pri">Tinjau usulan</span><span class="btn">Nanti</span></div>
+          </div>
+          <div class="task">
+            <div class="top2"><div class="t">Kontrak PKS-2026-014 berakhir 21 hari lagi</div><span class="pill p-mute">Tindak lanjut</span></div>
+            <div class="src"><span>PMO · Kontrak</span>·<span>fakta ERP</span></div>
+            <div class="btns"><span class="btn pri">Buat tindak lanjut</span><span class="btn">Buka kontrak</span></div>
+          </div>
+          <div class="task">
+            <div class="top2"><div class="t">Draf koreksi pengetahuan</div><span class="pill p-ok">Masukan</span></div>
+            <div class="src"><span>dari percakapan Agent Anda</span></div>
+            <div class="btns"><span class="btn pri">Kirim</span><span class="btn">Batal</span></div>
+          </div>
+        </div>
+        <div class="tabbar">
+          <div class="tab"><div class="g"></div>Beranda</div>
+          <div class="tab"><div class="g"></div>Modul</div>
+          <div class="tab"><div class="agentbtn">✦</div>Tanya</div>
+          <div class="tab on"><div class="g"></div><span class="badge">5</span>Tinjau</div>
+          <div class="tab"><div class="g"></div>Akun</div>
+        </div>
+      </div>
+      <div class="caption"><b>A2 · Tinjau.</b> Satu antrean untuk hal yang menunggu respons user, dari sumber yang sudah ada: persetujuan ERP, usulan Agent, draf masukan, notifikasi. Tombol aksi memanggil endpoint pemilik datanya; tidak ada jalur otorisasi baru.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ Direction B ============ -->
+<section class="direction" id="B">
+  <div class="dir-head">
+    <span class="tag">Arah B</span>
+    <h1>Launcher + satu bilah Cari / Tanya / Tangkap</h1>
+    <p>Beranda = launcher modul yang besar dan tenang. Di atasnya satu bilah untuk <b>mencari record atau berkas, memotret/unggah dokumen, dan bertanya</b>: hasil pencarian muncul lebih dulu, "Tanya Agent" menjadi baris terakhir. Agent tidak punya tab sendiri; ia muncul dari bilah, dari record, dan dari Tinjau. Tab bar hanya 3.</p>
+  </div>
+  <div class="row">
+    <div class="screen">
+      <div class="phone">
+        <div class="status"><span>9:41</span><span>●●● ▰</span></div>
+        <div class="top"><div class="brand"><div class="logo">C</div>Selamat pagi, Yoses</div><div class="icons"><div class="ico">🔔<span class="badge">5</span></div></div></div>
+        <div class="content">
+          <div class="search"><span>⌕</span><span class="grow">Cari record, berkas, atau tanya…</span><span class="act">📷</span><span class="act">🎙</span></div>
+          <div class="h" style="margin-top:18px">Modul Anda <a>Atur</a></div>
+          <div class="grid big" style="gap:16px 6px">
+            <div class="mod"><div class="tile t1">TA</div>Talent Acq.</div>
+            <div class="mod"><div class="tile t2">PMO</div>PMO</div>
+            <div class="mod"><div class="tile t3">S</div>Sales</div>
+            <div class="mod"><div class="tile t4">K</div>Kontrak</div>
+            <div class="mod"><div class="tile t5">TS</div>Timesheet</div>
+            <div class="mod"><div class="tile t6">B</div>BAST</div>
+            <div class="mod"><div class="tile t7">F</div>Files</div>
+            <div class="mod"><div class="tile t3" style="background:#0369a1">TM</div>Talent Mgmt</div>
+            <div class="mod"><div class="tile t8" style="background:#15803d">Fin</div>Finance</div>
+            <div class="mod"><div class="tile t8" style="background:#334155">Ex</div>Executive</div>
+            <div class="mod"><div class="tile t8" style="background:#0e7490">Tg</div>Task Board</div>
+            <div class="mod"><div class="tile t8">⋯</div>Semua</div>
+          </div>
+          <div class="h" style="margin-top:20px">Menunggu Anda</div>
+          <div class="attn" style="background:#fff;border-color:var(--line)"><b style="color:var(--ink)">5 untuk ditinjau</b><span style="flex:1;color:var(--muted)">2 persetujuan · 2 usulan · 1 masukan</span><span>›</span></div>
+          <div class="h">Terakhir dibuka</div>
+          <div class="seg"><span>REQ-2026-4015</span><span>PKS-2026-014</span><span>Andi S.</span></div>
+        </div>
+        <div class="tabbar">
+          <div class="tab on"><div class="g"></div>Beranda</div>
+          <div class="tab"><div class="g"></div><span class="badge">5</span>Tinjau</div>
+          <div class="tab"><div class="g"></div>Akun</div>
+        </div>
+      </div>
+      <div class="caption"><b>B1 · Beranda.</b> Modul adalah isi utama. Urutan/pin dapat diatur user; default dari peran. "Menunggu Anda" satu baris saja; perhatian proaktif tinggal di Tinjau dan di Agent.</div>
+    </div>
+    <div class="screen">
+      <div class="phone">
+        <div class="status"><span>9:41</span><span>●●● ▰</span></div>
+        <div class="content" style="padding-top:6px">
+          <div class="search typing"><span>←</span><span class="grow">kontrak astra</span><span class="act">✕</span></div>
+          <div class="group">Record</div>
+          <div class="res"><div class="k t4">K</div><div class="grow"><b>PKS-2026-014 · PT Synthetic Astra</b><div class="meta">PMO · Kontrak · aktif s/d 18 Okt 2026</div></div><span class="pill p-warn">21 hari</span></div>
+          <div class="res"><div class="k t3">S</div><div class="grow"><b>OPTY2026-849 · Astra Digital</b><div class="meta">Sales · Opportunity · Won</div></div></div>
+          <div class="group">Company Files</div>
+          <div class="res"><div class="k t7">PDF</div><div class="grow"><b>PKS Astra 2026.pdf</b><div class="meta">Kontrak · komersial · isi tidak dibagikan ke Agent</div></div></div>
+          <div class="res"><div class="k t7">PDF</div><div class="grow"><b>BAST Astra Maret.pdf</b><div class="meta">BAST · divisi PMO · hal. 2 cocok</div></div></div>
+          <div class="group">Modul</div>
+          <div class="res"><div class="k t2">PMO</div><div class="grow"><b>A.Contract</b><div class="meta">PMO</div></div></div>
+          <div class="group">Tanya</div>
+          <div class="ask"><div class="k">✦</div><div class="grow"><b>Tanya Agent: "kontrak astra"</b><div class="meta">Jawaban dengan sumber; tindakan selalu lewat konfirmasi Anda</div></div></div>
+          <div class="group">Tangkap</div>
+          <div class="seg"><span>📷 Foto dokumen</span><span>⤒ Unggah berkas</span><span>🎙 Suara</span></div>
+        </div>
+      </div>
+      <div class="caption"><b>B2 · Bilah terbuka.</b> Satu pintu untuk tiga kebutuhan: cari (record + berkas + modul, semua sudah terfilter otoritas), tangkap (foto/unggah → Company Files atau lampiran Agent), tanya (Agent layar penuh). Kalimat panjang atau pertanyaan langsung diarahkan ke Agent.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ Direction C ============ -->
+<section class="direction" id="C">
+  <div class="dir-head">
+    <span class="tag">Arah C</span>
+    <h1>Kerja-dulu: antrean respons sebagai beranda</h1>
+    <p>Untuk pola manajemen "buka, putuskan, tutup". Beranda = antrean hal yang menunggu Anda, dengan aksi langsung di kartu. Modul tetap satu ketukan lewat strip di atas dan lembar <b>Modul</b>. Agent sebagai tombol melayang. Kontras paling tajam dengan A/B; berisiko menjadikan beranda feed notifikasi.</p>
+  </div>
+  <div class="row">
+    <div class="screen">
+      <div class="phone">
+        <div class="status"><span>9:41</span><span>●●● ▰</span></div>
+        <div class="top"><div class="brand"><div class="logo">C</div>Celerates</div><div class="icons"><div class="ico">⌕</div><div class="ico">Y</div></div></div>
+        <div class="content">
+          <div class="strip">
+            <div class="mod"><div class="tile t1">TA</div>TA</div>
+            <div class="mod"><div class="tile t2">PMO</div>PMO</div>
+            <div class="mod"><div class="tile t3">S</div>Sales</div>
+            <div class="mod"><div class="tile t4">K</div>Kontrak</div>
+            <div class="mod"><div class="tile t5">TS</div>Timesh.</div>
+            <div class="mod"><div class="tile t8">⋯</div>Semua</div>
+          </div>
+          <div class="h">Untuk Anda hari ini · 5</div>
+          <div class="task">
+            <div class="top2"><div class="t">Extension request — Andi S.</div><span class="pill p-warn">Persetujuan</span></div>
+            <div class="src"><span>Talent Management · 2 hari</span></div>
+            <div class="btns"><span class="btn pri">Setujui</span><span class="btn">Tolak</span><span class="btn">Buka</span></div>
+          </div>
+          <div class="task">
+            <div class="top2"><div class="t">Tetapkan TA PIC · 2 requisition</div><span class="pill p-acc">Usulan</span></div>
+            <div class="btns"><span class="btn pri">Tinjau</span><span class="btn">Nanti</span></div>
+          </div>
+          <div class="task">
+            <div class="top2"><div class="t">PKS-2026-014 berakhir 21 hari</div><span class="pill p-mute">Tindak lanjut</span></div>
+            <div class="btns"><span class="btn pri">Buat tindak lanjut</span><span class="btn">Buka</span></div>
+          </div>
+          <div class="task" style="opacity:.55">
+            <div class="top2"><div class="t">4 timesheet September belum masuk</div><span class="pill p-mute">Info</span></div>
+          </div>
+        </div>
+        <div class="fab">✦ Tanya</div>
+        <div class="tabbar">
+          <div class="tab on"><div class="g"></div><span class="badge">5</span>Kerja</div>
+          <div class="tab"><div class="g"></div>Modul</div>
+          <div class="tab"><div class="g"></div>Berkas</div>
+          <div class="tab"><div class="g"></div>Akun</div>
+        </div>
+      </div>
+      <div class="caption"><b>C1 · Kerja.</b> Beranda yang habis dikerjakan ("0 menunggu" = selesai). Modul tetap terlihat tetapi sekunder. Company Files jadi tab karena capture dokumen sering dilakukan manajemen.</div>
+    </div>
+    <div class="screen">
+      <div class="phone">
+        <div class="status"><span>9:41</span><span>●●● ▰</span></div>
+        <div class="top"><div class="brand"><div class="logo">C</div>Celerates</div></div>
+        <div class="scrim"></div>
+        <div class="sheet">
+          <div class="grab"></div>
+          <div class="h" style="margin-top:0">Modul <span class="chip">sesuai akses Anda</span></div>
+          <div class="group" style="margin-top:4px">Komersial</div>
+          <div class="list-mod"><div class="tile t3">S</div><span class="grow">Sales</span><span class="pill p-ok">Penuh</span></div>
+          <div class="list-mod"><div class="tile t1" style="background:#0284c7">M</div><span class="grow">Marketing</span><span class="pill p-ok">Penuh</span></div>
+          <div class="group">Talenta</div>
+          <div class="list-mod"><div class="tile t1">TA</div><span class="grow">Talent Acquisition</span><span class="pill p-ok">Penuh</span></div>
+          <div class="list-mod"><div class="tile t3" style="background:#0369a1">TM</div><span class="grow">Talent Management</span><span class="pill p-mute">Baca</span></div>
+          <div class="list-mod"><div class="tile t6" style="background:#e11d48">HR</div><span class="grow">Human Resources</span><span class="pill p-mute">Baca</span></div>
+          <div class="group">Delivery &amp; keuangan</div>
+          <div class="list-mod"><div class="tile t2">PMO</div><span class="grow">PMO · Kontrak · BAST · Invoice</span><span class="pill p-ok">Penuh</span></div>
+          <div class="list-mod"><div class="tile t5">TS</div><span class="grow">Timesheet</span><span class="pill p-ok">Penuh</span></div>
+          <div class="list-mod"><div class="tile t8" style="background:#15803d">Fin</div><span class="grow">Finance</span><span class="pill p-mute">Baca</span></div>
+          <div class="group">Umum</div>
+          <div class="list-mod"><div class="tile t7">F</div><span class="grow">Company Files</span></div>
+          <div class="list-mod"><div class="tile t8" style="background:#0e7490">Tg</div><span class="grow">Task Board · Tanda Tangan Digital · Learning</span></div>
+        </div>
+      </div>
+      <div class="caption"><b>C2 · Lembar Modul.</b> Daftar lengkap dikelompokkan per fungsi, dengan tingkat akses per divisi (Penuh/Baca) dari data akses ERP yang sudah ada. Contoh ini menggambarkan user non-Owner untuk menunjukkan perilaku role-aware.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ Common: record on mobile ============ -->
+<section class="direction" id="common">
+  <div class="dir-head">
+    <span class="tag">Berlaku untuk semua arah</span>
+    <h1>Record di mobile: fakta dulu, aksi di bawah, Agent kontekstual</h1>
+    <p>Apa pun shell-nya, modul di mobile butuh pola daftar → detail, bukan tabel desktop yang diperkecil. Detail menampilkan fakta ERP, berkas terkait (Company Files), dan aksi yang memang diizinkan. "Tanya tentang ini" membuka Agent dengan konteks record ini.</p>
+  </div>
+  <div class="row">
+    <div class="screen">
+      <div class="phone">
+        <div class="status"><span>9:41</span><span>●●● ▰</span></div>
+        <div class="top"><span class="back">‹ Kontrak</span><div class="icons"><div class="ico">⋯</div></div></div>
+        <div class="content">
+          <div class="sub">PMO · A.Contract</div>
+          <div class="hello" style="font-size:19px">PKS-2026-014</div>
+          <div class="sub" style="margin-bottom:10px">PT Synthetic Astra · <span class="pill p-warn">berakhir 21 hari</span></div>
+          <div class="card kv">
+            <div>Periode</div><div>19 Okt 2025 – 18 Okt 2026</div>
+            <div>Opportunity</div><div>OPTY2026-849</div>
+            <div>Talent aktif</div><div>6 orang</div>
+            <div>BAST terakhir</div><div>Agustus 2026 · diterima</div>
+            <div>Invoice</div><div>2 terbit · 1 menunggu BAST</div>
+          </div>
+          <div class="h">Berkas terkait</div>
+          <div class="res"><div class="k t7">PDF</div><div class="grow"><b>PKS Astra 2026.pdf</b><div class="meta">komersial · dibuka lewat ERP, tercatat</div></div></div>
+          <div class="res"><div class="k t7">PDF</div><div class="grow"><b>BAST Agustus.pdf</b><div class="meta">BAST · divisi PMO</div></div></div>
+          <div class="h">Aktivitas</div>
+          <div class="card">
+            <div class="item"><span class="dot" style="background:#16a34a"></span><div>BAST Agustus diterima<div class="meta">3 hari lalu</div></div></div>
+            <div class="item"><span class="dot" style="background:#94a3b8"></span><div>Invoice INV-0912 terbit<div class="meta">5 hari lalu</div></div></div>
+          </div>
+        </div>
+        <div class="actions"><span class="btn pri">Buat tindak lanjut</span><span class="btn">✦ Tanya tentang ini</span></div>
+      </div>
+      <div class="caption"><b>Detail record.</b> Isi yang terlihat = otoritas record (server). Aksi yang tidak diizinkan tidak ditampilkan. Nilai komersial tetap di ERP; Agent menerima konteks record, bukan isi berkas komersial.</div>
+    </div>
+    <div class="screen">
+      <div class="phone">
+        <div class="status"><span>9:41</span><span>●●● ▰</span></div>
+        <div class="top"><span class="back">‹ Kembali</span><div class="brand" style="font-size:15px">Tangkap dokumen</div><span style="width:40px"></span></div>
+        <div class="content">
+          <div class="card" style="height:300px;display:grid;place-items:center;background:#0f172a;color:#94a3b8;font-size:13px;border:0">[ pratinjau kamera / foto ]</div>
+          <div class="h">Simpan sebagai</div>
+          <div class="task">
+            <div class="top2"><div class="t">Company File</div><span class="pill p-acc">disarankan untuk scan</span></div>
+            <div class="meta">Dibaca dengan OCR, bisa dicari, akses mengikuti kelas. Jenis, kelas, dan divisi dipilih oleh Anda.</div>
+            <div class="seg" style="margin-top:8px"><span class="on">BAST</span><span>Divisi PMO</span><span>Tautkan: PKS-2026-014</span></div>
+          </div>
+          <div class="task">
+            <div class="top2"><div class="t">Lampiran untuk Agent</div><span class="pill p-mute">sementara</span></div>
+            <div class="meta">Hanya untuk percakapan ini, hanya Anda yang melihat, dihapus setelah masa simpannya. Bisa disimpan ke Company Files nanti (M6.x).</div>
+          </div>
+        </div>
+        <div class="actions"><span class="btn pri">Simpan</span><span class="btn">Batal</span></div>
+      </div>
+      <div class="caption"><b>Tangkap.</b> Foto atau berkas selalu menanyakan tujuan: aset persisten (Company Files) atau konteks kerja (lampiran Agent). Ini memakai jalur M6/M6.x yang sudah ada.</div>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

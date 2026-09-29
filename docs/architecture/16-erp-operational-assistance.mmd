@@ -1,0 +1,9 @@
+flowchart TD
+  User["ERP user · active Owner pilot"] --> Panel["Floating operational panel"]
+  Panel --> Read["Session + module policy · read-only snapshot"]
+  Read --> ERP[("ERP PostgreSQL")]
+  Panel --> Screen["Existing ERP screens · reviewed actions"]
+  Screen --> Command["PMO preparation · lock + transaction + audit"]
+  Command --> ERP
+  Panel --> Feedback["Existing Feature Request · page + release + BA review"]
+  Feedback --> ERP
