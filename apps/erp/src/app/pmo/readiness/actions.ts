@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { sql } from "@/db";
 import { requireActor, requireOwner } from "@/lib/actor";
 import { conform, ConformError, type BastJob, type Campaign } from "@/lib/conform/client";
-import { conformCampaign, conformLookup, describeConformError, pmoActor } from "@/lib/conform/pmo";
+import { conformCampaign, conformLookup, describeConformError, pmoActor, PmoAccessError } from "@/lib/conform/pmo";
 import { activeLinksForEmployees, issueGrant, issueGrantForEmployee, linkTalentAccount, TalentLinkError } from "@/lib/talent/identity";
 
 type Result<T = undefined> = { ok: true; data: T } | { ok: false; error: string };
@@ -13,6 +13,7 @@ const NONCE = /^[A-Za-z0-9_-]{8,64}$/;
 
 function fail(error: unknown): { ok: false; error: string } {
   if (error instanceof TalentLinkError) return { ok: false, error: error.message };
+  if (!(error instanceof ConformError) && !(error instanceof PmoAccessError)) console.error("pmo readiness action failed", error);
   return { ok: false, error: describeConformError(error) };
 }
 

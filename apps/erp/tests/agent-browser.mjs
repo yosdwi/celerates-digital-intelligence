@@ -12,7 +12,7 @@ export async function agentBrowser({ base, cookies }) {
     await context.addCookies(cookies.map(([name, value]) => ({ name, value, url: base })));
     const page = await context.newPage();
     const errors = [];
-    page.on('pageerror', (e) => errors.push(e.message));
+    page.on('pageerror', (e) => errors.push(page.url() + ': ' + e.message));
     const lazy = [];
     page.on('request', (r) => { if (/\/_next\/static\/chunks\//.test(r.url())) lazy.push(r.url()); });
     await page.goto(base + '/sales');
@@ -368,7 +368,7 @@ export async function agentModelBrowser({ base, cookies }) {
     await context.addCookies(cookies.map(([name, value]) => ({ name, value, url: base })));
     const page = await context.newPage();
     const errors = [];
-    page.on('pageerror', (e) => errors.push(e.message));
+    page.on('pageerror', (e) => errors.push(page.url() + ': ' + e.message));
     await page.goto(base + '/ta');
     await page.getByRole('button', { name: /^Celerates Agent/ }).click();
     const panel = page.getByRole('dialog', { name: 'Celerates Agent' });
@@ -437,7 +437,7 @@ export async function consoleBrowser({ env, python, base, cookies }) {
     const context = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
     const page = await context.newPage();
     const errors = [];
-    page.on('pageerror', (e) => errors.push(e.message));
+    page.on('pageerror', (e) => errors.push(page.url() + ': ' + e.message));
     await page.goto('http://127.0.0.1:5173/app/agent' + fragment);
     assert.equal(new URL(page.url()).hash, '', 'sign-in removed from the address bar');
     assert.deepEqual(await page.locator('.sidebar nav a').allTextContents(), ['Agent & learning'], 'ERP sign-in opens the Brain Console only');

@@ -31,8 +31,11 @@ export function TaskEvidenceButton({ taskKey, title, year, month, staged }: { ta
       const result = await uploadTaskEvidence(data);
       if (!result.ok) return setError(result.error);
       setDone(result.status === "already_present" ? t("alreadyPresent") : t("stagedDone"));
-      router.refresh();
     });
+  };
+  const close = () => {
+    setOpen(false);
+    if (done) router.refresh();
   };
   return (
     <>
@@ -41,11 +44,11 @@ export function TaskEvidenceButton({ taskKey, title, year, month, staged }: { ta
       </button>
       <BottomSheet
         open={open}
-        onClose={() => setOpen(false)}
+        onClose={close}
         title={t("sheetTitle")}
         footer={
           done ? (
-            <button type="button" onClick={() => setOpen(false)} className={buttonClass.primary}>{t("close")}</button>
+            <button type="button" onClick={close} className={buttonClass.primary}>{t("close")}</button>
           ) : (
             <button type="submit" form={`task-form-${taskKey}`} disabled={pending} data-action="task-evidence-submit" className={`${buttonClass.primary} disabled:opacity-50`}>
               <Upload aria-hidden className="h-[18px] w-[18px]" /> {pending ? t("sending") : t("save")}

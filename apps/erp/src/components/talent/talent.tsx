@@ -53,6 +53,12 @@ export function CorrectionSheet({ requirement }: { requirement: Requirement }) {
   const worked = action === "worked";
   const needIn = worked && requirement.gap !== "missing_clock_out";
   const needOut = worked && requirement.gap !== "missing_clock_in";
+  // The record re-renders only when the sheet closes: the page stops offering "Lengkapi" once the day waits for PMO,
+  // so refreshing while the confirmation is shown would unmount it.
+  const close = () => {
+    setOpen(false);
+    if (done) router.refresh();
+  };
   const submit = (form: HTMLFormElement) => {
     setError(null);
     const data = new FormData(form);
@@ -63,7 +69,6 @@ export function CorrectionSheet({ requirement }: { requirement: Requirement }) {
       const result = await submitAttendanceCorrection(data);
       if (!result.ok) return setError(result.error);
       setDone(result.status === "already_open" ? t("alreadyOpen") : t("submitted"));
-      router.refresh();
     });
   };
   return (
@@ -73,11 +78,11 @@ export function CorrectionSheet({ requirement }: { requirement: Requirement }) {
       </button>
       <BottomSheet
         open={open}
-        onClose={() => setOpen(false)}
+        onClose={close}
         title={t("title")}
         footer={
           done ? (
-            <button type="button" onClick={() => setOpen(false)} className={buttonClass.primary}>
+            <button type="button" onClick={close} className={buttonClass.primary}>
               {t("close")}
             </button>
           ) : (

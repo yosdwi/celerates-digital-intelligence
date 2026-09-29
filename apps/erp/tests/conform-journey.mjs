@@ -125,8 +125,8 @@ export async function conformJourney({ base, db, cookies }) {
     await cdb`INSERT INTO attendance (record_key, employee_id, work_date, check_in, check_out) VALUES (${`attendance:${day}:${EMPLOYEE_ID}`}, ${EMPLOYEE_ID}, ${day}, ${day === gapDay ? null : '08:00'}, '17:00')`;
   }
   const taskDay = `${cycle.year}-${String(cycle.month).padStart(2, '0')}-01`;
-  await cdb`INSERT INTO bast_evidence_rules (scope_key, task_category, evidence_required, updated_by) VALUES ('default', 'E2E Delivery', true, 'e2e') ON CONFLICT (scope_key, task_category) DO UPDATE SET evidence_required = true`;
-  await cdb`INSERT INTO tasks (record_key, employee_id, work_date, title, status, category, task_source, source_id) VALUES ('task:e2e:1', ${EMPLOYEE_ID}, ${taskDay}, 'Synthetic deployment checklist', 'Closed', 'E2E Delivery', 'redmine', 'E2E-1')`;
+  await cdb`INSERT INTO bast_evidence_rules (scope_key, task_category, evidence_required, updated_by) VALUES ('default', 'Detail Aktivitas Waktu Rilis Fitur', true, 'e2e') ON CONFLICT (scope_key, task_category) DO UPDATE SET evidence_required = true`;
+  await cdb`INSERT INTO tasks (record_key, employee_id, work_date, title, status, category, task_source, source_id) VALUES ('task:e2e:1', ${EMPLOYEE_ID}, ${taskDay}, 'Synthetic deployment checklist', 'Closed', 'Detail Aktivitas Waktu Rilis Fitur', 'redmine', 'E2E-1')`;
   await cdb`INSERT INTO workflow_notification_settings (scope_key, payroll_closing_group_jid, updated_by) VALUES ('default', ${GROUP_JID}, 'e2e') ON CONFLICT (scope_key) DO UPDATE SET payroll_closing_group_jid = EXCLUDED.payroll_closing_group_jid`;
   await cdb`INSERT INTO source_sync_state (source_key, last_success_at) VALUES ('attendance', now() - interval '2 hours') ON CONFLICT (source_key) DO UPDATE SET last_success_at = EXCLUDED.last_success_at`;
 
@@ -293,6 +293,7 @@ export async function conformJourney({ base, db, cookies }) {
     const directLink = direct[0].text.match(/https?:\/\/\S+\/go\/[A-Za-z0-9_-]+/)?.[0];
     assert.ok(directLink && directLink.startsWith(base));
     assert.equal((await db`SELECT superseded_at FROM talent_link_grants WHERE token_sha256=${createHash('sha256').update(stale).digest('hex')}`)[0].superseded_at === null, false, 'older unused link superseded');
+    await page.getByRole('dialog').getByRole('button', { name: 'Selesai' }).click();
     await page.locator('[data-action="talent-message"]').click();
     await page.locator('[data-action="talent-message-confirm"]').click();
     await page.getByText('Talent ini baru saja dikirimi pesan. Tunggu 10 menit.').waitFor();

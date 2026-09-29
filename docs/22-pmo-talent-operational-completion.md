@@ -1,6 +1,6 @@
 # 22 — PMO and Talent operational completion: requirements and plan
 
-Status: **planned**, 2026-09-29. It follows [doc 21](21-conform-bounded-service-execution.md) and [ADR-019](adr/ADR-019-conform-bounded-operational-service.md), which delivered integration v1. This document records the requirements interview with Yos and the plan that follows from it.
+Status: **implemented, not deployed**, 2026-09-29 ([implementation record](implementation/pmo-talent-completion.md)). It follows [doc 21](21-conform-bounded-service-execution.md) and [ADR-019](adr/ADR-019-conform-bounded-operational-service.md), which delivered integration v1. This document records the requirements interview with Yos and the plan that follows from it.
 
 Goal: finish the operational loop **attendance → task list → BAST → WhatsApp** for two roles, **PMO** and **Talent**, on the real ConForm VPS, and make the Agent answer from uploaded documents.
 
