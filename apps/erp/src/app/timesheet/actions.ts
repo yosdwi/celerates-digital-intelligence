@@ -1,5 +1,5 @@
 "use server";
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor } from "@/lib/actor";
 import { db } from "@/db";
 import { companyHolidays, timesheetEntries, timesheetExports, timesheetSubmissions } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
@@ -24,7 +24,7 @@ function periodLabelOf(year: number, month1indexed: number): string {
 
 /** Talent eligible-Converter atau PMO-full/Owner boleh nambah hari libur -- Talent perlu ini supaya bisa lengkapi kalender sendiri sebelum parsing. Hapus tetap PMO-full/Owner saja (lihat deleteHoliday). */
 export async function createHoliday(formData: FormData): Promise<void> {
-  await requirePilotActor();
+  await requireActor();
 
   await requireConverterAccess();
   const date = formData.get("date") as string;
@@ -41,7 +41,7 @@ export async function createHoliday(formData: FormData): Promise<void> {
 }
 
 export async function deleteHoliday(id: string): Promise<DeleteResult> {
-  await requirePilotActor();
+  await requireActor();
 
   try {
     await requirePmoFullOrOwner("full");
@@ -61,7 +61,7 @@ export async function deleteHoliday(id: string): Promise<DeleteResult> {
  * PMO-full/Owner -- upsert per tanggal (tanggal yang sudah ada namanya diganti).
  */
 export async function bulkCreateHolidays(rows: { date: string; name: string }[]): Promise<ActionResult<{ count: number }>> {
-  await requirePilotActor();
+  await requireActor();
 
   try {
     await requireConverterAccess();
@@ -93,7 +93,7 @@ export async function bulkCreateHolidays(rows: { date: string; name: string }[])
  * sendiri kalau perlu, tapi peran utama mereka di modul ini adalah approve.
  */
 export async function createTimesheetSubmission(formData: FormData): Promise<void> {
-  await requirePilotActor();
+  await requireActor();
 
   const actor = await currentTimesheetActor();
 
@@ -117,7 +117,7 @@ export async function createTimesheetSubmission(formData: FormData): Promise<voi
 
 /** Review/approve cuma boleh PMO-full/Owner -- ini aksi administratif, bukan "punya sendiri". */
 export async function approveTimesheetSubmission(id: string): Promise<DeleteResult> {
-  await requirePilotActor();
+  await requireActor();
 
   try {
     await requirePmoFullOrOwner("editor");
@@ -139,7 +139,7 @@ export async function approveTimesheetSubmission(id: string): Promise<DeleteResu
 
 /** Talent boleh hapus submission MILIK SENDIRI; PMO-full/Owner boleh hapus siapa pun. */
 export async function deleteTimesheetSubmission(id: string): Promise<DeleteResult> {
-  await requirePilotActor();
+  await requireActor();
 
   try {
     const actor = await currentTimesheetActor();
@@ -156,13 +156,13 @@ export async function deleteTimesheetSubmission(id: string): Promise<DeleteResul
 }
 
 export async function deleteSubmissionAttachment(attachmentId: string, submissionId: string): Promise<void> {
-  await requirePilotActor();
+  await requireActor();
 
   const actor = await currentTimesheetActor();
   const [row] = await db.select({ user_id: timesheetSubmissions.user_id }).from(timesheetSubmissions).where(eq(timesheetSubmissions.id, submissionId));
   if (!row) throw new Error("Submission tidak ditemukan.");
   await assertCanActOnTimesheetRecord(actor, row.user_id, "full");
-  await deleteAttachment(attachmentId);
+  await deleteAttachment(attachmentId, [TIMESHEET_SUBMISSION_SOURCE], submissionId);
   await logActivity("timesheet", "delete", "Lampiran Submission Timesheet dihapus", "Timesheet");
   revalidatePath("/timesheet");
 }
@@ -188,7 +188,7 @@ export type ConverterPreviewResult = {
  * generate "atas nama" talent mana pun karena tidak ada FK ke data karyawan).
  */
 export async function parseAndPreviewConverter(formData: FormData): Promise<ActionResult<ConverterPreviewResult>> {
-  await requirePilotActor();
+  await requireActor();
 
   try {
     await requireConverterAccess();
@@ -235,7 +235,7 @@ function summaryClientNameOf(rows: ConverterPreviewRow[]): string {
 
 /** Simpan (replace) baris timesheet_entries untuk actor+periode ini, lalu generate file .xlsx format resmi Astra. */
 export async function saveAndGenerateConverter(payload: GenerateConverterPayload): Promise<ActionResult<GeneratedFile>> {
-  await requirePilotActor();
+  await requireActor();
 
   let actor;
   try {

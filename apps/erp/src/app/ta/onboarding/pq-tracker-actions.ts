@@ -1,5 +1,6 @@
 "use server";
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor } from "@/lib/actor";
+import { requireDivisionAccess } from "@/lib/require-division-access";
 import { db } from "@/db";
 import { opportunities, requisitions, onboardingRequests } from "@/db/schema";
 import { revalidatePath } from "next/cache";
@@ -12,7 +13,8 @@ import { eq } from "drizzle-orm";
  * dari awal sampai akhir.
  */
 export async function notifyTalentOnboarded(onboardingRequestId: string) {
-  await requirePilotActor();
+  await requireActor();
+  await requireDivisionAccess("ta");
 
   const [onboarding] = await db.select().from(onboardingRequests).where(eq(onboardingRequests.id, onboardingRequestId));
   if (!onboarding || !onboarding.requisition_id) {

@@ -2794,7 +2794,7 @@
       "title": "Celerates account",
       "email": "Email",
       "linkedAt": "Linked since",
-      "ownerOnly": "Only an Owner can link a Talent account.",
+      "ownerOnly": "Only PMO with Full access can link a Talent account.",
       "note": "Reminder links are issued only for Talent with a linked Celerates account.",
       "notLinked": "This Talent has no Celerates account yet.",
       "link": "Create & link account"

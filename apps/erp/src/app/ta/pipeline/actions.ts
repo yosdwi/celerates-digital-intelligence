@@ -1,5 +1,5 @@
 "use server";
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor } from "@/lib/actor";
 import { db } from "@/db";
 import { applications } from "@/db/schema";
 import { revalidatePath } from "next/cache";
@@ -14,7 +14,7 @@ import { APPLICATION_CV_CELERATES_SOURCE } from "./constants";
 import { requireDivisionAccess } from "@/lib/require-division-access";
 
 export async function createApplication(formData: FormData) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("ta");
   const application_date = formData.get("application_date") as string;
@@ -64,16 +64,16 @@ export async function createApplication(formData: FormData) {
 }
 
 export async function deleteApplicationAttachment(attachmentId: string) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("ta");
-  await deleteAttachment(attachmentId);
+  await deleteAttachment(attachmentId, [APPLICATION_CV_CELERATES_SOURCE]);
   await logActivity("ta", "delete", "Lampiran CV Celerates dihapus", "Hiring Pipeline");
   revalidatePath("/ta/pipeline");
 }
 
 export async function updateHiringStatus(id: string, hiring_status_code: string) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("ta");
   await db.update(applications).set({ hiring_status_code }).where(eq(applications.id, id));
@@ -82,7 +82,7 @@ export async function updateHiringStatus(id: string, hiring_status_code: string)
 }
 
 export async function updateApplication(id: string, formData: FormData) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("ta");
   const application_date = formData.get("application_date") as string;
@@ -132,7 +132,7 @@ export async function updateApplication(id: string, formData: FormData) {
 export type DeleteResult = { ok: true } | { ok: false; error: string };
 
 export async function deleteApplication(id: string): Promise<DeleteResult> {
-  await requirePilotActor();
+  await requireActor();
 
   try {
     await requireDivisionAccess("ta", "full");

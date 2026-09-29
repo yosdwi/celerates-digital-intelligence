@@ -1,5 +1,5 @@
 "use server";
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor } from "@/lib/actor";
 
 import { db } from "@/db";
 import { leads, opportunities, salesOpportunityTrackers } from "@/db/schema";
@@ -16,7 +16,8 @@ import { requireDivisionAccess } from "@/lib/require-division-access";
  * Cek-dan-ulang ke DB biar nggak gampang tabrakan.
  */
 export async function generateLeadNo(clientName: string, sourceCode: string): Promise<string> {
-  await requirePilotActor();
+  await requireActor();
+  await requireDivisionAccess("marketing", "viewer");
 
   const clientSlug = clientName.toUpperCase().replace(/[^A-Z0-9]+/g, "").slice(0, 10) || "CLIENT";
   const sourceSlug = sourceCode.toUpperCase().slice(0, 4);
@@ -31,7 +32,7 @@ export async function generateLeadNo(clientName: string, sourceCode: string): Pr
 }
 
 export async function createLead(formData: FormData) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("marketing");
   const client_name = formData.get("client_name") as string;
@@ -88,7 +89,7 @@ export async function createLead(formData: FormData) {
  * sama seperti nomor invoice yang tidak boleh berubah.
  */
 export async function updateLead(id: string, formData: FormData) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("marketing");
   const client_name = formData.get("client_name") as string;
@@ -148,7 +149,7 @@ export type DeleteResult = { ok: true } | { ok: false; error: string };
  * hapus -- daripada biarkan Postgres lempar error foreign key mentah.
  */
 export async function deleteLead(id: string): Promise<DeleteResult> {
-  await requirePilotActor();
+  await requireActor();
 
   try {
     await requireDivisionAccess("marketing", "full");
@@ -191,7 +192,7 @@ export type ConvertResult = { ok: true } | { ok: false; error: string };
  * murni konfirmasi, tanpa field tambahan yang harus diisi lagi.
  */
 export async function convertLeadToOpportunity(leadId: string): Promise<ConvertResult> {
-  await requirePilotActor();
+  await requireActor();
 
   try {
     await requireDivisionAccess("marketing");

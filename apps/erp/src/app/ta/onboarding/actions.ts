@@ -1,5 +1,5 @@
 "use server";
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor } from "@/lib/actor";
 import { db } from "@/db";
 import { onboardingRequests, signatureRequests } from "@/db/schema";
 import { revalidatePath } from "next/cache";
@@ -31,7 +31,7 @@ export type SendOfferingLetterResult = { ok: true } | { ok: false; error: string
 
 /** Kirim Offering Letter yang sudah diupload ke TTD Online buat ditandatangani HR (1 signer). */
 export async function sendOfferingLetterForSignature(onboardingRequestId: string, formData: FormData): Promise<SendOfferingLetterResult> {
-  await requirePilotActor();
+  await requireActor();
 
   try {
     await requireDivisionAccess("ta");
@@ -93,16 +93,16 @@ export async function sendOfferingLetterForSignature(onboardingRequestId: string
 }
 
 export async function deleteOnboardingAttachment(attachmentId: string) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("ta");
-  await deleteAttachment(attachmentId);
+  await deleteAttachment(attachmentId, ONBOARDING_DOC_FIELDS.map((f) => onboardingDocSource(f.key)));
   await logActivity("ta", "delete", "Lampiran dokumen onboarding dihapus", "Onboarding");
   revalidatePath("/ta/onboarding");
 }
 
 export async function createOnboardingRequest(formData: FormData): Promise<void> {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("ta");
   const candidate_id = formData.get("candidate_id") as string;
@@ -205,7 +205,8 @@ export async function createOnboardingRequest(formData: FormData): Promise<void>
 }
 
 export async function getDocumentSignedUrl(path: string | null): Promise<string | null> {
-  await requirePilotActor();
+  await requireActor();
+  await requireDivisionAccess("ta", "viewer");
 
   if (!path) return null;
   const { getDocumentUrl } = await import("@/lib/storage");
@@ -242,7 +243,7 @@ async function generateContractNo(employmentTypeCode: string): Promise<string> {
 export type PromoteResult = { ok: true } | { ok: false; error: string };
 
 export async function promoteToEmployee(onboardingRequestId: string): Promise<PromoteResult> {
-  await requirePilotActor();
+  await requireActor();
 
   try {
     await requireDivisionAccess("ta");
@@ -319,7 +320,7 @@ export async function promoteToEmployee(onboardingRequestId: string): Promise<Pr
 }
 
 export async function updateOnboardingRequest(id: string, formData: FormData): Promise<void> {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("ta");
   const get = (name: string) => (formData.get(name) as string) || null;
@@ -402,7 +403,7 @@ export async function updateOnboardingRequest(id: string, formData: FormData): P
 export type DeleteResult = { ok: true } | { ok: false; error: string };
 
 export async function deleteOnboardingRequest(id: string): Promise<DeleteResult> {
-  await requirePilotActor();
+  await requireActor();
 
   try {
     await requireDivisionAccess("ta", "full");

@@ -3,14 +3,14 @@
 import { notFound } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor } from "@/lib/actor";
 import { claimsOf, divisionLevel, type AccessClaims } from "@/lib/module-access";
 
 export type DivisionLevels = Record<string, "full" | "editor" | "viewer" | null>;
 
 /** Requires read access to at least one of `divisions`; returns the caller's level per division. */
 export async function requireDivisionRead(...divisions: string[]): Promise<{ claims: AccessClaims; levels: DivisionLevels }> {
-  await requirePilotActor();
+  await requireActor();
   const session = await getServerSession(authOptions);
   const claims = claimsOf(session?.user);
   const levels = Object.fromEntries(divisions.map((d) => [d, divisionLevel(claims, d)])) as DivisionLevels;

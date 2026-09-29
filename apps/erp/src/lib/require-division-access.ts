@@ -43,3 +43,19 @@ export async function requireDivisionAccess(divisionKey: string, minLevel: Acces
 
   return { userId, userName, isOwner };
 }
+
+/**
+ * Collaboration submodules shared by several divisions (Client Active, Special Notes, Profitability Tracker):
+ * passes when the caller has at least `minLevel` in ANY of `divisionKeys` (Owner always passes).
+ */
+export async function requireAnyDivisionAccess(divisionKeys: string[], minLevel: AccessLevel = "editor"): Promise<DivisionActor> {
+  let lastError: unknown = new Error("Anda tidak punya akses ke divisi ini");
+  for (const key of divisionKeys) {
+    try {
+      return await requireDivisionAccess(key, minLevel);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError;
+}

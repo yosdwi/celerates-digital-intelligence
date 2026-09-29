@@ -1,11 +1,21 @@
-export type ActorClaims = { id?: string; status?: string; isOwner?: boolean };
-// This audited pilot is intentionally owner-only. Multi-role rollout requires the
-// row-level authorization work listed in docs/erp-audit, not an environment toggle.
-export function assertPilotActor(actor: ActorClaims | null | undefined) {
-  if (!actor?.id || actor.status !== "active" || actor.isOwner !== true) {
-    throw new Error("Akses pilot hanya untuk Owner aktif.");
+export type ActorClaims = { id?: string; status?: string; isOwner?: boolean; accountType?: string; access?: { divisionKey: string; level: string }[] };
+export type Actor = ActorClaims & { id: string };
+// Authority is the division RBAC (doc 22 §2.1): this is only the first gate -- an active backoffice user.
+// A Talent account never passes it (Talent entry points use requireTalentActor). Each action adds its
+// module authority after it (division level, Owner, or the record's own ownership rule).
+export const isBackofficeClaims = (actor: ActorClaims | null | undefined) =>
+  (actor?.accountType ?? "backoffice") !== "talent" || actor?.isOwner === true;
+export function assertActor(actor: ActorClaims | null | undefined): Actor {
+  if (!actor?.id || actor.status !== "active" || !isBackofficeClaims(actor)) {
+    throw new Error("Akses hanya untuk pengguna backoffice aktif.");
   }
-  return actor as ActorClaims & { id: string };
+  return actor as Actor;
+}
+/** Owner-only modules (executive dashboard, kill switch, owner administration). */
+export function assertOwner(actor: ActorClaims | null | undefined): Actor {
+  const checked = assertActor(actor);
+  if (checked.isOwner !== true) throw new Error("Aksi ini hanya untuk Owner.");
+  return checked;
 }
 export function safeContextPath(value: unknown): string {
   if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//")) return "/";

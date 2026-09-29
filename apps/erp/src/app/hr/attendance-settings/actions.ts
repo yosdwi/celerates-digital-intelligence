@@ -1,5 +1,5 @@
 "use server";
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor } from "@/lib/actor";
 import { db } from "@/db";
 import { leaveTypes, attendanceApprovalSteps } from "@/db/schema";
 import { eq, asc, max } from "drizzle-orm";
@@ -12,7 +12,7 @@ export type ActionResult = { ok: true } | { ok: false; error: string };
 // ---------- Leave Types ----------
 
 export async function createLeaveType(formData: FormData): Promise<void> {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("hr", "full");
   const name = (formData.get("name") as string)?.trim();
@@ -25,7 +25,7 @@ export async function createLeaveType(formData: FormData): Promise<void> {
 }
 
 export async function toggleLeaveTypeActive(id: string, isActive: boolean): Promise<ActionResult> {
-  await requirePilotActor();
+  await requireActor();
 
   try {
     await requireDivisionAccess("hr", "full");
@@ -38,7 +38,7 @@ export async function toggleLeaveTypeActive(id: string, isActive: boolean): Prom
 }
 
 export async function deleteLeaveType(id: string): Promise<ActionResult> {
-  await requirePilotActor();
+  await requireActor();
 
   try {
     await requireDivisionAccess("hr", "full");
@@ -54,7 +54,7 @@ export async function deleteLeaveType(id: string): Promise<ActionResult> {
 // ---------- Approval Chain ----------
 
 export async function addApprovalStep(formData: FormData): Promise<void> {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("hr", "full");
   const approverUserId = formData.get("approver_user_id") as string;
@@ -69,7 +69,7 @@ export async function addApprovalStep(formData: FormData): Promise<void> {
 }
 
 export async function removeApprovalStep(id: string): Promise<ActionResult> {
-  await requirePilotActor();
+  await requireActor();
 
   try {
     await requireDivisionAccess("hr", "full");
@@ -84,7 +84,7 @@ export async function removeApprovalStep(id: string): Promise<ActionResult> {
 
 /** Tukar step_order dengan step tetangganya (naik/turun urutan). */
 export async function moveApprovalStep(id: string, direction: "up" | "down"): Promise<ActionResult> {
-  await requirePilotActor();
+  await requireActor();
 
   try {
     await requireDivisionAccess("hr", "full");

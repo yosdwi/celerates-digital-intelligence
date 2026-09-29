@@ -3,7 +3,7 @@
 // re-validates the business state. Campaign approval is where Celerates mints the per-Talent deep-link grants.
 import { revalidatePath } from "next/cache";
 import { sql } from "@/db";
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor, requireOwner } from "@/lib/actor";
 import { conform, ConformError, type BastJob, type Campaign } from "@/lib/conform/client";
 import { conformCampaign, conformLookup, describeConformError, pmoActor } from "@/lib/conform/pmo";
 import { activeLinksForEmployees, GRANT_DEFAULT_TTL_SECONDS, issueGrant, linkTalentAccount, TalentLinkError } from "@/lib/talent/identity";
@@ -22,7 +22,7 @@ function publicBase(): string {
 }
 
 export async function decideCorrection(id: string, decision: "approve" | "reject", reason: string): Promise<Result<{ status: string; outcome: string }>> {
-  await requirePilotActor();
+  await requireActor();
   try {
     const actor = await pmoActor("editor");
     if (!/^[0-9a-f-]{36}$/i.test(id) || !["approve", "reject"].includes(decision)) return { ok: false, error: "Permintaan tidak valid." };
@@ -43,7 +43,7 @@ export async function decideCorrection(id: string, decision: "approve" | "reject
 }
 
 export async function createCampaign(year: number, month: number, nonce: string): Promise<Result<{ id: string }>> {
-  await requirePilotActor();
+  await requireActor();
   try {
     const actor = await pmoActor("editor");
     if (!NONCE.test(nonce)) return { ok: false, error: "Permintaan tidak valid." };
@@ -61,7 +61,7 @@ export async function createCampaign(year: number, month: number, nonce: string)
  * single-use grant bound to that user; ConForm only carries the opaque URL. Unlinked recipients are skipped.
  */
 export async function approveCampaign(id: string): Promise<Result<{ linked: number; skipped: number }>> {
-  await requirePilotActor();
+  await requireActor();
   try {
     const actor = await pmoActor("full");
     if (!/^[0-9a-f-]{36}$/i.test(id)) return { ok: false, error: "Permintaan tidak valid." };
@@ -89,7 +89,7 @@ export async function approveCampaign(id: string): Promise<Result<{ linked: numb
 }
 
 export async function controlCampaign(id: string, action: "pause" | "resume" | "stop", nonce: string): Promise<Result> {
-  await requirePilotActor();
+  await requireActor();
   try {
     const actor = await pmoActor(action === "stop" ? "full" : "editor");
     if (!/^[0-9a-f-]{36}$/i.test(id) || !["pause", "resume", "stop"].includes(action) || !NONCE.test(nonce)) return { ok: false, error: "Permintaan tidak valid." };
@@ -103,7 +103,7 @@ export async function controlCampaign(id: string, action: "pause" | "resume" | "
 }
 
 export async function setKillSwitch(on: boolean): Promise<Result> {
-  await requirePilotActor();
+  await requireOwner();
   try {
     const actor = await pmoActor("full");
     if (!actor.isOwner) return { ok: false, error: "Hanya Owner yang dapat mengubah kill switch." };
@@ -116,7 +116,7 @@ export async function setKillSwitch(on: boolean): Promise<Result> {
 }
 
 export async function sendPmoSummary(year: number, month: number, nonce: string): Promise<Result<{ status: string }>> {
-  await requirePilotActor();
+  await requireActor();
   try {
     const actor = await pmoActor("editor");
     if (!NONCE.test(nonce)) return { ok: false, error: "Permintaan tidak valid." };
@@ -130,7 +130,7 @@ export async function sendPmoSummary(year: number, month: number, nonce: string)
 }
 
 export async function pmoSummaryPreview(year: number, month: number): Promise<Result<{ text: string; groupConfigured: boolean }>> {
-  await requirePilotActor();
+  await requireActor();
   try {
     await pmoActor("editor");
     const link = `${publicBase()}/pmo/readiness?year=${year}&month=${month}`;
@@ -142,7 +142,7 @@ export async function pmoSummaryPreview(year: number, month: number): Promise<Re
 }
 
 export async function generateBast(input: { year: number; month: number; reportType: "developer" | "iotoperation"; mode: "preview" | "final"; force: boolean; reason: string }): Promise<Result<BastJob>> {
-  await requirePilotActor();
+  await requireActor();
   try {
     const actor = await pmoActor("full");
     if (!["developer", "iotoperation"].includes(input.reportType) || !["preview", "final"].includes(input.mode)) return { ok: false, error: "Permintaan tidak valid." };
@@ -160,7 +160,7 @@ export async function generateBast(input: { year: number; month: number; reportT
 }
 
 export async function bastJobStatus(jobId: string): Promise<Result<BastJob>> {
-  await requirePilotActor();
+  await requireActor();
   try {
     await pmoActor("full");
     if (!/^[0-9a-f-]{36}$/i.test(jobId)) return { ok: false, error: "Permintaan tidak valid." };
@@ -170,12 +170,11 @@ export async function bastJobStatus(jobId: string): Promise<Result<BastJob>> {
   }
 }
 
-/** Owner links a Talent's Celerates account to their ConForm employee record (doc 21 §3). */
+/** PMO full links a Talent's Celerates account to their ConForm employee record (doc 21 §3). */
 export async function linkTalent(employeeId: string, email: string): Promise<Result<{ created: boolean }>> {
-  await requirePilotActor();
+  await requireActor();
   try {
     const actor = await pmoActor("full");
-    if (!actor.isOwner) return { ok: false, error: "Hanya Owner yang dapat menghubungkan akun Talent." };
     const talent = await conformLookup(employeeId);
     const result = await linkTalentAccount(sql, { email, conformEmployeeId: talent.employee_id, nrp: talent.nrp, name: talent.name, linkedBy: actor.userId });
     revalidatePath(`/pmo/readiness/talent/${encodeURIComponent(employeeId)}`);

@@ -1,5 +1,5 @@
 "use server";
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor } from "@/lib/actor";
 import { db } from "@/db";
 import { financeDocumentHandoffs, opportunities } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -24,7 +24,7 @@ async function clientNameOf(opportunityId: string): Promise<string> {
 
 /** Finance menandai dokumen invoice sebuah project sudah diterima & lengkap -- notify balik ke PMO. */
 export async function acknowledgeFinanceHandoff(opportunityId: string, formData: FormData): Promise<FinanceActionResult> {
-  await requirePilotActor();
+  await requireActor();
 
   try { await requireDivisionAccess("finance"); } catch (e: any) { return { ok: false, error: e.message }; }
   const userName = await currentUserName();
@@ -58,7 +58,7 @@ export async function acknowledgeFinanceHandoff(opportunityId: string, formData:
 
 /** Finance mengembalikan ke PMO karena dokumennya kurang/salah -- notify balik ke PMO dengan alasannya. */
 export async function requestRevisionFinanceHandoff(opportunityId: string, formData: FormData): Promise<FinanceActionResult> {
-  await requirePilotActor();
+  await requireActor();
 
   try { await requireDivisionAccess("finance"); } catch (e: any) { return { ok: false, error: e.message }; }
   const userName = await currentUserName();

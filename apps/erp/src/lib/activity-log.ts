@@ -1,5 +1,4 @@
-"use server";
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor } from "@/lib/actor";
 import { db } from "@/db";
 import { activityLogs } from "@/db/schema";
 import { getServerSession } from "next-auth";
@@ -12,7 +11,7 @@ export type ActionType = "create" | "update" | "delete";
  * Ambil user dari session sendiri, jadi caller cukup kirim divisi + deskripsinya.
  */
 export async function logActivity(divisionKey: string, actionType: ActionType, entityLabel: string, pageLabel?: string) {
-  await requirePilotActor();
+  await requireActor();
 
   const session = await getServerSession(authOptions);
   const userId = (session?.user as any)?.id ?? null;

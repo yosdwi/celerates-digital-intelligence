@@ -15,7 +15,7 @@ import { LinkTalentForm } from "@/components/conform/link-talent";
 export const dynamic = "force-dynamic";
 
 export default async function ReadinessTalentPage({ params, searchParams }: { params: Promise<{ ref: string }>; searchParams: Promise<{ year?: string; month?: string }> }) {
-  const { claims } = await requireDivisionRead("pmo");
+  const { levels } = await requireDivisionRead("pmo");
   const employeeId = decodeURIComponent((await params).ref);
   if (!employeeId || employeeId.length > 120) notFound();
   const t = await getTranslations("conform");
@@ -72,7 +72,7 @@ export default async function ReadinessTalentPage({ params, searchParams }: { pa
               { label: t("account.linkedAt"), value: fmtDate(new Date(link.created_at).toISOString().slice(0, 10), locale) },
             ]}
           />
-        ) : claims.isOwner ? (
+        ) : levels.pmo === "full" ? (
           <LinkTalentForm employeeId={employeeId} />
         ) : (
           <Card className="p-3.5 text-sm text-j-muted">{t("account.ownerOnly")}</Card>

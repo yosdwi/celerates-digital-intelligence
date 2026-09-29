@@ -1,5 +1,5 @@
 "use server";
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor } from "@/lib/actor";
 import { db } from "@/db";
 import { extensionIncrementRequests, employmentContracts } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
@@ -15,7 +15,7 @@ export type ProcessResult = { ok: true } | { ok: false; error: string };
  * terkait, supaya muncul otomatis di riwayat kontrak / raport per nama di modul Employee.
  */
 export async function processExtensionRequest(id: string): Promise<ProcessResult> {
-  await requirePilotActor();
+  await requireActor();
 
   try {
     await requireDivisionAccess("hr");

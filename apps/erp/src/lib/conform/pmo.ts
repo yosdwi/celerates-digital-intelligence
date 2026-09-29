@@ -2,7 +2,7 @@
 // ConForm then re-validates its own business state. Nothing ConForm owns is computed or copied in Celerates.
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor } from "@/lib/actor";
 import { claimsOf, divisionLevel } from "@/lib/module-access";
 import { conform, conformConfigured, ConformError, qs, type Campaign, type CampaignSummary, type Correction, type Readiness, type TalentLookup, type TalentRequirements } from "./client";
 
@@ -12,7 +12,7 @@ const RANK: Record<PmoLevel, number> = { viewer: 0, editor: 1, full: 2 };
 export class PmoAccessError extends Error {}
 
 export async function pmoActor(min: PmoLevel = "viewer") {
-  const pilot = await requirePilotActor();
+  const actor = await requireActor();
   const session = await getServerSession(authOptions);
   const claims = claimsOf(session?.user);
   const level = divisionLevel(claims, "pmo");
@@ -20,12 +20,12 @@ export async function pmoActor(min: PmoLevel = "viewer") {
   const user = session?.user as { fullName?: string; name?: string; email?: string } | undefined;
   const name = user?.fullName ?? user?.name ?? "PMO";
   return {
-    userId: pilot.id as string,
+    userId: actor.id,
     level,
     isOwner: claims.isOwner === true,
     name,
     /** Recorded by ConForm as reviewer / exporter / approver. */
-    tag: `celerates:${name} <${user?.email ?? pilot.id}>`,
+    tag: `celerates:${name} <${user?.email ?? actor.id}>`,
   };
 }
 

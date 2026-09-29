@@ -1,5 +1,5 @@
 "use server";
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor, requireOwner } from "@/lib/actor";
 import { db } from "@/db";
 import { talentAssignments, extensionIncrementRequests, users } from "@/db/schema";
 import { revalidatePath } from "next/cache";
@@ -25,7 +25,7 @@ async function resolvePerformanceUrl(formData: FormData, urlField: string, fileF
 }
 
 export async function createTalentAssignment(formData: FormData) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("tm");
   const employee_id = formData.get("employee_id") as string;
@@ -94,7 +94,7 @@ export async function createTalentAssignment(formData: FormData) {
 }
 
 export async function updateTalentAssignment(id: string, formData: FormData) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("tm");
   const requisition_id = formData.get("requisition_id") as string;
@@ -172,7 +172,7 @@ export async function updateTalentAssignment(id: string, formData: FormData) {
 export type DeleteResult = { ok: true } | { ok: false; error: string };
 
 export async function deleteTalentAssignment(id: string): Promise<DeleteResult> {
-  await requirePilotActor();
+  await requireActor();
 
   try {
     await requireDivisionAccess("tm", "full");
@@ -188,7 +188,7 @@ export async function deleteTalentAssignment(id: string): Promise<DeleteResult> 
 // ---------- Extension & Increment Request ----------
 
 export async function createExtensionRequest(formData: FormData) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("tm");
   const employee_id = formData.get("employee_id") as string;
@@ -258,7 +258,7 @@ export async function createExtensionRequest(formData: FormData) {
 export type UpdateExtensionRequestResult = { ok: true; blockedSteps: string[] } | { ok: false; error: string };
 
 export async function updateExtensionRequest(id: string, formData: FormData): Promise<UpdateExtensionRequestResult> {
-  await requirePilotActor();
+  await requireActor();
 
   try {
     await requireDivisionAccess("tm");
@@ -329,16 +329,16 @@ export async function updateExtensionRequest(id: string, formData: FormData): Pr
 }
 
 export async function deleteExtensionRequestAttachment(attachmentId: string) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("tm");
-  await deleteAttachment(attachmentId);
+  await deleteAttachment(attachmentId, [EXTENSION_REQUEST_SOURCE]);
   await logActivity("tm", "delete", "Lampiran Extension Request dihapus", "Extension Request");
   revalidatePath("/tm/extension-requests");
 }
 
 export async function ownerOverrideExtensionRequest(id: string) {
-  await requirePilotActor();
+  await requireOwner();
 
   const session = await getServerSession(authOptions);
   const isOwner = Boolean((session?.user as any)?.isOwner);
@@ -352,7 +352,7 @@ export async function ownerOverrideExtensionRequest(id: string) {
 }
 
 export async function rejectExtensionRequest(id: string) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("tm");
   await db.update(extensionIncrementRequests).set({ status_code: "rejected" }).where(eq(extensionIncrementRequests.id, id));
@@ -361,7 +361,7 @@ export async function rejectExtensionRequest(id: string) {
 }
 
 export async function deleteExtensionRequest(id: string): Promise<DeleteResult> {
-  await requirePilotActor();
+  await requireActor();
 
   try {
     await requireDivisionAccess("tm", "full");

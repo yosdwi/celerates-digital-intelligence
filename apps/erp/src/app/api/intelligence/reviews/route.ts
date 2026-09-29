@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requirePilotActor } from '@/lib/actor';
+import { requireOwner } from '@/lib/actor';
 import { sql } from '@/db';
 import { ContractError, fail, object, uuid } from '@/lib/integration/contract';
 import { reviewByOwner } from '@/lib/integration/service';
@@ -7,7 +7,7 @@ export const dynamic='force-dynamic';
 async function handle(req: NextRequest) {
   const headers={'Cache-Control':'private, no-store',Vary:'Cookie'};
   try {
-    let actor;try{actor=await requirePilotActor();}catch{fail(403,'FORBIDDEN','Akses hanya untuk Owner aktif.');}
+    let actor;try{actor=await requireOwner();}catch{fail(403,'FORBIDDEN','Akses hanya untuk Owner aktif.');}
     const [human]=await sql`SELECT id FROM users WHERE id=${actor.id} AND is_owner AND status='active'`;
     if(!human)fail(403,'FORBIDDEN','Akses tidak tersedia.');
     if(req.method==='GET') {

@@ -2794,7 +2794,7 @@
       "title": "Akun Celerates",
       "email": "Email",
       "linkedAt": "Terhubung sejak",
-      "ownerOnly": "Hanya Owner yang dapat menghubungkan akun Talent.",
+      "ownerOnly": "Hanya PMO dengan akses Full yang dapat menghubungkan akun Talent.",
       "note": "Tautan pengingat hanya dibuat untuk Talent dengan akun Celerates yang terhubung.",
       "notLinked": "Talent ini belum punya akun Celerates.",
       "link": "Buat & hubungkan akun"

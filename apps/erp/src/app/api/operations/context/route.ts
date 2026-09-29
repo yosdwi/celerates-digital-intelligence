@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor } from "@/lib/actor";
 import { sql } from "@/db";
 import { readOperationalContext, signalTrends } from "@/lib/operations/reader";
 import type { OperationalActor } from "@/lib/operations/policy";
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   const headers = { "Cache-Control": "private, no-store", Vary: "Cookie" };
   try {
-    await requirePilotActor();
+    await requireActor();
   } catch {
     return NextResponse.json(
       { error: "Akses tidak tersedia." },

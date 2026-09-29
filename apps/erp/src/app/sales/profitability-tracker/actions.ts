@@ -1,5 +1,6 @@
 "use server";
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor } from "@/lib/actor";
+import { requireAnyDivisionAccess } from "@/lib/require-division-access";
 import { db } from "@/db";
 import {
   profitabilityEntries,
@@ -36,7 +37,8 @@ export type SyncResult = { ok: true; data: { synced: number; skipped: number } }
  * hasil kalkulator aslinya -- dianggap cukup akurat untuk tracking bisnis.
  */
 export async function syncProfitabilityFromTalents(year: number, month: number): Promise<SyncResult> {
-  await requirePilotActor();
+  await requireActor();
+  try { await requireAnyDivisionAccess(["sales", "tm", "pmo"]); } catch (e: any) { return { ok: false, error: e.message }; }
 
   const session = await getServerSession(authOptions);
   const actorName = (session?.user as any)?.fullName ?? session?.user?.name ?? session?.user?.email;

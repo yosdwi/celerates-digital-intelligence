@@ -1,5 +1,6 @@
 "use server";
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor } from "@/lib/actor";
+import { requireAnyDivisionAccess } from "@/lib/require-division-access";
 import { db } from "@/db";
 import { extensionRequestSpecialNotes, extensionIncrementRequests, employees, onboardingRequests, candidates } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -28,7 +29,8 @@ async function getEmployeeLabel(employeeId: string) {
 }
 
 export async function createSpecialNote(extensionRequestId: string, formData: FormData): Promise<void> {
-  await requirePilotActor();
+  await requireActor();
+  await requireAnyDivisionAccess(["tm", "hr"]);
 
   const { id: userId, name: userName } = await currentUser();
   const division = (await resolveActorDivision(userId)) ?? "tm";
@@ -64,7 +66,8 @@ export async function createSpecialNote(extensionRequestId: string, formData: Fo
 }
 
 export async function updateSpecialNoteStatus(id: string, statusCode: string): Promise<void> {
-  await requirePilotActor();
+  await requireActor();
+  await requireAnyDivisionAccess(["tm", "hr"]);
 
   const { id: userId, name: userName } = await currentUser();
   const division = (await resolveActorDivision(userId)) ?? "hr";
@@ -96,7 +99,8 @@ export async function updateSpecialNoteStatus(id: string, statusCode: string): P
 }
 
 export async function deleteSpecialNote(id: string): Promise<void> {
-  await requirePilotActor();
+  await requireActor();
+  await requireAnyDivisionAccess(["tm", "hr"], "full");
 
   const { id: userId } = await currentUser();
   const division = (await resolveActorDivision(userId)) ?? "tm";

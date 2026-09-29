@@ -1,4 +1,4 @@
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor } from "@/lib/actor";
 import { readObject } from "@/lib/object-store";
 import { sql } from "@/db";
 import { canReadEntityModule, loadActor } from "@/lib/agent/reads";
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 // beyond Owners (set DOCUMENTS_STRICT=1 to refuse them now).
 export async function GET(request: Request) {
   let pilot;
-  try { pilot = await requirePilotActor(); } catch { return new Response("Unauthorized", { status: 403 }); }
+  try { pilot = await requireActor(); } catch { return new Response("Unauthorized", { status: 403 }); }
   const params = new URL(request.url).searchParams;
   const bucket = params.get("bucket") || "";
   const path = params.get("path") || "";

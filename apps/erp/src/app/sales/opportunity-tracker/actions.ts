@@ -1,5 +1,5 @@
 "use server";
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor } from "@/lib/actor";
 import { db } from "@/db";
 import { salesOpportunityTrackers, requisitions, opportunities } from "@/db/schema";
 import { revalidatePath } from "next/cache";
@@ -12,7 +12,7 @@ import { markSaved } from "@/lib/saved-flag";
 
 
 export async function createOpportunityTracker(formData: FormData) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("sales");
   const lead_id = (formData.get("lead_id") as string) || null;
@@ -63,7 +63,7 @@ export async function createOpportunityTracker(formData: FormData) {
 }
 
 export async function updateOpportunityTracker(id: string, formData: FormData) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("sales");
   const client_name = formData.get("client_name") as string;
@@ -115,7 +115,7 @@ export async function updateOpportunityTracker(id: string, formData: FormData) {
 }
 
 export async function updateSalesQualified(id: string, sales_qualified: boolean) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("sales");
   await db.update(salesOpportunityTrackers).set({ sales_qualified }).where(eq(salesOpportunityTrackers.id, id));
@@ -124,7 +124,7 @@ export async function updateSalesQualified(id: string, sales_qualified: boolean)
 }
 
 export async function updateOptyStatus(id: string, opty_status_code: string) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("sales");
   await db.update(salesOpportunityTrackers).set({ opty_status_code }).where(eq(salesOpportunityTrackers.id, id));
@@ -135,7 +135,7 @@ export async function updateOptyStatus(id: string, opty_status_code: string) {
 export type DeleteResult = { ok: true } | { ok: false; error: string };
 
 export async function deleteOpportunityTracker(id: string): Promise<DeleteResult> {
-  await requirePilotActor();
+  await requireActor();
 
   try {
     await requireDivisionAccess("sales", "full");
@@ -163,7 +163,7 @@ export async function deleteOpportunityTracker(id: string): Promise<DeleteResult
 
 
 export async function convertToRequisition(opportunityTrackerId: string, formData: FormData) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("sales");
   const existing = await db.select().from(requisitions).where(eq(requisitions.opportunity_id, opportunityTrackerId));

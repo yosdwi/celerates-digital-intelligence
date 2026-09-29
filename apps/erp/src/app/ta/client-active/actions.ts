@@ -1,5 +1,6 @@
 "use server";
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor } from "@/lib/actor";
+import { requireAnyDivisionAccess } from "@/lib/require-division-access";
 import { db } from "@/db";
 import { applications } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -13,7 +14,8 @@ import { CLIENT_SUBMISSION_LABELS } from "./constants";
 export type UpdateClientSubmissionResult = { ok: true } | { ok: false; error: string };
 
 export async function updateClientSubmissionStatus(applicationId: string, formData: FormData): Promise<UpdateClientSubmissionResult> {
-  await requirePilotActor();
+  await requireActor();
+  try { await requireAnyDivisionAccess(["ta", "sales"]); } catch (e: any) { return { ok: false, error: e.message }; }
 
   const session = await getServerSession(authOptions);
   const userId = (session?.user as any)?.id as string | undefined;

@@ -1,5 +1,5 @@
 import { headers } from "next/headers";
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor } from "@/lib/actor";
 import { requireTalentSession } from "@/lib/talent/actor";
 import "@fontsource-variable/plus-jakarta-sans";
 import "./globals.css";
@@ -37,12 +37,13 @@ export const viewport: Viewport = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const requestHeaders = await headers();
-  if (requestHeaders.get("x-erp-protected") === "1") await requirePilotActor();
+  if (requestHeaders.get("x-erp-protected") === "1") await requireActor();
   // A Talent gets only their own surfaces (ADR-019 §4): no sidebar, Agent, module tabs or backoffice widgets.
   const talent = requestHeaders.get("x-erp-talent") === "1";
   if (talent) await requireTalentSession();
-  // Deep-link exchange pages render bare too, whoever (if anyone) is signed in.
-  const bare = talent || requestHeaders.get("x-erp-link") === "1";
+  // Deep-link exchange pages render bare too, whoever (if anyone) is signed in; so do the waiting pages of an
+  // account that is not active yet (no backoffice widget may call actions it cannot use).
+  const bare = talent || requestHeaders.get("x-erp-link") === "1" || requestHeaders.get("x-erp-bare") === "1";
   const locale = await getLocale();
   const messages = await getMessages();
   const timeZone = await getTimeZone();

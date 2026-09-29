@@ -1,5 +1,5 @@
 "use server";
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor } from "@/lib/actor";
 import { db, sql as pg } from "@/db";
 import { materializePmo } from "@/lib/operations/materialize";
 import { projectDocuments, projectContracts, projectInvoices, projectMonthlyBillings, financeDocumentHandoffs, opportunities } from "@/db/schema";
@@ -20,13 +20,13 @@ import { formatMonthNameYear } from "@/lib/month-format";
 
 // Explicit, authorized commands. Opening pages never materializes business state.
 export async function syncBillingScheduleToInvoices() {
-  await requirePilotActor();
+  await requireActor();
   const actor = await requireDivisionAccess("pmo");
   await materializePmo(pg, "invoices", { userId: actor.userId!, userName: actor.userName });
   revalidatePath("/pmo/invoices");
 }
 export async function syncDocumentTrackerFromContracts() {
-  await requirePilotActor();
+  await requireActor();
   const actor = await requireDivisionAccess("pmo");
   await materializePmo(pg, "documents", { userId: actor.userId!, userName: actor.userName });
   revalidatePath("/pmo");
@@ -40,7 +40,7 @@ async function clientNameOf(opportunityId: string): Promise<string> {
 // ---------- Document Tracker ----------
 
 export async function createProjectDocument(formData: FormData) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("pmo");
   const opportunity_id = formData.get("opportunity_id") as string;
@@ -102,16 +102,16 @@ async function saveProjectDocAttachments(projectDocumentId: string, formData: Fo
 }
 
 export async function deleteProjectDocAttachment(attachmentId: string) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("pmo");
-  await deleteAttachment(attachmentId);
+  await deleteAttachment(attachmentId, Object.values(PROJECT_DOC_SOURCES));
   await logActivity("pmo", "delete", "Lampiran Document Tracker dihapus", "Talent Document Tracker");
   revalidatePath("/pmo");
 }
 
 export async function updateProjectDocument(id: string, formData: FormData) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("pmo");
   const get = (name: string) => (formData.get(name) as string) || null;
@@ -163,7 +163,7 @@ export async function updateProjectDocument(id: string, formData: FormData) {
 export type DeleteResult = { ok: true } | { ok: false; error: string };
 
 export async function deleteProjectDocument(id: string): Promise<DeleteResult> {
-  await requirePilotActor();
+  await requireActor();
 
   try {
     await requireDivisionAccess("pmo", "full");
@@ -179,7 +179,7 @@ export async function deleteProjectDocument(id: string): Promise<DeleteResult> {
 // ---------- Contract ----------
 
 export async function createProjectContract(formData: FormData) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("pmo");
   const opportunity_id = formData.get("opportunity_id") as string;
@@ -209,7 +209,7 @@ export async function createProjectContract(formData: FormData) {
 }
 
 export async function updateProjectContract(id: string, formData: FormData) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("pmo");
   const startDate = formData.get("start_date") as string;
@@ -238,7 +238,7 @@ export async function updateProjectContract(id: string, formData: FormData) {
 }
 
 export async function deleteProjectContract(id: string): Promise<DeleteResult> {
-  await requirePilotActor();
+  await requireActor();
 
   try {
     await requireDivisionAccess("pmo", "full");
@@ -254,7 +254,7 @@ export async function deleteProjectContract(id: string): Promise<DeleteResult> {
 // ---------- Invoice ----------
 
 export async function createProjectInvoice(formData: FormData) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("pmo");
   const opportunity_id = formData.get("opportunity_id") as string;
@@ -300,17 +300,17 @@ async function saveInvoiceAttachments(invoiceId: string, formData: FormData) {
 }
 
 export async function deleteInvoiceAttachment(attachmentId: string, invoiceId?: string) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("pmo");
-  await deleteAttachment(attachmentId);
+  await deleteAttachment(attachmentId, [INVOICE_BAST_DOC_SOURCE], invoiceId);
   await logActivity("pmo", "delete", "Lampiran TM Invoice dihapus", "TM Invoice");
   revalidatePath("/pmo/invoices");
   if (invoiceId) revalidatePath(`/pmo/invoices/${invoiceId}/edit`);
 }
 
 export async function updateProjectInvoice(id: string, formData: FormData) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("pmo");
   const bastFile = formData.get("bast_support_doc_file") as File | null;
@@ -351,7 +351,7 @@ export async function updateProjectInvoice(id: string, formData: FormData) {
 }
 
 export async function deleteProjectInvoice(id: string): Promise<DeleteResult> {
-  await requirePilotActor();
+  await requireActor();
 
   try {
     await requireDivisionAccess("pmo", "full");
@@ -381,7 +381,7 @@ export type FinanceHandoffResult = { ok: true } | { ok: false; error: string };
  * yang sama, padahal per bulan biasanya diserahkan ke Finance terpisah.
  */
 export async function upsertFinanceHandoff(opportunityId: string, invoiceId: string, formData: FormData): Promise<FinanceHandoffResult> {
-  await requirePilotActor();
+  await requireActor();
 
   try {
     await requireDivisionAccess("pmo");
@@ -511,7 +511,7 @@ async function generateMonthlyBillings(contractId: string, startDate: string, en
 }
 
 export async function updateMonthlyBillingAmount(id: string, amount: number) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("pmo");
   await db.update(projectMonthlyBillings).set({ amount }).where(eq(projectMonthlyBillings.id, id));

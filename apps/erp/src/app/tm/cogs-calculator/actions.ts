@@ -1,5 +1,5 @@
 "use server";
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor } from "@/lib/actor";
 import { db } from "@/db";
 import { talentAssignments } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -49,7 +49,7 @@ export type ApplyCogsResult = { ok: true } | { ok: false; error: string };
  * (sekarang cuma read-only di sana, lihat src/app/tm/[id]/edit/page.tsx).
  */
 export async function applyCogsToTalentAssignment(input: ApplyCogsInput): Promise<ApplyCogsResult> {
-  await requirePilotActor();
+  await requireActor();
 
   try {
     await requireDivisionAccess("tm");

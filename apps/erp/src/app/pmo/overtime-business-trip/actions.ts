@@ -1,5 +1,5 @@
 "use server";
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor } from "@/lib/actor";
 import { db } from "@/db";
 import { overtimeBusinessTripClaims, opportunities, employees, candidates, onboardingRequests } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -35,7 +35,7 @@ async function talentLabelOf(claim: { employee_id: string | null }): Promise<str
 }
 
 export async function createClaim(formData: FormData): Promise<void> {
-  await requirePilotActor();
+  await requireActor();
 
   const access = await requireDivisionAccess("pmo");
 
@@ -89,7 +89,7 @@ export async function createClaim(formData: FormData): Promise<void> {
  * durasi jam lembur/business trip setelah data awal diinput.
  */
 export async function updateClaim(id: string, formData: FormData): Promise<void> {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("pmo");
 
@@ -140,7 +140,7 @@ export type ClaimActionResult = { ok: true } | { ok: false; error: string };
 
 /** PMO forward klaim ke Sales untuk konfirmasi ke client. */
 export async function forwardToSales(id: string): Promise<ClaimActionResult> {
-  await requirePilotActor();
+  await requireActor();
 
   let actor;
   try { actor = await requireDivisionAccess("pmo"); } catch (e: any) { return { ok: false, error: e.message }; }
@@ -161,7 +161,7 @@ export async function forwardToSales(id: string): Promise<ClaimActionResult> {
 
 /** Sales submit ke Finance setelah konfirmasi client. */
 export async function submitToFinance(id: string): Promise<ClaimActionResult> {
-  await requirePilotActor();
+  await requireActor();
 
   let actor;
   try { actor = await requireDivisionAccess("sales"); } catch (e: any) { return { ok: false, error: e.message }; }
@@ -182,7 +182,7 @@ export async function submitToFinance(id: string): Promise<ClaimActionResult> {
 
 /** Finance tandai sudah diinvoice ke client. */
 export async function markInvoiced(id: string, formData: FormData): Promise<ClaimActionResult> {
-  await requirePilotActor();
+  await requireActor();
 
   let actor;
   try { actor = await requireDivisionAccess("finance"); } catch (e: any) { return { ok: false, error: e.message }; }
@@ -212,7 +212,7 @@ export async function markInvoiced(id: string, formData: FormData): Promise<Clai
 }
 
 export async function updateBillingStatus(id: string, statusCode: string): Promise<ClaimActionResult> {
-  await requirePilotActor();
+  await requireActor();
 
   try { await requireDivisionAccess("finance"); } catch (e: any) { return { ok: false, error: e.message }; }
   await db.update(overtimeBusinessTripClaims).set({ billing_status_code: statusCode, updated_at: new Date() }).where(eq(overtimeBusinessTripClaims.id, id));
@@ -223,7 +223,7 @@ export async function updateBillingStatus(id: string, statusCode: string): Promi
 
 /** HR proses pencairan ke talent. */
 export async function updateTalentPayment(id: string, formData: FormData): Promise<ClaimActionResult> {
-  await requirePilotActor();
+  await requireActor();
 
   let actor;
   try { actor = await requireDivisionAccess("hr"); } catch (e: any) { return { ok: false, error: e.message }; }
@@ -254,7 +254,7 @@ export async function updateTalentPayment(id: string, formData: FormData): Promi
 }
 
 export async function deleteClaim(id: string): Promise<ClaimActionResult> {
-  await requirePilotActor();
+  await requireActor();
 
   try { await requireDivisionAccess("pmo", "full"); } catch (e: any) { return { ok: false, error: e.message }; }
 

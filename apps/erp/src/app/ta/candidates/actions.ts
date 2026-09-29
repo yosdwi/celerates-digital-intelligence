@@ -1,5 +1,5 @@
 "use server";
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor } from "@/lib/actor";
 import { db } from "@/db";
 import { candidates } from "@/db/schema";
 import { revalidatePath } from "next/cache";
@@ -16,7 +16,7 @@ import { requireDivisionAccess } from "@/lib/require-division-access";
 import { generateCandidateNo } from "@/lib/id-generators";
 
 export async function createCandidate(formData: FormData) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("ta");
   const candidate_date = formData.get("candidate_date") as string;
@@ -83,17 +83,17 @@ export async function createCandidate(formData: FormData) {
 }
 
 export async function deleteCandidateAttachment(attachmentId: string) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("ta");
-  await deleteAttachment(attachmentId);
+  await deleteAttachment(attachmentId, [CANDIDATE_CV_ASLI_SOURCE]);
   await logActivity("ta", "delete", "Lampiran CV dihapus", "Candidate");
   revalidatePath("/ta/candidates");
   revalidatePath("/ta/pipeline");
 }
 
 export async function updateCandidate(id: string, formData: FormData) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("ta");
   const candidate_date = formData.get("candidate_date") as string;
@@ -156,7 +156,7 @@ export async function updateCandidate(id: string, formData: FormData) {
 export type DeleteResult = { ok: true } | { ok: false; error: string };
 
 export async function deleteCandidate(id: string): Promise<DeleteResult> {
-  await requirePilotActor();
+  await requireActor();
 
   try {
     await requireDivisionAccess("ta", "full");
