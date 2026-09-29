@@ -408,8 +408,8 @@ def search(principal, query, *, kinds=None, entity=None, limit=10, purpose="ui")
     For `purpose='agent'`, content is returned only for classes whose ERP policy shares it with the model."""
     access = access_of(principal)
     predicate, params = _auth_sql(access, principal)
-    embedding, model = ModelGateway().embed(query) if query else ([0.0], None)
-    semantic = bool(query) and model != retrieval.DEMO_EMBEDDING
+    embedding, model = retrieval.query_embedding(query) if query else (None, None)
+    semantic = bool(query) and model not in (None, retrieval.DEMO_EMBEDDING)
     filters, fparams = [], []
     if kinds:
         filters.append("f.kind = ANY(%s)")
@@ -465,7 +465,7 @@ def search(principal, query, *, kinds=None, entity=None, limit=10, purpose="ui")
                     *fparams,
                     semantic,
                     model,
-                    str(embedding),
+                    str(embedding or [0.0]),
                     limit * 3,
                 ),
             )
