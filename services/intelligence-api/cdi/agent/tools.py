@@ -192,7 +192,13 @@ def files_search(ctx, query, kind=None):
     from .. import files
 
     try:
-        return {"files": files.search(ctx.principal, query, kinds=[kind] if kind else None, limit=6, purpose="agent")}
+        norm = kind.strip().lower() if isinstance(kind, str) and kind.strip() else None
+        found = files.search(ctx.principal, query, kinds=[norm] if norm else None, limit=6, purpose="agent")
+        # A model-guessed kind is a hint, not a hard filter: a wrong guess (e.g. "sop" for a "policy" file) must not
+        # turn a real match into a false "not found" (agent-knowledge-poc.md #4/#10).
+        if not found and norm:
+            found = files.search(ctx.principal, query, kinds=None, limit=6, purpose="agent")
+        return {"files": found}
     except files.FilesError as exc:
         raise PolicyError(str(exc)) from exc
 
