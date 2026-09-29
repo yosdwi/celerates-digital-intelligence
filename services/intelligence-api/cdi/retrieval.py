@@ -5,8 +5,10 @@ stemmers plus a `simple` prefix match. Ranking fuses lexical rank and, only when
 configured, vector rank by reciprocal-rank fusion (RRF). The demo hash embedding never ranks or admits passages.
 """
 
+import logging
 import re
 
+log = logging.getLogger(__name__)
 RRF_K = 60
 DEMO_EMBEDDING = "demo-hash-64-v1"
 # Function words in Indonesian and English. PostgreSQL's `indonesian` configuration has no stop-word list, so an OR
@@ -40,3 +42,15 @@ TSQUERY_SQL = "(to_tsquery('indonesian', %s) || to_tsquery('english', %s) || to_
 def tsquery_params(query):
     or_terms, prefix = tsquery_args(query)
     return (or_terms, or_terms, prefix)
+
+
+def query_embedding(query):
+    """(embedding, model) for a search query, or (None, None) when the embedding provider fails: retrieval then
+    ranks lexically instead of failing the whole request (a provider outage must not break file or knowledge search)."""
+    from .gateway import ModelGateway, failure
+
+    try:
+        return ModelGateway().embed(query)
+    except Exception as exc:  # provider errors never carry payloads or keys into logs
+        log.warning("Query embedding failed; lexical retrieval only: %s", failure(exc))
+        return None, None

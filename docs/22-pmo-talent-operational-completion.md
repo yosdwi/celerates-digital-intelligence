@@ -156,6 +156,7 @@ All three reuse the Talent Mobile service rules unchanged.
 - The Agent falls back to the deterministic router whenever the model path fails validation. That answer says "(Model tidak menghasilkan jawaban yang dapat dibuktikan…)". The same fallback turns feedback detection into keyword offers.
 - Company Files content reaches the model only for access classes whose policy shares content with it.
 - Governed "knowledge" needs curator approval.
+- P4 diagnosis, fixes and the production POC steps: [implementation record](implementation/agent-knowledge-poc.md).
 
 **R7.1 — POC.**
 1. Generate a sample PDF, "Kebijakan Cuti Karyawan", with synthetic but realistic rules.

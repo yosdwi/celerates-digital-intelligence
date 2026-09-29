@@ -31,8 +31,9 @@ MAX_ANSWER = 1500
 MODEL_TIMEOUT = 20
 FALLBACK_RESERVE = 10  # seconds kept for the deterministic answer if the model path fails
 EVIDENCE_CHARS = 700
+PASSAGE_CHARS = 1000  # a file/document passage is one chunk (~900 characters): keep it whole, or its facts are cut off
 JAKARTA = ZoneInfo("Asia/Jakarta")
-PROMPT_VERSION = "agent-ask-v3"
+PROMPT_VERSION = "agent-ask-v4"
 
 # The planner may call these read tools. Argument names and allowed values are fixed here; ERP authorizes each call.
 PLANNER_TOOLS = {
@@ -95,6 +96,9 @@ Reply with exactly one JSON object, one of:
   "detail": "...", "expected": "...", "type": "improvement|bug_fix|new_feature|data_fix",
   "reason": "wrong|incomplete|irrelevant|other", "cite": ["E1"]}}   -- the message is feedback, not a question
 Rules:
+- Company rules, policies, SOPs and HR matters (cuti/leave, reimbursement, working hours, procedures): search
+  Company Files (files_search, then file_read on the best file for the exact passage) and approved knowledge before
+  answering. Cite the page passage.
 - Company Files: when a file's content is withheld, say which file holds the answer and that the user can open it;
   never guess what a withheld file says.
 - Facts come only from the numbered evidence (S = attention rules, E = tool results, D = the user's attached
@@ -109,6 +113,9 @@ Rules:
   record first and cite its E id); approved knowledge that is wrong or outdated (knowledge_correction: cite the
   knowledge E ids); or your previous answer, shown as `previous` (agent_feedback; reason optional). Title: one short
   line in the user's language. The user reviews every route before it is sent; do not answer it as a question.
+  Feedback is often implicit, with no keyword, e.g. "tabel ini harusnya bisa difilter per client" (feature_request),
+  "kok angkanya beda sama laporan finance" (data_correction about the record or rule in question, or agent_feedback
+  when it is about your previous answer), "jawaban tadi kurang lengkap" (agent_feedback, reason incomplete).
 - `previous` is the previous question and answer in this conversation; use it to resolve references like "nomor 2".
 - Answer in the user's language (Indonesian by default), concisely, at most 6 short lines. No markdown headings."""
 
@@ -138,9 +145,9 @@ class Ledger:
         self.refs = {}  # evidence id → stable source reference (erp_rule:key, erp:type/id, knowledge:doc, upload:…)
         self.meta = {}  # evidence id → knowledge passage (for a knowledge correction's scope); not persisted
 
-    def add(self, prefix, compact, card=None):
+    def add(self, prefix, compact, card=None, limit=EVIDENCE_CHARS):
         key = f"{prefix}{sum(1 for k in self.items if k.startswith(prefix)) + 1}"
-        self.items[key] = _clip(compact)
+        self.items[key] = _clip(compact, limit)
         if card:
             self.cards[key] = card
         return key
@@ -168,21 +175,27 @@ DOCUMENT_TOOL = {
 
 def _validate_call(call, document=None):
     tools = {**PLANNER_TOOLS, **({"document_search": DOCUMENT_TOOL} if document else {})}
-    if not isinstance(call, dict) or call.get("tool") not in tools or not isinstance(call.get("args"), dict):
-        raise ReasoningFailed("invalid tool call")
+    if not isinstance(call, dict) or call.get("tool") not in tools:
+        raise ReasoningFailed(f"invalid tool call; tools: {', '.join(tools)}")
+    if call.get("args") is None:
+        call = {**call, "args": {}}
+    if not isinstance(call["args"], dict):
+        raise ReasoningFailed("invalid tool call: args must be an object")
     spec = tools[call["tool"]]
-    args = call["args"]
-    if not set(args) <= set(spec["args"]) or not spec["required"] <= set(args):
-        raise ReasoningFailed("invalid tool arguments")
+    # Optional extras a model adds ("kind": null, "limit": 5, an unknown mode) are dropped, not fatal: only the
+    # declared arguments ever reach the tool, and a required one must still be a valid value.
     clean = {}
-    for name, value in args.items():
-        kind = spec["args"][name]
+    for name, value in call["args"].items():
+        kind = spec["args"].get(name)
+        if kind is None or value is None or value == "":
+            continue
         if isinstance(kind, tuple):
-            if value not in kind:
-                raise ReasoningFailed("invalid argument value")
-        elif not isinstance(value, str) or not 1 <= len(value) <= 200:
-            raise ReasoningFailed("invalid argument value")
-        clean[name] = value
+            if value in kind:
+                clean[name] = value
+        elif isinstance(value, str) and 1 <= len(value) <= 200:
+            clean[name] = value
+    if not spec["required"] <= set(clean):
+        raise ReasoningFailed(f"invalid tool arguments: {call['tool']} needs {', '.join(sorted(spec['required']))}")
     if call["tool"] == "document_search":
         clean["dataset_id"] = document["id"]  # bound by the run, never chosen by the model
     return call["tool"], clean
@@ -193,7 +206,9 @@ def document_cards(ledger, document, passages):
     keys, cards = [], []
     company = bool(document.get("file"))
     for p in passages:
-        key = ledger.add("D", f"document '{document['name']}' page {p['page']} part {p['ordinal']}: {p['text']}")
+        key = ledger.add(
+            "D", f"document '{document['name']}' page {p['page']} part {p['ordinal']}: {p['text']}", limit=PASSAGE_CHARS
+        )
         keys.append(key)
         cards.append(
             {
@@ -310,6 +325,7 @@ def _record(ctx, ledger, tool, args, result):
                     + (f" page {f['page']}" if f.get("page") else "")
                     + (f" linked: {links}" if links else "")
                     + f": {content}",
+                    limit=PASSAGE_CHARS,
                 )
             )
             cards.append({**file_card(f), "cite": keys[-1]})
@@ -325,7 +341,14 @@ def _record(ctx, ledger, tool, args, result):
             )
             cards.append({**file_card(f), "cite": keys[-1]})
         for p in result["passages"]:
-            keys.append(ledger.add("E", f"company file '{f['title']}' page {p['page']}: {p['text']}"))
+            section = f" section '{p['heading']}'" if p.get("heading") else ""
+            keys.append(
+                ledger.add(
+                    "E",
+                    f"company file id={f['id']} '{f['title']}' page {p['page']}{section}: {p['text']}",
+                    limit=PASSAGE_CHARS,
+                )
+            )
             cards.append({**file_card({**f, "page": p["page"], "snippet": _clip(p["text"], 320)}), "cite": keys[-1]})
         if not result["withheld"] and not result["passages"]:
             keys.append(ledger.add("E", f"company file '{f['title']}': no matching passages"))
@@ -342,19 +365,46 @@ def _record(ctx, ledger, tool, args, result):
 
 
 NUMBER = re.compile(r"(?<![\w\[])(\d[\d.,]*\d|\d)(?![\w\]])")
+EVIDENCE_ID = re.compile(r"\b[ESD]\d+\b")
+CITATION = re.compile(r"\[\s*[ESD]\d+(?:\s*[,;]\s*[ESD]\d+)*\s*\]")  # [E1] or [E1, S2]
+LIST_MARKER = re.compile(r"(?m)^\s*\d{1,2}[.)](?=\s)")  # "1. …" / "2) …" numbering the answer's own lines
+
+
+def cites(value):
+    """Evidence ids a model cited, as a list: ["E1", "S2"], "E1, S2" and "[E1]" all mean the same. None when the
+    value is not a citation list at all."""
+    if value is None:
+        return []
+    if isinstance(value, str):
+        value = [value]
+    if not isinstance(value, list) or not all(isinstance(c, str) for c in value):
+        return None
+    return list(dict.fromkeys(i for c in value for i in EVIDENCE_ID.findall(c.upper())))
+
+
+def answer_cites(answer, cite):
+    return sorted(set(cites(cite) or []) | {i for m in CITATION.findall(answer) for i in EVIDENCE_ID.findall(m)})
+
+
+def _number_forms(n):
+    """A number and its equivalent spellings: 09 = 9, 1.500.000 = 1,500,000 = 1500000."""
+    digits = re.sub(r"[.,]", "", n)
+    return {n, n.lstrip("0") or "0", digits, digits.lstrip("0") or "0"}
 
 
 def _check_answer(answer, cite, ledger, question, today):
     if not isinstance(answer, str) or not answer.strip() or len(answer) > MAX_ANSWER:
         return "answer must be a non-empty string under 1500 characters"
-    if not isinstance(cite, list) or not all(isinstance(c, str) for c in cite):
+    if cites(cite) is None:
         return "cite must be a list of evidence ids"
-    cited = set(cite) | set(re.findall(r"\[([ESD]\d+)\]", answer))
-    unknown = cited - set(ledger.items)
+    unknown = set(answer_cites(answer, cite)) - set(ledger.items)
     if unknown:
         return f"unknown evidence ids: {', '.join(sorted(unknown))}"
-    corpus = set(NUMBER.findall(ledger.text() + " " + question + " " + today))
-    loose = [n for n in NUMBER.findall(re.sub(r"\[[ESD]\d+\]", "", answer)) if n not in corpus]
+    corpus = set()
+    for n in NUMBER.findall(ledger.text() + " " + question + " " + today):
+        corpus |= _number_forms(n)
+    body = LIST_MARKER.sub("", CITATION.sub("", answer))
+    loose = [n for n in NUMBER.findall(body) if not _number_forms(n) & corpus]
     if loose:
         return f"numbers not present in evidence: {', '.join(loose[:5])}"
     return None
@@ -388,14 +438,21 @@ ROUTE_INTENTS = ("feature_request", "data_correction", "knowledge_correction", "
 ERP_REF = re.compile(r"^erp:([a-z_]{2,40})/([0-9a-fA-F-]{36})$")
 
 
-def validate_route(value, ledger):
+def validate_route(value, ledger, question=None):
     """A feedback route from the model. Intent from a fixed set; citations must exist; the record for a data
     correction and the knowledge for a knowledge correction come from cited evidence, never from model text."""
-    if not isinstance(value, dict) or value.get("intent") not in ROUTE_INTENTS:
+    intent = value.get("intent") if isinstance(value, dict) else None
+    intent = intent.strip().lower() if isinstance(intent, str) else None
+    if intent not in ROUTE_INTENTS:
         raise ReasoningFailed("invalid route intent")
     title = value.get("title")
-    if not isinstance(title, str) or not 1 <= len(title.strip()) <= 200:
+    if (title is None or title == "") and question:
+        from .intents import title_from
+
+        title = title_from(question)  # the user's own words, when the model left the title out
+    if not isinstance(title, str) or not title.strip():
         raise ReasoningFailed("route title must be a short string")
+    title = title.strip()[:200]
     text = {}
     for name, limit in (("detail", 3000), ("expected", 3000)):
         v = value.get(name)
@@ -404,8 +461,8 @@ def validate_route(value, ledger):
         text[name] = v.strip() if isinstance(v, str) and v.strip() else None
     kind = value.get("type") if value.get("type") in ("improvement", "bug_fix", "new_feature", "data_fix") else None
     reason = value.get("reason") if value.get("reason") in ("wrong", "incomplete", "irrelevant", "other") else None
-    cite = value.get("cite", [])
-    if not isinstance(cite, list) or not all(isinstance(c, str) for c in cite):
+    cite = cites(value.get("cite"))
+    if cite is None:
         raise ReasoningFailed("route cite must be a list of evidence ids")
     unknown = set(cite) - set(ledger.items)
     if unknown:
@@ -418,13 +475,13 @@ def validate_route(value, ledger):
             break
     passages = [ledger.meta[k] for k in cite if k in ledger.meta]
     refs = None
-    if value["intent"] == "knowledge_correction" and passages:
+    if intent == "knowledge_correction" and passages:
         from .intents import _knowledge_refs
 
         refs = _knowledge_refs(passages)
     return {
-        "intent": value["intent"],
-        "title": title.strip(),
+        "intent": intent,
+        "title": title,
         **text,
         "type": kind,
         "reason": reason,
@@ -559,22 +616,31 @@ def _loop(ctx, query, document, ledger, usage, messages, by_key, commands, today
         usage["latency_ms"] += meta["latency_ms"]
         usage["rounds"] += 1
         messages.append({"role": "assistant", "content": json.dumps(reply, ensure_ascii=False)})
-        shapes = [k for k in SHAPES if k in reply]
+        # Empty companions ({"answer": "…", "calls": []}, "route": null) are not a second shape.
+        shapes = [k for k in SHAPES if reply.get(k) not in (None, "", [], {})]
         if len(shapes) != 1:
             raise ReasoningFailed("model reply must contain exactly one of calls, proposal, answer, route")
-        turn["verdict"] = shapes[0]
-        if "calls" in reply:
+        shape = turn["verdict"] = shapes[0]
+        if shape == "calls":
             calls = reply["calls"]
-            if not isinstance(calls, list) or not 1 <= len(calls) <= MAX_CALLS_PER_ROUND:
+            if isinstance(calls, dict):
+                calls = [calls]
+            if not isinstance(calls, list):
                 raise ReasoningFailed("invalid calls")
             new = []
             with ctx.recorder.step("Membaca bukti dari ERP dan pengetahuan"):
-                for call in calls:
-                    tool, args = _validate_call(call, document)
+                for call in calls[:MAX_CALLS_PER_ROUND]:
+                    try:
+                        tool, args = _validate_call(call, document)
+                    except ReasoningFailed as exc:  # nothing runs; the model sees why and may correct the call
+                        new.append(ledger.add("E", f"call not run: {exc}"))
+                        continue
                     try:
                         result = invoke(ctx, tool, **args)
-                    except PolicyError:
-                        raise
+                    except (PolicyError, ValueError) as exc:  # not permitted / not found / malformed id
+                        why = "not permitted or not found" if isinstance(exc, PolicyError) else "invalid id"
+                        new.append(ledger.add("E", f"{tool} {args}: not available ({why})"))
+                        continue
                     except Exception as exc:  # a failed read is evidence of absence, not a crash
                         status = getattr(exc, "status", None)
                         if status not in (403, 404, 422):
@@ -592,8 +658,8 @@ def _loop(ctx, query, document, ledger, usage, messages, by_key, commands, today
                 }
             )
             continue
-        if "route" in reply:
-            route = validate_route(reply["route"], ledger)
+        if shape == "route":
+            route = validate_route(reply["route"], ledger, query)
             from .intents import prepare
 
             target = route["target"]
@@ -618,7 +684,7 @@ def _loop(ctx, query, document, ledger, usage, messages, by_key, commands, today
 
             ctx.recorder.actions(alternatives(route["intent"], query, target))
             return {**result, "reasoning": "model", **_usage(usage)}
-        if "proposal" in reply:
+        if shape == "proposal":
             title, items = _validate_proposal(reply["proposal"], commands)
             with ctx.recorder.step("Menyiapkan usulan di ERP"):
                 proposal = invoke(ctx, "erp_propose", title=title, items=items)
@@ -645,7 +711,7 @@ def _loop(ctx, query, document, ledger, usage, messages, by_key, commands, today
             repaired = True
             messages.append({"role": "user", "content": json.dumps({"rejected": problem, "fix": "answer again"})})
             continue
-        cited = sorted(set(reply.get("cite", [])) | set(re.findall(r"\[([ESD]\d+)\]", reply["answer"])))
+        cited = answer_cites(reply["answer"], reply.get("cite"))
         rule_keys = [k for k in cited if k in by_key]
         rule_cards = [by_key[k] for k in rule_keys]
         from .playbooks import _signal_evidence

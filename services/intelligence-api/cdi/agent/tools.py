@@ -198,8 +198,14 @@ def files_search(ctx, query, kind=None):
 
 
 def _file_read(ctx, file_id, query=None):
+    from uuid import UUID
+
     from .. import files
 
+    try:
+        UUID(str(file_id))
+    except ValueError as exc:  # a title or a truncated id from a model: not found, not a crash
+        raise PolicyError("Berkas tidak tersedia untuk pengguna ini") from exc
     try:
         return files.read(ctx.principal, file_id, query, purpose="agent")
     except files.FilesError as exc:

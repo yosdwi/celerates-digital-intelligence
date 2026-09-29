@@ -8,7 +8,6 @@ numbers), does it cite the sources a curator expects, and at what latency and to
 
 import json
 import logging
-import re
 import statistics
 from uuid import uuid4
 
@@ -49,7 +48,11 @@ def case_candidates(run_id):
         return None
     ledger = rows[-1]["ledger"]
     final = rows[-1]["reply"] or {}
-    cited = set(final.get("cite", [])) if isinstance(final, dict) else set()
+    cited = (
+        set(reasoning.answer_cites(str(final.get("answer") or ""), final.get("cite")))
+        if isinstance(final, dict)
+        else set()
+    )
     refs = []
     for key, text in ledger["items"].items():
         ref = ledger["refs"].get(key)
@@ -60,8 +63,9 @@ def case_candidates(run_id):
         kinds = sorted({i.get("kind") for i in final.get("proposal", {}).get("items", [])})
     elif shape == "route":
         route = final.get("route") or {}
-        kinds = [route["intent"]] if isinstance(route, dict) and route.get("intent") else []
-        cited = set(route.get("cite", [])) if isinstance(route, dict) and isinstance(route.get("cite"), list) else set()
+        intent = route.get("intent") if isinstance(route, dict) else None
+        kinds = [intent.strip().lower()] if isinstance(intent, str) and intent.strip() else []
+        cited = set(reasoning.cites(route.get("cite")) or []) if isinstance(route, dict) else set()
         refs = [{**r, "cited": r["key"] in cited} for r in refs]
     else:
         kinds = []
@@ -102,12 +106,12 @@ class _FrozenLedger(reasoning.Ledger):
 
 
 def _plan_check(reply, has_document):
-    shapes = [k for k in reasoning.SHAPES if k in reply]
+    shapes = [k for k in reasoning.SHAPES if reply.get(k) not in (None, "", [], {})]
     if len(shapes) != 1:
         return False, "shape"
-    if "calls" in reply:
-        calls = reply["calls"]
-        if not isinstance(calls, list) or not 1 <= len(calls) <= reasoning.MAX_CALLS_PER_ROUND:
+    if shapes[0] == "calls":
+        calls = reply["calls"] if isinstance(reply["calls"], list) else [reply["calls"]]
+        if not 1 <= len(calls) <= reasoning.MAX_CALLS_PER_ROUND:
             return False, "calls"
         for call in calls:
             try:
@@ -158,7 +162,7 @@ def replay_case(case, model):
         # Feedback routing: the intent must match and citations must be known (no ERP call, nothing drafted).
         out["shape_ok"] = "route" in final
         try:
-            route = reasoning.validate_route(final.get("route"), ledger)
+            route = reasoning.validate_route(final.get("route"), ledger, case["question"])
             out["grounded"] = True
             out["recall"] = 1.0 if not expect["kinds"] or route["intent"] in expect["kinds"] else 0.0
             out["answer"] = f"route: {route['intent']} — {route['title']}"[:400]
@@ -169,8 +173,7 @@ def replay_case(case, model):
     if not out["shape_ok"]:
         return {**out, "grounded": False, "recall": 0.0, "problem": "no answer"}
     problem = reasoning._check_answer(final["answer"], final.get("cite", []), ledger, first["question"], first["today"])
-    cited = set(final.get("cite", [])) if isinstance(final.get("cite"), list) else set()
-    cited |= set(re.findall(r"\[([ESD]\d+)\]", str(final["answer"])))
+    cited = set(reasoning.answer_cites(str(final["answer"]), final.get("cite")))
     cited_refs = {ledger.refs[k] for k in cited if k in ledger.refs}
     expected = set(expect["refs"])
     out["grounded"] = problem is None

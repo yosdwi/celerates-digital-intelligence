@@ -178,8 +178,8 @@ def search_for_principal(query, actor, opportunity_ids=(), limit=5, min_vector=0
     model is configured. Ranking is reciprocal-rank fusion of lexical and (semantic only) vector rank. The
     deterministic demo hash is not semantic, so it never admits or ranks a passage.
     """
-    embedding, model = ModelGateway().embed(query)
-    semantic = model != DEMO_EMBEDDING
+    embedding, model = retrieval.query_embedding(query)
+    semantic = model not in (None, DEMO_EMBEDDING)
     with connect() as conn:
         return all_rows(
             conn,
@@ -195,8 +195,9 @@ def search_for_principal(query, actor, opportunity_ids=(), limit=5, min_vector=0
                  a.scope_id,a.classification,a.source_kind,a.approved_at,
                  (c.search_multi @@ q.terms) AS lexical_match,
                  ts_rank_cd(c.search_multi, q.terms) AS lexical,
-                 1-(c.embedding <=> %s::vector) AS vector
-          FROM authorized a JOIN chunks c ON c.document_id=a.id CROSS JOIN q WHERE c.embedding_model=%s
+                 CASE WHEN %s THEN 1-(c.embedding <=> %s::vector) END AS vector
+          FROM authorized a JOIN chunks c ON c.document_id=a.id CROSS JOIN q
+          WHERE c.embedding_model=%s OR (%s::text IS NULL)
         ), admitted AS (
           SELECT *, row_number() OVER (ORDER BY lexical DESC, id) AS lrank,
                     row_number() OVER (ORDER BY vector DESC, id) AS vrank
@@ -213,7 +214,9 @@ def search_for_principal(query, actor, opportunity_ids=(), limit=5, min_vector=0
                 actor.restricted,
                 sorted(actor.divisions),
                 list(opportunity_ids),
-                str(embedding),
+                semantic,
+                str(embedding or [0.0]),
+                model,
                 model,
                 semantic,
                 min_vector,

@@ -100,6 +100,40 @@ class ModelUnavailable(RuntimeError):
     pass
 
 
+FENCE = re.compile(r"^```(?:json)?\s*|\s*```$", re.I)
+
+
+def json_object(message):
+    """The JSON object in a chat completion message. Providers in JSON mode still sometimes wrap it in a ```json
+    fence or a sentence, or (Workers AI) return it already parsed; an empty message is an error that says why."""
+    content = getattr(message, "content", None)
+    if isinstance(content, dict):
+        return content
+    if not isinstance(content, str) or not content.strip():
+        raise ValueError("Model returned no content")
+    text = FENCE.sub("", content.strip())
+    try:
+        value = json.loads(text)
+    except json.JSONDecodeError:
+        start, end = text.find("{"), text.rfind("}")
+        if start < 0 or end <= start:
+            raise ValueError("Model reply is not JSON") from None
+        value = json.loads(text[start : end + 1])
+    if not isinstance(value, dict):
+        raise ValueError("Model did not return a JSON object")
+    return value
+
+
+def failure(exc):
+    """A log-safe description of a model failure: exception types and HTTP status only, never payloads or keys."""
+    parts, seen = [], exc
+    while seen is not None and len(parts) < 3:
+        status = getattr(seen, "status_code", None)
+        parts.append(type(seen).__name__ + (f"({status})" if status else ""))
+        seen = seen.__cause__
+    return " <- ".join(parts)
+
+
 def agent_model_enabled():
     cfg = settings()
     return cfg.generation_mode == "litellm" and bool(cfg.agent_model)
@@ -140,9 +174,12 @@ def structured(messages, *, use_case, fast=False, max_tokens=1200, timeout=30, m
                 max_tokens=max_tokens,
                 metadata={"use_case": use_case},
             )
-            content = json.loads(result.choices[0].message.content)
-            if not isinstance(content, dict):
-                raise ValueError("Model did not return a JSON object")
+            choice = result.choices[0]
+            try:
+                content = json_object(choice.message)
+            except ValueError as exc:
+                reason = getattr(choice, "finish_reason", None)
+                raise ValueError(f"{exc} (finish_reason={reason})") from None
             usage = getattr(result, "usage", None)
             return content, {
                 "model": model,

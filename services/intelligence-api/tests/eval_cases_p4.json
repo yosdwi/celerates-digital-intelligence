@@ -1,0 +1,80 @@
+{
+  "about": "Doc 22 P4 evaluation cases: cuti questions against samples/policies/kebijakan-cuti-karyawan-contoh.pdf and implicit feedback without keywords. `script` is the reference model behaviour used by tests/test_agent_knowledge_poc.py (stubbed provider); on production the same questions are asked, and the runs are saved as cases in Brain Console → Agent → Evaluasi. `{policy}` is the Company File id of the uploaded sample.",
+  "cases": [
+    {
+      "id": "cuti-jatah-tahunan",
+      "question": "berapa jatah cuti tahunan?",
+      "path": "/",
+      "expect": {"shape": "answer", "pages": [1], "must_say": ["12 hari kerja"]},
+      "script": [
+        {"calls": [{"tool": "files_search", "args": {"query": "jatah cuti tahunan", "kind": null}}]},
+        {"calls": [{"tool": "file_read", "args": {"file_id": "{policy}", "query": "jatah cuti tahunan"}}]},
+        {
+          "answer": "Jatah cuti tahunan adalah 12 hari kerja per tahun kalender [E2]. Karyawan yang bergabung di tengah tahun mendapat 1 hari untuk setiap bulan kerja penuh (pro-rata) [E3].",
+          "cite": ["E2", "E3"]
+        }
+      ]
+    },
+    {
+      "id": "cuti-carry-over",
+      "question": "apakah cuti tahunan bisa dibawa ke tahun berikutnya?",
+      "path": "/",
+      "expect": {"shape": "answer", "pages": [3], "must_say": ["5 hari kerja", "31 Maret"]},
+      "script": [
+        {"calls": [{"tool": "files_search", "args": {"query": "sisa cuti tahunan dibawa tahun berikutnya"}}]},
+        {"calls": [{"tool": "file_read", "args": {"file_id": "{policy}", "query": "sisa cuti tahunan dibawa tahun berikutnya"}}]},
+        {
+          "answer": "Bisa, paling banyak 5 hari kerja. Sisa cuti yang dibawa wajib dipakai paling lambat 31 Maret tahun berikutnya; setelah itu hangus [E2].",
+          "cite": "E2"
+        }
+      ]
+    },
+    {
+      "id": "feedback-filter-per-client",
+      "question": "tabel ini harusnya bisa difilter per client",
+      "path": "/pmo/timesheets",
+      "expect": {"shape": "route", "kinds": ["feature_request"]},
+      "script": [
+        {
+          "route": {
+            "intent": "feature_request",
+            "title": "Tabel timesheet bisa difilter per client",
+            "type": "improvement",
+            "expected": "Ada filter client di tabel timesheet"
+          }
+        }
+      ]
+    },
+    {
+      "id": "feedback-angka-beda-finance",
+      "question": "kok angkanya beda sama laporan finance",
+      "path": "/ta",
+      "previous": {
+        "question": "berapa requisition tanpa TA PIC?",
+        "script": [{"answer": "Ada 2 requisition tanpa TA PIC [S2].", "cite": ["S2"]}]
+      },
+      "expect": {"shape": "route", "kinds": ["agent_feedback"], "no_keyword": true},
+      "script": [
+        {
+          "route": {
+            "intent": "agent_feedback",
+            "title": "Angka jawaban berbeda dengan laporan finance",
+            "reason": "wrong",
+            "cite": ["S2"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "feedback-jawaban-kurang-lengkap",
+      "question": "jawaban tadi kurang lengkap",
+      "path": "/ta",
+      "previous": {
+        "question": "berapa requisition tanpa TA PIC?",
+        "script": [{"answer": "Ada 2 requisition tanpa TA PIC [S2].", "cite": ["S2"]}]
+      },
+      "expect": {"shape": "route", "kinds": ["agent_feedback"], "no_keyword": true},
+      "script": [{"route": {"intent": "Agent_Feedback", "reason": "incomplete"}, "calls": []}]
+    }
+  ]
+}
