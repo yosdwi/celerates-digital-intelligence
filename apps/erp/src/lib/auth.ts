@@ -8,7 +8,17 @@ import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { isBetaWhitelisted } from "@/lib/beta";
 import { sql } from "@/db";
-import { redeemGrant } from "@/lib/talent/identity";
+import { activeLinkForUser, redeemGrant } from "@/lib/talent/identity";
+
+// R3.1 (doc 22): sessions do not expire on their own; they end on sign-out, deactivation or, for a Talent, when the
+// identity link the session relies on is revoked. Claims are reloaded from the database on every session read.
+const SESSION_MAX_AGE_SECONDS = 10 * 365 * 24 * 3600;
+const LINK_RECHECK_MS = 5 * 60 * 1000;
+
+/** A session that can no longer be used: fails the middleware and every server guard (status is not "active"). */
+function endSession<T extends Record<string, unknown>>(token: T): T {
+  return Object.assign(token, { revoked: true, status: "revoked", isOwner: false, access: [], canUseTimesheetConverter: false });
+}
 
 
 async function loadUserClaims(email: string) {
@@ -61,7 +71,9 @@ export const authOptions: NextAuthOptions = {
         if (!credentials?.email || !credentials?.password) return null;
         if (credentials.email.length > 254 || credentials.password.length > 72 || !await allowLoginAttempt(credentials.email)) return null;
         const [user] = await db.select().from(users).where(eq(users.email, credentials.email.trim().toLowerCase()));
-        if (!user || user.status !== "active" || !user.is_owner || !user.password_hash) return null;
+        // R1.4 / R3.3: every active account with a password (backoffice or Talent). The session claims carry the
+        // account type, so a Talent signed in by password is confined exactly like one who came by link.
+        if (!user || user.status !== "active" || !user.password_hash) return null;
 
         const valid = await bcrypt.compare(credentials.password, user.password_hash);
         if (!valid) return null;
@@ -104,6 +116,7 @@ export const authOptions: NextAuthOptions = {
     },
 
     async jwt({ token, user }) {
+      if (token.revoked === true) return endSession(token);
       const email = (user?.email ?? token.email as string | undefined)?.toLowerCase();
       if (email) {
         const claims = await loadUserClaims(email);
@@ -119,6 +132,19 @@ export const authOptions: NextAuthOptions = {
             token.canUseTimesheetConverter = claims.canUseTimesheetConverter;
         } else {
             token.userId = undefined; token.status = "rejected"; token.isOwner = false; token.access = [];
+        }
+      }
+      // Talent: the session stays valid while the identity link it started with (or first saw) is active.
+      // A Talent signed in by password before being linked keeps an unlinked session (/me shows "belum terhubung").
+      if (token.accountType === "talent" && token.status === "active" && token.isOwner !== true && typeof token.userId === "string") {
+        const now = Date.now();
+        const checkedAt = typeof token.linkCheckedAt === "number" ? token.linkCheckedAt : 0;
+        if (user || now - checkedAt >= LINK_RECHECK_MS) {
+          const link = await activeLinkForUser(sql, token.userId);
+          const known = typeof token.linkId === "string" ? token.linkId : null;
+          if (!user && known && link?.id !== known) return endSession(token);
+          token.linkId = link?.id ?? null;
+          token.linkCheckedAt = now;
         }
       }
       return token;
@@ -143,5 +169,6 @@ export const authOptions: NextAuthOptions = {
   pages: {
     signIn: "/login",
   },
-  session: { strategy: "jwt" },
+  session: { strategy: "jwt", maxAge: SESSION_MAX_AGE_SECONDS, updateAge: 24 * 3600 },
+  jwt: { maxAge: SESSION_MAX_AGE_SECONDS },
 };
