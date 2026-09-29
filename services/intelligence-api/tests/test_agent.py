@@ -1013,7 +1013,6 @@ def test_dropped_documents_are_read_cited_and_owner_only(monkeypatch):
                     }
                 },
                 {"calls": [{"tool": "document_search", "args": {"query": "kontrak", "dataset_id": "evil"}}]},
-                {"calls": [{"tool": "document_search", "args": {"query": "kontrak"}}]},
                 {"answer": "Kontrak berjalan 12 bulan [D1].", "cite": ["D1"]},
             ]
         )
@@ -1028,14 +1027,14 @@ def test_dropped_documents_are_read_cited_and_owner_only(monkeypatch):
         ]
         prompt = json.loads(model.calls[0]["messages"][1]["content"])
         assert "D1: document 'permintaan.docx' page 1" in prompt["document"]["passages"]
-        # The model cannot choose which dataset to read: an extra dataset_id argument is rejected → fallback.
-        _, stream = run_skill(monkeypatch, c, token, "ask", {"query": "kontrak?", "dataset_id": doc["id"]}, AskingERP)
-        assert stream[-1][1]["result"]["reasoning"] == "fallback"
+        # The model cannot choose which dataset to read: its dataset_id argument is dropped; the run's document is read.
         _, stream = run_skill(
             monkeypatch, c, token, "ask", {"query": "berapa lama kontrak?", "dataset_id": doc["id"]}, AskingERP
         )
         end = stream[-1][1]["result"]
         assert end["reasoning"] == "model" and end["cited"] == ["D1"], end
+        tool_args = [e["delta"] for _, e in stream if e["type"] == "TOOL_CALL_ARGS"]
+        assert tool_args and "evil" not in "".join(tool_args) and doc["id"] in tool_args[-1]
 
 
 def test_brain_console_shows_runs_reasoning_outcomes_and_learning_to_curators_only(monkeypatch):

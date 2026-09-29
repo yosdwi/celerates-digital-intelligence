@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from ..config import settings
-from ..gateway import agent_model_enabled
+from ..gateway import agent_model_enabled, failure
 from . import datasets, intents, reasoning, runs
 from .erp_client import DelegatedERP, ERPAgentError
 from .tools import PolicyError, RunContext, invoke
@@ -336,22 +336,30 @@ FILE_WORDS = {
 }
 
 
-def _files_lines(ctx, query, terms):
-    """Company Files for a question that names files (deterministic): cards and one line per file."""
+def _files_lines(ctx, query, terms, quiet=False):
+    """Company Files for a question (deterministic): cards and one line per file, with the matching passage where
+    class policy shares content. `quiet`: nothing when no file matches (a last resort, not a file question)."""
     kinds = [FILE_WORDS[t] for t in terms if FILE_WORDS.get(t)]
     rest = " ".join(t for t in terms if t not in FILE_WORDS) or query
     with ctx.recorder.step("Mencari di Company Files"):
         try:
             found = invoke(ctx, "files_search", query=rest, kind=kinds[0] if len(set(kinds)) == 1 else None)["files"]
-        except ERPAgentError:
-            return ["Company Files belum dapat dicari saat ini."]
+        except (ERPAgentError, PolicyError):
+            return [] if quiet else ["Company Files belum dapat dicari saat ini."]
+        except Exception:
+            if not quiet:
+                raise
+            log.warning("Company Files search failed in the deterministic fallback", exc_info=True)
+            return []
     ctx.recorder.evidence([file_card(f) for f in found])
     if not found:
-        return [f"Tidak ada berkas perusahaan yang cocok dengan “{rest}” dan dapat Anda akses."]
+        return [] if quiet else [f"Tidak ada berkas perusahaan yang cocok dengan “{rest}” dan dapat Anda akses."]
     lines = [f"Berkas perusahaan yang cocok ({len(found)}):"]
     for f in found[:MAX_RESULT_LINES]:
         where = f", hal. {f['page']}" if f.get("page") else ""
         lines.append(f"• {f['title']} ({KIND_LABEL.get(f['kind'], f['kind'])}{where})")
+        if f.get("snippet"):
+            lines.append(f"  “{f['snippet'][:220]}{'…' if len(f['snippet']) > 220 else ''}”")
     if any(not f["content_shared"] for f in found):
         lines.append(
             "Isi sebagian berkas tidak dibagikan ke Agent menurut kebijakan kelasnya; buka berkasnya untuk membaca."
@@ -389,6 +397,14 @@ def _document(ctx, dataset_id):
     return {"id": data["id"], "name": data["name"], "profile": data["profile"], "chunks": data["chunks"]}
 
 
+def _fallback_detail(exc):
+    """Why the model path was left, safe to log and keep in the run: the validation message (fixed wording, evidence
+    ids, numbers from the answer) or, for a provider failure, exception types and HTTP status only."""
+    if isinstance(exc, reasoning.ReasoningFailed):
+        return str(exc)[:300]
+    return failure(exc.__cause__) if exc.__cause__ else type(exc).__name__
+
+
 def ask(ctx, query, dataset_id=None, file_id=None):
     """`Ask anything`. With an Agent model configured, a bounded plan → read → answer loop (reasoning.py) over the same
     tools; otherwise, or whenever the model path fails validation, the deterministic router below. A dropped document
@@ -400,11 +416,17 @@ def ask(ctx, query, dataset_id=None, file_id=None):
         try:
             return reasoning.ask_with_model(ctx, query, document=document)
         except (reasoning.ModelUnavailable, reasoning.ReasoningFailed, TimeoutError) as exc:
-            log.warning("Agent model path fell back to deterministic: %s", type(exc).__name__)
+            detail = _fallback_detail(exc)
+            log.warning("Agent model path fell back to deterministic: %s: %s", type(exc).__name__, detail)
             ctx.calls = 0
             ctx.deadline = max(ctx.deadline, time.monotonic() + reasoning.FALLBACK_RESERVE)
             result = ask_deterministic(ctx, query, fallback=True, document=document)
-            return {**result, "reasoning": "fallback", "fallback_reason": type(exc).__name__}
+            return {
+                **result,
+                "reasoning": "fallback",
+                "fallback_reason": type(exc).__name__,
+                "fallback_detail": detail,
+            }
     return ask_deterministic(ctx, query, document=document)
 
 
@@ -446,7 +468,7 @@ def read_document(ctx, dataset_id):
             )
             return {**result, "skill": "read_document", "dataset_id": dataset_id}
         except (reasoning.ModelUnavailable, reasoning.ReasoningFailed, TimeoutError) as exc:
-            log.warning("Document brief fell back to deterministic: %s", type(exc).__name__)
+            log.warning("Document brief fell back to deterministic: %s: %s", type(exc).__name__, _fallback_detail(exc))
             ctx.calls = 0
             ctx.deadline = max(ctx.deadline, time.monotonic() + reasoning.FALLBACK_RESERVE)
     text = " ".join(c["text"] for c in document["chunks"])
@@ -566,6 +588,8 @@ def ask_deterministic(ctx, query, fallback=False, document=None):
     ctx.recorder.evidence(_knowledge_evidence(passages))
     if passages:
         lines.append(f"Pengetahuan disetujui: {', '.join(p['title'] for p in passages[:3])}.")
+    if not lines and not document and not FILE_WORDS.keys() & set(terms):
+        lines += _files_lines(ctx, query, terms, quiet=True)  # e.g. "berapa jatah cuti tahunan?" → the policy file
     if not lines and not intents.cues(query):
         lines.append(
             f"Belum ada aturan ERP, record, atau pengetahuan disetujui yang cocok dengan “{' '.join(terms)}”. "
