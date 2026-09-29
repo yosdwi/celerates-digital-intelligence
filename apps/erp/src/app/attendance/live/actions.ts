@@ -1,5 +1,5 @@
 "use server";
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor } from "@/lib/actor";
 import { db } from "@/db";
 import { attendanceLogs } from "@/db/schema";
 import { and, desc, eq, isNull } from "drizzle-orm";
@@ -17,7 +17,7 @@ function todayDate(): string {
 
 /** Selalu bikin sesi baru -- 1 user bisa check-in berkali-kali sehari, tiap sesi masuk log sendiri-sendiri. */
 export async function checkIn(lat: number | null, lng: number | null, selfie: File): Promise<ActionResult> {
-  await requirePilotActor();
+  await requireActor();
 
   let actor;
   try {
@@ -55,7 +55,7 @@ export async function checkIn(lat: number | null, lng: number | null, selfie: Fi
 
 /** Nutup sesi yang lagi terbuka PALING BARU milik user ini (check_out_at masih null). */
 export async function checkOut(lat: number | null, lng: number | null, selfie: File): Promise<ActionResult> {
-  await requirePilotActor();
+  await requireActor();
 
   let actor;
   try {

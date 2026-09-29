@@ -1,5 +1,5 @@
 "use server";
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor } from "@/lib/actor";
 
 import { db } from "@/db";
 import { opportunities, requisitions, signatureRequests, projectDocuments, employees, extensionIncrementRequests, salesOpportunityTrackers } from "@/db/schema";
@@ -20,7 +20,7 @@ import { generateOptyNo, generateOptyNoWithPosition, generatePqNo } from "@/lib/
 import { requireDivisionAccess } from "@/lib/require-division-access";
 
 export async function createOpportunity(formData: FormData) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("sales");
   const client_name = formData.get("client_name") as string;
@@ -118,7 +118,7 @@ export async function createOpportunity(formData: FormData) {
  *    persis kayak pola notifikasi "talent baru" di HR.
  */
 export async function createExtensionRequestFromSales(formData: FormData): Promise<void> {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("sales");
   const employee_id = formData.get("employee_id") as string;
@@ -215,7 +215,7 @@ export async function createExtensionRequestFromSales(formData: FormData): Promi
 }
 
 export async function updateOpportunity(id: string, formData: FormData) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("sales");
   const client_name = formData.get("client_name") as string;
@@ -352,7 +352,7 @@ export async function updateOpportunity(id: string, formData: FormData) {
 export type UpdateStageResult = { ok: true } | { ok: false; error: string };
 
 export async function updatePipelineStage(id: string, pipeline_stage_code: string): Promise<UpdateStageResult> {
-  await requirePilotActor();
+  await requireActor();
 
   try {
     await requireDivisionAccess("sales");
@@ -384,7 +384,7 @@ export async function updatePipelineStage(id: string, pipeline_stage_code: strin
 }
 
 export async function updateOptyStatus(id: string, opty_status_code: string): Promise<UpdateStageResult> {
-  await requirePilotActor();
+  await requireActor();
 
   try {
     await requireDivisionAccess("sales");
@@ -398,10 +398,10 @@ export async function updateOptyStatus(id: string, opty_status_code: string): Pr
 }
 
 export async function deleteOpportunityAttachment(attachmentId: string) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("sales");
-  await deleteAttachment(attachmentId);
+  await deleteAttachment(attachmentId, [OPPORTUNITY_PO_DOC_SOURCE, PQ_DOCUMENT_SOURCE]);
   await logActivity("sales", "delete", "Lampiran PO/Dokumen dihapus", "PQ Tracker");
   revalidatePath("/sales");
 }
@@ -410,7 +410,7 @@ export type SendPqResult = { ok: true } | { ok: false; error: string };
 
 /** Kirim dokumen PQ opportunity ini ke TTD Online untuk ditandatangani (1 signer). */
 export async function sendPqForSignature(opportunityId: string, formData: FormData): Promise<SendPqResult> {
-  await requirePilotActor();
+  await requireActor();
 
   try {
     await requireDivisionAccess("sales");
@@ -472,7 +472,7 @@ export async function sendPqForSignature(opportunityId: string, formData: FormDa
 export type DeleteResult = { ok: true } | { ok: false; error: string };
 
 export async function deleteOpportunity(id: string): Promise<DeleteResult> {
-  await requirePilotActor();
+  await requireActor();
 
   try {
     await requireDivisionAccess("sales", "full");
@@ -491,7 +491,7 @@ export async function deleteOpportunity(id: string): Promise<DeleteResult> {
 }
 
 export async function generatePqNumber(id: string, formData: FormData) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("sales");
   const pq_no = formData.get("pq_no") as string;

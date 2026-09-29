@@ -1,13 +1,13 @@
 import { FolderOpen } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor } from "@/lib/actor";
 import { agentEnabled } from "@/lib/agent/bff";
 import { FilesExplorer } from "@/components/files/explorer";
 
 // Company Files (doc 17, ADR-018): one place to find, open and ask about company files — ERP attachments (CVs, PKS,
 // PO, BAST, …) and files uploaded here (SOP, proposals, manpower sheets, …) — with access decided by ERP policy.
 export default async function FilesPage({ searchParams }: { searchParams: Promise<{ file?: string; q?: string }> }) {
-  await requirePilotActor();
+  await requireActor();
   const params = await searchParams;
   return (
     <div className="min-h-screen">

@@ -1,7 +1,7 @@
 // One canonical answer to "which modules does this user see, and with what access?" (doc 18 §14).
 // Pure over the session claims, so the desktop sidebar, desktop Home, the mobile shell and tests share it.
 // It decides VISIBILITY only. Authority stays in the server actions (requireDivisionAccess and the
-// module-specific guards) and, for the pilot, in middleware.ts.
+// module-specific guards); middleware.ts applies the matching route-level gate (route-access.ts).
 import { MODULES, type ModuleConfig, type SubPage } from "./modules-config";
 
 export type AccessClaims = {

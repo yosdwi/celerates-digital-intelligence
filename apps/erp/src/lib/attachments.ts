@@ -1,4 +1,4 @@
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor } from "@/lib/actor";
 import { safeExternalLink } from "@/lib/access-policy";
 import { db } from "@/db";
 import { attachments } from "@/db/schema";
@@ -143,9 +143,19 @@ export async function getAttachmentsWithUrlsForManySourceTypes(
   return bySourceType;
 }
 
-export async function deleteAttachment(id: string) {
-  await requirePilotActor();
-  await db.delete(attachments).where(eq(attachments.id, id));
+/**
+ * Deletes one attachment, only when it belongs to one of the caller's `sourceTypes` (the module's own
+ * attachment kinds). The caller has already checked its module authority; this keeps that authority from
+ * reaching another module's attachment by id.
+ */
+export async function deleteAttachment(id: string, sourceTypes: readonly string[], sourceId?: string) {
+  await requireActor();
+  if (sourceTypes.length === 0) throw new Error("Jenis lampiran tidak diketahui.");
+  await db.delete(attachments).where(and(
+    eq(attachments.id, id),
+    inArray(attachments.source_type, [...sourceTypes]),
+    ...(sourceId ? [eq(attachments.source_id, sourceId)] : []),
+  ));
 }
 
 /** Ekstrak semua File valid dari sebuah field FormData multi-file (dukung `<input multiple>`). */

@@ -1,8 +1,8 @@
 "use server";
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor } from "@/lib/actor";
 import { db } from "@/db";
-import { signatures, signatureRequests } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { signatures, signatureRequests, attachments } from "@/db/schema";
+import { and, eq } from "drizzle-orm";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
@@ -26,7 +26,7 @@ async function currentUser() {
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
 export async function saveSignature(file: File): Promise<ActionResult> {
-  await requirePilotActor();
+  await requireActor();
 
   const { id: userId } = await currentUser();
   if (!userId) return { ok: false, error: "Belum login" };
@@ -45,7 +45,7 @@ export async function saveSignature(file: File): Promise<ActionResult> {
 }
 
 export async function createSignatureRequest(formData: FormData): Promise<ActionResult> {
-  await requirePilotActor();
+  await requireActor();
 
   const { id: requesterId, name: requesterName } = await currentUser();
   if (!requesterId) return { ok: false, error: "Belum login" };
@@ -93,15 +93,22 @@ export async function createSignatureRequest(formData: FormData): Promise<Action
 }
 
 export async function deleteSignatureRequestAttachment(attachmentId: string) {
-  await requirePilotActor();
+  await requireActor();
 
-  await deleteAttachment(attachmentId);
+  // Only the requester of a still-pending request may remove its documents.
+  const { id: userId } = await currentUser();
+  const [row] = await db.select({ requester: signatureRequests.requested_by_user_id, status: signatureRequests.status_code })
+    .from(attachments)
+    .innerJoin(signatureRequests, eq(signatureRequests.id, attachments.source_id))
+    .where(and(eq(attachments.id, attachmentId), eq(attachments.source_type, SIGNATURE_REQUEST_DOCUMENT_SOURCE)));
+  if (!row || row.requester !== userId || row.status !== "pending") throw new Error("Hanya pembuat permintaan pending yang bisa menghapus lampiran");
+  await deleteAttachment(attachmentId, [SIGNATURE_REQUEST_DOCUMENT_SOURCE]);
   await logActivity("ttd", "delete", "Lampiran dokumen TTD dihapus", "TTD Online");
   revalidatePath("/ttd-online");
 }
 
 export async function signRequest(id: string): Promise<ActionResult> {
-  await requirePilotActor();
+  await requireActor();
 
   const { id: userId, name: userName } = await currentUser();
   if (!userId) return { ok: false, error: "Belum login" };
@@ -141,7 +148,7 @@ export async function signRequest(id: string): Promise<ActionResult> {
 }
 
 export async function rejectRequest(id: string, formData: FormData): Promise<ActionResult> {
-  await requirePilotActor();
+  await requireActor();
 
   const { id: userId, name: userName } = await currentUser();
   if (!userId) return { ok: false, error: "Belum login" };
@@ -173,7 +180,7 @@ export async function rejectRequest(id: string, formData: FormData): Promise<Act
 }
 
 export async function deleteSignatureRequest(id: string): Promise<ActionResult> {
-  await requirePilotActor();
+  await requireActor();
 
   const { id: userId } = await currentUser();
   const [request] = await db.select().from(signatureRequests).where(eq(signatureRequests.id, id));

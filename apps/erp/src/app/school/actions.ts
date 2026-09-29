@@ -1,5 +1,6 @@
 "use server";
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor } from "@/lib/actor";
+import { requireDivisionAccess } from "@/lib/require-division-access";
 import { db } from "@/db";
 import {
   schoolCourses, schoolModules, schoolLessons, schoolQuizzes, schoolQuizQuestions,
@@ -50,7 +51,7 @@ async function generateCourseNo(): Promise<string> {
 // ---------- Course ----------
 
 export async function createCourse(formData: FormData): Promise<void> {
-  await requirePilotActor();
+  await requireActor();
 
   const access = await requireManage();
   const title = formData.get("title") as string;
@@ -76,7 +77,7 @@ export async function createCourse(formData: FormData): Promise<void> {
 }
 
 export async function updateCourse(id: string, formData: FormData): Promise<void> {
-  await requirePilotActor();
+  await requireActor();
 
   await requireManage();
   const title = formData.get("title") as string;
@@ -100,7 +101,7 @@ export async function updateCourse(id: string, formData: FormData): Promise<void
 }
 
 export async function publishCourse(id: string, statusCode: string) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireManage();
   await db.update(schoolCourses).set({ status_code: statusCode, updated_at: new Date() }).where(eq(schoolCourses.id, id));
@@ -110,7 +111,7 @@ export async function publishCourse(id: string, statusCode: string) {
 }
 
 export async function deleteCourse(id: string) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDelete();
   const [course] = await db.select().from(schoolCourses).where(eq(schoolCourses.id, id));
@@ -124,7 +125,7 @@ export async function deleteCourse(id: string) {
 // ---------- Module ----------
 
 export async function createModule(courseId: string, title: string) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireManage();
   if (!title) throw new Error("Judul module wajib diisi");
@@ -135,7 +136,7 @@ export async function createModule(courseId: string, title: string) {
 }
 
 export async function updateModule(id: string, courseId: string, title: string) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireManage();
   if (!title) throw new Error("Judul module wajib diisi");
@@ -144,7 +145,7 @@ export async function updateModule(id: string, courseId: string, title: string) 
 }
 
 export async function deleteModule(id: string, courseId: string) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDelete();
   await db.delete(schoolModules).where(eq(schoolModules.id, id));
@@ -154,7 +155,7 @@ export async function deleteModule(id: string, courseId: string) {
 // ---------- Lesson ----------
 
 export async function createLesson(moduleId: string, courseId: string, formData: FormData) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireManage();
   const title = formData.get("title") as string;
@@ -205,7 +206,7 @@ export async function createLesson(moduleId: string, courseId: string, formData:
 }
 
 export async function updateLesson(id: string, courseId: string, formData: FormData) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireManage();
   const title = formData.get("title") as string;
@@ -238,15 +239,15 @@ export async function updateLesson(id: string, courseId: string, formData: FormD
 }
 
 export async function deleteLessonAttachment(attachmentId: string, courseId: string) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireManage();
-  await deleteAttachment(attachmentId);
+  await deleteAttachment(attachmentId, [LESSON_DOCUMENT_SOURCE, LESSON_VIDEO_SOURCE]);
   revalidatePath(`/school/${courseId}`);
 }
 
 export async function deleteLesson(id: string, courseId: string) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDelete();
   await db.delete(schoolLessons).where(eq(schoolLessons.id, id));
@@ -256,7 +257,7 @@ export async function deleteLesson(id: string, courseId: string) {
 // ---------- Quiz builder ----------
 
 export async function addQuizQuestion(quizId: string, courseId: string, formData: FormData) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireManage();
   const question_text = formData.get("question_text") as string;
@@ -291,7 +292,7 @@ export async function addQuizQuestion(quizId: string, courseId: string, formData
 }
 
 export async function deleteQuizQuestion(id: string, courseId: string) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDelete();
   await db.delete(schoolQuizQuestions).where(eq(schoolQuizQuestions.id, id));
@@ -307,7 +308,8 @@ async function currentUser() {
 }
 
 export async function enrollInCourse(courseId: string) {
-  await requirePilotActor();
+  await requireActor();
+  await requireDivisionAccess("school", "viewer");
 
   const { userId } = await currentUser();
   const existing = await db.select().from(schoolEnrollments)
@@ -360,7 +362,8 @@ async function checkAndCompleteCourse(enrollmentId: string) {
 }
 
 export async function markLessonComplete(lessonId: string, courseId: string) {
-  await requirePilotActor();
+  await requireActor();
+  await requireDivisionAccess("school", "viewer");
 
   const { userId } = await currentUser();
   const [lesson] = await db.select().from(schoolLessons).where(eq(schoolLessons.id, lessonId));
@@ -390,7 +393,8 @@ export async function markLessonComplete(lessonId: string, courseId: string) {
 export type QuizSubmitResult = { ok: true; score_percent: number; passed: boolean } | { ok: false; error: string };
 
 export async function submitQuiz(lessonId: string, courseId: string, formData: FormData): Promise<QuizSubmitResult> {
-  await requirePilotActor();
+  await requireActor();
+  await requireDivisionAccess("school", "viewer");
 
   const { userId } = await currentUser();
   const [lesson] = await db.select().from(schoolLessons).where(eq(schoolLessons.id, lessonId));

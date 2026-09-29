@@ -1,5 +1,5 @@
 "use server";
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor } from "@/lib/actor";
 import { db } from "@/db";
 import { employees, employmentContracts, bpjsRegistrations, onboardingRequests } from "@/db/schema";
 import { revalidatePath } from "next/cache";
@@ -11,7 +11,7 @@ import { requireDivisionAccess } from "@/lib/require-division-access";
 import { encryptPII } from "@/lib/pii-crypto";
 
 export async function updateEmployee(id: string, formData: FormData) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("hr");
   const employee_category_code = formData.get("employee_category_code") as string;
@@ -49,7 +49,7 @@ export async function updateEmployee(id: string, formData: FormData) {
 export type DeleteResult = { ok: true } | { ok: false; error: string };
 
 export async function deleteEmployee(id: string): Promise<DeleteResult> {
-  await requirePilotActor();
+  await requireActor();
 
   try {
     await requireDivisionAccess("hr", "full");
@@ -67,7 +67,7 @@ export async function deleteEmployee(id: string): Promise<DeleteResult> {
 }
 
 export async function addContract(employeeId: string, formData: FormData) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("hr");
   const contract_no = formData.get("contract_no") as string;
@@ -100,7 +100,7 @@ export async function addContract(employeeId: string, formData: FormData) {
 }
 
 export async function updateBpjsStatus(id: string, employeeId: string, formData: FormData) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("hr");
   const company_no = formData.get("company_no") as string;
@@ -134,7 +134,7 @@ export async function updateBpjsStatus(id: string, employeeId: string, formData:
  * kolom data pribadi sendiri, cuma referensi onboarding_request_id.
  */
 export async function updateEmployeePersonalData(employeeId: string, formData: FormData) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("hr");
   const [employee] = await db.select().from(employees).where(eq(employees.id, employeeId));

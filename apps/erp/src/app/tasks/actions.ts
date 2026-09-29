@@ -1,5 +1,5 @@
 "use server";
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor } from "@/lib/actor";
 import { db } from "@/db";
 import { kanbanTasks, kanbanTaskComments, attachments } from "@/db/schema";
 import { revalidatePath } from "next/cache";
@@ -35,7 +35,7 @@ async function generateTaskNo(): Promise<string> {
 }
 
 export async function createTask(formData: FormData) {
-  await requirePilotActor();
+  await requireActor();
 
   const creatorName = await currentUserName();
 
@@ -80,7 +80,7 @@ export async function createTask(formData: FormData) {
 }
 
 export async function updateTask(id: string, formData: FormData) {
-  await requirePilotActor();
+  await requireActor();
 
   const actorName = await currentUserName();
 
@@ -118,21 +118,21 @@ export async function updateTask(id: string, formData: FormData) {
 }
 
 export async function deleteTaskAttachment(id: string) {
-  await requirePilotActor();
+  await requireActor();
 
-  await deleteAttachment(id);
+  await deleteAttachment(id, [TASK_ATTACHMENT_SOURCE]);
   revalidatePath("/tasks");
 }
 
 export async function getTaskAttachments(taskId: string) {
-  await requirePilotActor();
+  await requireActor();
 
   return getAttachmentsWithUrls(TASK_ATTACHMENT_SOURCE, taskId);
 }
 
 /** Jumlah lampiran per task -- dipakai buat badge di card, 1 query buat semua task sekaligus. */
 export async function getTaskAttachmentCounts(taskIds: string[]): Promise<Record<string, number>> {
-  await requirePilotActor();
+  await requireActor();
 
   const byTask = await getAttachmentsWithUrlsForMany(TASK_ATTACHMENT_SOURCE, taskIds);
   const counts: Record<string, number> = {};
@@ -141,14 +141,14 @@ export async function getTaskAttachmentCounts(taskIds: string[]): Promise<Record
 }
 
 export async function getTaskComments(taskId: string) {
-  await requirePilotActor();
+  await requireActor();
 
   return db.select().from(kanbanTaskComments).where(eq(kanbanTaskComments.task_id, taskId)).orderBy(asc(kanbanTaskComments.created_at));
 }
 
 /** Jumlah komentar per task -- 1 query agregat buat semua task sekaligus, dipakai badge di card. */
 export async function getTaskCommentCounts(taskIds: string[]): Promise<Record<string, number>> {
-  await requirePilotActor();
+  await requireActor();
 
   const counts: Record<string, number> = {};
   for (const id of taskIds) counts[id] = 0;
@@ -165,7 +165,7 @@ export async function getTaskCommentCounts(taskIds: string[]): Promise<Record<st
 }
 
 export async function addTaskComment(taskId: string, body: string) {
-  await requirePilotActor();
+  await requireActor();
 
   if (!body.trim()) return;
   const authorName = await currentUserName();
@@ -174,7 +174,7 @@ export async function addTaskComment(taskId: string, body: string) {
 }
 
 export async function deleteTaskComment(id: string) {
-  await requirePilotActor();
+  await requireActor();
 
   await db.delete(kanbanTaskComments).where(eq(kanbanTaskComments.id, id));
   revalidatePath("/tasks");
@@ -185,7 +185,7 @@ export type MoveResult = { ok: true } | { ok: false; error: string };
 /** Dipanggil pas drag-drop kartu ke kolom lain -- taruh di posisi paling akhir kolom tujuan.
  * parentGroupId dikirim kalau kartu di-drop ke kolom milik grup (parent task) lain. */
 export async function moveTask(id: string, newStatus: string, parentGroupId?: string | null): Promise<MoveResult> {
-  await requirePilotActor();
+  await requireActor();
 
   if (!(STATUS_CODES as readonly string[]).includes(newStatus)) return { ok: false, error: "Status tidak valid" };
 
@@ -211,7 +211,7 @@ export async function moveTask(id: string, newStatus: string, parentGroupId?: st
 export type DeleteResult = { ok: true } | { ok: false; error: string };
 
 export async function deleteTask(id: string): Promise<DeleteResult> {
-  await requirePilotActor();
+  await requireActor();
 
   const [task] = await db.select().from(kanbanTasks).where(eq(kanbanTasks.id, id));
   await db.delete(kanbanTaskComments).where(eq(kanbanTaskComments.task_id, id));

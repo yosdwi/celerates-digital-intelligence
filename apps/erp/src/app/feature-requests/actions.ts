@@ -1,5 +1,5 @@
 "use server";
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor } from "@/lib/actor";
 import { safeExternalLink } from "@/lib/access-policy";
 import { db } from "@/db";
 import { operationalContext } from "@/lib/operations/policy";
@@ -44,7 +44,7 @@ async function notifyOwners(title: string, body: string, link: string) {
 }
 
 export async function createFeatureRequest(formData: FormData): Promise<void> {
-  await requirePilotActor();
+  await requireActor();
 
   const { id: userId, name: userName, email } = await currentUser();
 
@@ -98,7 +98,7 @@ export async function createFeatureRequest(formData: FormData): Promise<void> {
 }
 
 export async function updateFeatureRequest(id: string, formData: FormData): Promise<void> {
-  await requirePilotActor();
+  await requireActor();
 
   const { name: userName } = await currentUser();
 
@@ -135,7 +135,7 @@ export type UpdateStatusResult = { ok: true } | { ok: false; error: string };
 
 /** Owner-only: pindah status, assign PIC, isi catatan resolusi -- lalu notif requester aslinya. */
 export async function updateFeatureRequestStatus(id: string, formData: FormData): Promise<UpdateStatusResult> {
-  await requirePilotActor();
+  await requireActor();
 
   const { isOwner, name: actorName } = await currentUser();
   if (!isOwner) return { ok: false, error: "Hanya Owner yang bisa mengubah status" };
@@ -178,9 +178,9 @@ export async function updateFeatureRequestStatus(id: string, formData: FormData)
 }
 
 export async function deleteFeatureRequestAttachment(attachmentId: string) {
-  await requirePilotActor();
+  await requireActor();
 
-  await deleteAttachment(attachmentId);
+  await deleteAttachment(attachmentId, [FEATURE_REQUEST_ATTACHMENT_SOURCE]);
   await logActivity("feature-requests", "delete", "Lampiran Feature Request dihapus", "Feature Request");
   revalidatePath("/feature-requests");
 }
@@ -188,7 +188,7 @@ export async function deleteFeatureRequestAttachment(attachmentId: string) {
 export type DeleteResult = { ok: true } | { ok: false; error: string };
 
 export async function deleteFeatureRequest(id: string): Promise<DeleteResult> {
-  await requirePilotActor();
+  await requireActor();
 
   const { id: userId, isOwner } = await currentUser();
   const [request] = await db.select().from(featureRequests).where(eq(featureRequests.id, id));

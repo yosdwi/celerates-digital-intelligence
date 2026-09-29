@@ -2,7 +2,7 @@
 // The browser only ever talks same-origin to /api/agent/*; it never receives a delegation or Intelligence URL.
 import type { NextRequest } from "next/server";
 import { sql } from "@/db";
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor } from "@/lib/actor";
 import { MODULES, operationalContext } from "@/lib/operations/policy";
 import { CATALOG, hrefFor, resolvePageEntity } from "./catalog";
 import { submoduleFor } from "@/lib/module-access";
@@ -37,7 +37,7 @@ export class BffError extends Error {
 export async function agentActor(): Promise<AgentActor> {
   let pilot;
   try {
-    pilot = await requirePilotActor();
+    pilot = await requireActor();
   } catch {
     throw new BffError(403, "Akses tidak tersedia.");
   }

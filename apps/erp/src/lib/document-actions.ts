@@ -1,10 +1,10 @@
 "use server";
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor } from "@/lib/actor";
 import { getDocumentUrl } from "./storage";
 import { extractStoragePathFromSignedUrl } from "./storage-url";
 
 export async function getDocumentSignedUrl(value: string | null): Promise<string | null> {
-  await requirePilotActor();
+  await requireActor();
 
   if (!value) return null;
   // Kalau value ternyata signed URL lama yang sudah/segera expired, ambil

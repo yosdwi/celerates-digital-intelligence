@@ -1,5 +1,5 @@
 "use server";
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor } from "@/lib/actor";
 import { db } from "@/db";
 import { crmClients, crmClientContacts, crmClientActivities } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -8,7 +8,7 @@ import { logActivity } from "@/lib/activity-log";
 import { requireDivisionAccess } from "@/lib/require-division-access";
 
 export async function createClient(formData: FormData) {
-  await requirePilotActor();
+  await requireActor();
 
   const actor = await requireDivisionAccess("sales");
   const name = formData.get("name") as string;
@@ -22,7 +22,7 @@ export async function createClient(formData: FormData) {
 }
 
 export async function updateClient(id: string, formData: FormData) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("sales");
   const name = formData.get("name") as string;
@@ -39,7 +39,7 @@ export async function updateClient(id: string, formData: FormData) {
 export type DeleteResult = { ok: true } | { ok: false; error: string };
 
 export async function deleteClient(id: string): Promise<DeleteResult> {
-  await requirePilotActor();
+  await requireActor();
 
   try {
     await requireDivisionAccess("sales", "full");
@@ -56,7 +56,7 @@ export async function deleteClient(id: string): Promise<DeleteResult> {
 }
 
 export async function createContact(clientId: string, formData: FormData) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("sales");
   const name = formData.get("name") as string;
@@ -74,7 +74,7 @@ export async function createContact(clientId: string, formData: FormData) {
 }
 
 export async function deleteContact(id: string, clientId: string) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("sales");
   await db.delete(crmClientContacts).where(eq(crmClientContacts.id, id));
@@ -82,7 +82,7 @@ export async function deleteContact(id: string, clientId: string) {
 }
 
 export async function createActivity(clientId: string, formData: FormData) {
-  await requirePilotActor();
+  await requireActor();
 
   const actor = await requireDivisionAccess("sales");
   const type_code = formData.get("type_code") as string;
@@ -105,7 +105,7 @@ export async function createActivity(clientId: string, formData: FormData) {
 }
 
 export async function deleteActivity(id: string, clientId: string) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("sales");
   await db.delete(crmClientActivities).where(eq(crmClientActivities.id, id));

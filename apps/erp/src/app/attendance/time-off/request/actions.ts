@@ -1,5 +1,5 @@
 "use server";
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor } from "@/lib/actor";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { currentAttendanceActor } from "@/lib/require-attendance-access";
@@ -9,7 +9,7 @@ import { TIME_OFF_REQUEST_SOURCE } from "../../constants";
 import { submitTimeOffRequest } from "../lib/time-off-approval";
 
 export async function createTimeOffRequest(formData: FormData): Promise<void> {
-  await requirePilotActor();
+  await requireActor();
 
   const actor = await currentAttendanceActor();
 

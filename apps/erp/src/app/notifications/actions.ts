@@ -1,5 +1,5 @@
 "use server";
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor } from "@/lib/actor";
 import { db } from "@/db";
 import { notifications } from "@/db/schema";
 import { and, eq, desc } from "drizzle-orm";
@@ -8,7 +8,7 @@ import { authOptions } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
 export async function getMyNotifications() {
-  await requirePilotActor();
+  await requireActor();
 
   const session = await getServerSession(authOptions);
   const userId = (session?.user as any)?.id;
@@ -17,7 +17,7 @@ export async function getMyNotifications() {
 }
 
 export async function markNotificationRead(id: string) {
-  await requirePilotActor();
+  await requireActor();
 
   // Only the recipient can mark their own notification.
   const session = await getServerSession(authOptions);
@@ -28,7 +28,7 @@ export async function markNotificationRead(id: string) {
 }
 
 export async function markAllNotificationsRead() {
-  await requirePilotActor();
+  await requireActor();
 
   const session = await getServerSession(authOptions);
   const userId = (session?.user as any)?.id;

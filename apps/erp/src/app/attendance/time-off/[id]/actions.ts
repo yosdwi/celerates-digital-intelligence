@@ -1,12 +1,12 @@
 "use server";
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor } from "@/lib/actor";
 import { revalidatePath } from "next/cache";
 import { currentAttendanceActor } from "@/lib/require-attendance-access";
 import { approveCurrentStep, rejectCurrentStep, cancelTimeOffRequest, type EngineResult } from "../lib/time-off-approval";
 import { logActivity } from "@/lib/activity-log";
 
 export async function approveTimeOffStep(requestId: string): Promise<EngineResult> {
-  await requirePilotActor();
+  await requireActor();
 
   const actor = await currentAttendanceActor();
   const result = await approveCurrentStep(actor, requestId);
@@ -19,7 +19,7 @@ export async function approveTimeOffStep(requestId: string): Promise<EngineResul
 }
 
 export async function rejectTimeOffStep(requestId: string, notes: string): Promise<EngineResult> {
-  await requirePilotActor();
+  await requireActor();
 
   const actor = await currentAttendanceActor();
   const result = await rejectCurrentStep(actor, requestId, notes);
@@ -32,7 +32,7 @@ export async function rejectTimeOffStep(requestId: string, notes: string): Promi
 }
 
 export async function cancelTimeOffRequestAction(requestId: string): Promise<EngineResult> {
-  await requirePilotActor();
+  await requireActor();
 
   const actor = await currentAttendanceActor();
   const result = await cancelTimeOffRequest(actor, requestId);

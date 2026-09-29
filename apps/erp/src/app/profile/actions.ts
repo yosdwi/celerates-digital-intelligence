@@ -1,5 +1,5 @@
 "use server";
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor } from "@/lib/actor";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -10,7 +10,7 @@ import bcrypt from "bcryptjs";
 export type ProfileResult = { ok: true } | { ok: false; error: string };
 
 export async function updateProfile(formData: FormData): Promise<ProfileResult> {
-  await requirePilotActor();
+  await requireActor();
 
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) return { ok: false, error: "Belum login" };
@@ -29,7 +29,7 @@ export async function updateProfile(formData: FormData): Promise<ProfileResult> 
 }
 
 export async function changePassword(formData: FormData): Promise<ProfileResult> {
-  await requirePilotActor();
+  await requireActor();
 
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) return { ok: false, error: "Belum login" };

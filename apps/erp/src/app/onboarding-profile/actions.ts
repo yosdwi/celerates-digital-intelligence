@@ -1,5 +1,5 @@
 "use server";
-import { requirePilotActor } from "@/lib/actor";
+import { requirePendingActor } from "@/lib/actor";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -9,7 +9,7 @@ import { redirect } from "next/navigation";
 import { markSaved } from "@/lib/saved-flag";
 
 export async function completeProfile(formData: FormData) {
-  await requirePilotActor();
+  await requirePendingActor();
 
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) redirect("/login");

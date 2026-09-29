@@ -1,5 +1,5 @@
 "use server";
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor } from "@/lib/actor";
 import { db } from "@/db";
 import { users, userAccess, divisions, googleTokens, sheetConnections } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
@@ -31,7 +31,7 @@ async function requireOwnerOrPmoFull() {
 }
 
 export async function approveUser(userId: string) {
-  await requirePilotActor();
+  await requireActor();
 
   const owner = await requireOwner();
   const [user] = await db.select().from(users).where(eq(users.id, userId));
@@ -52,7 +52,7 @@ export async function approveUser(userId: string) {
 }
 
 export async function rejectUser(userId: string) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireOwner();
   await db.update(users).set({ status: "rejected" }).where(eq(users.id, userId));
@@ -60,7 +60,7 @@ export async function rejectUser(userId: string) {
 }
 
 export async function setUserAccess(userId: string, divisionId: string, level: string) {
-  await requirePilotActor();
+  await requireActor();
 
   const owner = await requireOwner();
 
@@ -79,7 +79,7 @@ export async function setUserAccess(userId: string, divisionId: string, level: s
 }
 
 export async function toggleOwner(userId: string, isOwner: boolean) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireOwner();
   await db.update(users).set({ is_owner: isOwner }).where(eq(users.id, userId));
@@ -93,7 +93,7 @@ export async function toggleOwner(userId: string, isOwner: boolean) {
  * cuma menampilkan toggle ini untuk baris Talent.
  */
 export async function toggleTimesheetConverterAccess(userId: string, enabled: boolean) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireOwnerOrPmoFull();
   await db.update(users).set({ can_use_timesheet_converter: enabled }).where(eq(users.id, userId));
@@ -101,7 +101,7 @@ export async function toggleTimesheetConverterAccess(userId: string, enabled: bo
 }
 
 export async function createDivision(formData: FormData) {
-  await requirePilotActor();
+  await requireActor();
 
   await requireOwner();
   const name = formData.get("name") as string;
@@ -119,7 +119,7 @@ export async function createDivision(formData: FormData) {
 export type InviteResult = { ok: true } | { ok: false; error: string };
 
 export async function inviteUser(formData: FormData): Promise<InviteResult> {
-  await requirePilotActor();
+  await requireActor();
 
   const owner = await requireOwner();
 
@@ -162,7 +162,7 @@ export async function inviteUser(formData: FormData): Promise<InviteResult> {
 }
 
 export async function deleteUser(userId: string): Promise<InviteResult> {
-  await requirePilotActor();
+  await requireActor();
 
   const owner = await requireOwner();
   if (userId === owner.id) {
@@ -179,7 +179,7 @@ export async function deleteUser(userId: string): Promise<InviteResult> {
 }
 
 export async function updateUserInfo(userId: string, formData: FormData): Promise<InviteResult> {
-  await requirePilotActor();
+  await requireActor();
 
   await requireOwner();
   const full_name = formData.get("full_name") as string;

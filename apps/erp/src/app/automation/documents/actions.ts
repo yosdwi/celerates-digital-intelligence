@@ -1,5 +1,5 @@
 "use server";
-import { requirePilotActor } from "@/lib/actor";
+import { requireActor } from "@/lib/actor";
 import { db } from "@/db";
 import { automationDocumentTemplates, automationGeneratedDocuments } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
@@ -10,7 +10,7 @@ import { uploadTemplate } from "@/lib/automation/storage";
 import { generateDocumentFromTemplate, previewDocumentFromTemplate, type PreviewResult } from "@/lib/automation/document-merge";
 
 export async function createTemplate(formData: FormData): Promise<void> {
-  await requirePilotActor();
+  await requireActor();
 
   const actor = await requireDivisionAccess("automation");
 
@@ -31,7 +31,7 @@ export async function createTemplate(formData: FormData): Promise<void> {
 }
 
 export async function deleteTemplate(id: string): Promise<void> {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("automation", "full");
   await db.delete(automationDocumentTemplates).where(eq(automationDocumentTemplates.id, id));
@@ -42,7 +42,7 @@ export async function deleteTemplate(id: string): Promise<void> {
 export type PreviewActionResult = { ok: true; preview: PreviewResult } | { ok: false; error: string };
 
 export async function previewDocument(templateId: string, onboardingRequestId: string): Promise<PreviewActionResult> {
-  await requirePilotActor();
+  await requireActor();
 
   try {
     await requireDivisionAccess("automation");
@@ -57,7 +57,7 @@ export async function previewDocument(templateId: string, onboardingRequestId: s
 export type GenerateResult = { ok: true; signedUrl: string } | { ok: false; error: string };
 
 export async function generateDocument(templateId: string, onboardingRequestId: string): Promise<GenerateResult> {
-  await requirePilotActor();
+  await requireActor();
 
   try {
     await requireDivisionAccess("automation");
@@ -72,7 +72,7 @@ export async function generateDocument(templateId: string, onboardingRequestId: 
 }
 
 export async function deleteGeneratedDocument(id: string): Promise<void> {
-  await requirePilotActor();
+  await requireActor();
 
   await requireDivisionAccess("automation", "full");
   await db.delete(automationGeneratedDocuments).where(eq(automationGeneratedDocuments.id, id));
