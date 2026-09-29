@@ -3,11 +3,12 @@ import assert from "node:assert/strict";
 import { PGlite } from "@electric-sql/pglite";
 import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
 import postgres from "postgres";
-import { activeLinkForUser, issueGrant, linkTalentAccount, peekGrant, redeemGrant, revokeTalentLink, TalentLinkError } from "../src/lib/talent/identity";
+import { activeLinkForUser, issueGrant, issueGrantForEmployee, linkTalentAccount, peekGrant, redeemGrant, revokeTalentLink, TalentLinkError } from "../src/lib/talent/identity";
 import { cycleLabelFor } from "../src/lib/conform/pmo";
 
-// ADR-019 §4: WhatsApp reminders reach Celerates only through single-use, expiring, user-bound grants, and only
-// for an active Talent account with an active identity link. Backoffice accounts are never converted.
+// ADR-019 §4, doc 22 R3.2: WhatsApp reminders reach Celerates only through single-use, user-bound grants (no time
+// expiry by default; a newer grant supersedes older unused ones), and only for an active Talent account with an
+// active identity link. Backoffice accounts are never converted.
 test("talent identity links and deep-link grants", async () => {
   // @ts-expect-error JS runner
   const { migrate } = await import("../scripts/migrate.mjs");
@@ -39,7 +40,7 @@ test("talent identity links and deep-link grants", async () => {
     assert.match(grant.code, /^[A-Za-z0-9_-]{43}$/);
     const stored = await sql`SELECT token_sha256 FROM talent_link_grants`;
     assert.notEqual(stored[0].token_sha256, grant.code, "only the hash is stored");
-    assert.ok(grant.expiresAt.getTime() - Date.now() <= 72 * 3600 * 1000 + 5000);
+    assert.equal(grant.expiresAt, null, "no time expiry by default");
 
     assert.deepEqual(await peekGrant(sql, grant.code), { userId: user.id, targetPath: "/me?year=2026&month=9" }, "peek does not consume");
     assert.ok(await peekGrant(sql, grant.code), "still unused after peeking twice");
@@ -51,7 +52,18 @@ test("talent identity links and deep-link grants", async () => {
     assert.equal(await peekGrant(sql, grant.code), null);
     assert.equal(await redeemGrant(sql, "not-a-code"), null);
 
-    const expired = await issueGrant(sql, { userId: user.id, targetPath: "/me", purpose: "manual" });
+    const older = await issueGrant(sql, { userId: user.id, targetPath: "/me", purpose: "direct" });
+    const newer = await issueGrant(sql, { userId: user.id, targetPath: "/me", purpose: "whatsapp" });
+    assert.equal(await peekGrant(sql, older.code), null, "a newer grant supersedes the older unused one");
+    assert.equal(await redeemGrant(sql, older.code), null);
+    assert.ok(await peekGrant(sql, newer.code), "only the latest link works");
+    const viaEmployee = await issueGrantForEmployee(sql, { employeeId: "MTG-TF/1", targetPath: "/me", purpose: "whatsapp" });
+    assert.equal(viaEmployee?.userId, user.id, "a linked employee gets a grant for its Talent account");
+    assert.equal(await peekGrant(sql, newer.code), null, "and that supersedes the previous link");
+    assert.equal(await issueGrantForEmployee(sql, { employeeId: "MTG-TF/404", targetPath: "/me", purpose: "whatsapp" }), null, "no account, no grant");
+
+    const expired = await issueGrant(sql, { userId: user.id, targetPath: "/me", purpose: "manual", ttlSeconds: 3600 });
+    assert.ok(expired.expiresAt, "an explicit TTL still bounds a grant");
     await sql`UPDATE talent_link_grants SET created_at = now() - interval '2 hours', expires_at = now() - interval '1 second' WHERE token_sha256 = encode(sha256(${expired.code}::bytea), 'hex')`;
     assert.equal(await redeemGrant(sql, expired.code), null, "expired");
 
@@ -62,7 +74,8 @@ test("talent identity links and deep-link grants", async () => {
     await sql`INSERT INTO talent_identity_links (user_id, conform_employee_id, nrp, display_name, linked_by_user_id) VALUES (${user.id}, 'MTG-TF/1', 'N1', 'Rina', ${owner.id})`;
     await sql`UPDATE users SET status='rejected' WHERE id=${user.id}`;
     assert.equal(await redeemGrant(sql, revoked.code), null, "an inactive account cannot start a session");
-    await assert.rejects(sql`INSERT INTO talent_link_grants (token_sha256, user_id, target_path, purpose, expires_at) VALUES (${"a".repeat(64)}, ${user.id}, '/me', 'manual', now() + interval '8 days')`, "grants are capped at 7 days");
+    await assert.rejects(sql`INSERT INTO talent_link_grants (token_sha256, user_id, target_path, purpose, expires_at) VALUES (${"a".repeat(64)}, ${user.id}, '/pmo', 'manual', NULL)`, "targets stay under /me in the schema");
+    await assert.rejects(sql`INSERT INTO talent_link_grants (token_sha256, user_id, target_path, purpose, expires_at) VALUES (${"b".repeat(64)}, ${user.id}, '/me', 'other', NULL)`, "known purposes only");
   } finally {
     await sql.end();
     await server.stop();

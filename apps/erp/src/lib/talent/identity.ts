@@ -5,8 +5,6 @@ import { createHash, randomBytes } from "node:crypto";
 import type { Sql, TransactionSql } from "postgres";
 
 type Tx = Sql | TransactionSql;
-export const GRANT_DEFAULT_TTL_SECONDS = 72 * 3600;
-export const GRANT_MAX_TTL_SECONDS = 7 * 24 * 3600;
 const TARGET = /^\/me(\/[A-Za-z0-9_\-/%.]*)?(\?[A-Za-z0-9_=&%.\-]*)?$/;
 
 export type TalentLink = { id: string; user_id: string; conform_employee_id: string; nrp: string; display_name: string; created_at: Date | string };
@@ -69,18 +67,36 @@ export async function revokeTalentLink(sql: Tx, userId: string): Promise<boolean
   return rows.length > 0;
 }
 
-/** Issue an opaque, single-use grant. Returns the code once; only its hash is stored. */
+/**
+ * Issue an opaque, single-use grant (doc 22 R3.2). Returns the code once; only its hash is stored. A grant has no
+ * time expiry unless `ttlSeconds` is given; issuing one supersedes the user's older unused grants, so only the
+ * latest link a Talent received works.
+ */
 export async function issueGrant(
   sql: Tx,
-  input: { userId: string; targetPath: string; purpose: "campaign" | "manual"; ttlSeconds?: number; campaignRef?: string | null; createdBy?: string | null },
-): Promise<{ code: string; expiresAt: Date }> {
+  input: { userId: string; targetPath: string; purpose: "campaign" | "manual" | "direct" | "whatsapp"; ttlSeconds?: number; campaignRef?: string | null; createdBy?: string | null },
+): Promise<{ code: string; expiresAt: Date | null }> {
   if (!TARGET.test(input.targetPath)) throw new TalentLinkError("invalid_target", "Target harus di bawah /me.");
-  const ttl = Math.min(Math.max(input.ttlSeconds ?? GRANT_DEFAULT_TTL_SECONDS, 300), GRANT_MAX_TTL_SECONDS);
+  const ttl = input.ttlSeconds === undefined ? null : Math.max(Math.floor(input.ttlSeconds), 300);
   const code = randomBytes(32).toString("base64url");
+  await sql`UPDATE talent_link_grants SET superseded_at = now() WHERE user_id=${input.userId} AND used_at IS NULL AND superseded_at IS NULL`;
   const [row] = await sql`INSERT INTO talent_link_grants (token_sha256, user_id, target_path, purpose, campaign_ref, created_by_user_id, expires_at)
-    VALUES (${sha256(code)}, ${input.userId}, ${input.targetPath}, ${input.purpose}, ${input.campaignRef ?? null}, ${input.createdBy ?? null}, now() + make_interval(secs => ${ttl}))
+    VALUES (${sha256(code)}, ${input.userId}, ${input.targetPath}, ${input.purpose}, ${input.campaignRef ?? null}, ${input.createdBy ?? null},
+            CASE WHEN ${ttl}::int IS NULL THEN NULL ELSE now() + make_interval(secs => ${ttl}::int) END)
     RETURNING expires_at`;
-  return { code, expiresAt: new Date(row.expires_at as string | Date) };
+  return { code, expiresAt: row.expires_at ? new Date(row.expires_at as string | Date) : null };
+}
+
+/** Issue a link for the Talent linked to a ConForm employee, or null when no active linked Talent account exists. */
+export async function issueGrantForEmployee(
+  sql: Tx,
+  input: { employeeId: string; targetPath: string; purpose: "direct" | "whatsapp"; createdBy?: string | null },
+): Promise<{ code: string; expiresAt: Date | null; userId: string } | null> {
+  const [row] = await sql`SELECT l.user_id FROM talent_identity_links l JOIN users u ON u.id = l.user_id
+    WHERE l.conform_employee_id=${input.employeeId} AND l.status='active' AND u.status='active' AND u.account_type='talent' AND u.is_owner = false`;
+  if (!row) return null;
+  const grant = await issueGrant(sql, { userId: row.user_id as string, targetPath: input.targetPath, purpose: input.purpose, createdBy: input.createdBy ?? null });
+  return { ...grant, userId: row.user_id as string };
 }
 
 const CODE = /^[A-Za-z0-9_-]{40,60}$/;
@@ -88,7 +104,7 @@ const CODE = /^[A-Za-z0-9_-]{40,60}$/;
 /** Look at a grant without consuming it (link previews and crawlers must never redeem one). */
 export async function peekGrant(sql: Tx, code: string): Promise<{ userId: string; targetPath: string } | null> {
   if (!CODE.test(code)) return null;
-  const [row] = await sql`SELECT user_id, target_path FROM talent_link_grants WHERE token_sha256=${sha256(code)} AND used_at IS NULL AND expires_at > now()`;
+  const [row] = await sql`SELECT user_id, target_path FROM talent_link_grants WHERE token_sha256=${sha256(code)} AND used_at IS NULL AND superseded_at IS NULL AND (expires_at IS NULL OR expires_at > now())`;
   return row ? { userId: row.user_id as string, targetPath: row.target_path as string } : null;
 }
 
@@ -101,7 +117,7 @@ export async function redeemGrant(sql: Tx, code: string, expectUserId?: string):
   const [row] = await sql`
     UPDATE talent_link_grants g SET used_at = now()
     FROM users u
-    WHERE g.token_sha256=${sha256(code)} AND g.used_at IS NULL AND g.expires_at > now()
+    WHERE g.token_sha256=${sha256(code)} AND g.used_at IS NULL AND g.superseded_at IS NULL AND (g.expires_at IS NULL OR g.expires_at > now())
       AND u.id = g.user_id AND u.status='active' AND u.account_type='talent' AND u.is_owner = false
       AND (${expectUserId ?? null}::uuid IS NULL OR g.user_id = ${expectUserId ?? null}::uuid)
       AND EXISTS (SELECT 1 FROM talent_identity_links l WHERE l.user_id=u.id AND l.status='active')
