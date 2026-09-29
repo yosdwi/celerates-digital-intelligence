@@ -197,6 +197,47 @@ def _paragraph_blocks(text):
     return blocks
 
 
+CLAUSE = re.compile(r"^(\d+(\.\d+)+[.)]?|\(?[a-z]\)|[-•▪])\s")
+# A wrapped line may start with a number ("12 bulan …"), so a PDF heading line needs "1." / "1)" / BAB / Pasal or caps.
+PDF_HEADING = re.compile(r"^(\d+[.)]|[A-Z]\.|BAB|Pasal|Section)\s")
+
+
+def _pdf_heading(line):
+    return (
+        3 <= len(line) <= 80
+        and not line.endswith((".", ",", ";"))
+        and (bool(PDF_HEADING.match(line)) or (line.isupper() and len(line.split()) >= 2))
+    )
+
+
+def _pdf_blocks(text):
+    """Blocks of one pypdf page. pypdf seldom emits blank lines between paragraphs, so a page would otherwise be one
+    block and be cut into chunks mid-sentence, without headings. Here each line that reads as a heading starts a
+    section, and a numbered clause ("3.1 …") or bullet starts a paragraph; other lines continue the paragraph."""
+    if re.search(r"\n\s*\n", text):
+        return _paragraph_blocks(text)
+    blocks, para = [], []
+
+    def flush():
+        if para:
+            blocks.append({"kind": "text", "text": " ".join(para)})
+            para.clear()
+
+    for raw in text.replace("\r", "").split("\n"):
+        line = " ".join(raw.split())
+        if not line:
+            continue
+        if _pdf_heading(line):
+            flush()
+            blocks.append({"kind": "heading", "text": line})
+            continue
+        if CLAUSE.match(line):
+            flush()
+        para.append(line)
+    flush()
+    return blocks
+
+
 # ── Docling (layout, tables, OCR) ──────────────────────────────────────────────────────────────────────────────────
 def docling_available():
     try:
@@ -294,7 +335,7 @@ def extract(name, body, *, want_tables=False, allow_ocr=True, converter=None):
                     for p, bs in out.pages
                 ]
         else:
-            out.pages = [(p, _paragraph_blocks(text)) for p, text in raw if text.strip()]
+            out.pages = [(p, _pdf_blocks(text)) for p, text in raw if text.strip()]
             out.parser = "pypdf-v1"
         out.scanned = bool(sparse) and out.ocr_pages == 0 and not any(bs for _, bs in out.pages)
     else:  # image of a document
