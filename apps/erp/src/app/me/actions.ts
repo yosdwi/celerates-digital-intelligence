@@ -14,6 +14,7 @@ const MAX_BYTES = 5 * 1024 * 1024;
 export type CorrectionResult = { ok: true; status: "submitted" | "already_open" } | { ok: false; error: string };
 
 export async function submitAttendanceCorrection(formData: FormData): Promise<CorrectionResult> {
+  await requireTalentActor();
   const actor = await requireTalentActor();
   const workDate = String(formData.get("work_date") ?? "");
   const action = String(formData.get("action") ?? "");
@@ -58,6 +59,7 @@ export type TaskUploadResult = { ok: true; status: "saved" | "already_present" }
 
 /** One closed task owns at most one evidence image in the Talent UI. The staged ConForm transport is finalized immediately. */
 export async function uploadTaskEvidence(formData: FormData): Promise<TaskUploadResult> {
+  await requireTalentActor();
   const actor = await requireTalentActor();
   const taskKey = String(formData.get("task_key") ?? "");
   const year = Number(formData.get("year"));
@@ -122,6 +124,7 @@ export async function uploadTaskEvidence(formData: FormData): Promise<TaskUpload
 
 /** Kept for older clients that still have staged evidence. New Talent UI finalizes evidence per task. */
 export async function submitTaskEvidence(year: number, month: number, nonce: string): Promise<{ ok: true; count: number } | { ok: false; error: string }> {
+  await requireTalentActor();
   const actor = await requireTalentActor();
   if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12 || !NONCE.test(nonce)) return { ok: false, error: "Permintaan tidak valid." };
   try {
