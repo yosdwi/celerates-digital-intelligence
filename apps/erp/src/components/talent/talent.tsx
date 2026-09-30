@@ -65,6 +65,7 @@ export function CorrectionSheet({
   const worked = action === "worked";
   const needIn = worked && requirement.gap !== "missing_clock_out";
   const needOut = worked && requirement.gap !== "missing_clock_in";
+  const formId = `talent-fix-${requirement.work_date}`;
   const dateLabel = new Intl.DateTimeFormat("id-ID", {
     weekday: "long",
     day: "numeric",
@@ -119,7 +120,7 @@ export function CorrectionSheet({
               Selesai
             </button>
           ) : (
-            <button type="submit" form="talent-fix-form" disabled={pending} data-action="talent-fix-submit" className={`${buttonClass.primary} disabled:opacity-50`}>
+            <button type="submit" form={formId} disabled={pending} data-action="talent-fix-submit" className={`${buttonClass.primary} disabled:opacity-50`}>
               <Save aria-hidden className="h-[18px] w-[18px]" /> {pending ? "Menyimpan…" : "Simpan"}
             </button>
           )
@@ -132,7 +133,7 @@ export function CorrectionSheet({
             <p className="text-sm text-j-muted">Perubahan attendance berhasil dikirim.</p>
           </div>
         ) : (
-          <form id="talent-fix-form" onSubmit={(e) => { e.preventDefault(); submit(e.currentTarget); }} className="flex flex-col gap-4 pb-1">
+          <form id={formId} onSubmit={(e) => { e.preventDefault(); submit(e.currentTarget); }} className="flex flex-col gap-4 pb-1">
             <div className="flex flex-col gap-0.5">
               <p className="text-[15px] font-bold capitalize">{dateLabel}</p>
               <p className="text-sm text-j-muted">{talentT(`gap.${requirement.gap}`)}</p>
