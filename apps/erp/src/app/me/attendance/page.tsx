@@ -1,7 +1,7 @@
 import { getLocale, getTranslations } from "next-intl/server";
 import { ConformError, type Requirement } from "@/lib/conform/client";
-import { conformRequirements, jakartaToday } from "@/lib/conform/pmo";
-import { conformSource, type AttendanceDay, type AttendanceLog } from "@/lib/attendance/source";
+import { jakartaToday } from "@/lib/conform/pmo";
+import { conformMonthRequirements, conformSource, type AttendanceDay, type AttendanceLog } from "@/lib/attendance/source";
 import { requireTalentActor, requireTalentSession, TalentAccessError } from "@/lib/talent/actor";
 import { Card } from "@/components/mobile/primitives";
 import { TalentFrame } from "@/components/talent/frame";
@@ -49,12 +49,10 @@ export default async function TalentAttendancePage({ searchParams }: { searchPar
   let log: AttendanceLog | null = null;
   let requirements: Requirement[] = [];
   try {
-    const [attendance, requirementData] = await Promise.all([
+    [log, requirements] = await Promise.all([
       conformSource(actor.link.conform_employee_id).log(period.year, period.month),
-      conformRequirements(actor.link.conform_employee_id, period.year, period.month),
+      conformMonthRequirements(actor.link.conform_employee_id, period.year, period.month),
     ]);
-    log = attendance;
-    requirements = requirementData.requirements;
   } catch (error) {
     if (!(error instanceof ConformError)) throw error;
   }
