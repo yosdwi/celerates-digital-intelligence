@@ -1,8 +1,8 @@
 "use server";
 // Talent self-service (doc 21 §6). The ConForm employee is always taken from the caller's active identity link;
-// ConForm re-validates that the day still needs a correction before it stores anything.
+// ConForm re-validates business state before it stores anything.
 import { revalidatePath } from "next/cache";
-import { conform, ConformError } from "@/lib/conform/client";
+import { conform, ConformError, qs, type TalentTasks } from "@/lib/conform/client";
 import { requireTalentActor, talentActorTag } from "@/lib/talent/actor";
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -14,7 +14,6 @@ const MAX_BYTES = 5 * 1024 * 1024;
 export type CorrectionResult = { ok: true; status: "submitted" | "already_open" } | { ok: false; error: string };
 
 export async function submitAttendanceCorrection(formData: FormData): Promise<CorrectionResult> {
-  await requireTalentActor();
   const actor = await requireTalentActor();
   const workDate = String(formData.get("work_date") ?? "");
   const action = String(formData.get("action") ?? "");
@@ -44,6 +43,7 @@ export async function submitAttendanceCorrection(formData: FormData): Promise<Co
       timeoutMs: 30000,
     });
     revalidatePath("/me");
+    revalidatePath("/me/attendance");
     return { ok: true, status: result.status };
   } catch (error) {
     if (error instanceof ConformError) {
@@ -54,11 +54,10 @@ export async function submitAttendanceCorrection(formData: FormData): Promise<Co
   }
 }
 
-export type TaskUploadResult = { ok: true; status: "staged" | "already_present" } | { ok: false; error: string };
+export type TaskUploadResult = { ok: true; status: "saved" | "already_present" } | { ok: false; error: string };
 
-/** Stage one task evidence photo in ConForm (doc 22 R5.2). The employee comes from the caller's identity link. */
+/** One closed task owns at most one evidence image in the Talent UI. The staged ConForm transport is finalized immediately. */
 export async function uploadTaskEvidence(formData: FormData): Promise<TaskUploadResult> {
-  await requireTalentActor();
   const actor = await requireTalentActor();
   const taskKey = String(formData.get("task_key") ?? "");
   const year = Number(formData.get("year"));
@@ -70,20 +69,48 @@ export async function uploadTaskEvidence(formData: FormData): Promise<TaskUpload
   if (!(file instanceof File) || file.size === 0) return { ok: false, error: "Lampirkan foto bukti." };
   if (file.size > MAX_BYTES) return { ok: false, error: "Ukuran foto maksimal 5 MB." };
   if (!/^image\/(png|jpeg|webp)$/.test(file.type)) return { ok: false, error: "Gunakan foto JPG, PNG, atau WebP." };
-  const out = new FormData();
-  out.set("employee_id", actor.link.conform_employee_id);
-  out.set("year", String(year));
-  out.set("month", String(month));
-  out.set("caption", caption);
-  out.set("file", file, file.name.slice(-100) || "bukti.jpg");
+
+  const actorTag = talentActorTag(actor);
   try {
-    const result = await conform.postForm<{ status: "staged" | "already_present" }>(`/talents/tasks/${encodeURIComponent(taskKey)}/evidence`, out, {
-      actor: talentActorTag(actor),
+    const tasks = await conform.get<TalentTasks>(`/talents/tasks${qs({ employee_id: actor.link.conform_employee_id, year, month })}`, { actor: actorTag });
+    const task = tasks.items.find((item) => item.task_key === taskKey);
+    if (!task) return { ok: false, error: "Task ini sudah berubah. Muat ulang halaman." };
+    if (task.status.trim().toLowerCase() !== "closed") return { ok: false, error: "Evidence hanya dapat dilengkapi untuk task yang sudah Closed." };
+    if (task.evidence_count > 0) return { ok: true, status: "already_present" };
+
+    // A legacy staged evidence is already the one allowed evidence; finalize it instead of accepting another file.
+    if (task.staged_count > 0) {
+      await conform.post<{ status: string; count: number }>(
+        "/talents/tasks/submit",
+        { employee_id: actor.link.conform_employee_id, year, month },
+        { actor: actorTag, idempotencyKey: `task-submit:${actor.userId.slice(0, 8)}:${nonce}` },
+      );
+      revalidatePath("/me/tasks");
+      revalidatePath("/me");
+      return { ok: true, status: "saved" };
+    }
+
+    const out = new FormData();
+    out.set("employee_id", actor.link.conform_employee_id);
+    out.set("year", String(year));
+    out.set("month", String(month));
+    out.set("caption", caption);
+    out.set("file", file, file.name.slice(-100) || "bukti.jpg");
+    const staged = await conform.postForm<{ status: "staged" | "already_present" }>(`/talents/tasks/${encodeURIComponent(taskKey)}/evidence`, out, {
+      actor: actorTag,
       idempotencyKey: `task:${actor.userId.slice(0, 8)}:${nonce}`,
       timeoutMs: 30000,
     });
+    if (staged.status === "already_present") return { ok: true, status: "already_present" };
+
+    await conform.post<{ status: string; count: number }>(
+      "/talents/tasks/submit",
+      { employee_id: actor.link.conform_employee_id, year, month },
+      { actor: actorTag, idempotencyKey: `task-submit:${actor.userId.slice(0, 8)}:${nonce}` },
+    );
     revalidatePath("/me/tasks");
-    return { ok: true, status: result.status };
+    revalidatePath("/me");
+    return { ok: true, status: "saved" };
   } catch (error) {
     if (error instanceof ConformError) {
       if (error.code === "task_not_found" || error.code === "task_changed") return { ok: false, error: "Task ini sudah berubah. Muat ulang halaman." };
@@ -93,9 +120,8 @@ export async function uploadTaskEvidence(formData: FormData): Promise<TaskUpload
   }
 }
 
-/** Submit every staged task evidence of the month to ConForm (no PMO approval; doc 22 R5.2). */
+/** Kept for older clients that still have staged evidence. New Talent UI finalizes evidence per task. */
 export async function submitTaskEvidence(year: number, month: number, nonce: string): Promise<{ ok: true; count: number } | { ok: false; error: string }> {
-  await requireTalentActor();
   const actor = await requireTalentActor();
   if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12 || !NONCE.test(nonce)) return { ok: false, error: "Permintaan tidak valid." };
   try {
