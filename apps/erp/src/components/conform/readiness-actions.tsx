@@ -20,6 +20,9 @@ type CampaignRow = { id: string; state: string; label: string; counts: Record<st
 export function ReadinessActions(props: {
   year: number;
   month: number;
+  campaignYear: number;
+  campaignMonth: number;
+  campaignCycleLabel: string;
   cycleLabel: string;
   needs: number;
   canEdit: boolean;
@@ -164,14 +167,14 @@ export function ReadinessActions(props: {
 
       <BottomSheet open={sheet === "campaign"} onClose={() => setSheet(null)} title={t("campaign.title")}>
         <div className="flex flex-col gap-3 pb-2">
-          <p className="text-sm">{t("campaign.explain", { count: props.needs, cycle: props.cycleLabel })}</p>
+          <p className="text-sm">{t("campaign.explain", { count: props.needs, cycle: props.campaignCycleLabel })}</p>
           <p className="text-xs text-j-muted">{t("campaign.rules")}</p>
           {error && <p role="alert" className="text-sm font-semibold text-[#a8261c]">{error}</p>}
           <button
             type="button"
             disabled={pending}
             data-action="campaign-create"
-            onClick={() => start(async () => { const r = await createCampaign(props.year, props.month, nonce()); if (r.ok) router.push(`/review/campaign/${r.data.id}`); else setError(r.error); })}
+            onClick={() => start(async () => { const r = await createCampaign(props.campaignYear, props.campaignMonth, nonce()); if (r.ok) router.push(`/review/campaign/${r.data.id}`); else setError(r.error); })}
             className={`${buttonClass.primary} disabled:opacity-50`}
           >
             {pending ? "…" : t("campaign.create")}

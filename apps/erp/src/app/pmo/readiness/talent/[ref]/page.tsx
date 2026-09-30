@@ -5,7 +5,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { sql } from "@/db";
 import { requireDivisionRead } from "@/lib/module-guard";
 import { ConformError, type TalentLookup, type TalentRequirements, type TalentTasks } from "@/lib/conform/client";
-import { canPmo, conformLookup, conformRequirements, conformTasks, cycleLabelFor, jakartaToday } from "@/lib/conform/pmo";
+import { canPmo, conformLookup, conformRequirements, conformTasks, cycleLabelFor, jakartaToday, previousCycle } from "@/lib/conform/pmo";
 import { conformSource, type AttendanceLog } from "@/lib/attendance/source";
 import { fmtDate } from "@/lib/pmo/mobile-format";
 import { activeLinksForEmployees } from "@/lib/talent/identity";
@@ -81,7 +81,9 @@ export default async function ReadinessTalentPage({ params, searchParams }: { pa
       </Section>
       {link && talent.whatsapp_bound && canPmo(levels.pmo ?? null, "editor") && (
         <div className="flex" data-record-section="message">
-          <TalentMessageButton employeeId={employeeId} name={talent.name} year={cycle.year} month={cycle.month} needs={needs} missingTasks={tasks?.summary.missing ?? 0} />
+          {/* A Payroll cycle (21st-20th) is named after its closing month, but the work it reports is mostly the
+              month before -- "Timesheet September" for the "Payroll Oktober" cycle. The reminder targets that. */}
+          <TalentMessageButton employeeId={employeeId} name={talent.name} {...previousCycle(cycle.year, cycle.month)} needs={needs} missingTasks={tasks?.summary.missing ?? 0} />
         </div>
       )}
       <Section id="attendance" title={t("attendanceLog")}>

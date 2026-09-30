@@ -24,6 +24,9 @@ export default async function OperationalReadinessPage({ searchParams }: { searc
   const cycle = Number(sp.year) && Number(sp.month) ? { year: Number(sp.year), month: Number(sp.month) } : current;
   const prev = previousCycle(cycle.year, cycle.month);
   const next = cycle.month === 12 ? { year: cycle.year + 1, month: 1 } : { year: cycle.year, month: cycle.month + 1 };
+  // A Payroll cycle (21st-20th) is named after its closing month; the Talent-facing reminder is about the
+  // month it mostly reports on, "Timesheet <prev>" for the "Payroll <cycle>" cycle.
+  const campaignCycleLabel = new Intl.DateTimeFormat(locale, { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(prev.year, prev.month - 1, 1)));
   const siblings = [
     { href: "/pmo/contracts", label: "A.Contract" },
     { href: "/pmo/invoices", label: "TM Invoice" },
@@ -124,6 +127,9 @@ export default async function OperationalReadinessPage({ searchParams }: { searc
           <ReadinessActions
             year={cycle.year}
             month={cycle.month}
+            campaignYear={prev.year}
+            campaignMonth={prev.month}
+            campaignCycleLabel={campaignCycleLabel}
             cycleLabel={data.cycle.label}
             needs={data.summary.needs_talent_action}
             canEdit={canWrite(levels.pmo)}
