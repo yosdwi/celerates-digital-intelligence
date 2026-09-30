@@ -3,7 +3,7 @@
 // (PAMA) from ConForm on demand. Nothing is copied: ConForm stays the record for client attendance.
 import type { Sql } from "postgres";
 import type { AttendanceDayState, Requirement } from "@/lib/conform/client";
-import { conformAttendance } from "@/lib/conform/pmo";
+import { conformAttendance, conformRequirements, cycleLabelFor } from "@/lib/conform/pmo";
 
 export type AttendanceDay = {
   workDate: string;
@@ -24,29 +24,70 @@ export interface AttendanceSource {
   log(year: number, month: number): Promise<AttendanceLog>;
 }
 
-/** A linked Talent's client attendance for one calendar-month Timesheet view, as ConForm evaluates it. */
+const pad2 = (value: number) => String(value).padStart(2, "0");
+
+function calendarMonth(year: number, month: number) {
+  const prefix = `${year}-${pad2(month)}`;
+  const start = `${prefix}-01`;
+  const end = `${prefix}-${pad2(new Date(Date.UTC(year, month, 0)).getUTCDate())}`;
+  const sourcePeriods = [cycleLabelFor(start), cycleLabelFor(end)].filter(
+    (item, index, all) => all.findIndex((other) => other.year === item.year && other.month === item.month) === index,
+  );
+  return { prefix, start, end, sourcePeriods };
+}
+
+/**
+ * ConForm's current transport can split one calendar month across two internal operational periods.
+ * Talent never needs that distinction: this adapter composes those reads into one calendar-month Timesheet view.
+ */
 export function conformSource(employeeId: string): AttendanceSource {
   return {
     key: "conform:pama",
     async log(year, month) {
-      const data = await conformAttendance(employeeId, year, month);
+      const calendar = calendarMonth(year, month);
+      const sourceLogs = await Promise.all(calendar.sourcePeriods.map((period) => conformAttendance(employeeId, period.year, period.month)));
+      const byDate = new Map<string, AttendanceDay>();
+      for (const data of sourceLogs) {
+        for (const day of data.days) {
+          if (!day.work_date.startsWith(`${calendar.prefix}-`)) continue;
+          byDate.set(day.work_date, {
+            workDate: day.work_date,
+            checkIn: day.check_in,
+            checkOut: day.check_out,
+            source: "conform:pama",
+            state: day.state,
+            gap: day.gap,
+            reason: day.reason,
+            evidenceCount: day.evidence_count,
+            correction: day.correction,
+          });
+        }
+      }
+      const evaluatedThrough = sourceLogs
+        .map((data) => data.evaluated_through)
+        .filter((value): value is string => Boolean(value))
+        .sort()
+        .at(-1) ?? null;
       return {
         source: "conform:pama",
-        period: { label: data.cycle.label, year: data.cycle.year, month: data.cycle.month, start: data.cycle.start, end: data.cycle.end, evaluatedThrough: data.evaluated_through },
-        days: data.days.map((d) => ({
-          workDate: d.work_date,
-          checkIn: d.check_in,
-          checkOut: d.check_out,
-          source: "conform:pama",
-          state: d.state,
-          gap: d.gap,
-          reason: d.reason,
-          evidenceCount: d.evidence_count,
-          correction: d.correction,
-        })),
+        period: { label: calendar.prefix, year, month, start: calendar.start, end: calendar.end, evaluatedThrough },
+        days: [...byDate.values()].sort((a, b) => a.workDate.localeCompare(b.workDate)),
       };
     },
   };
+}
+
+/** Actionable attendance gaps for exactly one Talent-facing calendar month. */
+export async function conformMonthRequirements(employeeId: string, year: number, month: number): Promise<Requirement[]> {
+  const calendar = calendarMonth(year, month);
+  const sourceRequirements = await Promise.all(calendar.sourcePeriods.map((period) => conformRequirements(employeeId, period.year, period.month)));
+  const byDate = new Map<string, Requirement>();
+  for (const data of sourceRequirements) {
+    for (const requirement of data.requirements) {
+      if (requirement.work_date.startsWith(`${calendar.prefix}-`)) byDate.set(requirement.work_date, requirement);
+    }
+  }
+  return [...byDate.values()].sort((a, b) => a.work_date.localeCompare(b.work_date));
 }
 
 const hhmm = (value: Date | string | null) =>
