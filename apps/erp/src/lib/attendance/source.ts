@@ -12,6 +12,7 @@ export type AttendanceDay = {
   source: "native" | "conform:pama";
   state: AttendanceDayState;
   gap: Requirement["gap"] | null;
+  reason: string;
   evidenceCount: number;
   correction: Requirement["correction"];
 };
@@ -23,7 +24,7 @@ export interface AttendanceSource {
   log(year: number, month: number): Promise<AttendanceLog>;
 }
 
-/** A linked Talent's client attendance for one Payroll cycle, as ConForm evaluates it. */
+/** A linked Talent's client attendance for one calendar-month Timesheet view, as ConForm evaluates it. */
 export function conformSource(employeeId: string): AttendanceSource {
   return {
     key: "conform:pama",
@@ -39,6 +40,7 @@ export function conformSource(employeeId: string): AttendanceSource {
           source: "conform:pama",
           state: d.state,
           gap: d.gap,
+          reason: d.reason,
           evidenceCount: d.evidence_count,
           correction: d.correction,
         })),
@@ -71,6 +73,7 @@ export function nativeSource(sql: Sql, userId: string): AttendanceSource {
           source: "native",
           state: r.last_out ? "complete" : "needs_action",
           gap: r.last_out ? null : "missing_clock_out",
+          reason: r.last_out ? "" : "Jam pulang belum tercatat",
           evidenceCount: 0,
           correction: null,
         })),
