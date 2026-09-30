@@ -104,20 +104,23 @@ const CODE = /^[A-Za-z0-9_-]{40,60}$/;
 /** Look at a grant without consuming it (link previews and crawlers must never redeem one). */
 export async function peekGrant(sql: Tx, code: string): Promise<{ userId: string; targetPath: string } | null> {
   if (!CODE.test(code)) return null;
-  const [row] = await sql`SELECT user_id, target_path FROM talent_link_grants WHERE token_sha256=${sha256(code)} AND used_at IS NULL AND superseded_at IS NULL AND (expires_at IS NULL OR expires_at > now())`;
+  const [row] = await sql`SELECT user_id, target_path FROM talent_link_grants WHERE token_sha256=${sha256(code)} AND superseded_at IS NULL AND (expires_at IS NULL OR expires_at > now())`;
   return row ? { userId: row.user_id as string, targetPath: row.target_path as string } : null;
 }
 
 /**
- * Redeem atomically: one UPDATE decides. The user must still be an active Talent account with an active link;
- * otherwise nothing is consumed and no session is created.
+ * Redeem: reusable while the link stays the Talent's current one, not single-use. Pilot feedback: the same link
+ * re-opened later (WhatsApp preload, a second tab, coming back to the chat tomorrow) only ever produced "Tautan
+ * tidak dapat dipakai" with no matching security gain here -- the link never left that one private DM. A grant
+ * still stops working the moment a newer one is issued (superseded_at) or its own expiry passes. The user must
+ * still be an active Talent account with an active link; otherwise nothing is recorded and no session is created.
  */
 export async function redeemGrant(sql: Tx, code: string, expectUserId?: string): Promise<{ userId: string; email: string; name: string; targetPath: string } | null> {
   if (!CODE.test(code)) return null;
   const [row] = await sql`
-    UPDATE talent_link_grants g SET used_at = now()
+    UPDATE talent_link_grants g SET used_at = COALESCE(g.used_at, now())
     FROM users u
-    WHERE g.token_sha256=${sha256(code)} AND g.used_at IS NULL AND g.superseded_at IS NULL AND (g.expires_at IS NULL OR g.expires_at > now())
+    WHERE g.token_sha256=${sha256(code)} AND g.superseded_at IS NULL AND (g.expires_at IS NULL OR g.expires_at > now())
       AND u.id = g.user_id AND u.status='active' AND u.account_type='talent' AND u.is_owner = false
       AND (${expectUserId ?? null}::uuid IS NULL OR g.user_id = ${expectUserId ?? null}::uuid)
       AND EXISTS (SELECT 1 FROM talent_identity_links l WHERE l.user_id=u.id AND l.status='active')
