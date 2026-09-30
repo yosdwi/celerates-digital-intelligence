@@ -82,6 +82,10 @@ export function CorrectionSheet({
   const submit = (form: HTMLFormElement) => {
     setError(null);
     const data = new FormData(form);
+    if (worked && needIn && !String(data.get("check_in") ?? "").trim()) return setError("Jam masuk wajib diisi.");
+    if (worked && needOut && !String(data.get("check_out") ?? "").trim()) return setError("Jam pulang wajib diisi.");
+    const file = data.get("file");
+    if (!(file instanceof File) || file.size === 0) return setError("Bukti pendukung wajib diunggah.");
     data.set("work_date", requirement.work_date);
     data.set("action", action);
     data.set("nonce", nonce);
@@ -181,7 +185,7 @@ export function CorrectionSheet({
                 <Camera aria-hidden className="h-5 w-5 text-j-accent" />
                 <span className="truncate">{fileName ?? "Tambah foto evidence"}</span>
               </span>
-              <input type="file" name="file" accept="image/jpeg,image/png,image/webp" capture="environment" required className="sr-only" data-fix-file onChange={(e) => setFileName(e.target.files?.[0]?.name ?? null)} />
+              <input type="file" name="file" accept="image/jpeg,image/png,image/webp" required className="sr-only" data-fix-file onChange={(e) => setFileName(e.target.files?.[0]?.name ?? null)} />
             </label>
 
             <label className="flex flex-col text-[13px] font-semibold">

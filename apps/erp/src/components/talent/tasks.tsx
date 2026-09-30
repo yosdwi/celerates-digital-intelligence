@@ -22,6 +22,8 @@ export function TaskEvidenceButton({ taskKey, title, year, month }: { taskKey: s
   const submit = (form: HTMLFormElement) => {
     setError(null);
     const data = new FormData(form);
+    const file = data.get("file");
+    if (!(file instanceof File) || file.size === 0) return setError("Foto evidence wajib diunggah.");
     data.set("task_key", taskKey);
     data.set("year", String(year));
     data.set("month", String(month));
@@ -84,7 +86,7 @@ export function TaskEvidenceButton({ taskKey, title, year, month }: { taskKey: s
                 <Camera aria-hidden className="h-5 w-5 text-j-accent" />
                 <span className="truncate">{fileName ?? "Ambil atau pilih foto"}</span>
               </span>
-              <input type="file" name="file" accept="image/jpeg,image/png,image/webp" capture="environment" required className="sr-only" data-task-file onChange={(e) => setFileName(e.target.files?.[0]?.name ?? null)} />
+              <input type="file" name="file" accept="image/jpeg,image/png,image/webp" required className="sr-only" data-task-file onChange={(e) => setFileName(e.target.files?.[0]?.name ?? null)} />
             </label>
             <label className="flex flex-col text-[13px] font-semibold">
               Keterangan (opsional)
