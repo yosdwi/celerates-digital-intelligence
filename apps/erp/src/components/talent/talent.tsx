@@ -5,11 +5,12 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { signOut } from "next-auth/react";
 import { useTranslations } from "next-intl";
-import { Camera, CheckCircle2, LogOut, Save } from "lucide-react";
+import { CheckCircle2, LogOut, Save } from "lucide-react";
 import { submitAttendanceCorrection } from "@/app/me/actions";
 import type { Requirement } from "@/lib/conform/client";
 import { BottomSheet } from "@/components/mobile/primitives";
 import { buttonClass } from "@/components/mobile/styles";
+import { EvidenceDropzone } from "@/components/talent/evidence-dropzone";
 
 const field = "mt-1 w-full rounded-xl border border-[#d5dbe5] bg-j-surface px-3 py-2.5 text-[15px] font-normal text-j-ink outline-none focus:border-j-accent";
 
@@ -60,7 +61,7 @@ export function CorrectionSheet({
   const [nonce, setNonce] = useState(newNonce);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
-  const [fileName, setFileName] = useState<string | null>(null);
+  const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
   const [pending, start] = useTransition();
   const worked = action === "worked";
   const needIn = worked && requirement.gap !== "missing_clock_out";
@@ -84,8 +85,8 @@ export function CorrectionSheet({
     const data = new FormData(form);
     if (worked && needIn && !String(data.get("check_in") ?? "").trim()) return setError("Jam masuk wajib diisi.");
     if (worked && needOut && !String(data.get("check_out") ?? "").trim()) return setError("Jam pulang wajib diisi.");
-    const file = data.get("file");
-    if (!(file instanceof File) || file.size === 0) return setError("Bukti pendukung wajib diunggah.");
+    if (!evidenceFile) return setError("Bukti pendukung wajib diunggah.");
+    data.set("file", evidenceFile, evidenceFile.name || "bukti.jpg");
     data.set("work_date", requirement.work_date);
     data.set("action", action);
     data.set("nonce", nonce);
@@ -105,7 +106,7 @@ export function CorrectionSheet({
           setNonce(newNonce());
           setDone(null);
           setError(null);
-          setFileName(null);
+          setEvidenceFile(null);
           setAction(requirement.allowed_actions[0] ?? "worked");
         }}
         data-action="talent-fix"
@@ -118,6 +119,7 @@ export function CorrectionSheet({
         open={open}
         onClose={close}
         title="Lengkapi Kehadiran"
+        desktopMode="side"
         footer={
           done ? (
             <button type="button" onClick={close} className={buttonClass.primary}>
@@ -137,9 +139,9 @@ export function CorrectionSheet({
             <p className="text-sm text-j-muted">Perubahan attendance berhasil dikirim.</p>
           </div>
         ) : (
-          <form id={formId} onSubmit={(e) => { e.preventDefault(); submit(e.currentTarget); }} className="flex flex-col gap-4 pb-1">
-            <div className="flex flex-col gap-0.5">
-              <p className="text-[15px] font-bold capitalize">{dateLabel}</p>
+          <form id={formId} onSubmit={(e) => { e.preventDefault(); submit(e.currentTarget); }} className="flex flex-col gap-4 pb-1 md:gap-5">
+            <div className="flex flex-col gap-0.5 rounded-[14px] bg-[#f7f9fc] p-3.5 md:p-4">
+              <p className="text-[15px] font-bold capitalize md:text-base">{dateLabel}</p>
               <p className="text-sm text-j-muted">{talentT(`gap.${requirement.gap}`)}</p>
             </div>
 
@@ -149,7 +151,7 @@ export function CorrectionSheet({
                 {requirement.allowed_actions.map((item) => (
                   <label
                     key={item}
-                    className={`flex min-h-10 cursor-pointer items-center rounded-full border px-4 text-[14px] transition ${action === item ? "border-j-accent bg-j-accent text-white font-bold" : "border-j-line bg-j-surface text-j-ink"}`}
+                    className={`flex min-h-10 cursor-pointer items-center rounded-full border px-4 text-[14px] transition ${action === item ? "border-j-accent bg-j-accent text-white font-bold" : "border-j-line bg-j-surface text-j-ink hover:border-[#aebbd8]"}`}
                   >
                     <input type="radio" name="action_choice" value={item} checked={action === item} onChange={() => setAction(item)} className="sr-only" />
                     {actionLabel(item)}
@@ -179,18 +181,11 @@ export function CorrectionSheet({
               </div>
             )}
 
-            <label className="flex cursor-pointer flex-col gap-1 text-[13px] font-semibold">
-              Bukti pendukung
-              <span className="flex min-h-12 items-center gap-2 rounded-xl border border-dashed border-[#c9d4f2] px-3 text-sm font-normal text-j-muted">
-                <Camera aria-hidden className="h-5 w-5 text-j-accent" />
-                <span className="truncate">{fileName ?? "Tambah foto evidence"}</span>
-              </span>
-              <input type="file" name="file" accept="image/jpeg,image/png,image/webp" required className="sr-only" data-fix-file onChange={(e) => setFileName(e.target.files?.[0]?.name ?? null)} />
-            </label>
+            <EvidenceDropzone file={evidenceFile} onFileChange={setEvidenceFile} label="Bukti pendukung" disabled={pending} />
 
             <label className="flex flex-col text-[13px] font-semibold">
               {t("note")}
-              <textarea name="caption" rows={2} maxLength={500} className={field} />
+              <textarea name="caption" rows={3} maxLength={500} className={field} />
             </label>
             {error && <p role="alert" className="text-sm font-semibold text-[#a8261c]">{error}</p>}
           </form>
