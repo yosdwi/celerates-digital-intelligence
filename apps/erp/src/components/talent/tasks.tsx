@@ -2,10 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Camera, CheckCircle2, Upload } from "lucide-react";
+import { CheckCircle2, Upload } from "lucide-react";
 import { uploadTaskEvidence } from "@/app/me/actions";
 import { BottomSheet } from "@/components/mobile/primitives";
 import { buttonClass } from "@/components/mobile/styles";
+import { EvidenceDropzone } from "@/components/talent/evidence-dropzone";
 
 const field = "mt-1 w-full rounded-xl border border-[#d5dbe5] bg-j-surface px-3 py-2.5 text-[15px] font-normal text-j-ink outline-none focus:border-j-accent";
 const newNonce = () => (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`).replace(/[^A-Za-z0-9_-]/g, "");
@@ -14,16 +15,16 @@ export function TaskEvidenceButton({ taskKey, title, year, month }: { taskKey: s
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [nonce, setNonce] = useState(newNonce);
-  const [fileName, setFileName] = useState<string | null>(null);
+  const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
   const submit = (form: HTMLFormElement) => {
     setError(null);
+    if (!evidenceFile) return setError("Foto evidence wajib diunggah.");
     const data = new FormData(form);
-    const file = data.get("file");
-    if (!(file instanceof File) || file.size === 0) return setError("Foto evidence wajib diunggah.");
+    data.set("file", evidenceFile, evidenceFile.name || "evidence.jpg");
     data.set("task_key", taskKey);
     data.set("year", String(year));
     data.set("month", String(month));
@@ -49,7 +50,7 @@ export function TaskEvidenceButton({ taskKey, title, year, month }: { taskKey: s
           setNonce(newNonce());
           setDone(null);
           setError(null);
-          setFileName(null);
+          setEvidenceFile(null);
         }}
         data-action="task-evidence"
         className={`${buttonClass.secondary} !h-11 !w-auto px-4`}
@@ -61,6 +62,7 @@ export function TaskEvidenceButton({ taskKey, title, year, month }: { taskKey: s
         open={open}
         onClose={close}
         title="Evidence Task"
+        desktopMode="side"
         footer={
           done ? (
             <button type="button" onClick={close} className={buttonClass.primary}>Selesai</button>
@@ -79,18 +81,14 @@ export function TaskEvidenceButton({ taskKey, title, year, month }: { taskKey: s
           </div>
         ) : (
           <form id={`task-form-${taskKey}`} onSubmit={(e) => { e.preventDefault(); submit(e.currentTarget); }} className="flex flex-col gap-4 pb-1">
-            <p className="text-[15px] font-bold leading-snug">{title}</p>
-            <label className="flex cursor-pointer flex-col gap-1 text-[13px] font-semibold">
-              Foto evidence
-              <span className="flex min-h-12 items-center gap-2 rounded-xl border border-dashed border-[#c9d4f2] px-3 text-sm font-normal text-j-muted">
-                <Camera aria-hidden className="h-5 w-5 text-j-accent" />
-                <span className="truncate">{fileName ?? "Ambil atau pilih foto"}</span>
-              </span>
-              <input type="file" name="file" accept="image/jpeg,image/png,image/webp" required className="sr-only" data-task-file onChange={(e) => setFileName(e.target.files?.[0]?.name ?? null)} />
-            </label>
+            <div>
+              <p className="text-[15px] font-bold leading-snug">{title}</p>
+              <p className="mt-1 text-xs text-j-muted md:text-sm">Lampirkan satu evidence yang mewakili penyelesaian task ini.</p>
+            </div>
+            <EvidenceDropzone file={evidenceFile} onFileChange={setEvidenceFile} label="Foto evidence" disabled={pending} />
             <label className="flex flex-col text-[13px] font-semibold">
               Keterangan (opsional)
-              <textarea name="caption" rows={2} maxLength={500} className={field} />
+              <textarea name="caption" rows={3} maxLength={500} className={field} />
             </label>
             {error && <p role="alert" className="text-sm font-semibold text-[#a8261c]">{error}</p>}
           </form>
