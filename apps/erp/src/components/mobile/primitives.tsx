@@ -195,19 +195,21 @@ export function StickyActions({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** Modal bottom sheet: contextual actions, filters, module landing. Escape and the scrim close it. */
+/** Modal bottom sheet on phones; optionally becomes a right-side work panel on desktop. */
 export function BottomSheet({
   open,
   onClose,
   title,
   children,
   footer,
+  desktopMode = "modal",
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
+  desktopMode?: "modal" | "side";
 }) {
   const titleId = useId();
   const panel = useRef<HTMLDivElement>(null);
@@ -228,6 +230,12 @@ export function BottomSheet({
     };
   }, [open, onClose]);
   if (!open) return null;
+
+  const desktopClass =
+    desktopMode === "side"
+      ? "md:inset-y-0 md:left-auto md:right-0 md:bottom-auto md:h-full md:max-h-none md:w-[min(520px,44vw)] md:max-w-none md:translate-x-0 md:rounded-none md:border-l md:border-j-line"
+      : "md:left-1/2 md:max-w-lg md:-translate-x-1/2";
+
   return (
     <div className="fixed inset-0 z-50 font-jakarta text-j-ink">
       <button type="button" aria-label="Tutup" tabIndex={-1} onClick={onClose} className="absolute inset-0 h-full w-full bg-[rgba(14,23,38,0.4)]" />
@@ -238,10 +246,11 @@ export function BottomSheet({
         aria-labelledby={titleId}
         tabIndex={-1}
         data-bottom-sheet
-        className="absolute inset-x-0 bottom-0 flex max-h-[88dvh] flex-col rounded-t-[26px] bg-j-surface shadow-j-sheet outline-none md:left-1/2 md:max-w-lg md:-translate-x-1/2"
+        data-desktop-mode={desktopMode}
+        className={`absolute inset-x-0 bottom-0 flex max-h-[88dvh] flex-col rounded-t-[26px] bg-j-surface shadow-j-sheet outline-none ${desktopClass}`}
       >
-        <div className="mx-auto mt-2.5 h-[5px] w-10 shrink-0 rounded-full bg-[#d5dbe5]" aria-hidden />
-        <div className="flex shrink-0 items-center justify-between gap-3 px-5 pb-2 pt-3">
+        <div className={`mx-auto mt-2.5 h-[5px] w-10 shrink-0 rounded-full bg-[#d5dbe5] ${desktopMode === "side" ? "md:hidden" : ""}`} aria-hidden />
+        <div className={`flex shrink-0 items-center justify-between gap-3 px-5 pb-2 pt-3 ${desktopMode === "side" ? "md:px-6 md:pb-3 md:pt-6" : ""}`}>
           <h2 id={titleId} className="text-[19px] font-extrabold">
             {title}
           </h2>
@@ -249,8 +258,12 @@ export function BottomSheet({
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-4">{children}</div>
-        {footer && <div className="flex shrink-0 gap-2.5 border-t border-j-line px-5 pb-[calc(14px+env(safe-area-inset-bottom))] pt-3">{footer}</div>}
+        <div className={`min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-4 ${desktopMode === "side" ? "md:px-6 md:pb-6" : ""}`}>{children}</div>
+        {footer && (
+          <div className={`flex shrink-0 gap-2.5 border-t border-j-line px-5 pb-[calc(14px+env(safe-area-inset-bottom))] pt-3 ${desktopMode === "side" ? "md:px-6 md:pb-6 md:pt-4" : ""}`}>
+            {footer}
+          </div>
+        )}
       </div>
     </div>
   );
