@@ -68,9 +68,9 @@ export async function revokeTalentLink(sql: Tx, userId: string): Promise<boolean
 }
 
 /**
- * Issue an opaque, single-use grant (doc 22 R3.2). Returns the code once; only its hash is stored. A grant has no
- * time expiry unless `ttlSeconds` is given; issuing one supersedes the user's older unused grants, so only the
- * latest link a Talent received works.
+ * Issue an opaque grant. It stays reusable while it is the user's current link. A newer grant supersedes every
+ * older active grant for that user, whether or not the old link was already opened. A grant has no time expiry
+ * unless `ttlSeconds` is explicitly provided.
  */
 export async function issueGrant(
   sql: Tx,
@@ -79,7 +79,7 @@ export async function issueGrant(
   if (!TARGET.test(input.targetPath)) throw new TalentLinkError("invalid_target", "Target harus di bawah /me.");
   const ttl = input.ttlSeconds === undefined ? null : Math.max(Math.floor(input.ttlSeconds), 300);
   const code = randomBytes(32).toString("base64url");
-  await sql`UPDATE talent_link_grants SET superseded_at = now() WHERE user_id=${input.userId} AND used_at IS NULL AND superseded_at IS NULL`;
+  await sql`UPDATE talent_link_grants SET superseded_at = now() WHERE user_id=${input.userId} AND superseded_at IS NULL`;
   const [row] = await sql`INSERT INTO talent_link_grants (token_sha256, user_id, target_path, purpose, campaign_ref, created_by_user_id, expires_at)
     VALUES (${sha256(code)}, ${input.userId}, ${input.targetPath}, ${input.purpose}, ${input.campaignRef ?? null}, ${input.createdBy ?? null},
             CASE WHEN ${ttl}::int IS NULL THEN NULL ELSE now() + make_interval(secs => ${ttl}::int) END)
@@ -109,11 +109,11 @@ export async function peekGrant(sql: Tx, code: string): Promise<{ userId: string
 }
 
 /**
- * Redeem: reusable while the link stays the Talent's current one, not single-use. Pilot feedback: the same link
- * re-opened later (WhatsApp preload, a second tab, coming back to the chat tomorrow) only ever produced "Tautan
- * tidak dapat dipakai" with no matching security gain here -- the link never left that one private DM. A grant
- * still stops working the moment a newer one is issued (superseded_at) or its own expiry passes. The user must
- * still be an active Talent account with an active link; otherwise nothing is recorded and no session is created.
+ * Redeem: reusable while the link stays the Talent's current one. Pilot feedback: the same link re-opened later
+ * (WhatsApp preload, a second tab, coming back to the chat tomorrow) only ever produced "Tautan tidak dapat
+ * dipakai" with no matching security gain here -- the link never left that one private DM. A grant stops working
+ * when a newer one is issued (superseded_at) or its own expiry passes. The user must still be an active Talent
+ * account with an active link; otherwise nothing is recorded and no session is created.
  */
 export async function redeemGrant(sql: Tx, code: string, expectUserId?: string): Promise<{ userId: string; email: string; name: string; targetPath: string } | null> {
   if (!CODE.test(code)) return null;

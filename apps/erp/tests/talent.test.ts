@@ -6,9 +6,10 @@ import postgres from "postgres";
 import { activeLinkForUser, issueGrant, issueGrantForEmployee, linkTalentAccount, peekGrant, redeemGrant, revokeTalentLink, TalentLinkError } from "../src/lib/talent/identity";
 import { cycleLabelFor } from "../src/lib/conform/pmo";
 
-// ADR-019 §4, doc 22 R3.2: WhatsApp reminders reach Celerates only through single-use, user-bound grants (no time
-// expiry by default; a newer grant supersedes older unused ones), and only for an active Talent account with an
-// active identity link. Backoffice accounts are never converted.
+// ADR-019 §4, doc 22 R3.2: WhatsApp reminders reach Celerates only through user-bound grants. The current grant
+// stays reusable so link previews, a second tab, or reopening the same private DM do not break access. A newer
+// grant supersedes every older active one; time expiry remains optional. Only active Talent accounts with an
+// active identity link may use a grant. Backoffice accounts are never converted.
 test("talent identity links and deep-link grants", async () => {
   // @ts-expect-error JS runner
   const { migrate } = await import("../scripts/migrate.mjs");
@@ -43,16 +44,18 @@ test("talent identity links and deep-link grants", async () => {
     assert.equal(grant.expiresAt, null, "no time expiry by default");
 
     assert.deepEqual(await peekGrant(sql, grant.code), { userId: user.id, targetPath: "/me?year=2026&month=9" }, "peek does not consume");
-    assert.ok(await peekGrant(sql, grant.code), "still unused after peeking twice");
+    assert.ok(await peekGrant(sql, grant.code), "still available after peeking twice");
     assert.equal(await redeemGrant(sql, grant.code, owner.id), null, "bound to its user: another user cannot redeem");
     const redeemed = await redeemGrant(sql, grant.code);
     assert.equal(redeemed?.userId, user.id);
     assert.equal(redeemed?.email, "rina@example.test");
-    assert.equal(await redeemGrant(sql, grant.code), null, "single-use");
-    assert.equal(await peekGrant(sql, grant.code), null);
+    assert.equal((await redeemGrant(sql, grant.code))?.userId, user.id, "the current private-DM link is reusable");
+    assert.ok(await peekGrant(sql, grant.code), "opening the current link does not invalidate it");
     assert.equal(await redeemGrant(sql, "not-a-code"), null);
 
     const older = await issueGrant(sql, { userId: user.id, targetPath: "/me", purpose: "direct" });
+    assert.equal(await peekGrant(sql, grant.code), null, "a new grant supersedes even a previously used link");
+    assert.equal(await redeemGrant(sql, grant.code), null);
     const newer = await issueGrant(sql, { userId: user.id, targetPath: "/me", purpose: "whatsapp" });
     assert.equal(await peekGrant(sql, older.code), null, "a newer grant supersedes the older unused one");
     assert.equal(await redeemGrant(sql, older.code), null);
