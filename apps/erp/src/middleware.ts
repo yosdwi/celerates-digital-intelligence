@@ -18,7 +18,11 @@ function pass(req: NextRequest, ...set: (Flag | undefined)[]) {
 }
 // Not a server redirect: Next normalizes same-origin Locations onto its bind host, which would drop the session.
 // A same-origin meta refresh keeps a signed-in user on the origin their session belongs to.
-function refresh(to: string, label: string) {
+// A Server Action POST (the `next-action` header) can't follow a meta refresh -- it's an XHR, not a navigation --
+// so the 403 HTML body above just surfaces as an opaque "403 Forbidden" in whatever UI triggered the action. Next's
+// action runtime *does* natively follow a redirect Response, so give those requests one instead of the HTML trick.
+function refresh(req: NextRequest, to: string, label: string) {
+  if (req.headers.has("next-action")) return NextResponse.redirect(new URL(to, req.url), 303);
   return new NextResponse(`<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=${to}"><a href="${to}">${label}</a>`, { status: 403, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
 }
 // Signed in but not (yet) active: only the request-access and waiting pages, rendered bare.
@@ -40,14 +44,14 @@ export async function middleware(req: NextRequest) {
   if (talent) {
     if (TALENT_PATHS.some((p) => p.test(path))) return pass(req, "x-erp-talent");
     if (path.startsWith("/api/")) return new NextResponse("Forbidden", { status: 403 });
-    return refresh("/me", "Kelengkapan Saya");
+    return refresh(req, "/me", "Kelengkapan Saya");
   }
   // A backoffice account waiting for approval (or rejected) sees the request-access / waiting pages only.
   if (token && (token.status === "pending" || token.status === "rejected") && token.accountType !== "talent") {
     if (WAITING_PATHS.includes(path)) return pass(req, "x-erp-bare");
     if (path.startsWith("/api/")) return new NextResponse("Unauthorized", { status: 403 });
     const to = token.status === "pending" && token.hasRequestedDivision !== true ? "/onboarding-profile" : "/pending-approval";
-    return refresh(to, "Status akun");
+    return refresh(req, to, "Status akun");
   }
   if (!token || !backoffice) {
     if (path.startsWith("/api/")) return new NextResponse("Unauthorized", { status: 403 });
@@ -55,7 +59,7 @@ export async function middleware(req: NextRequest) {
   }
   // Route-level module gate. APIs and server actions check their own authority; a module page the user has no
   // division for is refused here, before any page code runs.
-  if (!path.startsWith("/api/") && !canOpenRoute(token as RouteClaims, path)) return refresh("/", "Beranda");
+  if (!path.startsWith("/api/") && !canOpenRoute(token as RouteClaims, path)) return refresh(req, "/", "Beranda");
   return pass(req, "x-erp-protected");
 }
 export const config = { matcher: ["/((?!_next/static|_next/image|favicon.ico|logo.png|logo-white.png).*)"] };

@@ -17,7 +17,13 @@ export function Providers({
 }) {
   return (
     <SessionProvider>
-      <NextIntlClientProvider locale={locale} messages={messages} timeZone={timeZone}>
+      <NextIntlClientProvider
+        locale={locale}
+        messages={messages}
+        timeZone={timeZone}
+        onError={(error) => console.error(`[i18n] ${error.message}`)}
+        getMessageFallback={({ namespace, key }) => [namespace, key].filter(Boolean).join(".")}
+      >
         <ToastProvider>
           <SavedRedirectToast />
           {children}

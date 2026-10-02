@@ -16,5 +16,13 @@ export default getRequestConfig(async () => {
     locale,
     timeZone: DEFAULT_TIME_ZONE,
     messages: (await import(`../../messages/${locale}.json`)).default,
+    // A missing/malformed translation key must degrade to a visible placeholder, never take down
+    // the whole page -- it did, repeatedly, on the ERP home shell (INSUFFICIENT_PATH, 2026-09-30).
+    onError(error) {
+      console.error(`[i18n] ${error.message}`);
+    },
+    getMessageFallback({ namespace, key }) {
+      return [namespace, key].filter(Boolean).join(".");
+    },
   };
 });
