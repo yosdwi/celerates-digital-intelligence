@@ -31,6 +31,9 @@ if (!url) fail('DATABASE_URL is required.');
 const disable = process.argv.includes('--disable');
 const password = process.env.TEST_ACCOUNT_PASSWORD ?? '';
 if (!disable && (password.length < 8 || password.length > 72)) fail('TEST_ACCOUNT_PASSWORD is required (8 to 72 characters). Refusing to seed.');
+// docs/security R5.4: shared test accounts never sign in to an internet-facing pilot/production. Disabling is always allowed.
+if (!disable && ['pilot', 'production', 'erp-pilot'].includes(process.env.APP_ENV ?? '') && process.env.ALLOW_TEST_ACCOUNTS !== '1')
+  fail(`APP_ENV=${process.env.APP_ENV}: refusing to create shared test accounts here (use staging, or --disable).`);
 
 const sql = postgres(url, { max: 1, prepare: false, connect_timeout: 10 });
 const report = [];
@@ -40,6 +43,8 @@ try {
     if (disable) {
       for (const account of ACCOUNTS) {
         const rows = await tx`UPDATE users SET status = 'inactive' WHERE email = ${account.email} RETURNING id`;
+        // Sessions end at once (they also stop validating because the user is inactive).
+        if (rows.length) await tx`UPDATE auth_sessions SET revoked_at = now(), revoke_reason = 'test_account_disabled' WHERE user_id = ${rows[0].id} AND revoked_at IS NULL`;
         report.push([account.email, rows.length ? 'disabled' : 'not found']);
       }
       return;

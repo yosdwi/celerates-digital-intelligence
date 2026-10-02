@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { talentAssignments, employees, requisitions, onboardingRequests, candidates, employmentContracts } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
-import { decryptPII } from "@/lib/pii-crypto";
+import { maskIdentity } from "@/lib/people/identity";
 import { PageHeader } from "@/components/page-header";
 import { Wallet } from "lucide-react";
 import { getTranslations } from "next-intl/server";
@@ -131,7 +131,7 @@ export default async function TalentDatabaseSalaryPage() {
                   <Item label="Client" value={r.client_name} />
                   <Item label="Company Email" value={r.company_email} />
                   <Item label="Personal Email" value={r.personal_email} />
-                  <Item label="NIK" value={decryptPII(r.nik)} />
+                  <Item label="NIK" value={maskIdentity(r.nik)} />
                   <Item label="Gender" value={r.gender_code} />
                   <Item label="Religion" value={r.religion_code} />
                   <Item label="Education" value={r.education_level_code} />

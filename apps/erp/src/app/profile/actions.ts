@@ -6,6 +6,9 @@ import { eq } from "drizzle-orm";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import bcrypt from "bcryptjs";
+import { sql } from "@/db";
+import { audit } from "@/lib/security/audit";
+import { revokeUserSessions } from "@/lib/security/session";
 
 export type ProfileResult = { ok: true } | { ok: false; error: string };
 
@@ -49,8 +52,12 @@ export async function changePassword(formData: FormData): Promise<ProfileResult>
   if (new_password.length < 8) return { ok: false, error: "Password baru minimal 8 karakter" };
   if (new_password !== confirm_password) return { ok: false, error: "Konfirmasi password tidak cocok" };
 
-  const password_hash = await bcrypt.hash(new_password, 10);
+  const password_hash = await bcrypt.hash(new_password, 12);
   await db.update(users).set({ password_hash }).where(eq(users.id, user.id));
+  // docs/security/02: a password change ends every other session; this browser stays signed in.
+  const sid = (session.user as { sid?: string }).sid ?? null;
+  const revoked = await revokeUserSessions(sql, user.id, "password_changed", { exceptSid: sid });
+  await audit(sql, { action: "password_change", decision: "allow", actorUserId: user.id, sessionId: sid, reason: `sessions_revoked:${revoked}` });
 
   return { ok: true };
 }

@@ -25,7 +25,8 @@ export async function requireDivisionAccess(divisionKey: string, minLevel: Acces
   const userName = ((session?.user as any)?.fullName ?? session?.user?.name ?? session?.user?.email ?? "Seseorang") as string;
   const isOwner = Boolean((session?.user as any)?.isOwner);
 
-  if (!userId) throw new Error("Sesi tidak valid, silakan login ulang");
+  // Sessions only exist for active users (docs/security/02); checked again here so a stale caller fails closed.
+  if (!userId || (session?.user as any)?.status !== "active") throw new Error("Sesi tidak valid, silakan login ulang");
   if (isOwner) return { userId, userName, isOwner };
 
   const access = ((session?.user as any)?.access ?? []) as { divisionKey: string; level: string }[];

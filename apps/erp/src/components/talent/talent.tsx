@@ -29,6 +29,9 @@ export function TalentAccountButton({ name, email }: { name: string; email: stri
             <p className="text-sm text-j-muted">{email}</p>
           </div>
           <p className="text-xs text-j-muted">{t("accountNote")}</p>
+          <a href="/me/documents" className="flex h-12 items-center justify-center rounded-[14px] border border-j-line text-[15px] font-bold text-j-ink">
+            Dokumen identitas
+          </a>
           <button type="button" onClick={() => signOut({ callbackUrl: "/login" })} className="flex h-12 items-center justify-center gap-2 rounded-[14px] border border-[#f3c7c2] text-[15px] font-bold text-[#b3261e]">
             <LogOut aria-hidden className="h-5 w-5" /> {t("logout")}
           </button>

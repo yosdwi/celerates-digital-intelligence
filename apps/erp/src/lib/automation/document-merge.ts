@@ -3,7 +3,9 @@ import Docxtemplater from "docxtemplater";
 import { db } from "@/db";
 import { automationDocumentTemplates, automationGeneratedDocuments, onboardingRequests, candidates, requisitions, employees, opportunities } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { decryptPII } from "@/lib/pii-crypto";
+import { sql } from "@/db";
+import { currentClaims, requestMeta } from "@/lib/actor";
+import { identityForDocument } from "@/lib/people/identity";
 import { prettify } from "@/components/dashboard-charts";
 import { downloadFromStorage, uploadGeneratedDocument, getSignedUrl } from "./storage";
 import { extractDocxTags, findRemainingBlanks } from "./docx-inspect";
@@ -91,6 +93,11 @@ async function buildMergeData(onboardingRequestId: string): Promise<Record<strin
   const todayParts = dateParts(new Date().toISOString());
   const todayDayName = new Date().toLocaleDateString("id-ID", { weekday: "long" });
   const durationMonths = calcDurationMonths(onboarding.start_date, onboarding.end_date);
+  // docs/security/03: identity numbers enter a generated document in plaintext only for a user who may reveal them
+  // now (capability + scope + fresh step-up); otherwise the document carries the masked value. Audited.
+  const identity = await identityForDocument(sql, await currentClaims(), onboardingRequestId, {
+    nik: onboarding.nik, npwp: onboarding.npwp, family_card_no: onboarding.family_card_no, bank_account_no: onboarding.bank_account_no,
+  }, await requestMeta());
 
   const grossSalary = [
     onboarding.basic_salary_amount, onboarding.functional_allowance_amount, onboarding.transport_allowance_amount,
@@ -105,8 +112,8 @@ async function buildMergeData(onboardingRequestId: string): Promise<Record<strin
     no_tlp: onboarding.personal_phone ?? candidate?.wa_number ?? "-",
     alamat: onboarding.id_card_address ?? "-",
     alamat_domisili: onboarding.current_address ?? "-",
-    nik: decryptPII(onboarding.nik) ?? "-",
-    npwp: decryptPII(onboarding.npwp) ?? "-",
+    nik: identity.nik ?? "-",
+    npwp: identity.npwp ?? "-",
     tempat_lahir: onboarding.birth_place ?? "-",
     tanggal_lahir: formatDate(onboarding.birth_date),
     umur: calcAge(onboarding.birth_date),
@@ -147,7 +154,7 @@ async function buildMergeData(onboardingRequestId: string): Promise<Record<strin
     tunjangan_akomodasi: formatMoney(onboarding.accommodation_allowance_amount),
     total_gross_gaji: formatMoney(grossSalary),
     nama_bank: onboarding.bank_name ?? "-",
-    no_rekening: decryptPII(onboarding.bank_account_no) ?? "-",
+    no_rekening: identity.bank_account_no ?? "-",
     nama_pemilik_rekening: onboarding.bank_account_holder_name ?? "-",
   };
 }

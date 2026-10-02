@@ -28,5 +28,19 @@ export function objectUrl(logical: string, path: string) {
   return `/api/documents?bucket=${encodeURIComponent(logical)}&path=${encodeURIComponent(path)}`;
 }
 export async function checkStorage() {
-  await Promise.all([...allowed].map(logical => s3().send(new HeadBucketCommand({ Bucket: bucket(logical) }))));
+  await Promise.all([...[...allowed].map(bucket), identityBucket()].map(Bucket => s3().send(new HeadBucketCommand({ Bucket }))));
+}
+// Identity documents (docs/security/04) live in their own private bucket that is deliberately NOT in `allowed`, so
+// the generic /api/documents route can never name it. Objects are ciphertext under opaque keys; no URLs are issued.
+const identityBucket = () => `${process.env.S3_BUCKET_PREFIX || "erp"}-identity-documents`;
+const IDENTITY_KEY = /^id\/[0-9a-f]{32}$/;
+export async function putIdentityObject(key: string, body: Buffer) {
+  if (!IDENTITY_KEY.test(key)) throw new Error("Invalid identity object key");
+  await s3().send(new PutObjectCommand({ Bucket: identityBucket(), Key: key, Body: body, ContentType: "application/octet-stream", IfNoneMatch: "*" }));
+}
+export async function readIdentityObject(key: string): Promise<Buffer> {
+  if (!IDENTITY_KEY.test(key)) throw new Error("Invalid identity object key");
+  const result = await s3().send(new GetObjectCommand({ Bucket: identityBucket(), Key: key }));
+  if (!result.Body || (result.ContentLength ?? Infinity) > 6 * 1024 * 1024) throw new Error("Object unavailable");
+  return Buffer.from(await result.Body.transformToByteArray());
 }

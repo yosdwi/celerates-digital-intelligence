@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { getTranslations } from "next-intl/server";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { db } from "@/db";
+import { db, sql } from "@/db";
 import { users, divisions, userAccess } from "@/db/schema";
 import { ApproveRejectButtons } from "./approve-reject-buttons";
 import { AccessEditor } from "./access-editor";
@@ -12,6 +12,7 @@ import { ExpandableSection } from "@/components/expandable-section";
 import { InviteUserForm } from "./invite-user-form";
 import { EditUserButton } from "./edit-user-button";
 import { DeleteUserButton } from "./delete-user-button";
+import { SecurityControls, type GrantRow } from "./security-controls";
 import { PageHeader } from "@/components/page-header";
 import { Shield } from "lucide-react";
 
@@ -19,6 +20,7 @@ const STATUS_BADGE: Record<string, string> = {
   pending: "bg-amber-100 text-amber-700",
   active: "bg-green-100 text-green-700",
   rejected: "bg-red-100 text-red-700",
+  inactive: "bg-slate-200 text-slate-600",
 };
 
 function AccountTypeBadge({ accountType, talentLabel, backofficeLabel }: { accountType: string; talentLabel: string; backofficeLabel: string }) {
@@ -38,10 +40,12 @@ export default async function AccessManagementPage() {
 
   const t = await getTranslations("accessManagement");
 
-  const [allUsers, divisionOptions, allAccess] = await Promise.all([
+  const [allUsers, divisionOptions, allAccess, allGrants] = await Promise.all([
     db.select().from(users),
     db.select({ id: divisions.id, key: divisions.key, name: divisions.name }).from(divisions),
     db.select().from(userAccess),
+    sql<(GrantRow & { user_id: string })[]>`SELECT id, user_id, capability, scope, reason, granted_at::text FROM user_capabilities
+      WHERE revoked_at IS NULL AND (expires_at IS NULL OR expires_at > now()) ORDER BY capability`,
   ]);
 
   const pendingUsers = allUsers.filter((u) => u.status === "pending");
@@ -57,6 +61,7 @@ export default async function AccessManagementPage() {
     pending: t("statusPending"),
     active: t("statusActive"),
     rejected: t("statusRejected"),
+    inactive: "Nonaktif",
   };
 
   function getAccessFor(userId: string) {
@@ -135,6 +140,7 @@ export default async function AccessManagementPage() {
                   {u.email !== "abi.rohmat@celerates.co.id" && <DeleteUserButton userId={u.id} userName={u.full_name} />}
                 </div>
               </div>
+              <SecurityControls userId={u.id} status={u.status} isTalent={u.account_type === "talent"} grants={allGrants.filter((g) => g.user_id === u.id)} />
               </div>
             ))}
             {otherUsers.length === 0 && (

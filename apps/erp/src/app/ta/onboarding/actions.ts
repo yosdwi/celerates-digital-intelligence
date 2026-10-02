@@ -1,6 +1,6 @@
 "use server";
-import { requireActor } from "@/lib/actor";
-import { db } from "@/db";
+import { currentClaims, requestMeta, requireActor } from "@/lib/actor";
+import { db, sql } from "@/db";
 import { onboardingRequests, signatureRequests } from "@/db/schema";
 import { revalidatePath } from "next/cache";
 import { eq, and } from "drizzle-orm";
@@ -15,6 +15,7 @@ import { saveAttachmentsAndLinks, extractFiles, extractLinks, deleteAttachment, 
 import { ONBOARDING_DOC_FIELDS, onboardingDocSource, OFFERING_LETTER_SIGNATURE_SOURCE, OFFERING_LETTER_SIGNATURE_STEP } from "./constants";
 import { onTalentPromoted } from "@/lib/pq-approval";
 import { encryptPII } from "@/lib/pii-crypto";
+import { identityWrites } from "@/lib/people/identity";
 import { requireDivisionAccess } from "@/lib/require-division-access";
 
 async function saveOnboardingDocAttachments(onboardingRequestId: string, formData: FormData, uploadedByName: string | null) {
@@ -329,8 +330,13 @@ export async function updateOnboardingRequest(id: string, formData: FormData): P
     return v ? Number(v) : null;
   };
   const getBool = (name: string) => formData.get(name) === "on";
+  // docs/security/03: identity numbers go through lib/people/identity (blank keeps the stored value).
+  const claims = await currentClaims();
+  if (!claims) throw new Error("Sesi tidak valid, silakan login ulang");
+  const identity = await identityWrites(sql, claims, id, formData, await requestMeta());
 
   await db.update(onboardingRequests).set({
+    ...identity,
     requisition_id: get("requisition_id"),
     ta_pic_name: get("ta_pic_name") ?? "",
     salary_deal_amount: getNum("salary_deal_amount"),
@@ -339,7 +345,6 @@ export async function updateOnboardingRequest(id: string, formData: FormData): P
     end_date: get("end_date"),
     needs_laptop: getBool("needs_laptop"),
     needs_id_card: getBool("needs_id_card"),
-    nik: encryptPII(get("nik")),
     birth_place: get("birth_place"),
     birth_date: get("birth_date"),
     id_card_address: get("id_card_address"),
@@ -350,11 +355,8 @@ export async function updateOnboardingRequest(id: string, formData: FormData): P
     gpa: get("gpa"),
     personal_email: get("personal_email"),
     personal_phone: get("personal_phone"),
-    npwp: encryptPII(get("npwp")),
-    family_card_no: encryptPII(get("family_card_no")),
     marital_status_code: get("marital_status_code"),
     dependent_count: getNum("dependent_count"),
-    bank_account_no: encryptPII(get("bank_account_no")),
     bank_name: get("bank_name"),
     bank_account_holder_name: get("bank_account_holder_name"),
     bank_branch_name: get("bank_branch_name"),

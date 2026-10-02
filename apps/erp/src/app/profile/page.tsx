@@ -5,6 +5,9 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { ProfileForm } from "./profile-form";
+import { SessionsPanel } from "./sessions-panel";
+import { sql } from "@/db";
+import { listSessions, listTrustedBrowsers } from "@/lib/security/session";
 
 export default async function ProfilePage() {
   const session = await getServerSession(authOptions);
@@ -12,6 +15,8 @@ export default async function ProfilePage() {
 
   const [user] = await db.select().from(users).where(eq(users.email, session.user.email as string));
   if (!user) redirect("/login");
+  const [sessions, browsers] = await Promise.all([listSessions(sql, user.id), listTrustedBrowsers(sql, user.id)]);
+  const iso = (d: Date | string) => new Date(d).toISOString();
 
   return (
     <div className="min-h-screen">
@@ -22,6 +27,11 @@ export default async function ProfilePage() {
 
       <main className="px-8 py-8 max-w-lg mx-auto">
         <ProfileForm user={{ full_name: user.full_name, role_title: user.role_title, email: user.email, hasPassword: !!user.password_hash }} />
+        <SessionsPanel
+          currentSid={(session.user as { sid?: string }).sid ?? null}
+          sessions={sessions.map((s) => ({ ...s, created_at: iso(s.created_at), last_seen_at: iso(s.last_seen_at) }))}
+          browsers={browsers.map((b) => ({ id: b.id, device: b.device, created_at: iso(b.created_at), expires_at: iso(b.expires_at) }))}
+        />
       </main>
     </div>
   );

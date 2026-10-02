@@ -4,6 +4,7 @@
 import type { Sql } from "postgres";
 import { canReadModule, MODULES, type Module, type OperationalActor } from "@/lib/operations/policy";
 import { checkSignals } from "@/lib/operations/reader";
+import { identityDocumentStatus } from "@/lib/security/identity-documents";
 import { LEGAL_FORMS, CATALOG, edgeSql, entity as catalogEntity, hrefFor, type CatalogEntity, type EntityType } from "./catalog";
 
 const EDGE_SAMPLE = 5;
@@ -76,6 +77,13 @@ export async function readEntity(sql: Sql, actor: OperationalActor, type: string
     return found;
   });
   if (!row) throw new AgentReadError(404, "NOT_FOUND");
+  const fields = visible
+    .filter((f) => f.sensitivity === "internal")
+    .map((f) => ({ name: f.name, label: f.label, value: format(row[f.name], f.kind) }));
+  if (def.type === "employee") {
+    const status = await ktpStatus(sql, actor, id);
+    if (status) fields.push({ name: "ktp_status", label: "Status KTP", value: status });
+  }
   return {
     schema_version: "1.0",
     as_of: asOf,
@@ -89,9 +97,7 @@ export async function readEntity(sql: Sql, actor: OperationalActor, type: string
       href: hrefFor(def.type, id),
       record_version: def.version ? Number(row.__version) : null,
       as_of: asOf,
-      fields: visible
-        .filter((f) => f.sensitivity === "internal")
-        .map((f) => ({ name: f.name, label: f.label, value: format(row[f.name], f.kind) })),
+      fields,
       commercial: visible
         .filter((f) => f.sensitivity === "commercial")
         .map((f) => ({ name: f.name, label: f.label, state: row[f.name] === null || row[f.name] === undefined ? "kosong" : "terisi" })),
@@ -99,6 +105,22 @@ export async function readEntity(sql: Sql, actor: OperationalActor, type: string
       quality: { version_tracking: Boolean(def.version) },
     },
   };
+}
+
+/**
+ * docs/security/04: the Agent may know whether a KTP exists and whether it was verified, never its content. The same
+ * policy as the ERP UI decides (`identity_document.status`); the Agent never gets a document id, key or bytes.
+ */
+async function ktpStatus(sql: Sql, actor: OperationalActor, employeeId: string): Promise<string | null> {
+  const docs = await identityDocumentStatus(
+    sql,
+    { userId: actor.id ?? "", status: actor.status ?? "", accountType: actor.accountType ?? "backoffice", isOwner: actor.isOwner === true, access: actor.access ?? [], capabilities: [], stepUpAt: null },
+    { employeeId },
+  );
+  const ktp = docs?.find((d) => d.doc_type === "ktp");
+  if (!ktp) return null;
+  const label = { absent: "belum diunggah", uploaded: "diunggah, belum diverifikasi", verified: "terverifikasi", rejected: "ditolak" }[ktp.status];
+  return ktp.verified_at && ktp.status === "verified" ? `${label} (${ktp.verified_at.slice(0, 10)})` : label;
 }
 
 export async function readNeighbours(sql: Sql, actor: OperationalActor, type: string, id: string) {

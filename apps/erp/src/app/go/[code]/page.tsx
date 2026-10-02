@@ -7,6 +7,7 @@ import { getTranslations } from "next-intl/server";
 import { authOptions } from "@/lib/auth";
 import { sql } from "@/db";
 import { peekGrant, redeemGrant } from "@/lib/talent/identity";
+import { markStepUp } from "@/lib/security/session";
 import { GoSignIn, LinkNotice } from "@/components/talent/go";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +23,9 @@ export default async function GoPage({ params }: { params: Promise<{ code: strin
     if (current !== grant.userId) return <LinkNotice title={t("otherTitle")} body={t("otherBody")} kind="other-account" />;
     const redeemed = await redeemGrant(sql, code, current);
     if (!redeemed) return <LinkNotice title={t("invalidTitle")} body={t("invalidBody")} kind="invalid" />;
+    // Opening the current WhatsApp link again is the Talent's recent proof (step-up for their own documents).
+    const sid = (session?.user as { sid?: string } | undefined)?.sid;
+    if (sid) await markStepUp(sql, sid);
     redirect(redeemed.targetPath);
   }
   return <GoSignIn code={code} target={grant.targetPath} />;

@@ -1,6 +1,6 @@
 "use server";
-import { requireActor } from "@/lib/actor";
-import { db } from "@/db";
+import { currentClaims, requestMeta, requireActor } from "@/lib/actor";
+import { db, sql } from "@/db";
 import { employees, employmentContracts, bpjsRegistrations, onboardingRequests } from "@/db/schema";
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
@@ -8,7 +8,7 @@ import { redirect } from "next/navigation";
 import { markSaved } from "@/lib/saved-flag";
 import { logActivity } from "@/lib/activity-log";
 import { requireDivisionAccess } from "@/lib/require-division-access";
-import { encryptPII } from "@/lib/pii-crypto";
+import { identityWrites } from "@/lib/people/identity";
 
 export async function updateEmployee(id: string, formData: FormData) {
   await requireActor();
@@ -146,9 +146,14 @@ export async function updateEmployeePersonalData(employeeId: string, formData: F
     return v ? Number(v) : null;
   };
   const getBool = (name: string) => formData.get(name) === "on";
+  // docs/security/03: identity numbers are written through lib/people/identity (blank keeps the stored value;
+  // a bank-account change needs bank.write + step-up).
+  const claims = await currentClaims();
+  if (!claims) throw new Error("Sesi tidak valid, silakan login ulang");
+  const identity = await identityWrites(sql, claims, employee.onboarding_request_id, formData, await requestMeta());
 
   await db.update(onboardingRequests).set({
-    nik: encryptPII(get("nik")),
+    ...identity,
     birth_place: get("birth_place"),
     birth_date: get("birth_date"),
     available_start_date: get("available_start_date"),
@@ -160,11 +165,8 @@ export async function updateEmployeePersonalData(employeeId: string, formData: F
     gpa: get("gpa"),
     personal_email: get("personal_email"),
     personal_phone: get("personal_phone"),
-    npwp: encryptPII(get("npwp")),
-    family_card_no: encryptPII(get("family_card_no")),
     marital_status_code: get("marital_status_code"),
     dependent_count: getNum("dependent_count"),
-    bank_account_no: encryptPII(get("bank_account_no")),
     bank_name: get("bank_name"),
     bank_account_holder_name: get("bank_account_holder_name"),
     bank_branch_name: get("bank_branch_name"),

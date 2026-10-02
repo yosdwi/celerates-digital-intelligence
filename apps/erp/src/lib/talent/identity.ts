@@ -62,8 +62,10 @@ export async function linkTalentAccount(
   });
 }
 
+/** Revoking the link ends every session of that Talent at once (docs/security/02: sessions rest on the link). */
 export async function revokeTalentLink(sql: Tx, userId: string): Promise<boolean> {
   const rows = await sql`UPDATE talent_identity_links SET status='revoked', revoked_at=now() WHERE user_id=${userId} AND status='active' RETURNING id`;
+  if (rows.length) await sql`UPDATE auth_sessions SET revoked_at=now(), revoke_reason='talent_link_revoked' WHERE user_id=${userId} AND revoked_at IS NULL`;
   return rows.length > 0;
 }
 

@@ -2,7 +2,7 @@ import { db } from "@/db";
 import { employees, onboardingRequests } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
-import { decryptPII } from "@/lib/pii-crypto";
+import { maskIdentity } from "@/lib/people/identity";
 import { updateEmployeePersonalData } from "../../actions";
 import Link from "next/link";
 import { Field as FieldBase, SelectField } from "@/components/form-fields";
@@ -49,7 +49,7 @@ export default async function EditEmployeePersonalDataPage({ params }: { params:
       <main className="px-8 py-8 max-w-5xl mx-auto space-y-8">
         <form action={updateWithId} className="space-y-8">
           <FormSection title={t("personalDataSection")}>
-            <Field label={t("nik")} name="nik" defaultValue={decryptPII(record.nik) ?? ""} />
+            <Field label={t("nik")} name="nik" defaultValue="" placeholder={maskIdentity(record.nik) ?? ""} hint="Kosongkan untuk tetap memakai nilai tersimpan." />
             <Field label={t("birthPlace")} name="birth_place" defaultValue={record.birth_place ?? ""} />
             <Field label={t("birthDate")} name="birth_date" type="date" defaultValue={record.birth_date ?? ""} />
             <Field label={t("availableStartDate")} name="available_start_date" type="date" defaultValue={record.available_start_date ?? ""} />
@@ -61,15 +61,15 @@ export default async function EditEmployeePersonalDataPage({ params }: { params:
             <Field label={t("gpa")} name="gpa" defaultValue={record.gpa ?? ""} />
             <Field label={t("personalEmail")} name="personal_email" type="email" defaultValue={record.personal_email ?? ""} />
             <Field label={t("personalPhone")} name="personal_phone" defaultValue={record.personal_phone ?? ""} />
-            <Field label={t("npwp")} name="npwp" defaultValue={decryptPII(record.npwp) ?? ""} />
-            <Field label={t("familyCardNo")} name="family_card_no" defaultValue={decryptPII(record.family_card_no) ?? ""} />
+            <Field label={t("npwp")} name="npwp" defaultValue="" placeholder={maskIdentity(record.npwp) ?? ""} hint="Kosongkan untuk tetap memakai nilai tersimpan." />
+            <Field label={t("familyCardNo")} name="family_card_no" defaultValue="" placeholder={maskIdentity(record.family_card_no) ?? ""} hint="Kosongkan untuk tetap memakai nilai tersimpan." />
             <SelectField label={t("currentMaritalStatus")} name="marital_status_code" defaultValue={record.marital_status_code ?? ""} options={MARITAL_STATUS} />
             <SelectField
               label={t("dependentCount")} name="dependent_count"
               defaultValue={record.dependent_count?.toString() ?? ""}
               options={[["0","0"],["1","1"],["2","2"],["3","3"],["4","4"],["5","5"],["6","6"],["7","7"],["8","8"],["9","9"],["10","10"],["other","Other"]]}
             />
-            <Field label={t("bankAccountNo")} name="bank_account_no" defaultValue={decryptPII(record.bank_account_no) ?? ""} />
+            <Field label={t("bankAccountNo")} name="bank_account_no" defaultValue="" placeholder={maskIdentity(record.bank_account_no) ?? ""} hint="Kosongkan untuk tetap memakai nilai tersimpan." />
             <Field label={t("bankName")} name="bank_name" defaultValue={record.bank_name ?? ""} />
             <Field label={t("bankAccountHolderName")} name="bank_account_holder_name" defaultValue={record.bank_account_holder_name ?? ""} />
             <Field label={t("bankBranchName")} name="bank_branch_name" defaultValue={record.bank_branch_name ?? ""} />

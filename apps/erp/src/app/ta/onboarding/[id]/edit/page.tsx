@@ -7,7 +7,8 @@ import { updateOnboardingRequest, deleteOnboardingAttachment } from "../../actio
 import { MultiFileUpload } from "@/components/multi-file-upload";
 import { getAttachmentsWithUrlsForManySourceTypes } from "@/lib/attachments";
 import { getPicNames } from "@/lib/reference-data";
-import { decryptPII } from "@/lib/pii-crypto";
+import { maskIdentity } from "@/lib/people/identity";
+import { IdentityDocuments } from "@/components/security/identity-documents";
 import { ONBOARDING_DOC_FIELDS, onboardingDocSource } from "../../constants";
 import { RequisitionPicker } from "@/components/requisition-picker";
 import Link from "next/link";
@@ -112,7 +113,7 @@ export default async function EditOnboardingPage({
           </FormSection>
 
           <FormSection title={t("sectionPersonalData")}>
-            <Field label={t("fields.nik")} name="nik" defaultValue={decryptPII(record.nik) ?? ""} digitsOnly />
+            <Field label={t("fields.nik")} name="nik" defaultValue="" placeholder={maskIdentity(record.nik) ?? ""} hint="Kosongkan untuk tetap memakai nilai tersimpan." digitsOnly />
             <Field label={t("fields.birthPlace")} name="birth_place" defaultValue={record.birth_place ?? ""} />
             <Field label={t("fields.birthDate")} name="birth_date" type="date" defaultValue={record.birth_date ?? ""} />
             <Field label={t("fields.idCardAddress")} name="id_card_address" defaultValue={record.id_card_address ?? ""} textarea />
@@ -123,15 +124,15 @@ export default async function EditOnboardingPage({
             <GpaField label={t("fields.gpa")} name="gpa" defaultValue={record.gpa ?? ""} />
             <Field label={t("fields.personalEmail")} name="personal_email" type="email" defaultValue={record.personal_email ?? ""} />
             <Field label={t("fields.personalPhone")} name="personal_phone" defaultValue={record.personal_phone ?? ""} digitsOnly />
-            <Field label={t("fields.npwp")} name="npwp" defaultValue={decryptPII(record.npwp) ?? ""} digitsOnly />
-            <Field label={t("fields.familyCardNo")} name="family_card_no" defaultValue={decryptPII(record.family_card_no) ?? ""} digitsOnly />
+            <Field label={t("fields.npwp")} name="npwp" defaultValue="" placeholder={maskIdentity(record.npwp) ?? ""} hint="Kosongkan untuk tetap memakai nilai tersimpan." digitsOnly />
+            <Field label={t("fields.familyCardNo")} name="family_card_no" defaultValue="" placeholder={maskIdentity(record.family_card_no) ?? ""} hint="Kosongkan untuk tetap memakai nilai tersimpan." digitsOnly />
             <SelectField label={t("fields.maritalStatus")} name="marital_status_code" defaultValue={record.marital_status_code ?? ""} options={MARITAL_STATUS} />
             <SelectField
               label={t("fields.dependentCount")} name="dependent_count"
               defaultValue={record.dependent_count?.toString() ?? ""}
               options={[["0","0"],["1","1"],["2","2"],["3","3"],["4","4"],["5","5"],["6","6"],["7","7"],["8","8"],["9","9"],["10","10"],["other",t("fields.other")]]}
             />
-            <Field label={t("fields.bankAccountNo")} name="bank_account_no" defaultValue={decryptPII(record.bank_account_no) ?? ""} digitsOnly />
+            <Field label={t("fields.bankAccountNo")} name="bank_account_no" defaultValue="" placeholder={maskIdentity(record.bank_account_no) ?? ""} hint="Kosongkan untuk tetap memakai nilai tersimpan." digitsOnly />
             <Field label={t("fields.bankName")} name="bank_name" defaultValue={record.bank_name ?? ""} />
             <Field label={t("fields.bankAccountHolderName")} name="bank_account_holder_name" defaultValue={record.bank_account_holder_name ?? ""} />
             <Field label={t("fields.bankBranchName")} name="bank_branch_name" defaultValue={record.bank_branch_name ?? ""} />
@@ -229,6 +230,10 @@ export default async function EditOnboardingPage({
             </Link>
           </div>
         </form>
+        {/* docs/security/04: identity documents are not form fields; they go to the encrypted private store. */}
+        <div className="mt-8">
+          <IdentityDocuments subjectKind="onboarding" subjectId={id} />
+        </div>
       </main>
     </div>
   );

@@ -2,7 +2,9 @@ import { db } from "@/db";
 import { employees, employmentContracts, bpjsRegistrations, onboardingRequests, candidates, talentAssignments, requisitions } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { notFound } from "next/navigation";
-import { decryptPII } from "@/lib/pii-crypto";
+import { maskIdentity } from "@/lib/people/identity";
+import { RevealField } from "@/components/security/reveal-field";
+import { IdentityDocuments } from "@/components/security/identity-documents";
 import { getDocumentUrl } from "@/lib/storage";
 import { AddContractForm } from "./add-contract-form";
 import { BpjsRow } from "./bpjs-row";
@@ -140,16 +142,16 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
             </div>
           {onboarding ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
-              <Info label={t("nik")} value={decryptPII(onboarding.nik)} />
+              <RevealField label={t("nik")} masked={maskIdentity(onboarding.nik)} onboardingId={onboarding.id} field="nik" />
               <Info label={t("birthPlaceDate")} value={`${onboarding.birth_place ?? "-"}, ${onboarding.birth_date ?? "-"}`} />
               <Info label={t("personalEmail")} value={onboarding.personal_email} />
               <Info label={t("phoneNumber")} value={onboarding.personal_phone} />
               <Info label={t("idCardAddress")} value={onboarding.id_card_address} />
               <Info label={t("currentAddress")} value={onboarding.current_address} />
-              <Info label={t("npwp")} value={decryptPII(onboarding.npwp)} />
-              <Info label={t("familyCardNo")} value={decryptPII(onboarding.family_card_no)} />
+              <RevealField label={t("npwp")} masked={maskIdentity(onboarding.npwp)} onboardingId={onboarding.id} field="npwp" />
+              <RevealField label={t("familyCardNo")} masked={maskIdentity(onboarding.family_card_no)} onboardingId={onboarding.id} field="family_card_no" />
               <Info label={t("bank")} value={onboarding.bank_name} />
-              <Info label={t("bankAccountNo")} value={decryptPII(onboarding.bank_account_no)} />
+              <RevealField label={t("bankAccountNo")} masked={maskIdentity(onboarding.bank_account_no)} onboardingId={onboarding.id} field="bank_account_no" />
               <Info label={t("emergencyContact")} value={`${onboarding.emergency_contact_name ?? "-"} (${onboarding.emergency_contact_relationship ?? "-"})`} />
               <Info label={t("education")} value={`${onboarding.education_level_code ?? "-"} - ${onboarding.institution_name ?? "-"}`} />
             </div>
@@ -157,6 +159,9 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
             <p className="text-sm text-slate-400">{t("onboardingDataNotFound")}</p>
           )}
         </section>
+
+        {/* docs/security/04: private identity documents (encrypted, capability + step-up, audited) */}
+        <IdentityDocuments subjectKind="employee" subjectId={id} />
 
         {/* Info proses onboarding & dokumen -- ditarik dari TA Onboarding, bukan diketik ulang di HR */}
         {onboarding && (

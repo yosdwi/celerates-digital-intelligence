@@ -17,7 +17,7 @@ test('baseline is repeatable, includes all domains, refuses checksum drift', asy
   try {
     await migrate(url); await migrate(url);
     const [tables] = await sql`SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema='public'`;
-    assert.equal(tables.n, 74);
+    assert.equal(tables.n, 80); // 74 + 6 security tables (0011)
     const [divisions] = await sql`SELECT count(*)::int AS n FROM divisions`;
     assert.equal(divisions.n,9);
     const [owners] = await sql`SELECT count(*)::int AS n FROM users WHERE is_owner`;

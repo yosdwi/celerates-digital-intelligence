@@ -1,174 +1,126 @@
-import { allowLoginAttempt } from "@/lib/login-throttle";
-import { NextAuthOptions } from "next-auth";
-import GoogleProvider from "next-auth/providers/google";
+import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { db } from "@/db";
-import { users, userAccess, divisions, googleTokens } from "@/db/schema";
-import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
-import { isBetaWhitelisted } from "@/lib/beta";
 import { sql } from "@/db";
-import { activeLinkForUser, redeemGrant } from "@/lib/talent/identity";
+import { allowAttempt } from "@/lib/login-throttle";
+import { isBetaWhitelisted } from "@/lib/beta";
+import { redeemGrant } from "@/lib/talent/identity";
+import { audit } from "@/lib/security/audit";
+import { emailOtpRequired } from "@/lib/security/email-otp";
+import {
+  clientMeta, createSession, findTrustedBrowser, loadSession, readCookie, revokeSession, TRUSTED_BROWSER_COOKIE, type AuthMethod, type SessionClaims,
+} from "@/lib/security/session";
 
-// R3.1 (doc 22): sessions do not expire on their own; they end on sign-out, deactivation or, for a Talent, when the
-// identity link the session relies on is revoked. Claims are reloaded from the database on every session read.
-const SESSION_MAX_AGE_SECONDS = 10 * 365 * 24 * 3600;
-const LINK_RECHECK_MS = 5 * 60 * 1000;
+// docs/security/02: the cookie carries only the session id. PostgreSQL (auth_sessions + users) decides on every
+// request whether the session is still valid and what the user may do. This is only the cookie's lifetime.
+const COOKIE_MAX_AGE_SECONDS = 90 * 86_400;
+// bcrypt of a random string: unknown accounts cost the same time as wrong passwords.
+const DUMMY_HASH = "$2b$12$vNzuoeuJ33uo7I72Tc6mmuyodhamln.cvDmmN8JcZgoIV7vmiasN.";
 
-/** A session that can no longer be used: fails the middleware and every server guard (status is not "active"). */
-function endSession<T extends Record<string, unknown>>(token: T): T {
-  return Object.assign(token, { revoked: true, status: "revoked", isOwner: false, access: [], canUseTimesheetConverter: false });
-}
+type Meta = ReturnType<typeof clientMeta>;
 
-
-async function loadUserClaims(email: string) {
-  const [dbUser] = await db.select().from(users).where(eq(users.email, email));
-  if (!dbUser) return null;
-
-  const access = await db
-    .select({ divisionKey: divisions.key, level: userAccess.level })
-    .from(userAccess)
-    .innerJoin(divisions, eq(userAccess.division_id, divisions.id))
-    .where(eq(userAccess.user_id, dbUser.id));
-
-  // Email whitelist saja tidak cukup -- google_sub memastikan email ini benar-benar
-  // diverifikasi lewat login Google, bukan sekadar diklaim lewat form register/credentials.
-  const isVerifiedViaGoogle = dbUser.google_sub !== null;
-
-  return {
-    userId: dbUser.id,
-    status: dbUser.status,
-    isOwner: dbUser.is_owner,
-    fullName: dbUser.full_name,
-    hasRequestedDivision: dbUser.requested_division_id !== null,
-    access,
-    isBetaTester: isVerifiedViaGoogle && isBetaWhitelisted(email),
-    accountType: dbUser.account_type ?? "backoffice",
-    canUseTimesheetConverter: dbUser.can_use_timesheet_converter ?? false,
-  };
+/** Password check shared by the login API (before any email code is sent) and the final sign-in. */
+export async function checkPassword(emailInput: unknown, password: unknown, meta: Meta) {
+  if (typeof emailInput !== "string" || typeof password !== "string" || !emailInput || !password || emailInput.length > 254 || password.length > 72) return null;
+  const email = emailInput.trim().toLowerCase();
+  const allowed = (await allowAttempt(sql, "login:" + email, 20)) && (await allowAttempt(sql, "login-ip:" + meta.ip, 60));
+  const [user] = await sql`SELECT id, email, full_name, password_hash, account_type, status FROM users WHERE email = ${email}`;
+  const usable = allowed && user?.status === "active" && typeof user.password_hash === "string";
+  const valid = await bcrypt.compare(password, usable ? user.password_hash : DUMMY_HASH);
+  if (usable && valid) return user as { id: string; email: string; full_name: string; account_type: string };
+  await audit(sql, { action: "login", decision: "deny", actorUserId: user?.id ?? null, reason: allowed ? "bad_credentials" : "rate_limited", ipHash: meta.ipHash, device: meta.device });
+  return null;
 }
 
 export const authOptions: NextAuthOptions = {
   providers: [
-    ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET ? [GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      authorization: {
-        params: {
-          scope: "openid email profile",
-          access_type: "offline",
-          prompt: "consent",
-        },
-      },
-    })] : []),
     CredentialsProvider({
       name: "Email",
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null;
-        if (credentials.email.length > 254 || credentials.password.length > 72 || !await allowLoginAttempt(credentials.email)) return null;
-        const [user] = await db.select().from(users).where(eq(users.email, credentials.email.trim().toLowerCase()));
-        // R1.4 / R3.3: every active account with a password (backoffice or Talent). The session claims carry the
-        // account type, so a Talent signed in by password is confined exactly like one who came by link.
-        if (!user || user.status !== "active" || !user.password_hash) return null;
-
-        const valid = await bcrypt.compare(credentials.password, user.password_hash);
-        if (!valid) return null;
-
-        return { id: user.id, email: user.email, name: user.full_name };
+      async authorize(credentials, req) {
+        const meta = clientMeta((req?.headers ?? {}) as Record<string, string>);
+        const user = await checkPassword(credentials?.email, credentials?.password, meta);
+        if (!user) return null;
+        // Backoffice: a browser that has not proved the corporate mailbox gets no session (docs/security/02).
+        // Talent accounts with a password keep password-only; their strong path is the WhatsApp link.
+        let method: AuthMethod = "password";
+        const browser = user.account_type === "talent" ? null : await findTrustedBrowser(sql, user.id, readCookie(meta.cookie, TRUSTED_BROWSER_COOKIE));
+        if (user.account_type !== "talent" && emailOtpRequired() && !browser) {
+          await audit(sql, { action: "login", decision: "deny", actorUserId: user.id, reason: "email_verification_required", ipHash: meta.ipHash, device: meta.device });
+          return null;
+        }
+        if (browser?.fresh) method = "password+email_otp";
+        const sid = await createSession(sql, { userId: user.id, method, trustedBrowserId: browser?.id, stepUp: browser?.fresh, device: meta.device, ipPrefix: meta.ipPrefix });
+        await audit(sql, { action: "login", decision: "allow", actorUserId: user.id, sessionId: sid, reason: method, ipHash: meta.ipHash, device: meta.device });
+        return { id: user.id, email: user.email, name: user.full_name, sid };
       },
     }),
-    // ADR-019 §4: a Talent session starts only by redeeming a single-use, expiring deep-link grant bound to an
-    // active, linked Talent account. The grant is consumed here, in the explicit sign-in call -- never on GET.
+    // ADR-019 §4: a Talent session starts only by redeeming a deep-link grant bound to an active, linked Talent
+    // account, in this explicit sign-in call (never on GET). Opening the WhatsApp link is the Talent's recent proof.
     CredentialsProvider({
       id: "talent-link",
       name: "Tautan Talent",
       credentials: { code: { label: "Kode", type: "text" } },
-      async authorize(credentials) {
-        const code = credentials?.code ?? "";
-        const redeemed = await redeemGrant(sql, code);
-        if (!redeemed) return null;
-        return { id: redeemed.userId, email: redeemed.email, name: redeemed.name };
+      async authorize(credentials, req) {
+        const meta = clientMeta((req?.headers ?? {}) as Record<string, string>);
+        const redeemed = await redeemGrant(sql, credentials?.code ?? "");
+        if (!redeemed) {
+          await audit(sql, { action: "login", decision: "deny", reason: "talent_link_invalid", ipHash: meta.ipHash, device: meta.device });
+          return null;
+        }
+        const sid = await createSession(sql, { userId: redeemed.userId, method: "talent_link", stepUp: true, device: meta.device, ipPrefix: meta.ipPrefix });
+        await audit(sql, { action: "login", decision: "allow", actorUserId: redeemed.userId, sessionId: sid, reason: "talent_link", ipHash: meta.ipHash, device: meta.device });
+        return { id: redeemed.userId, email: redeemed.email, name: redeemed.name, sid };
       },
     }),
   ],
   callbacks: {
-    async signIn({ user, account }) {
-      if (account?.provider === "google" && user.email) {
-        const email = user.email.toLowerCase();
-        const [existing] = await db.select().from(users).where(eq(users.email, email));
-        if (!existing) {
-          await db.insert(users).values({
-            email,
-            full_name: user.name ?? email,
-            google_sub: account.providerAccountId,
-            status: "pending",
-          });
-        } else if (!existing.google_sub) {
-          await db.update(users).set({ google_sub: account.providerAccountId }).where(eq(users.id, existing.id));
-        }
-      }
-
-      return true;
-    },
-
     async jwt({ token, user }) {
-      if (token.revoked === true) return endSession(token);
-      const email = (user?.email ?? token.email as string | undefined)?.toLowerCase();
-      if (email) {
-        const claims = await loadUserClaims(email);
-        if (claims) {
-            token.userId = claims.userId;
-            token.status = claims.status;
-            token.isOwner = claims.isOwner;
-            token.fullName = claims.fullName;
-            token.hasRequestedDivision = claims.hasRequestedDivision;
-            token.access = claims.access;
-            token.isBetaTester = claims.isBetaTester;
-            token.accountType = claims.accountType;
-            token.canUseTimesheetConverter = claims.canUseTimesheetConverter;
-        } else {
-            token.userId = undefined; token.status = "rejected"; token.isOwner = false; token.access = [];
-        }
-      }
-      // Talent: the session stays valid while the identity link it started with (or first saw) is active.
-      // A Talent signed in by password before being linked keeps an unlinked session (/me shows "belum terhubung").
-      if (token.accountType === "talent" && token.status === "active" && token.isOwner !== true && typeof token.userId === "string") {
-        const now = Date.now();
-        const checkedAt = typeof token.linkCheckedAt === "number" ? token.linkCheckedAt : 0;
-        if (user || now - checkedAt >= LINK_RECHECK_MS) {
-          const link = await activeLinkForUser(sql, token.userId);
-          const known = typeof token.linkId === "string" ? token.linkId : null;
-          if (!user && known && link?.id !== known) return endSession(token);
-          token.linkId = link?.id ?? null;
-          token.linkCheckedAt = now;
-        }
-      }
-      return token;
+      // Sign-in: the cookie holds the session id and user id, nothing else.
+      if (user) return { sub: user.id, sid: (user as { sid?: string }).sid };
+      const claims = await loadSession(sql, token.sid);
+      // Revoked, expired, unknown or inactive: NextAuth clears the cookie and getServerSession returns null.
+      if (!claims) throw new Error("session_invalid");
+      // Handed to the session callback below, which removes it again before the cookie is re-encoded.
+      return { sub: token.sub, sid: token.sid, claims };
     },
 
     async session({ session, token }) {
-      if (session.user) {
-        Object.assign(session.user, {
-          id: token.userId,
-          status: token.status,
-          isOwner: token.isOwner,
-          fullName: token.fullName,
-          access: token.access,
-          isBetaTester: token.isBetaTester,
-          accountType: token.accountType,
-          canUseTimesheetConverter: token.canUseTimesheetConverter,
-        });
-      }
+      const claims = token.claims as SessionClaims | undefined;
+      delete token.claims;
+      if (!claims) return session;
+      session.user = {
+        id: claims.userId,
+        email: claims.email,
+        name: claims.fullName,
+        sid: claims.sid,
+        status: claims.status,
+        isOwner: claims.isOwner,
+        fullName: claims.fullName,
+        access: claims.access,
+        capabilities: claims.capabilities,
+        stepUpAt: claims.stepUpAt ? new Date(claims.stepUpAt).toISOString() : null,
+        isBetaTester: claims.googleLinked && isBetaWhitelisted(claims.email),
+        accountType: claims.accountType,
+        canUseTimesheetConverter: claims.canUseTimesheetConverter,
+        hasRequestedDivision: claims.hasRequestedDivision,
+      } as typeof session.user;
       return session;
+    },
+  },
+  events: {
+    async signOut({ token }) {
+      const sid = (token as { sid?: unknown } | null)?.sid;
+      if (typeof sid === "string" && (await revokeSession(sql, sid, "logout")))
+        await audit(sql, { action: "logout", decision: "allow", actorUserId: (token?.sub as string) ?? null, sessionId: sid });
     },
   },
   pages: {
     signIn: "/login",
   },
-  session: { strategy: "jwt", maxAge: SESSION_MAX_AGE_SECONDS, updateAge: 24 * 3600 },
-  jwt: { maxAge: SESSION_MAX_AGE_SECONDS },
+  session: { strategy: "jwt", maxAge: COOKIE_MAX_AGE_SECONDS, updateAge: 24 * 3600 },
+  jwt: { maxAge: COOKIE_MAX_AGE_SECONDS },
 };

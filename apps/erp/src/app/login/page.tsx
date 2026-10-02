@@ -90,7 +90,7 @@ export default function LoginPage() {
 
             <div className="mt-7">
               <Suspense fallback={<div className="text-sm text-slate-400">Memuat...</div>}>
-                <LoginForm googleEnabled={Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)} />
+                <LoginForm />
               </Suspense>
             </div>
           </div>
