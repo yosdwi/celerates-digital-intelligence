@@ -112,17 +112,20 @@ browser without a second code. The response is identical whether or not the emai
 
 **Decision (owner, 2026-10-02):** the owner has no access to the `celerates.com` cPanel, so a `noreply@celerates.com`
 mailbox (review option A) is not possible. The sender is Google Workspace **`celerates.co.id`** over SMTP submission
-(`smtp.gmail.com:587`, STARTTLS required) with an **App Password**. The code still proves control of the recipient's
+(`smtp.gmail.com:587`, STARTTLS required) with an **App Password** of `celeratesapps@celerates.co.id`. The code still proves control of the recipient's
 `@celerates.com` mailbox; the sender domain does not need to match. `nodemailer` 7.0.13 was added (the version range
 `next-auth` 4.24 accepts). Resend was not used: its key is unset everywhere and it would need DNS changes on Dewaweb.
 
-**Status: waiting for the App Password.** Only the account owner can create one (Google Account → Security →
-2-Step Verification on → App passwords). Steps, in the owner's own SSH terminal (not in a chat):
+**Status (2026-10-02 08:5x UTC): configured.** App Password of `celeratesapps@celerates.co.id` stored in
+`/etc/celerates/secrets/smtp-password` (uid 1000, 0400, mounted read-only); SMTP AUTH over STARTTLS verified from the
+container; a test message to the sender's own mailbox was accepted (`250 2.0.0 OK`). Delivery to an `@celerates.com`
+mailbox (via `dewaspamguard`) still has to be confirmed by someone who can read one. To replace the password
+(the owner, in their own SSH terminal; `bash`, because Debian's `sh` cannot read silently):
 
 ```bash
-# 1. Store it (the prompt does not echo; spaces are removed). Readable by the container user only.
-sudo sh -c 'umask 077; read -rs -p "App Password: " p; echo; printf %s "$p" | tr -d " " > /etc/celerates/secrets/smtp-password; chown 1000:1000 /etc/celerates/secrets/smtp-password; chmod 400 /etc/celerates/secrets/smtp-password'
-# 2. Configure (replace the account if a dedicated sender such as noreply-erp@celerates.co.id is created).
+# 1. Store it (no echo; spaces and the paste's trailing CR are removed). Prints 16 when correct.
+sudo bash -c 'umask 077; read -rs -p "App Password: " p; echo; printf %s "$p" | tr -d " \r" > /etc/celerates/secrets/smtp-password; chown 1000:1000 /etc/celerates/secrets/smtp-password; chmod 400 /etc/celerates/secrets/smtp-password; wc -c < /etc/celerates/secrets/smtp-password'
+# 2. Configure (already present in celerates-erp.env; change the account if a dedicated sender is created).
 sudo sh -c 'cat >> /etc/celerates/secrets/celerates-erp.env <<EOF
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
