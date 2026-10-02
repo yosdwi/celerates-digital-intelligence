@@ -58,9 +58,21 @@ export async function deleteEmployee(id: string): Promise<DeleteResult> {
   }
   const [employee] = await db.select().from(employees).where(eq(employees.id, id));
   if (!employee) return { ok: false, error: "Employee tidak ditemukan" };
-  await db.delete(employmentContracts).where(eq(employmentContracts.employee_id, id));
-  await db.delete(bpjsRegistrations).where(eq(bpjsRegistrations.employee_id, id));
-  await db.delete(employees).where(eq(employees.id, id));
+  // Identity documents are never deleted as a side effect (docs/security/04: retention is a separate decision).
+  const [docs] = await sql`SELECT count(*)::int AS n FROM identity_documents WHERE subject_employee_id = ${id} AND deleted_at IS NULL`;
+  if (docs.n > 0) return { ok: false, error: "Karyawan ini masih punya dokumen identitas terenkripsi, jadi tidak bisa dihapus." };
+  // One transaction: a refused delete must not leave contracts/BPJS already gone.
+  try {
+    await db.transaction(async (tx) => {
+      await tx.delete(employmentContracts).where(eq(employmentContracts.employee_id, id));
+      await tx.delete(bpjsRegistrations).where(eq(bpjsRegistrations.employee_id, id));
+      await tx.delete(employees).where(eq(employees.id, id));
+    });
+  } catch (e) {
+    if ((e as { cause?: { code?: string } }).cause?.code === "23503")
+      return { ok: false, error: "Karyawan ini masih dipakai data lain (penugasan, absensi, atau dokumen), jadi tidak bisa dihapus." };
+    throw e;
+  }
   await logActivity("hr", "delete", `Employee: ${employee?.employee_no ?? id}`, "Employee");
   revalidatePath("/hr");
   return { ok: true };
