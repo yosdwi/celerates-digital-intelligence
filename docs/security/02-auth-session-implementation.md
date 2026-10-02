@@ -118,8 +118,8 @@ mailbox (review option A) is not possible. The sender is Google Workspace **`cel
 
 **Status (2026-10-02 08:5x UTC): configured.** App Password of `celeratesapps@celerates.co.id` stored in
 `/etc/celerates/secrets/smtp-password` (uid 1000, 0400, mounted read-only); SMTP AUTH over STARTTLS verified from the
-container; a test message to the sender's own mailbox was accepted (`250 2.0.0 OK`). Delivery to an `@celerates.com`
-mailbox (via `dewaspamguard`) still has to be confirmed by someone who can read one. To replace the password
+container; a test message to the sender's own mailbox was accepted (`250 2.0.0 OK`), and a test in the login-code format sent to an
+`@celerates.com` mailbox at 09:10 UTC arrived in the **Inbox** (confirmed by the owner; through `dewaspamguard`). To replace the password
 (the owner, in their own SSH terminal; `bash`, because Debian's `sh` cannot read silently):
 
 ```bash

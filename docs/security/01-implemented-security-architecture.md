@@ -131,9 +131,8 @@ All steps are reversible; take them in this order and only as far as needed.
 
 ## 7. Known limitations
 
-- **Delivery to `@celerates.com` not yet confirmed.** Codes are sent through Gmail (`celeratesapps@celerates.co.id`,
-  SMTP verified, test message accepted); arrival in a Dewaweb mailbox (inbox vs spam) still needs one real check.
-  If mail fails, the operator break-glass code still works.
+- **Codes depend on Gmail and the Dewaweb spam gateway.** Delivery to an `@celerates.com` inbox was confirmed on
+  2026-10-02; there is no delivery monitoring yet. If mail fails, the operator break-glass code still works.
 - **Bank-account changes by HR** need a fresh step-up, but the edit form has no "Confirm it's you" dialog: the user must
   confirm first (any *Tampilkan* button) and then save within 10 minutes; otherwise the save fails with a generic error.
 - **Blank identity fields keep the stored value**; an identity number cannot be cleared from the form.
@@ -158,8 +157,7 @@ All steps are reversible; take them in this order and only as far as needed.
 
 ## 9. Not implemented (exact)
 
-From the M0–M4 request: nothing in the definition of done is missing; only the first real delivery to an
-`@celerates.com` inbox remains to be observed.
+From the M0–M4 request: nothing in the definition of done is missing.
 Outside M0–M4 or deferred by decision: SSH hardening, tunnel-token rotation, backup automation and restore drill,
 Railway retirement, Intelligence non-root container, Agent dataset egress guard (R11.2) and model egress policy/log
 (Phase 6), compensation module (Phase 5), `identity.read` enforcement on non-number fields, Talent link browser binding

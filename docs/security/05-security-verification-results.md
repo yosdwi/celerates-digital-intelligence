@@ -124,4 +124,5 @@ by the ERP afterwards); UPDATE, DELETE, TRUNCATE, `DISABLE TRIGGER`, DROP, `ALTE
 | raw stored object is ciphertext | security.test; security-http; pilot |
 
 Not exercised at runtime (covered by tests only): Talent sessions on the pilot (would need a ConForm-linked test
-Talent), Agent `ktp_status` through Intelligence, real OTP email to an `@celerates.com` inbox (SMTP configured and verified; first inbox check pending).
+Talent), Agent `ktp_status` through Intelligence, a real login code to an `@celerates.com` inbox (a test in the same format arrived in the Inbox on 2026-10-02 09:10 UTC;
+SMTP AUTH over STARTTLS verified).
