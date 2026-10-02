@@ -134,7 +134,7 @@ SMTP_FROM=Celerates ERP <celeratesapps@celerates.co.id>
 SMTP_PASSWORD_FILE=/run/secrets/smtp-password
 EOF'
 # 3. Recreate the ERP container (the run script mounts smtp-password once it exists; ~30 s restart).
-/opt/celerates-digital-intelligence/infra/pilot/celerates-run.sh erp celerates-erp:c5c163a
+/opt/celerates-digital-intelligence/infra/pilot/celerates-run.sh erp   # celerates-erp:pilot = current build
 # 4. Test: sign in from a private window with an @celerates.com account whose mailbox someone can read; check inbox and spam.
 ```
 
