@@ -1,5 +1,7 @@
 # GPT Astra Work Handoff — ERP Audit & Production Readiness
 
+> **Historical handoff notice (2026-10-04):** This file records the earlier audit/productionization workstream. Do not use its Railway or snapshot-era assumptions as current target architecture. Current product/system-boundary direction is governed by `docs/01-product-and-architecture.md`, `docs/05-execution-plan.md`, and ADR-020. The audit evidence remains useful as historical evidence.
+
 ## Mission
 
 Audit the supplied Celerates ERP snapshot independently and turn the findings into a production-readiness and implementation plan that supports the Celerates Digital Intelligence roadmap.
