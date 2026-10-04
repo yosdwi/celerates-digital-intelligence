@@ -285,7 +285,7 @@ Examples:
 - BAST exception is resolved -> exception closes because ERP state changes.
 - Human Service case is answered -> case/outcome is recorded and can improve knowledge curation.
 
-## 6. Deterministic vs generative boundary
+## 7. Deterministic vs generative boundary
 
 ### Deterministic / trusted source
 
@@ -311,7 +311,7 @@ Examples:
 
 AI may explain and prepare; it must not fabricate authoritative facts.
 
-## 7. Strategic positioning
+## 8. Strategic positioning
 
 The differentiator is not “Celerates has GPT”. The reusable capability is the combination of:
 
@@ -327,18 +327,18 @@ The differentiator is not “Celerates has GPT”. The reusable capability is th
 
 This enables Celerates to prove the capability internally first and later productize reusable patterns for client digitalization/intelligence engagements.
 
-## 8. Infrastructure is a sizing decision, not a brand decision
+## 9. Infrastructure is portable and sized from evidence
 
-The permanent hosting provider is not yet locked by architecture. Current/proposed providers can be used for POC or transition, but the next production choice should be based on measured requirements for:
+The current production baseline is the approved Hostinger VPS target described in ADR-020, initially using the KVM 4 class. This is a deployment decision, not an application coupling.
 
-- ERP web/backend;
+The stack remains Docker-based and portable. Initial components may share one VPS:
+
+- ERP web/runtime;
 - PostgreSQL;
 - Intelligence API/worker;
-- object storage;
-- optional Redis;
-- Model Gateway;
-- tracing/evaluation;
-- optional n8n;
-- user count and workload pattern.
+- private object storage;
+- self-hosted observability;
+- optional Redis/n8n only when useful;
+- Model Gateway boundary.
 
-Provider selection should follow workload sizing and operational requirements rather than drive the architecture itself.
+Scale-up or component separation should follow measured CPU, RAM, storage, concurrency, retention, reliability and recovery requirements. Cost figures and renewal assumptions are maintained in the management spreadsheet, not duplicated in architecture docs.
