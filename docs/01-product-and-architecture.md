@@ -2,59 +2,133 @@
 
 ## 1. Problem statement
 
-Celerates already has an ERP and existing digital workflows. The next problem is not “build an ERP” and not “add a chatbot”. The problem is to make Celerates operational data and institutional knowledge usable as a reliable intelligence capability across Sales/Pre-Sales, operations, talent/people service, and management.
+Celerates already has a broad ERP baseline and several existing operational systems. The next problem is not “build another ERP”, “replace every existing SaaS”, or “add a chatbot”. The problem is to mature Celerates into a reliable **Digital Operational Core**: connected cross-division workflows, clear data ownership, low-friction user experience, and trusted operational state that can later support Intelligence.
 
-Today business information can originate from Excel/CSV, Jira, databases, documents, forms, APIs, Google Sheets, and manual operational processes. Many of these are **current/transitional sources**, not the target operating model. The target is for users to work primarily through Celerates ERP where the relevant business workflow has matured.
+Business information can still originate from Excel/CSV, Jira, databases, documents, forms, Google Sheets, ConForm/PAMA integrations, Mekari Talenta and other specialist systems. These sources do not all have the same target treatment. Some are transitional and should be migrated or retired; some specialist capabilities may remain external when they are already mature and economically sensible.
 
-The ERP remains the place where canonical business state is managed. Intelligence should consume trusted ERP context plus curated knowledge, use models safely, and return useful work products and actions back into business workflows.
+The target therefore is **capability-driven**, not vendor-replacement-driven.
 
-## 2. Transformation storyline
+> **Apps adapt to user workflow, not the opposite.**
+
+> **Configuration before customization.**
+
+> **ERP maturity and trusted operational data come before Intelligence becomes the centre of value.**
+
+## 2. Product and operating principles
+
+### 2.1 Business capability architecture is not the sidebar
+
+Logical ownership is organized by business capability/domain, while navigation is organized around the user's job.
+
+A useful domain view is:
+
+- **Commercial** — Marketing, Sales, Opportunity, Pre-Sales;
+- **People / HRIS** — Recruitment, Onboarding, Employee, Talent, Attendance, Leave, Roster, Compensation, Learning;
+- **Project Operations** — Project, Allocation, Task, Timesheet, Evidence, BAST;
+- **Finance** — Billing, Invoice, Payroll-facing handoff, Payment, Closing;
+- **Corporate Services** — Approval, Document, E-signature, Notification, Audit.
+
+A role-based workspace may combine several of those domains. Talent self-service can show Attendance, Timesheet, Tasks and HR services without requiring the user to understand which backend domain or provider owns each capability.
+
+Navigation changes are therefore validated by user workflow and pilot evidence; architecture changes do not automatically require a wholesale sidebar redesign.
+
+### 2.2 Reusable interaction system
+
+Celerates should converge on a consistent ERP interaction grammar:
+
+`Workspace · List · Table · Kanban · Form · Record Detail · Search · Filter · Saved View · Status · Workflow · Approval · Quick/Bulk Action · History`.
+
+Use configuration and reusable patterns before one-off custom screens:
+
+1. **User preference** — saved filters/views, visible columns, sort and dashboard preference.
+2. **Admin/business configuration** — required/visible fields, workflow/approval route, reference/master data.
+3. **Product development** — new business process, complex domain rule, integration or genuinely new interaction.
+
+This is not a requirement to build a generic no-code platform first. It is a guardrail against turning every user request into bespoke code.
+
+### 2.3 Capability-driven system ownership
+
+For every overlapping capability, choose one explicit direction:
+
+- **retain** — the existing specialist system remains the authority;
+- **integrate** — the capability stays external but Celerates consumes or links it through a governed contract;
+- **migrate** — authority moves to Celerates after reconciliation and cut-over;
+- **rebuild** — Celerates implements a business-specific capability because existing options do not fit;
+- **retire** — the old surface/source is removed after replacement is proven.
+
+At every transition stage, each operational datum/process must have one write-owner. Avoid uncontrolled bidirectional synchronization.
+
+Mekari Talenta is therefore not assumed to be removed as an initial objective. Mature commodity HR capabilities such as payroll, roster or payslip may remain external while Celerates focuses engineering effort on differentiating cross-division workflows. The same rule applies to other external systems: keep or migrate them based on business value, control, cost and operational risk.
+
+### 2.4 ERP maturity criteria
+
+A workflow is not mature merely because a screen exists.
+
+It must satisfy:
+
+1. **Flow** — the end-to-end business journey works.
+2. **Data** — required data is complete, reconciled and trusted.
+3. **Experience** — the workflow is easy enough that users do not fall back to spreadsheets/manual work.
+4. **Control** — authorization, approval, audit and security are explicit.
+5. **Adoption** — real users actually execute the workflow.
+
+The dependency is intentional:
+
+`Good UX → User Adoption → Good Data Capture → Trusted Data → Mature Workflow → ERP Source of Truth → Intelligence`.
+
+## 3. Transformation storyline
 
 The target architecture and the migration path are related but should not be confused.
 
 ```text
 CURRENT
-Fragmented operational inputs
-Google Sheets • Excel • Jira • DB • Documents • Forms
+Existing ERP + specialist systems + fragmented operational sources
+Mekari Talenta · ConForm/PAMA · Google Sheets/Excel · Jira · DB · Documents · Manual
         ↓
 TRANSITION
-ERP production access • user review • BA requirement deltas
-workflow hardening • migration • reconciliation • cut-over
+Capability ownership decision
+retain / integrate / migrate / rebuild / retire
+        ↓
+ERP user pilot + workflow hardening + adapters + reconciliation + selective cut-over
         ↓
 TARGET
-Celerates ERP — Digital Operational Core
+Celerates role-based operational experience
+        ↓
+Celerates ERP — Digital Operational Core for owned capabilities
++ governed retained specialist systems
+        ↓
+Trusted operational state
         ↓
 Celerates Intelligence Layer
-        ↓
-Celerates Intelligence Applications
 ```
 
-Key rule:
+Key rules:
 
-> **ERP is the critical dependency, but delivery can run in parallel where integration contracts and source-of-truth boundaries are already stable.**
+> **Mature divisional workflows first; do not make full HRIS replacement a prerequisite for ERP value.**
 
-See `docs/07-meeting-alignment-mas-abi-2026-09-23.md` and `docs/architecture/12-current-transition-target.mmd` for the delivery/transformation view.
+> **ERP is the critical dependency for owned workflows, but delivery can run in parallel where system ownership and contracts are stable.**
 
-## 3. Canonical model
+See `docs/05-execution-plan.md`, `docs/architecture/12-current-transition-target.mmd`, and [`ADR-020`](adr/ADR-020-capability-driven-migration-and-vps-target.md) for the execution and system-boundary decisions.
 
-### Current / Transitional Raw Sources
+## 4. Canonical operating model
 
-Business and operational input can originate from:
+### Current / retained / transitional sources
 
-- Google Sheets / Excel / CSV
-- Jira / external APIs
-- PostgreSQL / SQL Server / legacy databases
-- TOR, RFP, proposal, contract, BAST, CV, policy and other documents
-- Forms
-- Manual input
+Operational input may originate from:
 
-These sources are not themselves the long-term source of truth. They enter through controlled ingestion, validation, migration, or transition workflows.
+- Google Sheets / Excel / CSV;
+- Jira / external APIs;
+- PostgreSQL / SQL Server / legacy databases;
+- TOR, RFP, proposal, contract, BAST, CV, policy and other documents;
+- forms and manual entry;
+- ConForm/PAMA operational integrations during transition;
+- Mekari Talenta or another specialist system for deliberately retained HR capabilities.
 
-For a business process that has successfully moved into ERP, the target is to reduce or retire parallel operational use of spreadsheets/sheets rather than maintain duplicate sources indefinitely.
+These sources do not automatically become permanent peers of ERP, and they do not feed Intelligence around ERP controls. Their authority is explicit per capability.
 
-### Celerates Data Intake
+### Celerates Data Intake & Provider Integration
 
-This is a capability between current/transitional sources and ERP, not a separate business platform.
+This is a capability between source/provider systems and the ERP/domain layer, not a separate business platform.
 
 Responsibilities:
 
@@ -64,31 +138,26 @@ Responsibilities:
 - reconcile conflicts/duplicates;
 - preserve source provenance and ingestion audit;
 - route rejected/conflicting records for review;
-- support migration/cut-over from siloed sources;
-- commit approved operational state to ERP.
+- support migration/cut-over from transitional sources;
+- support governed reads from retained specialist systems;
+- commit approved operational state only to the designated write-owner.
 
-Primary implementation is Python Integration Core. n8n is a supporting low-code integration/automation surface.
+Primary critical integration logic remains testable code in Git. n8n is a supporting low-code connector/automation surface where appropriate.
+
+UI and business-domain code should depend on stable domain/provider contracts rather than directly on Google Sheet, ConForm, Talenta or another provider schema.
 
 ### Celerates ERP — Digital Operational Core
 
-The existing ERP remains the canonical operational source of truth and is the **critical near-term product foundation**.
+The existing ERP remains the critical near-term product foundation.
 
-Typical responsibility:
+It owns canonical state for the workflows and capabilities that have been validated and cut over, including business/master data, customer/opportunity state, employee/talent/project context, workflows/approvals, project delivery, documents/evidence and finance-related operational state as those domains mature.
 
-- business/master data;
-- customer and opportunity state;
-- employee/talent/capability data;
-- project and allocation state;
-- workflows and approvals;
-- contracts, timesheet, BAST, invoice and finance-related operational state;
-- identity/RBAC/audit within the ERP domain.
+The ERP should not be rebuilt from zero unless a concrete blocker demands it. Improve the existing baseline incrementally and let actual user usage expose service-specific requirements.
 
 #### ERP maturity loop
 
-The ERP should mature through real usage rather than requirement guessing alone:
-
 ```text
-ERP available to users
+ERP available to selected users
       ↓
 User runs real workflow
       ↓
@@ -101,9 +170,7 @@ Web team implements
 Release and review again
 ```
 
-The ERP should not be rebuilt from zero unless a concrete blocker demands it. Improve the existing baseline incrementally and let actual user usage expose service-specific requirements.
-
-The intelligence layer should integrate through controlled APIs/read models/events/actions rather than making arbitrary direct writes to the ERP database.
+The Intelligence layer integrates through controlled APIs/read models/events/actions rather than arbitrary direct ERP database writes.
 
 ### Celerates Intelligence Layer
 
@@ -167,7 +234,7 @@ They may surface through web workspace, contextual copilot, in-app notification,
 
 A channel is not an application. For example, Exception Management can appear in the web Action Center, an in-app notification, a WhatsApp escalation, and management summary while remaining one business capability.
 
-## 4. Application intent clarified by stakeholder discussion
+## 5. Intelligence application intent
 
 ### Pre-Sales Intelligence
 
@@ -204,7 +271,7 @@ Can include employee/talent chatbot, confirmation flows, reminders, service ques
 
 Management Intelligence should explain **what changed, why it matters, what is causing it, who owns it, and what action needs attention**, not merely provide another dashboard.
 
-## 5. Closed-loop behaviour
+## 6. Closed-loop behaviour
 
 The platform must not stop at “AI generated an answer”.
 
@@ -218,7 +285,7 @@ Examples:
 - BAST exception is resolved -> exception closes because ERP state changes.
 - Human Service case is answered -> case/outcome is recorded and can improve knowledge curation.
 
-## 6. Deterministic vs generative boundary
+## 7. Deterministic vs generative boundary
 
 ### Deterministic / trusted source
 
@@ -244,7 +311,7 @@ Examples:
 
 AI may explain and prepare; it must not fabricate authoritative facts.
 
-## 7. Strategic positioning
+## 8. Strategic positioning
 
 The differentiator is not “Celerates has GPT”. The reusable capability is the combination of:
 
@@ -260,18 +327,18 @@ The differentiator is not “Celerates has GPT”. The reusable capability is th
 
 This enables Celerates to prove the capability internally first and later productize reusable patterns for client digitalization/intelligence engagements.
 
-## 8. Infrastructure is a sizing decision, not a brand decision
+## 9. Infrastructure is portable and sized from evidence
 
-The permanent hosting provider is not yet locked by architecture. Current/proposed providers can be used for POC or transition, but the next production choice should be based on measured requirements for:
+The current production baseline is the approved Hostinger VPS target described in ADR-020, initially using the KVM 4 class. This is a deployment decision, not an application coupling.
 
-- ERP web/backend;
+The stack remains Docker-based and portable. Initial components may share one VPS:
+
+- ERP web/runtime;
 - PostgreSQL;
 - Intelligence API/worker;
-- object storage;
-- optional Redis;
-- Model Gateway;
-- tracing/evaluation;
-- optional n8n;
-- user count and workload pattern.
+- private object storage;
+- self-hosted observability;
+- optional Redis/n8n only when useful;
+- Model Gateway boundary.
 
-Provider selection should follow workload sizing and operational requirements rather than drive the architecture itself.
+Scale-up or component separation should follow measured CPU, RAM, storage, concurrency, retention, reliability and recovery requirements. Cost figures and renewal assumptions are maintained in the management spreadsheet, not duplicated in architecture docs.

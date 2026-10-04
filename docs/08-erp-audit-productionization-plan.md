@@ -1,5 +1,7 @@
 # ERP Audit & Productionization Plan
 
+> **Historical planning notice (2026-10-04):** This remains an audit-era productionization plan. The Railway target described below is superseded by ADR-020 and the current portable VPS direction. Preserve this document for audit history; use `docs/05-execution-plan.md` for the active delivery plan.
+
 ## Objective
 
 Turn the current Celerates ERP from a broad but still evolving internal application into a **production-like operational core** that can be used by real users for structured review, feedback and iterative hardening, while preparing a controlled integration boundary for the Celerates Intelligence Layer.
