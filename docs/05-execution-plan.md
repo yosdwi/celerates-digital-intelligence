@@ -2,99 +2,205 @@
 
 ## Objective
 
-Move from architecture to a functional, presentation-ready baseline quickly, without creating throwaway code, while aligning delivery with the confirmed dependency that **ERP is the Digital Operational Core and the critical near-term foundation**.
+Move Celerates from a broad existing ERP baseline into a production-usable Digital Operational Core while real users validate workflows, data ownership and usability. Intelligence continues in parallel only where ERP/system boundaries are stable.
 
-This plan has two views:
+This plan deliberately separates:
 
-1. **Transformation roadmap** — how Celerates moves from fragmented operations to ERP-centered digital operations and then intelligence.
-2. **Product implementation roadmap** — how this repository continues delivering functional intelligence capability without waiting for every ERP detail to be finalized.
+1. **Management Timeline** — the Oct 2026 to Feb 2027 delivery view used for alignment.
+2. **Detailed execution/WBS** — the task-level breakdown maintained in the project spreadsheet.
+3. **Repository product implementation track** — the implementation sequence for the Intelligence foundation in this repository.
 
-The phases are dependencies, not a rigid waterfall. Parallel work is allowed when contracts and source-of-truth boundaries are stable.
+The plan is not a rigid waterfall. Documentation, pilot feedback and implementation run in parallel.
+
+## Delivery rules
+
+- **Mature divisional workflows first.** Prioritize the connected Celerates service lifecycle before rebuilding commodity SaaS features.
+- **Capability-driven migration.** For overlapping functions choose `retain / integrate / migrate / rebuild / retire`.
+- **One write-owner.** Every operational state has one authority at a given transition stage.
+- **Role-based experience.** Navigation follows the user's job; it does not need to mirror domain ownership.
+- **Pilot early.** Do not wait for perfect documentation before selected users exercise real workflows.
+- **Intelligence downstream.** AI consumes trusted governed context and cannot become operational truth.
+- **Portable production.** Target deployment is Docker-based on the approved VPS baseline; historical provider-specific pilots are not target architecture.
 
 ---
 
-## Transformation Phase A — Cloud / delivery foundation
+## Timeline — Oct 2026 to Feb 2027
 
-Deliver / decide:
+### October 2026 — Alignment & Pilot
 
-- production-like hosting for ERP user review;
-- domain / reverse proxy / Cloudflare where appropriate;
-- PostgreSQL persistence;
-- document/object storage where required;
-- baseline monitoring / backup expectations;
-- infrastructure sizing before locking a long-term provider.
+Focus:
 
-Exit condition: real users can access the ERP outside local development reliably enough for structured review.
+- lock the high-level architecture and product principles;
+- confirm priority workflows and system boundaries;
+- review the production security baseline;
+- establish role-based workspace/navigation direction;
+- release selected ERP workflows to pilot users;
+- start one feedback/backlog loop;
+- prepare initial technical and cost assumptions.
 
-## Transformation Phase B — ERP hardening through real user review
+Exit / gate:
 
-Deliver:
+- selected users can access the system safely;
+- priority workflow scenarios can be executed;
+- architecture and known boundary assumptions are explicit;
+- user feedback enters one governed backlog.
 
-- deploy existing ERP baseline rather than redesign from zero;
-- let users execute actual service workflows;
-- Business Analyst captures service-specific requirement deltas;
-- improve forms, flow, approval, data model, UX, RBAC/audit as required;
-- release incrementally and repeat user review.
+### November 2026 — Validate & Fix
 
-Core loop:
+Focus:
+
+- user shadowing and BA requirement capture;
+- P0/P1 workflow and UX remediation;
+- source-of-truth mapping;
+- prioritize Talenta, ConForm/PAMA and other provider adapters only where needed;
+- validate cross-module handoffs;
+- reconcile critical data gaps.
+
+Exit / gate:
+
+- priority workflows are usable end-to-end;
+- there is no critical access/security blocker;
+- data ownership and retained external-system boundaries are clearer;
+- fallback to uncontrolled manual/spreadsheet work is reduced.
+
+### December 2026 — Consolidate & Mature
+
+Focus:
+
+- scale reusable ERP interaction patterns;
+- execute priority data migration/reconciliation;
+- implement selected integrations;
+- mature PMO/Finance and other cross-division handoffs;
+- demonstrate one Intelligence vertical slice only on trusted operational data.
+
+Exit / gate:
+
+- selected workflows are stable enough for broader rollout;
+- source ownership and transition dependencies are explicit;
+- selected integrations are live and governed;
+- Intelligence demonstrates value without bypassing ERP authority.
+
+### January 2027 — Production Rollout
+
+Focus:
+
+- controlled rollout of validated divisions/workflows;
+- monitoring and operational runbook;
+- independent security retest;
+- infrastructure sizing from measured workload;
+- adoption, reliability and actual operating-cost measurement.
+
+Exit / gate:
+
+- selected priority workflows are production-usable;
+- production monitoring/runbook and security evidence exist;
+- management has real adoption, reliability and cost evidence for scale decisions.
+
+### February 2027 — Stabilization & Next Roadmap
+
+Focus:
+
+- close remaining high-impact gaps;
+- retire legacy surfaces only where replacement is proven;
+- optimize usability and integrations;
+- hand over operating procedures;
+- define the next roadmap from measured outcomes.
+
+Exit / gate:
+
+- no unresolved P0 blocker in rolled-out workflows;
+- legacy retirement is explicit and evidence-based;
+- next investment priorities are agreed from usage data.
+
+---
+
+## Transformation workstreams
+
+### A. ERP workflow maturity and adoption
+
+Run the recurring loop:
 
 ```text
-User tries ERP
-   ↓
-BA captures delta
-   ↓
-Tech Lead reviews / prioritizes
-   ↓
-Web developer implements
-   ↓
+Selected user runs ERP workflow
+        ↓
+BA captures evidence / requirement delta
+        ↓
+Tech Lead triages business + architecture impact
+        ↓
+Implementation
+        ↓
 Release
-   ↓
-User reviews again
+        ↓
+User validates again
 ```
 
-Exit condition: priority business workflows are usable in ERP with known remaining gaps rather than hidden assumptions.
+A feature is not considered mature until Flow, Data, Experience, Control and Adoption are sufficiently proven.
 
-## Transformation Phase C — source consolidation and cut-over
+### B. Source ownership, integration and migration
 
-Deliver:
+For each capability/source:
 
-- inventory current Google Sheets / Excel / siloed operational sources;
-- map each source to ERP ownership or retained external-source responsibility;
-- migration/import mapping;
-- deterministic validation and reconciliation;
-- parallel-run only where necessary;
-- cut-over plan per business process;
-- provenance / audit for migrated data.
+1. identify the current authority and users;
+2. decide retain, integrate, migrate, rebuild or retire;
+3. define the target write-owner and conflict policy;
+4. implement adapter/import/reconciliation if needed;
+5. parallel-run only where necessary;
+6. cut over and retire duplicates only after validation.
 
-Exit condition: processes owned by ERP no longer depend on uncontrolled duplicate operational spreadsheets as the primary working surface.
+Mekari Talenta is not assumed to be removed as an initial objective. A retained specialist capability may remain authoritative behind a governed adapter.
 
-## Transformation Phase D — Intelligence foundation
+ConForm/PAMA integrations are treated as transitional operational dependencies where still required. Their user-facing replacement/cut-over follows proven ERP capability, not a big-bang rewrite.
 
-Deliver:
+### C. Security and production readiness
 
-- ERP read/event/action adapter contracts;
-- Context & Knowledge layer;
-- PostgreSQL + pgvector + PostgreSQL FTS;
-- document/object knowledge path;
-- FastAPI Intelligence API;
-- LangGraph workflow orchestration;
-- LiteLLM Model Gateway;
-- Langfuse tracing/evaluation boundary;
-- deterministic rules / exception engine;
-- human review / controlled action pattern.
+Maintain the current security baseline and close remaining production gaps:
 
-Exit condition: Intelligence applications can consume trusted ERP context and knowledge through stable boundaries without direct schema coupling.
+- revocable sessions and lifecycle;
+- role/capability authorization and record boundaries;
+- sensitive-data classification and private documents;
+- audit and step-up for sensitive operations;
+- backup/restore;
+- observability;
+- deployment/rollback;
+- independent security testing before broad rollout.
 
-## Transformation Phase E — Intelligence applications
+### D. Portable infrastructure
 
-Deliver progressively:
+Initial target topology:
 
+```text
+Internet / Cloudflare
+        ↓
+Hostinger VPS baseline
+        ↓
+Docker runtime
+├ ERP Web / services
+├ Intelligence API / workers
+├ PostgreSQL
+├ Private S3-compatible object storage
+└ Self-hosted observability
+```
+
+The baseline remains intentionally small. Scale the VPS or separate components only when measured CPU, RAM, storage, concurrency, retention or reliability requirements justify it.
+
+Cost values live in the management spreadsheet rather than this architecture document.
+
+### E. Intelligence foundation and applications
+
+Deliver progressively only on governed operational context:
+
+- ERP READ / EVENT / ACTION contracts;
+- Context & Knowledge;
+- Model Gateway;
 - Pre-Sales Intelligence;
 - Exception Management;
 - Human Services;
-- Management Intelligence.
+- Management Intelligence;
+- feedback/outcome evaluation.
 
-Exit condition: each application has at least one complete real workflow with trusted input, structured output, human/control point, and ERP feedback where applicable.
+The closed loop remains:
+
+`ERP state → Intelligence → reviewed/controlled output → ERP action/state → outcome/evaluation`.
 
 ---
 
