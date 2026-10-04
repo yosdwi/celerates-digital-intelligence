@@ -108,7 +108,7 @@ Key rules:
 
 > **ERP is the critical dependency for owned workflows, but delivery can run in parallel where system ownership and contracts are stable.**
 
-See `docs/05-execution-plan.md`, `docs/architecture/12-current-transition-target.mmd`, and ADR-020 for the execution and system-boundary decisions.
+See `docs/05-execution-plan.md`, `docs/architecture/12-current-transition-target.mmd`, and [`ADR-020`](adr/ADR-020-capability-driven-migration-and-vps-target.md) for the execution and system-boundary decisions.
 
 ## 4. Canonical operating model
 
@@ -172,3 +172,173 @@ Release and review again
 
 The Intelligence layer integrates through controlled APIs/read models/events/actions rather than arbitrary direct ERP database writes.
 
+### Celerates Intelligence Layer
+
+This is the new shared intelligence capability above ERP. It has three major internal concerns.
+
+#### A. Context & Knowledge
+
+Provides the evidence required for intelligent work:
+
+- structured business context from ERP read tools/models;
+- approved historical project/proposal knowledge;
+- documents and extracted structure;
+- search/retrieval indexes;
+- metadata and entity relationships;
+- access metadata and provenance;
+- freshness/version metadata.
+
+Important: this is not “copy all ERP data into a vector database”. Current structured business state should generally be read as structured data; semantic retrieval is for knowledge/document similarity and contextual evidence.
+
+#### B. Intelligence Core
+
+Coordinates how work is performed:
+
+- retrieval and hybrid search;
+- context assembly;
+- business rules and policy checks;
+- ERP/tool calls;
+- stateful reasoning workflows;
+- human review/approval checkpoints;
+- exception context enrichment;
+- structured artifact generation;
+- controlled automation coordination;
+- guardrails and evaluation hooks.
+
+#### C. Model Gateway
+
+A first-class capability, not a hard-coded provider.
+
+Responsibilities:
+
+- OpenAI / Anthropic / Gemini / open-source access;
+- provider abstraction;
+- model selection per workload;
+- fallback/retry;
+- budget/cost visibility;
+- quality/latency benchmarking;
+- future policy-based routing.
+
+The Model Gateway is important to the Intelligence Layer, but deterministic workflows do not become LLM-dependent just because the gateway exists.
+
+### Celerates Intelligence Applications
+
+These are business capabilities built on the shared layer, not separate AI stacks.
+
+- Pre-Sales Intelligence
+- Exception Management
+- Human Services
+- Management Intelligence
+
+They may surface through web workspace, contextual copilot, in-app notification, WhatsApp, email/Teams, generated documents, or background automation.
+
+A channel is not an application. For example, Exception Management can appear in the web Action Center, an in-app notification, a WhatsApp escalation, and management summary while remaining one business capability.
+
+## 5. Intelligence application intent
+
+### Pre-Sales Intelligence
+
+The target output remains a structured Pre-Sales Intelligence Pack covering:
+
+- brief/opportunity context;
+- requirements;
+- relevant experience;
+- risk and assumptions;
+- solution;
+- scope;
+- BOQ/effort;
+- proposal;
+- next actions and supporting evidence.
+
+### Exception Management
+
+Treat this as the shared operational alert/exception capability. Example signals include:
+
+- BAST/operational milestone delays;
+- SLA/client issue;
+- timesheet issue;
+- contract expiry;
+- project deadline;
+- other states requiring attention or escalation.
+
+Detection remains deterministic/rule/event-based where the condition is objective; AI enriches context, impact, explanation, and follow-up drafts.
+
+### Human Services
+
+Can include employee/talent chatbot, confirmation flows, reminders, service questions, and human case routing for HR/Talent/Finance-related support.
+
+### Management Intelligence
+
+Management Intelligence should explain **what changed, why it matters, what is causing it, who owns it, and what action needs attention**, not merely provide another dashboard.
+
+## 6. Closed-loop behaviour
+
+The platform must not stop at “AI generated an answer”.
+
+A healthy loop is:
+
+`ERP state -> intelligence -> structured output/action -> human or controlled automation -> ERP state update -> next intelligence cycle`.
+
+Examples:
+
+- Pre-Sales approves a solution outline -> opportunity status/artifact reference updates in ERP.
+- BAST exception is resolved -> exception closes because ERP state changes.
+- Human Service case is answered -> case/outcome is recorded and can improve knowledge curation.
+
+## 6. Deterministic vs generative boundary
+
+### Deterministic / trusted source
+
+- status and dates;
+- counts and business metrics;
+- employee/talent availability;
+- project allocation;
+- pricing/rate/margin inputs;
+- contract/BAST/invoice state;
+- SLA/deadline checks;
+- explicit business rules.
+
+### AI-assisted
+
+- summarize documents;
+- identify requirement themes;
+- retrieve and explain relevant prior experience;
+- surface ambiguity/missing information;
+- explain why an exception matters using trusted facts;
+- draft solution narrative;
+- prepare response/action drafts;
+- synthesize management context.
+
+AI may explain and prepare; it must not fabricate authoritative facts.
+
+## 7. Strategic positioning
+
+The differentiator is not “Celerates has GPT”. The reusable capability is the combination of:
+
+- ERP business context;
+- curated organizational knowledge;
+- retrieval and data provenance;
+- domain rules;
+- controlled ERP tools;
+- workflow orchestration;
+- model routing;
+- human decision points;
+- application-specific outputs.
+
+This enables Celerates to prove the capability internally first and later productize reusable patterns for client digitalization/intelligence engagements.
+
+## 8. Infrastructure is a sizing decision, not a brand decision
+
+The permanent hosting provider is not yet locked by architecture. Current/proposed providers can be used for POC or transition, but the next production choice should be based on measured requirements for:
+
+- ERP web/backend;
+- PostgreSQL;
+- Intelligence API/worker;
+- object storage;
+- optional Redis;
+- Model Gateway;
+- tracing/evaluation;
+- optional n8n;
+- user count and workload pattern.
+
+Provider selection should follow workload sizing and operational requirements rather than drive the architecture itself.
