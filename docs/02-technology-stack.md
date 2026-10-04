@@ -6,8 +6,9 @@
 
 | Concern | Baseline |
 |---|---|
-| Web application | React + TypeScript + Vite |
-| UI system | Tailwind CSS + shadcn/ui-style accessible components |
+| ERP web application | Next.js + React + TypeScript |
+| Intelligence web application | React + TypeScript + Vite |
+| UI system | Tailwind CSS + reusable accessible components |
 | Intelligence API | Python + FastAPI |
 | Workflow orchestration | LangGraph |
 | Integration Core | Python |
@@ -134,15 +135,21 @@ Integrate tracing/evaluation in a way that can be disabled locally. Capture usef
 
 ## Deployment baseline
 
-For v0, optimize for one-machine operability:
+Target production deployment is **portable Docker on the approved Hostinger VPS baseline**, not a provider-specific PaaS dependency.
 
-- `web`
-- `intelligence-api`
-- `integration-worker`
-- PostgreSQL with pgvector
-- MinIO
-- Redis (if actually used)
-- optional n8n profile
-- optional LiteLLM profile or external endpoint
+Initial planning uses the KVM 4 class (4 vCPU, 16 GB RAM, 200 GB NVMe) and keeps the topology intentionally small:
 
-Do not introduce Kubernetes, Kafka, separate vector DB, or high-availability topology until load/risk requires it.
+- Celerates ERP web/runtime;
+- Intelligence API and worker;
+- PostgreSQL with pgvector/FTS where used by Intelligence;
+- private MinIO / S3-compatible object storage;
+- self-hosted observability/logging;
+- Redis only when measured need justifies it;
+- optional n8n profile;
+- LiteLLM as a library/gateway boundary or optional service profile depending on runtime configuration.
+
+The initial baseline may colocate these components on one VPS while resource and reliability measurements remain healthy. Scale up the VPS or split a component only when CPU, RAM, disk, concurrency, retention or failure-isolation evidence requires it.
+
+Do not introduce Kubernetes, Kafka, a separate vector database, or high-availability topology until measured load/risk requires it. Cost figures remain in the management spreadsheet rather than this technical baseline.
+
+See ADR-020 for the deployment and capability-migration decision.
