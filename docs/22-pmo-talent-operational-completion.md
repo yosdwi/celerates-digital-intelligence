@@ -1,5 +1,7 @@
 # 22 — PMO and Talent operational completion: requirements and plan
 
+> **Implementation-record notice (2026-10-04):** This document preserves the requirements/implementation decisions made for the PMO/Talent completion increment. It is not the current product, authentication, deployment, or long-term system-boundary source of truth. Where it conflicts with current security/session policy, Celerates/Talenta/ConForm coexistence, or target deployment, `docs/01-product-and-architecture.md`, the current security docs, and ADR-020 govern.
+
 Status: **implemented, not deployed**, 2026-09-29 ([implementation record](implementation/pmo-talent-completion.md)). It follows [doc 21](21-conform-bounded-service-execution.md) and [ADR-019](adr/ADR-019-conform-bounded-operational-service.md), which delivered integration v1. This document records the requirements interview with Yos and the plan that follows from it.
 
 Goal: finish the operational loop **attendance → task list → BAST → WhatsApp** for two roles, **PMO** and **Talent**, on the real ConForm VPS, and make the Agent answer from uploaded documents.
