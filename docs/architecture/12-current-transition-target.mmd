@@ -43,7 +43,7 @@ flowchart LR
     T4 --> T5
 
     T5 --> E
-    T1 -. "retain / integrate" .-> R
+    T1 -.->|"retain / integrate"| R
 
     U --> E
     U --> R
@@ -58,6 +58,6 @@ flowchart LR
     P -.-> T2
 
     S["Security & Data Governance\nIdentity · Session · RBAC/Capability · Classification\nPrivate Documents · Audit · Retention · AI Disclosure"]
-    S -. "cross-cutting" .-> U
-    S -. "cross-cutting" .-> E
-    S -. "cross-cutting" .-> I
+    S -.->|"cross-cutting"| U
+    S -.->|"cross-cutting"| E
+    S -.->|"cross-cutting"| I
