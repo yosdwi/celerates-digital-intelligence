@@ -202,6 +202,8 @@ Development follows `docs/development/01-development-execution-rules.md`.
 For Wave 1:
 
 - Draft PR revisions run the ERP **Fast Gate** (unit/security/schema + typecheck).
-- The expensive ERP browser/HTTP journey and cross-service P0/Compose checks run when the PR is **ready for review** or on `main`.
+- The Sales ERP browser/HTTP Full Gate and the broader Intelligence P0/Compose gate are separate checkpoint gates.
+- Sales Wave 1 Full Gate intentionally does **not** build/run the Intelligence web/API/worker stack; Pre-Sales Intelligence is not a blocker for the operational Sales pilot.
+- The broader `P0 verification` workflow remains responsible for Intelligence API/web/Compose regression and runs at the same review-ready checkpoint.
 - The Sales browser journey uses a disposable database and Chromium virtual WebAuthn authenticator. It never targets a live ERP and never stores a real biometric.
 - Real-device biometric checks and real Sales/TA accounts remain pilot-environment validation and are not replaced by synthetic E2E.
