@@ -7,7 +7,7 @@ import { readFile, readdir, writeFile } from "node:fs/promises";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { randomBytes } from "node:crypto";
+import { createHash, generateKeyPairSync, randomBytes, sign as signData } from "node:crypto";
 import { PGlite } from "@electric-sql/pglite";
 import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
 // @ts-expect-error no types
@@ -34,7 +34,7 @@ Object.assign(process.env, {
   S3_SECRET_ACCESS_KEY: "S3RVER",
   S3_BUCKET_PREFIX: "erp-sec",
   IDENTITY_KEYRING_FILE: keyringFile,
-  AUTH_EMAIL_DOMAINS: "celerates.com",
+  AUTH_EMAIL_DOMAINS: "celerates.com,celerates.co.id",
   AUTH_EMAIL_EXCEPTIONS: "",
 });
 delete process.env.AUTH_EMAIL_OTP;
@@ -58,6 +58,7 @@ let sql: typeof import("../src/db").sql;
 let S: typeof import("../src/lib/security/session");
 let P: typeof import("../src/lib/security/policy");
 let OTP: typeof import("../src/lib/security/email-otp");
+let PASSKEY: typeof import("../src/lib/security/passkey");
 let ID: typeof import("../src/lib/security/identity-documents");
 let PEOPLE: typeof import("../src/lib/people/identity");
 let KEYS: typeof import("../src/lib/security/keyring");
@@ -83,6 +84,7 @@ before(async () => {
   S = await import("../src/lib/security/session");
   P = await import("../src/lib/security/policy");
   OTP = await import("../src/lib/security/email-otp");
+  PASSKEY = await import("../src/lib/security/passkey");
   ID = await import("../src/lib/security/identity-documents");
   PEOPLE = await import("../src/lib/people/identity");
   KEYS = await import("../src/lib/security/keyring");
@@ -121,7 +123,7 @@ after(async () => {
 });
 
 /** A live session's claims, optionally with a fresh step-up. */
-async function login(key: string, opts: { stepUp?: boolean; method?: "password" | "password+email_otp" | "talent_link" } = {}) {
+async function login(key: string, opts: { stepUp?: boolean; method?: "password" | "password+email_otp" | "talent_link" | "passkey" } = {}) {
   const sid = await S.createSession(sql, { userId: u[key], method: opts.method ?? "password+email_otp", stepUp: opts.stepUp });
   const claims = await S.loadSession(sql, sid);
   assert.ok(claims, `session for ${key}`);
@@ -297,6 +299,7 @@ test("email codes: hashed, single use, expiring, 5 tries, superseded, session-bo
   await assert.rejects(issueRecoveryCode(sql, "talent.a.sec@celerates.com", "x reason"), /No active backoffice/);
 
   assert.deepEqual(OTP.mailboxAllowed("hr.sec@celerates.com"), { ok: true, exception: false });
+  assert.deepEqual(OTP.mailboxAllowed("pilot.sec@celerates.co.id"), { ok: true, exception: false });
   assert.deepEqual(OTP.mailboxAllowed("outside.sec@gmail.com"), { ok: false, exception: false });
   process.env.AUTH_EMAIL_EXCEPTIONS = "outside.sec@gmail.com";
   assert.deepEqual(OTP.mailboxAllowed("Outside.Sec@gmail.com"), { ok: true, exception: true }, "explicit exception");
@@ -305,6 +308,88 @@ test("email codes: hashed, single use, expiring, 5 tries, superseded, session-bo
   const { allowAttempt } = await import("../src/lib/login-throttle");
   for (let i = 0; i < 3; i++) assert.equal(await allowAttempt(sql, "test:k", 3), true);
   assert.equal(await allowAttempt(sql, "test:k", 3), false, "rate limit");
+});
+
+test("passkey: registration is session-bound; assertion verifies RP/origin/UV/signature and is single-use", async () => {
+  const { publicKey, privateKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
+  const spki = publicKey.export({ type: "spki", format: "der" }) as Buffer;
+  const credentialId = randomBytes(32).toString("base64url");
+  const encode = (v: Buffer) => v.toString("base64url");
+  const makeClient = (type: "webauthn.create" | "webauthn.get", challenge: string) =>
+    Buffer.from(JSON.stringify({ type, challenge, origin: "http://localhost:3000", crossOrigin: false }));
+
+  const reg = await PASSKEY.issuePasskeyChallenge(sql, { purpose: "register", userId: u.hr });
+  const regClient = makeClient("webauthn.create", reg.challenge);
+  const saved = await PASSKEY.registerPasskey(sql, {
+    userId: u.hr,
+    challengeId: reg.id,
+    credentialId,
+    clientDataJSON: encode(regClient),
+    publicKeySpki: encode(spki),
+    algorithm: -7,
+    transports: ["internal"],
+    label: "Synthetic Windows Hello",
+  });
+  assert.match(saved.id, /^[0-9a-f-]{36}$/i);
+  await assert.rejects(
+    PASSKEY.registerPasskey(sql, {
+      userId: u.hr,
+      challengeId: reg.id,
+      credentialId: randomBytes(32).toString("base64url"),
+      clientDataJSON: encode(regClient),
+      publicKeySpki: encode(spki),
+      algorithm: -7,
+    }),
+    /invalid_or_expired_challenge/,
+    "registration challenge is single-use",
+  );
+
+  const loginChallenge = await PASSKEY.issuePasskeyChallenge(sql, { purpose: "login" });
+  const assertionClient = makeClient("webauthn.get", loginChallenge.challenge);
+  const rpHash = createHash("sha256").update("localhost").digest();
+  const authData = Buffer.alloc(37);
+  rpHash.copy(authData, 0);
+  authData[32] = 0x05; // user present + user verified
+  authData.writeUInt32BE(1, 33);
+  const signed = Buffer.concat([authData, createHash("sha256").update(assertionClient).digest()]);
+  const signature = signData("sha256", signed, privateKey);
+  const user = await PASSKEY.verifyPasskeyAssertion(sql, {
+    challengeId: loginChallenge.id,
+    credentialId,
+    clientDataJSON: encode(assertionClient),
+    authenticatorData: encode(authData),
+    signature: encode(signature),
+    userHandle: Buffer.from(u.hr).toString("base64url"),
+  });
+  assert.equal(user?.id, u.hr);
+
+  assert.equal(await PASSKEY.verifyPasskeyAssertion(sql, {
+    challengeId: loginChallenge.id,
+    credentialId,
+    clientDataJSON: encode(assertionClient),
+    authenticatorData: encode(authData),
+    signature: encode(signature),
+    userHandle: Buffer.from(u.hr).toString("base64url"),
+  }), null, "assertion challenge replay is refused");
+
+  const noUv = await PASSKEY.issuePasskeyChallenge(sql, { purpose: "login" });
+  const noUvClient = makeClient("webauthn.get", noUv.challenge);
+  const noUvAuth = Buffer.from(authData);
+  noUvAuth[32] = 0x01;
+  const noUvSigned = Buffer.concat([noUvAuth, createHash("sha256").update(noUvClient).digest()]);
+  const noUvSig = signData("sha256", noUvSigned, privateKey);
+  assert.equal(await PASSKEY.verifyPasskeyAssertion(sql, {
+    challengeId: noUv.id,
+    credentialId,
+    clientDataJSON: encode(noUvClient),
+    authenticatorData: encode(noUvAuth),
+    signature: encode(noUvSig),
+    userHandle: Buffer.from(u.hr).toString("base64url"),
+  }), null, "user verification is mandatory");
+
+  const session = await login("hr", { method: "passkey", stepUp: true });
+  assert.equal(session.authMethod, "passkey");
+  assert.ok(session.stepUpAt, "passkey login is a fresh strong session");
 });
 
 test("backoffice login: new browser → password → corporate-mailbox code → trusted browser → revocable session; next time no code", async () => {
