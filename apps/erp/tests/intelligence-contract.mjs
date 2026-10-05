@@ -31,12 +31,17 @@ export async function contractJourney({base,request,db,tracker,readToken,actionT
  assert.equal((await post('commands',command,'another-command-key')).status,412,'consumed approval cannot apply another action');
  assert.deepEqual(await (await machine('commands/'+receipts[0].command_id)).json(),receipts[0]);
  const events=await (await machine('events?cursor=0')).json();assert.ok(events.items.some(e=>e.event_type==='artifact.reference.attached.v1'));
- assert.ok((await (await machine('resources/sales_opportunity/'+id)).json()).data.artifact_references.some(r=>r.id===receipts[0].reference_id));
+ const afterAttach=await (await machine('resources/sales_opportunity/'+id)).json();
+ assert.ok(afterAttach.data.artifact_references.some(r=>r.id===receipts[0].reference_id));
+ const afterAttachVersion=Number(afterAttach.record_version);
+ assert.ok(afterAttachVersion>sourceVersion,'attaching an approved reference advances the ERP source version');
  // A source mutation after proposal invalidates review; no stale business write.
- const next={...body,expected_version:sourceVersion,manifest:{...manifest,run_id:randomUUID()}};
- const stale=await (await post('review-requests',next,'stale-review')).json();
+ const next={...body,expected_version:afterAttachVersion,manifest:{...manifest,run_id:randomUUID()}};
+ const staleResponse=await post('review-requests',next,'stale-review');
+ assert.equal(staleResponse.status,200,await staleResponse.clone().text());
+ const stale=await staleResponse.json();
  await db`UPDATE sales_opportunity_trackers SET requirement_summary='Changed requirement' WHERE id=${id}`;
- assert.equal((await request('/api/intelligence/reviews',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...approve,review_id:stale.id,manifest_sha256:stale.manifest_sha256,expected_version:sourceVersion})})).status,412);
+ assert.equal((await request('/api/intelligence/reviews',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...approve,review_id:stale.id,manifest_sha256:stale.manifest_sha256,expected_version:afterAttachVersion})})).status,412);
  await request('/api/intelligence/reviews',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'grant',resource_id:id,enabled:false})});
  assert.equal((await machine('resources/sales_opportunity/'+id)).status,404);
  assert.equal((await post('commands',command,'synthetic-command')).status,404,'revocation prevents even receipt replay disclosure');

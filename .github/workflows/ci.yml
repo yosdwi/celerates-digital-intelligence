@@ -4,6 +4,15 @@ on:
     branches: [main]
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'services/intelligence-api/**'
+      - 'apps/web/**'
+      - 'infra/docker-compose.yml'
+      - 'infra/litellm/**'
+      - 'scripts/check-api.py'
+      - '.env.example'
+      - 'uv.lock'
+      - '.github/workflows/ci.yml'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
