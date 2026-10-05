@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import { sql } from "@/db";
 import { currentClaims, requestMeta } from "@/lib/actor";
 import { audit } from "@/lib/security/audit";
+import { allowAttempt } from "@/lib/login-throttle";
 import { issuePasskeyChallenge, listPasskeys, passkeyRp, registerPasskey } from "@/lib/security/passkey";
 
 export const dynamic = "force-dynamic";
@@ -45,8 +46,8 @@ export async function GET() {
       timeout: 60_000,
       attestation: "none",
       authenticatorSelection: {
-        residentKey: "preferred",
-        requireResidentKey: false,
+        residentKey: "required",
+        requireResidentKey: true,
         userVerification: "required",
       },
       excludeCredentials: credentialRows.map((c) => ({
@@ -67,6 +68,10 @@ export async function POST(request: Request) {
   if (!claims || claims.accountType === "talent") return Response.json({ error: "unauthorized" }, { status: 401 });
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
   const currentPassword = typeof body.currentPassword === "string" ? body.currentPassword : "";
+  if (!(await allowAttempt(sql, "passkey-register:" + claims.userId, 10))) {
+    await audit(sql, { action: "passkey_register", decision: "deny", actorUserId: claims.userId, sessionId: claims.sid, reason: "rate_limited", ...(await requestMeta()) });
+    return Response.json({ error: "rate_limited" }, { status: 429 });
+  }
   const [user] = await sql`SELECT id, password_hash FROM users WHERE id = ${claims.userId} AND status = 'active'`;
   if (!user?.password_hash || !currentPassword || !(await bcrypt.compare(currentPassword, user.password_hash))) {
     await audit(sql, { action: "passkey_register", decision: "deny", actorUserId: claims.userId, sessionId: claims.sid, reason: "password_confirmation_failed", ...(await requestMeta()) });
@@ -79,8 +84,7 @@ export async function POST(request: Request) {
       challengeId: String(body.challengeId ?? ""),
       credentialId: String(body.credentialId ?? ""),
       clientDataJSON: String(body.clientDataJSON ?? ""),
-      publicKeySpki: String(body.publicKeySpki ?? ""),
-      algorithm: Number(body.algorithm),
+      attestationObject: String(body.attestationObject ?? ""),
       transports: Array.isArray(body.transports) ? body.transports.filter((x): x is string => typeof x === "string") : [],
       label: typeof body.label === "string" ? body.label : null,
     });
