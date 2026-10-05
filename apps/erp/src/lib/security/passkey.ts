@@ -10,7 +10,7 @@ export type PasskeyPurpose = "register" | "login";
 export const PASSKEY_CHALLENGE_TTL_SECONDS = 5 * 60;
 
 const B64URL = /^[A-Za-z0-9_-]+$/;
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const sha256 = (value: Buffer | string) => createHash("sha256").update(value).digest();
 const sha256Hex = (value: Buffer | string) => sha256(value).toString("hex");
