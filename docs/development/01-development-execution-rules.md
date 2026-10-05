@@ -202,7 +202,22 @@ Required principles:
 
 If CI configuration itself creates duplicated or unnecessary work, fixing the feedback loop is part of the development task.
 
-## 10. Commit discipline
+## 10. Bounded wait rule
+
+Development and CI must never rely on an unbounded or opaque `sleep` polling loop.
+
+Required:
+
+- every wait has an explicit deadline or job timeout;
+- prefer service-native readiness semantics such as healthchecks and `docker compose ... --wait --wait-timeout <seconds>`;
+- if polling is unavoidable, print the condition being checked and fail with diagnostics when the deadline is reached;
+- do not repeatedly poll GitHub Actions from the development process when the run already has a deterministic terminal result;
+- every CI job that can install, build, launch browsers, start containers, or run E2E must have a reasonable `timeout-minutes` value;
+- on readiness failure, capture service logs/status once and fix the root cause instead of extending the sleep interval.
+
+A visible `sleep` loop is not progress. Readiness must either become healthy within a bounded window or fail with actionable evidence.
+
+## 11. Commit discipline
 
 Commit messages describe the logical result, not a filename.
 
@@ -219,7 +234,7 @@ Avoid:
 - `change file`
 - many tiny commits created only because files were edited sequentially.
 
-## 11. Branch and PR discipline
+## 12. Branch and PR discipline
 
 - work on a feature/fix branch from the approved integration baseline;
 - keep unrelated work out of the branch;
@@ -235,7 +250,7 @@ Before review readiness, summarize:
 - known blocker/follow-up;
 - real-user validation still pending.
 
-## 12. Status reporting rule
+## 13. Status reporting rule
 
 Do not report only:
 
@@ -260,7 +275,7 @@ Next action:
 
 This prevents long-running CI from hiding actual implementation progress.
 
-## 13. Pilot-specific rule
+## 14. Pilot-specific rule
 
 During a user pilot:
 
@@ -273,7 +288,7 @@ During a user pilot:
 
 For the current Sales pilot, `docs/23-sales-pilot-wave-1.md` is the execution baseline.
 
-## 14. High-risk exception
+## 15. High-risk exception
 
 The Tech Lead may require immediate broader verification for:
 
@@ -287,7 +302,7 @@ The Tech Lead may require immediate broader verification for:
 
 Even then, targeted checks should be used first where possible. Full verification complements the Fast Gate; it does not replace it.
 
-## 15. Definition of done for a development batch
+## 16. Definition of done for a development batch
 
 A batch is complete when:
 
@@ -300,7 +315,7 @@ A batch is complete when:
 - external or real-user validation items are explicitly recorded;
 - no deterministic failure is being ignored or hidden.
 
-## 16. Short version
+## 17. Short version
 
 ```text
 THINK IN BATCHES

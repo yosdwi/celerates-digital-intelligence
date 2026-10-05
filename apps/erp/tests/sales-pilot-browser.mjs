@@ -42,7 +42,7 @@ export async function runSalesPilotBrowserJourney({ base, cookies, db, tracker }
     );
     await page.getByRole("button", { name: "Daftarkan biometrik / passkey" }).click();
     const saved = await registerResponse;
-    assert.equal(saved.status(), 200, "passkey registration failed: " + await saved.text());
+    assert.equal(saved.status(), 200, "passkey registration POST must succeed");
     await page.getByText("Synthetic Pilot Device", { exact: true }).waitFor({ timeout: 15_000 });
     const [passkey] = await db`SELECT id,label,revoked_at FROM auth_passkey_credentials WHERE label='Synthetic Pilot Device'`;
     assert.ok(passkey && !passkey.revoked_at, "passkey persisted after verified registration ceremony");
