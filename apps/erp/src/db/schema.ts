@@ -101,8 +101,8 @@ export const opportunities = pgTable("opportunities", {
   end_date: date("end_date"),
 }, (t) => ({
   uqOptyNo: uniqueIndex("uq_opportunities_opty_no").on(t.opty_no),
+  uqOpportunityTracker: uniqueIndex("uq_opportunities_opportunity_tracker").on(t.opportunity_tracker_id),
   idxLead: index("idx_opportunities_lead").on(t.lead_id),
-  idxOpportunityTracker: index("idx_opportunities_opportunity_tracker").on(t.opportunity_tracker_id),
   idxOnboardingRequest: index("idx_opportunities_onboarding_request").on(t.onboarding_request_id),
 }));
 
@@ -128,7 +128,7 @@ export const requisitions = pgTable("requisitions", {
   created_at: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({
   uqRequisitionNo: uniqueIndex("uq_requisitions_requisition_no").on(t.requisition_no),
-  idxOpportunity: index("idx_requisitions_opportunity").on(t.opportunity_id),
+  uqOpportunity: uniqueIndex("uq_requisitions_opportunity").on(t.opportunity_id),
 }));
 
 export const candidates = pgTable("candidates", {
