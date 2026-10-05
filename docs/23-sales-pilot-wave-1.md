@@ -140,8 +140,10 @@ PASSKEY_RP_NAME=Celerates ERP
 - [ ] Run one representative Sales scenario with the Product Owner/Sales user.
 - [ ] Record field/workflow mismatch as P0/P1/P2 instead of redesigning from assumptions.
 - [ ] Fix pilot-blocking P0/P1 items.
-- [ ] Verify authorization for viewer/editor/full Sales access on the tested actions.
-- [ ] Verify downstream TA can continue from the generated Requisition/PQ state.
+- [x] Make Opportunity Tracker UI reflect Sales viewer/editor/full access: viewer is read-only, editor can mutate/convert, full can also delete.
+- [ ] Verify authorization for viewer/editor/full Sales access with actual pilot accounts.
+- [x] Keep Sales users inside the Sales workspace after conversion; the downstream record is created for TA without redirecting Sales into a TA-only page.
+- [ ] Verify downstream TA can continue from the generated Requisition/PQ state with an actual TA account.
 - [x] Add database-level one-to-one guards for Opportunity → Requisition/PQ Tracker and cover conversion retry in HTTP smoke.
 - [ ] Verify duplicate conversion and orphan-state protections with real pilot scenarios.
 - [ ] Confirm what Google Sheet sync remains transitional during Wave 1 and who is the write-owner during the pilot.
