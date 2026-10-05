@@ -199,47 +199,58 @@ export async function convertToRequisition(opportunityTrackerId: string, formDat
 
   const requisition_no = await generateRequisitionNo();
 
-  await db.transaction(async (tx) => {
-    await tx.insert(requisitions).values({
-      requisition_no,
-      opportunity_id: opportunityTrackerId,
-      opty_request_date,
-      client_name: tracker.client_name,
-      position_name,
-      service_type_code: tracker.service_type_code,
-      level_code: tracker.level_code,
-      headcount_target,
-      priority_code,
-      price_amount,
-      estimated_duration_months: tracker.estimated_duration_months,
-      // TA PIC belum ditentukan saat convert -- dulu ini ketimpa nama Sales PIC,
-      // sekarang harus di-set manual oleh tim TA lewat halaman Edit Requisition.
-      ta_pic_name: "Belum Ditentukan",
-      sales_pic_name: tracker.sales_pic_name,
-      notes: tracker.requirement_summary ?? null,
-    });
+  try {
+    await db.transaction(async (tx) => {
+      await tx.insert(requisitions).values({
+        requisition_no,
+        opportunity_id: opportunityTrackerId,
+        opty_request_date,
+        client_name: tracker.client_name,
+        position_name,
+        service_type_code: tracker.service_type_code,
+        level_code: tracker.level_code,
+        headcount_target,
+        priority_code,
+        price_amount,
+        estimated_duration_months: tracker.estimated_duration_months,
+        // TA PIC belum ditentukan saat convert -- dulu ini ketimpa nama Sales PIC,
+        // sekarang harus di-set manual oleh tim TA lewat halaman Edit Requisition.
+        ta_pic_name: "Belum Ditentukan",
+        sales_pic_name: tracker.sales_pic_name,
+        notes: tracker.requirement_summary ?? null,
+      });
 
-    // Semua field ini SEMUA otomatis kecopy dari Opportunity Tracker --
-    // tetap editable belakangan di halaman Edit PQ Tracker kalau ada beda.
-    await tx.insert(opportunities).values({
-      opty_no,
-      opty_request_date,
-      client_name: tracker.client_name,
-      client_type_code: tracker.client_type_code,
-      project_name: position_name,
-      position_name,
-      service_type_code: tracker.service_type_code ?? "outsourcing",
-      level_code: tracker.level_code,
-      headcount_target,
-      priority_code,
-      bant_score: tracker.bante_score,
-      price_amount,
-      estimated_duration_months: tracker.estimated_duration_months,
-      sales_pic_name: tracker.sales_pic_name,
-      pipeline_stage_code: "on_going",
-      opportunity_tracker_id: opportunityTrackerId,
+      // Semua field ini otomatis kecopy dari Opportunity Tracker dan dibuat dalam transaksi yang sama.
+      // DB unique constraints 0013 menjamin retry / double-submit / concurrent request tidak membuat
+      // dua Requisition atau dua PQ Tracker untuk Opportunity Tracker yang sama.
+      await tx.insert(opportunities).values({
+        opty_no,
+        opty_request_date,
+        client_name: tracker.client_name,
+        client_type_code: tracker.client_type_code,
+        project_name: position_name,
+        position_name,
+        service_type_code: tracker.service_type_code ?? "outsourcing",
+        level_code: tracker.level_code,
+        headcount_target,
+        priority_code,
+        bant_score: tracker.bante_score,
+        price_amount,
+        estimated_duration_months: tracker.estimated_duration_months,
+        sales_pic_name: tracker.sales_pic_name,
+        pipeline_stage_code: "on_going",
+        opportunity_tracker_id: opportunityTrackerId,
+      });
     });
-  });
+  } catch (error) {
+    const code = (error as { code?: string })?.code;
+    if (code === "23505") {
+      const [createdReq] = await db.select({ id: requisitions.id }).from(requisitions).where(eq(requisitions.opportunity_id, opportunityTrackerId)).limit(1);
+      const [createdOpty] = await db.select({ id: opportunities.id }).from(opportunities).where(eq(opportunities.opportunity_tracker_id, opportunityTrackerId)).limit(1);
+      if (createdReq && createdOpty) redirect("/ta");
+    }
+    throw error;
+  }
 
   await logActivity("sales", "create", `${tracker.client_name} — ${position_name} dikonversi jadi Requisition & PQ Tracker`, "Opportunity Tracker");
   revalidatePath("/ta");
