@@ -1,0 +1,189 @@
+# Sales Pilot Wave 1 — Execution Baseline
+
+**Status:** Approved direction / implementation in progress  
+**Decision date:** 2026-10-05  
+**Pilot owner:** Product Owner + Tech Lead  
+**Pilot domain:** Sales, end-to-end from opportunity handling to a clean downstream handoff
+
+## 1. Why Sales is Wave 1
+
+Management alignment is complete enough to move from broad planning into execution.
+
+Sales is the first pilot because it is the upstream operational entry point for the commercial lifecycle and already has a substantial working ERP baseline. The purpose of Wave 1 is not to validate every Sales feature at once. It is to prove that a real Sales user can enter Celerates, run the priority journey, and hand clean operational state to the next division without falling back to an uncontrolled duplicate process.
+
+Wave 1 therefore prioritizes the operating chain before Pre-Sales Intelligence.
+
+```text
+Sales user
+  ↓
+Opportunity Tracker
+  ↓
+Qualification / requirement / status
+  ↓
+Convert
+  ├─ PQ Tracker
+  └─ Requisition
+        ↓
+clean handoff to TA
+  ↓
+PQ document / signature where applicable
+```
+
+The existing "Add Extension Request" path into TM remains available but is **not the critical path of the first pilot**. It becomes a follow-up scenario after the new-opportunity path is stable.
+
+## 2. Existing implementation we are building on
+
+Current ERP code already contains:
+
+- Sales Dashboard;
+- Opportunity Tracker with qualification, status, requirement and Sales PIC;
+- PQ Tracker;
+- client/accounts;
+- Profitability Tracker;
+- Google Sheet sync paths;
+- PQ attachments and TTD request;
+- `Opportunity Tracker → Convert to Requisition`, which transactionally creates the Requisition and linked PQ Tracker while preserving the same `opty_no` for upstream/downstream traceability;
+- an extension flow for existing Talent into TM.
+
+This pilot hardens those flows rather than replacing them with a greenfield Sales application.
+
+## 3. Wave 1 user journey
+
+### Entry
+
+A pilot Sales user has:
+
+- an active backoffice account;
+- Sales division access appropriate to the scenario;
+- one of the approved corporate email identities;
+- a supported login/recovery method.
+
+### Journey
+
+1. Sign in.
+2. Open the Sales workspace/dashboard.
+3. Create or continue an Opportunity.
+4. Capture/confirm client, service, requirement, position/headcount, PIC and commercial context required by the real Sales workflow.
+5. Update qualification and opportunity status.
+6. Convert a qualified Opportunity to the downstream flow.
+7. Verify that Requisition and PQ Tracker are created/linked correctly.
+8. Upload/use PQ documents and request signature when the business scenario requires it.
+9. Confirm that the downstream division can continue from the generated state without re-entering the same critical data.
+10. Submit feedback into the single pilot backlog.
+
+### Exit condition for the October pilot gate
+
+Wave 1 is ready to proceed when:
+
+- selected Sales users can sign in safely;
+- the priority Sales journey can be completed without a P0 blocker;
+- the same opportunity can be traced through the downstream handoff;
+- critical fields are not re-entered manually only because of a broken system handoff;
+- access and write permissions behave as intended;
+- user feedback is captured in one backlog and P0/P1 items have clear owners.
+
+This is intentionally a business-readable gate. Detailed test cases can be stricter without changing the management wording.
+
+## 4. Authentication decision for the pilot
+
+Approved login choices for backoffice users:
+
+1. **Biometric / Passkey** — implemented with WebAuthn, using Face ID, Touch ID, Windows Hello, Android/device biometrics or device PIN depending on the authenticator.
+2. **Corporate email identity: `@celerates.com`**.
+3. **Corporate email identity: `@celerates.co.id`**.
+
+Important boundaries:
+
+- Celerates never receives or stores a fingerprint/face template.
+- The authenticator keeps the private key; ERP stores only the credential id, public key, counter and audit metadata.
+- Corporate email + password + mailbox verification remains the bootstrap/recovery path.
+- A passkey must first be registered from an authenticated account and currently requires password confirmation.
+- Passkey login requires WebAuthn user verification.
+- Google OAuth is not reintroduced by this decision.
+- The two approved email domains identify eligible corporate mailboxes; they do not imply that either mail system is an OIDC/SAML identity provider.
+- Explicit audited mailbox exceptions remain a break-glass compatibility mechanism and are not the normal pilot path.
+
+### Production configuration
+
+Set/verify:
+
+```text
+AUTH_EMAIL_DOMAINS=celerates.com,celerates.co.id
+NEXTAUTH_URL=https://<canonical-erp-host>
+PASSKEY_RP_ID=<canonical-erp-host-without-scheme>
+PASSKEY_ORIGIN=https://<canonical-erp-host>
+PASSKEY_RP_NAME=Celerates ERP
+```
+
+`PASSKEY_RP_ID` and `PASSKEY_ORIGIN` are optional when they match `NEXTAUTH_URL`, but explicit production values reduce ambiguity during cut-over.
+
+## 5. Implementation status
+
+### Authentication
+
+- [x] Allow both corporate domains in the authentication policy.
+- [x] Enforce corporate-domain eligibility for backoffice password and passkey sign-in.
+- [x] Add passkey credential/challenge persistence.
+- [x] Add passkey cryptographic verification with RP/origin, UP/UV, signature and counter checks.
+- [x] Add discoverable passkey login option.
+- [x] Add passkey registration/revocation from Profile.
+- [x] Keep password + corporate mailbox verification as bootstrap/recovery.
+- [x] Revoke registered passkeys during mailbox-backed password reset.
+- [ ] Configure canonical production RP/origin and run real-device checks on Windows, Android/iOS/macOS used by pilot users.
+- [ ] Provision actual Sales pilot users and validate their roles.
+
+### Sales flow
+
+- [x] Existing Opportunity Tracker baseline identified.
+- [x] Existing PQ Tracker / Requisition handoff identified.
+- [x] Existing document/TTD path identified.
+- [ ] Run one representative Sales scenario with the Product Owner/Sales user.
+- [ ] Record field/workflow mismatch as P0/P1/P2 instead of redesigning from assumptions.
+- [ ] Fix pilot-blocking P0/P1 items.
+- [ ] Verify authorization for viewer/editor/full Sales access on the tested actions.
+- [ ] Verify downstream TA can continue from the generated Requisition/PQ state.
+- [ ] Verify duplicate conversion and orphan-state protections with real pilot scenarios.
+- [ ] Confirm what Google Sheet sync remains transitional during Wave 1 and who is the write-owner during the pilot.
+
+### Pilot release
+
+- [ ] Apply migration `0012_passkeys.sql`.
+- [ ] Deploy the pilot build to the approved environment.
+- [ ] Smoke-test login, session revocation, Sales create/update/convert, document flow and downstream visibility.
+- [ ] Start the single feedback backlog.
+- [ ] Onboard selected Sales users.
+- [ ] Observe real use and close P0/P1.
+- [ ] Record pilot result and November follow-up scope.
+
+## 6. Tech Lead implementation guardrails
+
+- Do not redesign the whole Sales module before observing pilot users.
+- Do not make Pre-Sales Intelligence a blocker for Wave 1.
+- Do not create a second source of truth just to preserve a legacy screen.
+- Do not weaken existing RBAC/session/audit controls to make the pilot easier.
+- Keep migration additive and reversible where practical.
+- Protect downstream handoffs with transaction/idempotency/duplicate guards rather than relying only on UI state.
+- Treat real user friction as product evidence; classify it before turning it into custom code.
+- Preserve `opty_no` as the traceability key across the current Opportunity → PQ/Requisition flow unless the business owner explicitly changes that contract.
+
+## 7. Immediate execution order
+
+```text
+1. Merge/approve architecture alignment
+        ↓
+2. Finish auth/passkey verification in CI
+        ↓
+3. Configure pilot environment + corporate domains
+        ↓
+4. Provision Sales pilot accounts/access
+        ↓
+5. Run Sales scenario with real user
+        ↓
+6. P0/P1 remediation
+        ↓
+7. Release pilot
+        ↓
+8. Feedback + November scope
+```
+
+Technical design should now be written only for decisions needed by this execution path (auth, Sales handoff, deployment, backup/observability and required provider boundaries), not as another broad architecture exercise.
