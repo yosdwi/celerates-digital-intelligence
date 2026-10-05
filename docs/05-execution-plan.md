@@ -26,24 +26,30 @@ The plan is not a rigid waterfall. Documentation, pilot feedback and implementat
 
 ## Timeline — Oct 2026 to Feb 2027
 
-### October 2026 — Alignment & Pilot
+### October 2026 — Alignment & Sales Pilot
+
+**Wave 1 decision (2026-10-05): Sales is the first end-to-end pilot domain.**
 
 Focus:
 
-- lock the high-level architecture and product principles;
-- confirm priority workflows and system boundaries;
-- review the production security baseline;
-- establish role-based workspace/navigation direction;
-- release selected ERP workflows to pilot users;
+- keep the approved high-level architecture/product principles as the baseline;
+- harden the existing Sales journey from Opportunity handling through PQ/Requisition handoff;
+- enable the approved backoffice login options: WebAuthn passkey/biometric plus corporate identities on `@celerates.com` and `@celerates.co.id`;
+- review the production security/access baseline for actual Sales pilot accounts;
+- provision selected Sales users and role/access levels;
+- run a representative real Sales scenario before broad redesign;
 - start one feedback/backlog loop;
-- prepare initial technical and cost assumptions.
+- prepare only the technical design needed to unblock the pilot and production path.
 
 Exit / gate:
 
-- selected users can access the system safely;
-- priority workflow scenarios can be executed;
-- architecture and known boundary assumptions are explicit;
+- selected Sales users can access the system safely;
+- the priority Sales workflow reaches a clean downstream handoff without a P0 blocker;
+- critical state is traceable from Opportunity to generated PQ/Requisition;
+- architecture and known source/write-owner assumptions for the pilot are explicit;
 - user feedback enters one governed backlog.
+
+Detailed execution and implementation status are maintained in `docs/23-sales-pilot-wave-1.md`.
 
 ### November 2026 — Validate & Fix
 
