@@ -82,6 +82,10 @@ export async function POST(request: Request) {
     case "start": {
       const user = await checkPassword(body.email, body.password, meta);
       if (!user) return json({ error: "invalid_credentials" }, 401);
+      if (user.account_type !== "talent" && !mailboxAllowed(user.email).ok) {
+        await audit(sql, { action: "login", decision: "deny", actorUserId: user.id, reason: "mailbox_not_allowed", ipHash: meta.ipHash, device: meta.device });
+        return json({ error: "mailbox_not_allowed" }, 403);
+      }
       if (user.account_type === "talent" || !emailOtpRequired()) return json({ next: "signin" });
       if (await findTrustedBrowser(sql, user.id, readCookie(meta.cookie, TRUSTED_BROWSER_COOKIE))) return json({ next: "signin" });
       const error = await sendCode(user, "login", meta);
