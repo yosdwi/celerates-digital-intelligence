@@ -107,7 +107,8 @@ export async function agentJourney({ base, request, db, env, python, publicKey, 
       // A fresh unassigned requisition for the browser's own `Tindak lanjuti` flow.
       await db`INSERT INTO requisitions (requisition_no,client_name,position_name,ta_pic_name) VALUES ('REQ-BROWSER','PT Synthetic Browser','Data Engineer','')`;
       // MS3 Tinjau: an Extension/Increment step and a Time Off step waiting for the Owner (doc 18 §17).
-      const [owner] = await db`SELECT id FROM users WHERE email='owner@example.test'`;
+      const [owner] = await db`SELECT id FROM users WHERE is_owner = true AND status = 'active' ORDER BY created_at LIMIT 1`;
+      assert.ok(owner, 'active Owner exists for browser journey');
       const [requester] = await db`INSERT INTO users (email,full_name,status,is_owner,account_type) VALUES ('ms3-requester@example.test','Rina Synthetic','active',false,'backoffice') RETURNING id`;
       const [emp] = await db`INSERT INTO employees (employee_no,position_name) VALUES ('EMP-MS3','Data Engineer') RETURNING id`;
       const [ext] = await db`INSERT INTO extension_increment_requests (employee_id,requester_name,requester_user_id,approver_1_user_id,propose_start_date,propose_end_date,proposed_position_name,proposed_increment_percent_deal)
