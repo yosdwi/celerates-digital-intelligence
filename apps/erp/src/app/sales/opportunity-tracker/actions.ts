@@ -168,7 +168,7 @@ export async function convertToRequisition(opportunityTrackerId: string, formDat
   await requireDivisionAccess("sales");
   const existing = await db.select().from(requisitions).where(eq(requisitions.opportunity_id, opportunityTrackerId));
   if (existing.length > 0) {
-    redirect("/ta");
+    redirect("/sales/opportunity-tracker");
   }
   // Tracker dari "Add Extension Request" nggak punya Requisition (cek di atas
   // nggak nangkep dia) tapi PQ Tracker-nya udah ada -- convert lagi bakal
@@ -247,7 +247,7 @@ export async function convertToRequisition(opportunityTrackerId: string, formDat
     if (code === "23505") {
       const [createdReq] = await db.select({ id: requisitions.id }).from(requisitions).where(eq(requisitions.opportunity_id, opportunityTrackerId)).limit(1);
       const [createdOpty] = await db.select({ id: opportunities.id }).from(opportunities).where(eq(opportunities.opportunity_tracker_id, opportunityTrackerId)).limit(1);
-      if (createdReq && createdOpty) redirect("/ta");
+      if (createdReq && createdOpty) redirect("/sales/opportunity-tracker");
     }
     throw error;
   }
@@ -256,5 +256,5 @@ export async function convertToRequisition(opportunityTrackerId: string, formDat
   revalidatePath("/ta");
   revalidatePath("/sales");
   await markSaved();
-  redirect("/ta");
+  redirect("/sales/opportunity-tracker");
 }
