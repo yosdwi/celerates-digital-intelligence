@@ -19,6 +19,7 @@ test('route gate follows the division RBAC', () => {
   const pmoFull = { access: [{ divisionKey: 'pmo', level: 'full' }] };
   assert.ok(canOpenRoute(sales, '/sales/opportunity-tracker'));
   assert.ok(canOpenRoute(sales, '/ta/client-active'));
+  assert.ok(!canOpenRoute(sales, '/ta'), 'Sales handoff must not redirect a Sales-only user into the TA workspace');
   assert.ok(canOpenRoute(sales, '/pmo/overtime-business-trip'));
   assert.ok(!canOpenRoute(sales, '/pmo/readiness'));
   assert.ok(!canOpenRoute(sales, '/hr'));
