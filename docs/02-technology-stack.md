@@ -142,7 +142,7 @@ Initial planning uses the KVM 4 class (4 vCPU, 16 GB RAM, 200 GB NVMe) and keeps
 - Celerates ERP web/runtime;
 - Intelligence API and worker;
 - PostgreSQL with pgvector/FTS where used by Intelligence;
-- private MinIO / S3-compatible object storage;
+- private S3-compatible object storage in production; local/demo Compose may use the filesystem backend so CI does not depend on a discontinued public MinIO image;
 - self-hosted observability/logging;
 - Redis only when measured need justifies it;
 - optional n8n profile;
