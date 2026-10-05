@@ -1,11 +1,10 @@
 "use client";
-// Backoffice sign-in (docs/security/02): password → (new browser only) code from the corporate mailbox → session.
-// A trusted browser with a valid session never sees this page; one whose session expired needs only the password.
-// "Aktivasi akun / lupa password" uses the same code to set a password (invites have none until then).
-import { useState, useTransition } from "react";
+// Sales pilot sign-in: corporate email/password remains the bootstrap and recovery path.
+// Registered backoffice users can sign in with a discoverable WebAuthn passkey (Face ID / Touch ID / Windows Hello).
+import { useEffect, useState, useTransition } from "react";
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
-import { Mail, Lock, Eye, EyeOff, KeyRound } from "lucide-react";
+import { Fingerprint, Mail, Lock, Eye, EyeOff, KeyRound } from "lucide-react";
 
 type Step = "password" | "otp" | "reset-email" | "reset-code";
 const ERRORS: Record<string, string> = {
@@ -13,13 +12,27 @@ const ERRORS: Record<string, string> = {
   invalid_code: "Kode salah atau sudah kedaluwarsa",
   rate_limited: "Terlalu banyak percobaan. Coba lagi dalam 15 menit.",
   mail_unavailable: "Email kode tidak dapat dikirim saat ini. Hubungi admin.",
-  mailbox_not_allowed: "Akun ini harus memakai email korporat @celerates.com. Hubungi admin.",
+  mailbox_not_allowed: "Gunakan akun korporat @celerates.com atau @celerates.co.id.",
   weak_password: "Password minimal 8 karakter",
+  passkey_failed: "Biometrik/passkey tidak dapat digunakan. Coba lagi atau masuk dengan email.",
 };
 const input =
   "w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-3 text-sm focus:border-violet-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-100 transition-all";
 const primary =
   "w-full rounded-xl bg-gradient-to-r from-violet-600 to-pink-500 px-4 py-3 text-sm font-semibold text-white hover:shadow-[0_10px_24px_-6px_rgba(124,58,237,0.55)] active:scale-[0.98] transition-all shadow-[0_8px_20px_-6px_rgba(124,58,237,0.45)] disabled:opacity-60";
+
+const toBytes = (value: string) => {
+  const padded = value.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - (value.length % 4)) % 4);
+  const raw = atob(padded);
+  return Uint8Array.from(raw, (c) => c.charCodeAt(0));
+};
+const toB64 = (value: ArrayBuffer | null) => {
+  if (!value) return "";
+  const bytes = new Uint8Array(value);
+  let raw = "";
+  for (const b of bytes) raw += String.fromCharCode(b);
+  return btoa(raw).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+};
 
 async function api(body: Record<string, unknown>) {
   const res = await fetch("/api/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -33,9 +46,12 @@ export function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [passkeySupported, setPasskeySupported] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
+
+  useEffect(() => setPasskeySupported(typeof window !== "undefined" && "PublicKeyCredential" in window && !!navigator.credentials), []);
 
   const fail = (key?: string) => setError(ERRORS[key ?? ""] ?? "Tidak dapat masuk. Coba lagi.");
 
@@ -43,6 +59,45 @@ export function LoginForm() {
     const result = await signIn("credentials", { email, password: pw, redirect: false });
     if (result?.error) return fail("invalid_credentials");
     window.location.href = "/";
+  }
+
+  function passkeyLogin() {
+    setError(null);
+    setNotice(null);
+    startTransition(async () => {
+      try {
+        const optionsRes = await fetch("/api/passkey/login/options", { method: "POST", headers: { "Content-Type": "application/json" } });
+        const options = (await optionsRes.json()) as {
+          error?: string;
+          challengeId?: string;
+          publicKey?: { challenge: string; rpId: string; timeout: number; userVerification: UserVerificationRequirement };
+        };
+        if (!optionsRes.ok || !options.challengeId || !options.publicKey) return fail(options.error === "rate_limited" ? "rate_limited" : "passkey_failed");
+
+        const credential = (await navigator.credentials.get({
+          publicKey: {
+            ...options.publicKey,
+            challenge: toBytes(options.publicKey.challenge),
+          },
+        })) as PublicKeyCredential | null;
+        if (!credential) return fail("passkey_failed");
+        const response = credential.response as AuthenticatorAssertionResponse;
+        const result = await signIn("passkey", {
+          redirect: false,
+          challengeId: options.challengeId,
+          credentialId: toB64(credential.rawId),
+          clientDataJSON: toB64(response.clientDataJSON),
+          authenticatorData: toB64(response.authenticatorData),
+          signature: toB64(response.signature),
+          userHandle: toB64(response.userHandle),
+        });
+        if (result?.error) return fail("passkey_failed");
+        window.location.href = "/";
+      } catch (e) {
+        if ((e as DOMException)?.name !== "NotAllowedError") console.warn("[login] passkey", (e as Error).message);
+        fail("passkey_failed");
+      }
+    });
   }
 
   function submit(e: React.FormEvent<HTMLFormElement>) {
@@ -105,13 +160,32 @@ export function LoginForm() {
       )}
       {notice && step !== "password" && <p className="rounded-xl bg-violet-50 border border-violet-100 px-3 py-2 text-sm text-violet-700">{notice}</p>}
 
+      {step === "password" && passkeySupported && (
+        <>
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={passkeyLogin}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50 disabled:opacity-60"
+          >
+            <Fingerprint className="h-5 w-5 text-violet-600" />
+            Masuk dengan biometrik / passkey
+          </button>
+          <div className="flex items-center gap-3 text-xs text-slate-400">
+            <span className="h-px flex-1 bg-slate-200" />
+            atau gunakan email perusahaan
+            <span className="h-px flex-1 bg-slate-200" />
+          </div>
+        </>
+      )}
+
       <form onSubmit={submit} className="space-y-4">
         {(step === "password" || step === "reset-email") && (
           <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-slate-700">Email</span>
+            <span className="mb-1.5 block text-sm font-medium text-slate-700">Email perusahaan</span>
             <div className="relative">
               <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <input name="email" type="email" required autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nama@celerates.com" className={input} />
+              <input name="email" type="email" required autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nama@celerates.com / .co.id" className={input} />
             </div>
           </label>
         )}
@@ -142,7 +216,7 @@ export function LoginForm() {
         {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
 
         <button type="submit" disabled={isPending} className={primary}>
-          {isPending ? "Memproses..." : step === "password" ? "Sign in" : step === "otp" ? "Verifikasi & masuk" : step === "reset-email" ? "Kirim kode" : "Simpan password & masuk"}
+          {isPending ? "Memproses..." : step === "password" ? "Masuk dengan email" : step === "otp" ? "Verifikasi & masuk" : step === "reset-email" ? "Kirim kode" : "Simpan password & masuk"}
         </button>
       </form>
 
