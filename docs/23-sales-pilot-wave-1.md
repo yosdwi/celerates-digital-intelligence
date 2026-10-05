@@ -139,7 +139,8 @@ PASSKEY_RP_NAME=Celerates ERP
 - [x] Existing document/TTD path identified.
 - [ ] Run one representative Sales scenario with the Product Owner/Sales user.
 - [ ] Record field/workflow mismatch as P0/P1/P2 instead of redesigning from assumptions.
-- [ ] Fix pilot-blocking P0/P1 items.
+- [x] Enforce server-side Sales Qualified + valid position/headcount before Opportunity can be handed downstream.
+- [ ] Fix remaining pilot-blocking P0/P1 items found by real-user validation.
 - [x] Make Opportunity Tracker UI reflect Sales viewer/editor/full access: viewer is read-only, editor can mutate/convert, full can also delete.
 - [ ] Verify authorization for viewer/editor/full Sales access with actual pilot accounts.
 - [x] Keep Sales users inside the Sales workspace after conversion; the downstream record is created for TA without redirecting Sales into a TA-only page.
