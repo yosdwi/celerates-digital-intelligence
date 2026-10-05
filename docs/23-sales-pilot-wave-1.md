@@ -154,7 +154,7 @@ PASSKEY_RP_NAME=Celerates ERP
 - [ ] Apply migrations `0012_passkeys.sql` and `0013_sales_handoff_uniqueness.sql` after checking the target DB for pre-existing duplicate handoffs.
 - [ ] Deploy the pilot build to the approved environment.
 - [x] Add disposable automated E2E for corporate bootstrap → passkey enrollment/login → Sales Opportunity visibility → converted-state guard → TA downstream visibility.
-- [ ] Full automated E2E gate is green on the review-ready PR revision.
+- [x] Full automated E2E gate is green on the review-ready PR revision (ERP pilot checks + P0 verification green at handoff checkpoint).
 - [ ] Smoke-test the same login, session revocation, Sales create/update/convert, document flow and downstream visibility in the approved pilot environment.
 - [ ] Start the single feedback backlog.
 - [ ] Onboard selected Sales users.

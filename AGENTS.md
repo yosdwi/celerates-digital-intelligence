@@ -65,3 +65,12 @@ In particular:
 - report exact implemented state, verification, blocker and next action instead of only saying CI is still running.
 
 If another repository document conflicts with these development-execution rules, this section and `docs/development/01-development-execution-rules.md` govern the development workflow unless the Tech Lead explicitly records an exception.
+
+
+## Current execution handoff
+
+For the active Oct 2026 pilot implementation, read this file before continuing work:
+
+- `docs/handoff/CURRENT-SALES-WAVE1.md`
+
+That handoff records the current branch/PR stack, what is already implemented and verified, what remains for real-user pilot readiness, and which work must **not** be restarted from scratch.
