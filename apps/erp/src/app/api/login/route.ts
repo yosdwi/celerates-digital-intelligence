@@ -11,6 +11,7 @@ import { checkPassword } from "@/lib/auth";
 import { allowAttempt } from "@/lib/login-throttle";
 import { audit } from "@/lib/security/audit";
 import { emailOtpRequired, issueChallenge, mail, mailboxAllowed, verifyChallenge, type OtpPurpose } from "@/lib/security/email-otp";
+import { revokeAllPasskeys } from "@/lib/security/passkey";
 import {
   clientMeta, createTrustedBrowser, findTrustedBrowser, readCookie, revokeUserSessions, TRUSTED_BROWSER_COOKIE, TRUSTED_BROWSER_SECONDS,
 } from "@/lib/security/session";
@@ -106,7 +107,8 @@ export async function POST(request: Request) {
       if (!(await checkCode(user, "reset", body.code, meta))) return json({ error: "invalid_code" }, 401);
       await sql`UPDATE users SET password_hash = ${await bcrypt.hash(password, 12)} WHERE id = ${user!.id}`;
       const revoked = await revokeUserSessions(sql, user!.id, "password_reset", { browsers: true });
-      await audit(sql, { action: "password_reset", decision: "allow", actorUserId: user!.id, reason: `sessions_revoked:${revoked}`, ipHash: meta.ipHash, device: meta.device });
+      const revokedPasskeys = await revokeAllPasskeys(sql, user!.id, "password_reset");
+      await audit(sql, { action: "password_reset", decision: "allow", actorUserId: user!.id, reason: `sessions_revoked:${revoked};passkeys_revoked:${revokedPasskeys}`, ipHash: meta.ipHash, device: meta.device });
       // The mailbox was just proven: this browser is trusted for the sign-in that follows.
       const browser = await createTrustedBrowser(sql, user!.id, meta.device);
       return json({ next: "signin" }, 200, { "Set-Cookie": trustCookie(browser.token) });
