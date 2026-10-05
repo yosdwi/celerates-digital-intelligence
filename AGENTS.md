@@ -45,3 +45,23 @@ Prioritize real, end-to-end divisional workflows and a working ERP user pilot be
 For retained specialist systems, integrate through explicit adapters/contracts instead of coupling UI components directly to provider schemas.
 
 UI must stay presentation-quality, responsive, concise, and business-first. Frappe and other mature products may be used as interaction/product references; do not copy proprietary assets or require a framework rewrite solely for visual similarity.
+
+## Mandatory development execution workflow
+
+Before implementing or continuing any code, migration, infrastructure, integration, or implementation-affecting documentation change, read and follow:
+
+- `docs/development/01-development-execution-rules.md`
+
+These rules are repository-wide and mandatory for future development.
+
+In particular:
+
+- work in **logical batches**, not one-file/one-full-CI loops;
+- run a **Fast Gate** before expensive integration/full verification;
+- treat CI as a **verifier, not the primary debugger**;
+- inspect and fix deterministic failures before rerunning expensive gates;
+- avoid duplicate push/PR full-suite work and cancel superseded runs;
+- use full browser/Compose/P0 verification at meaningful checkpoints or for high-risk boundaries, not after every edit;
+- report exact implemented state, verification, blocker and next action instead of only saying CI is still running.
+
+If another repository document conflicts with these development-execution rules, this section and `docs/development/01-development-execution-rules.md` govern the development workflow unless the Tech Lead explicitly records an exception.
