@@ -180,15 +180,22 @@ export async function convertToRequisition(opportunityTrackerId: string, formDat
 
   const [tracker] = await db.select().from(salesOpportunityTrackers).where(eq(salesOpportunityTrackers.id, opportunityTrackerId));
   if (!tracker) throw new Error("Opportunity Tracker tidak ditemukan");
+  if (!tracker.sales_qualified) {
+    throw new Error("Opportunity harus Sales Qualified sebelum diteruskan ke Requisition.");
+  }
 
-  // Kalau TA nggak isi manual di form Convert, pakai data yang udah ada
+  // Kalau Sales tidak mengubah field di form Convert, pakai data yang sudah ada
   // di Opportunity Tracker sebagai default.
   const positionInput = formData.get("position_name") as string;
   const headcountInput = formData.get("headcount_target") as string;
   const priorityInput = formData.get("priority_code") as string;
   const priceInput = formData.get("price_amount") as string;
-  const position_name = positionInput || tracker.position_name || "-";
-  const headcount_target = headcountInput ? Number(headcountInput) : (tracker.headcount_target ?? 1);
+  const position_name = (positionInput || tracker.position_name || "").trim();
+  const headcount_target = headcountInput ? Number(headcountInput) : tracker.headcount_target;
+  if (!position_name) throw new Error("Position wajib diisi sebelum Opportunity diteruskan.");
+  if (!headcount_target || !Number.isInteger(headcount_target) || headcount_target < 1) {
+    throw new Error("Headcount wajib berupa angka minimal 1 sebelum Opportunity diteruskan.");
+  }
   const priority_code = priorityInput || "p2";
   const price_amount = priceInput ? Number(priceInput) : tracker.price_amount;
   // Opty Request Date = tanggal saat sales melakukan convert, bukan input manual.
