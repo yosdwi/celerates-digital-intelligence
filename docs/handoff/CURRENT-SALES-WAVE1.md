@@ -3,7 +3,8 @@
 **Last updated:** 2026-10-05  
 **Repository:** `yosdwi/celerates-digital-intelligence`  
 **Active implementation branch:** `feat/sales-pilot-wave1-passkey`  
-**Current handoff checkpoint:** `39364a35c00fea36a1d1bcd57b5cb3010be20288`
+**Current automated-green checkpoint:** `39364a35c00fea36a1d1bcd57b5cb3010be20288`  
+**Current execution continuation head before this handoff update:** `8980dc0a389080b3d5e7c173ef7ae106afa734f6`
 
 This file is the **session-to-session execution handoff** for the current pilot.  
 A new ChatGPT/agent session must read this file together with `AGENTS.md` and `docs/development/01-development-execution-rules.md` before making changes.
@@ -455,3 +456,49 @@ For a new development session:
 8. `docs/adr/ADR-020-capability-driven-migration-and-vps-target.md`
 
 If older handoff/audit documents conflict with the current architecture/security/pilot documents above, treat the older material as historical evidence unless a newer ADR explicitly says otherwise.
+
+
+---
+
+## 11. Continuation executed after the green checkpoint
+
+The session that continued from this handoff did **not** restart planning or recreate completed Sales/passkey work.
+
+Completed on `feat/sales-pilot-wave1-passkey`:
+
+- added read-only pilot preflight:
+  - `apps/erp/scripts/sales-wave1-preflight.mjs`
+  - validates canonical HTTPS host, explicit passkey RP/origin, corporate mailbox domains, runtime config shape, migration tracking, duplicate Sales handoffs, migration/index presence, and active Sales/TA access coverage;
+  - exits `NO-GO` before deployment when a migration/config/data-integrity blocker exists;
+- added exact pilot release/deploy/rollback runbook:
+  - `docs/24-sales-wave1-pilot-release-runbook.md`;
+- opened the single governed real-user feedback backlog:
+  - **Issue #8 — Sales Wave 1 — Pilot feedback backlog**;
+- marked the feedback-backlog item complete in `docs/23-sales-pilot-wave-1.md`.
+
+Purpose-driven commits:
+
+- `d8df7aa6cfa7277d90f61eed4071e3d2ce268c7a` — ERP Sales Wave 1 deployment preflight;
+- `26f0fc31929ffa4bba0c54d543427edb0aa89f3c` — pilot release runbook;
+- `8980dc0a389080b3d5e7c173ef7ae106afa734f6` — record Issue #8 as the feedback backlog.
+
+Important deployment boundary:
+
+- `apps/erp/scripts/start.mjs` runs migrations automatically on container start;
+- therefore target DB preflight must pass **before** recreating the ERP container;
+- do not bypass duplicate `requisitions.opportunity_id` or `opportunities.opportunity_tracker_id` findings to force migration `0013`.
+
+External validation still pending because it requires the actual pilot VPS/database and real users/devices:
+
+1. run `sales-wave1-preflight.mjs` against the target DB using the canonical environment;
+2. confirm canonical ERP hostname and passkey RP/origin;
+3. take the approved DB restore point;
+4. deploy the versioned Wave 1 image;
+5. rerun preflight + live/ready health checks;
+6. provision/validate actual Sales viewer/editor/full + TA accounts;
+7. run real-device passkey checks;
+8. run the representative Sales → PQ/Requisition → TA journey;
+9. record evidence in Issue #8;
+10. confirm the transitional Google Sheet write-owner before controlled rollout.
+
+Do not mark Sales Wave 1 complete until those environment/user gates are evidenced.
