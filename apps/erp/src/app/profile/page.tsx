@@ -8,6 +8,8 @@ import { ProfileForm } from "./profile-form";
 import { SessionsPanel } from "./sessions-panel";
 import { sql } from "@/db";
 import { listSessions, listTrustedBrowsers } from "@/lib/security/session";
+import { listPasskeys } from "@/lib/security/passkey";
+import { PasskeysPanel } from "./passkeys-panel";
 
 export default async function ProfilePage() {
   const session = await getServerSession(authOptions);
@@ -15,7 +17,7 @@ export default async function ProfilePage() {
 
   const [user] = await db.select().from(users).where(eq(users.email, session.user.email as string));
   if (!user) redirect("/login");
-  const [sessions, browsers] = await Promise.all([listSessions(sql, user.id), listTrustedBrowsers(sql, user.id)]);
+  const [sessions, browsers, passkeys] = await Promise.all([listSessions(sql, user.id), listTrustedBrowsers(sql, user.id), listPasskeys(sql, user.id)]);
   const iso = (d: Date | string) => new Date(d).toISOString();
 
   return (
@@ -27,6 +29,7 @@ export default async function ProfilePage() {
 
       <main className="px-8 py-8 max-w-lg mx-auto">
         <ProfileForm user={{ full_name: user.full_name, role_title: user.role_title, email: user.email, hasPassword: !!user.password_hash }} />
+        <PasskeysPanel passkeys={passkeys.map((p) => ({ id: p.id, label: p.label, created_at: iso(p.created_at), last_used_at: p.last_used_at ? iso(p.last_used_at) : null }))} />
         <SessionsPanel
           currentSid={(session.user as { sid?: string }).sid ?? null}
           sessions={sessions.map((s) => ({ ...s, created_at: iso(s.created_at), last_seen_at: iso(s.last_seen_at) }))}
