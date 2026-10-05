@@ -2,10 +2,10 @@ name: ERP pilot checks
 on:
   push:
     branches: [main]
-    paths: ['apps/erp/**', 'services/intelligence-api/**', 'infra/postgres/migrations/**', 'infra/erp-compose.yml', '.github/workflows/erp-ci.yml']
+    paths: ['apps/erp/**', 'infra/erp-compose.yml', '.github/workflows/erp-ci.yml']
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-    paths: ['apps/erp/**', 'services/intelligence-api/**', 'infra/postgres/migrations/**', 'infra/erp-compose.yml', '.github/workflows/erp-ci.yml']
+    paths: ['apps/erp/**', 'infra/erp-compose.yml', '.github/workflows/erp-ci.yml']
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}

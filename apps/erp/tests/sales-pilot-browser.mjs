@@ -55,7 +55,7 @@ export async function runSalesPilotBrowserJourney({ base, cookies, db, tracker }
     await page.waitForURL((url) => url.pathname === "/", { timeout: 15_000 });
 
     await page.goto(browserBase + "/sales/opportunity-tracker");
-    await page.getByRole("heading", { name: "Opportunity Tracker" }).waitFor();
+    await page.getByRole("heading", { name: "Opportunity Tracker", exact: true }).waitFor();
     const row = page.getByRole("row").filter({ hasText: "Synthetic Client" }).first();
     await row.waitFor();
     const salesText = await row.innerText();
@@ -68,7 +68,7 @@ export async function runSalesPilotBrowserJourney({ base, cookies, db, tracker }
     );
 
     await page.goto(browserBase + "/ta");
-    await page.getByRole("heading", { name: "Requisition" }).waitFor();
+    await page.getByRole("heading", { name: "Requisition", exact: true }).waitFor();
     const taBody = await page.locator("body").innerText();
     assert.match(taBody, /Synthetic Client/);
     assert.match(taBody, /Engineer/);
