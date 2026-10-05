@@ -156,7 +156,7 @@ PASSKEY_RP_NAME=Celerates ERP
 - [x] Add disposable automated E2E for corporate bootstrap → passkey enrollment/login → Sales Opportunity visibility → converted-state guard → TA downstream visibility.
 - [x] Full automated E2E gate is green on the review-ready PR revision (ERP pilot checks + P0 verification green at handoff checkpoint).
 - [ ] Smoke-test the same login, session revocation, Sales create/update/convert, document flow and downstream visibility in the approved pilot environment.
-- [ ] Start the single feedback backlog.
+- [x] Start the single feedback backlog — GitHub Issue #8 (`Sales Wave 1 — Pilot feedback backlog`).
 - [ ] Onboard selected Sales users.
 - [ ] Observe real use and close P0/P1.
 - [ ] Record pilot result and November follow-up scope.
