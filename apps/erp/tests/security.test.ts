@@ -310,43 +310,81 @@ test("email codes: hashed, single use, expiring, 5 tries, superseded, session-bo
   assert.equal(await allowAttempt(sql, "test:k", 3), false, "rate limit");
 });
 
-test("passkey: registration is session-bound; assertion verifies RP/origin/UV/signature and is single-use", async () => {
+test("passkey: registration verifies attestation; assertion verifies RP/origin/UV/signature and is single-use", async () => {
   const { publicKey, privateKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
-  const spki = publicKey.export({ type: "spki", format: "der" }) as Buffer;
-  const credentialId = randomBytes(32).toString("base64url");
+  const jwk = publicKey.export({ format: "jwk" });
+  assert.ok(jwk.x && jwk.y);
+  const credentialRaw = randomBytes(32);
+  const credentialId = credentialRaw.toString("base64url");
   const encode = (v: Buffer) => v.toString("base64url");
   const makeClient = (type: "webauthn.create" | "webauthn.get", challenge: string) =>
     Buffer.from(JSON.stringify({ type, challenge, origin: "http://localhost:3000", crossOrigin: false }));
 
+  const cborLength = (major: number, n: number) => {
+    if (n < 24) return Buffer.from([(major << 5) | n]);
+    if (n < 256) return Buffer.from([(major << 5) | 24, n]);
+    if (n < 65536) {
+      const out = Buffer.alloc(3);
+      out[0] = (major << 5) | 25;
+      out.writeUInt16BE(n, 1);
+      return out;
+    }
+    throw new Error("test cbor length too large");
+  };
+  const cborInt = (n: number) => cborLength(n >= 0 ? 0 : 1, n >= 0 ? n : -1 - n);
+  const cborBytes = (v: Buffer) => Buffer.concat([cborLength(2, v.length), v]);
+  const cborText = (v: string) => {
+    const raw = Buffer.from(v);
+    return Buffer.concat([cborLength(3, raw.length), raw]);
+  };
+  const cborMap = (pairs: [Buffer, Buffer][]) =>
+    Buffer.concat([cborLength(5, pairs.length), ...pairs.flatMap(([k, v]) => [k, v])]);
+
+  const cose = cborMap([
+    [cborInt(1), cborInt(2)], // kty EC2
+    [cborInt(3), cborInt(-7)], // ES256
+    [cborInt(-1), cborInt(1)], // P-256
+    [cborInt(-2), cborBytes(Buffer.from(jwk.x!, "base64url"))],
+    [cborInt(-3), cborBytes(Buffer.from(jwk.y!, "base64url"))],
+  ]);
+  const rpHash = createHash("sha256").update("localhost").digest();
+  const registrationAuthData = Buffer.alloc(37 + 16 + 2);
+  rpHash.copy(registrationAuthData, 0);
+  registrationAuthData[32] = 0x45; // UP + UV + attested credential data
+  registrationAuthData.writeUInt32BE(0, 33);
+  registrationAuthData.writeUInt16BE(credentialRaw.length, 53);
+  const attestationObject = cborMap([
+    [cborText("fmt"), cborText("none")],
+    [cborText("authData"), cborBytes(Buffer.concat([registrationAuthData, credentialRaw, cose]))],
+    [cborText("attStmt"), cborMap([])],
+  ]);
+
   const reg = await PASSKEY.issuePasskeyChallenge(sql, { purpose: "register", userId: u.hr });
   const regClient = makeClient("webauthn.create", reg.challenge);
-  const saved = await PASSKEY.registerPasskey(sql, {
+  const registrationInput = {
     userId: u.hr,
     challengeId: reg.id,
     credentialId,
     clientDataJSON: encode(regClient),
-    publicKeySpki: encode(spki),
-    algorithm: -7,
+    attestationObject: encode(attestationObject),
     transports: ["internal"],
     label: "Synthetic Windows Hello",
-  });
+  };
+  const saved = await PASSKEY.registerPasskey(sql, registrationInput);
   assert.match(saved.id, /^[0-9a-f-]{36}$/i);
+  const [stored] = await sql`SELECT public_key_spki, algorithm, sign_count FROM auth_passkey_credentials WHERE id = ${saved.id}`;
+  assert.equal(stored.algorithm, -7);
+  assert.equal(Number(stored.sign_count), 0);
+  assert.ok(typeof stored.public_key_spki === "string" && stored.public_key_spki.length > 40);
+
   await assert.rejects(
-    PASSKEY.registerPasskey(sql, {
-      userId: u.hr,
-      challengeId: reg.id,
-      credentialId: randomBytes(32).toString("base64url"),
-      clientDataJSON: encode(regClient),
-      publicKeySpki: encode(spki),
-      algorithm: -7,
-    }),
+    PASSKEY.registerPasskey(sql, registrationInput),
     /invalid_or_expired_challenge/,
     "registration challenge is single-use",
   );
 
   const loginChallenge = await PASSKEY.issuePasskeyChallenge(sql, { purpose: "login" });
   const assertionClient = makeClient("webauthn.get", loginChallenge.challenge);
-  const rpHash = createHash("sha256").update("localhost").digest();
   const authData = Buffer.alloc(37);
   rpHash.copy(authData, 0);
   authData[32] = 0x05; // user present + user verified
@@ -376,6 +414,7 @@ test("passkey: registration is session-bound; assertion verifies RP/origin/UV/si
   const noUvClient = makeClient("webauthn.get", noUv.challenge);
   const noUvAuth = Buffer.from(authData);
   noUvAuth[32] = 0x01;
+  noUvAuth.writeUInt32BE(2, 33);
   const noUvSigned = Buffer.concat([noUvAuth, createHash("sha256").update(noUvClient).digest()]);
   const noUvSig = signData("sha256", noUvSigned, privateKey);
   assert.equal(await PASSKEY.verifyPasskeyAssertion(sql, {
