@@ -142,12 +142,13 @@ PASSKEY_RP_NAME=Celerates ERP
 - [ ] Fix pilot-blocking P0/P1 items.
 - [ ] Verify authorization for viewer/editor/full Sales access on the tested actions.
 - [ ] Verify downstream TA can continue from the generated Requisition/PQ state.
+- [x] Add database-level one-to-one guards for Opportunity → Requisition/PQ Tracker and cover conversion retry in HTTP smoke.
 - [ ] Verify duplicate conversion and orphan-state protections with real pilot scenarios.
 - [ ] Confirm what Google Sheet sync remains transitional during Wave 1 and who is the write-owner during the pilot.
 
 ### Pilot release
 
-- [ ] Apply migration `0012_passkeys.sql`.
+- [ ] Apply migrations `0012_passkeys.sql` and `0013_sales_handoff_uniqueness.sql` after checking the target DB for pre-existing duplicate handoffs.
 - [ ] Deploy the pilot build to the approved environment.
 - [ ] Smoke-test login, session revocation, Sales create/update/convert, document flow and downstream visibility.
 - [ ] Start the single feedback backlog.
