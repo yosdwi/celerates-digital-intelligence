@@ -70,6 +70,7 @@ try {
   console.log('Lead conversion requests complete');
   const trackers=await db`SELECT * FROM sales_opportunity_trackers WHERE lead_id=${lead.id}`;assert.equal(trackers.length,1,'retry does not duplicate tracker');
   const tracker=trackers[0];assert.equal(tracker.position_name,'Engineer');assert.equal(tracker.headcount_target,2);assert.equal(tracker.price_amount,20000000);assert.equal(tracker.price_period_code,'monthly');
+  await action('/sales/opportunity-tracker','app/sales/opportunity-tracker/actions.ts','updateSalesQualified',[tracker.id,true]);
   await action('/sales/opportunity-tracker','app/sales/opportunity-tracker/actions.ts','convertToRequisition',[tracker.id,form({})]);
   await action('/sales/opportunity-tracker','app/sales/opportunity-tracker/actions.ts','convertToRequisition',[tracker.id,form({})]);
   console.log('Requisition conversion request complete');
