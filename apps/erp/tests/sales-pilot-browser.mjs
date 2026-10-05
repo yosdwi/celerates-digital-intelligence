@@ -5,6 +5,7 @@ import { chromium } from "playwright";
 
 export async function runSalesPilotBrowserJourney({ base, cookies, db, tracker }) {
   assert.equal(new URL(base).hostname, "127.0.0.1");
+  const browserBase = base.replace("127.0.0.1", "localhost");
   const browser = await chromium.launch({
     headless: true,
     executablePath: process.env.ERP_BROWSER_EXECUTABLE || undefined,
@@ -14,7 +15,7 @@ export async function runSalesPilotBrowserJourney({ base, cookies, db, tracker }
   let authenticatorId;
   try {
     const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
-    await context.addCookies(cookies.map(([name, value]) => ({ name, value, url: base })));
+    await context.addCookies(cookies.map(([name, value]) => ({ name, value, url: browserBase })));
     const page = await context.newPage();
     const errors = [];
     page.on("pageerror", (e) => errors.push(e.message));
@@ -32,22 +33,28 @@ export async function runSalesPilotBrowserJourney({ base, cookies, db, tracker }
       },
     }));
 
-    await page.goto(base + "/profile");
+    await page.goto(browserBase + "/profile");
     await page.getByPlaceholder("Nama perangkat (opsional)").fill("Synthetic Pilot Device");
     await page.getByPlaceholder("Password saat ini").fill("Synthetic-Only-Password-123");
+    const registerResponse = page.waitForResponse(
+      (response) => response.url().endsWith("/api/passkey/register") && response.request().method() === "POST",
+      { timeout: 15_000 },
+    );
     await page.getByRole("button", { name: "Daftarkan biometrik / passkey" }).click();
+    const saved = await registerResponse;
+    assert.equal(saved.status(), 200, "passkey registration failed: " + await saved.text());
     await page.getByText("Synthetic Pilot Device", { exact: true }).waitFor({ timeout: 15_000 });
     const [passkey] = await db`SELECT id,label,revoked_at FROM auth_passkey_credentials WHERE label='Synthetic Pilot Device'`;
     assert.ok(passkey && !passkey.revoked_at, "passkey persisted after verified registration ceremony");
 
     await context.clearCookies();
-    await page.goto(base + "/login");
+    await page.goto(browserBase + "/login");
     const passkeyLogin = page.getByRole("button", { name: "Masuk dengan biometrik / passkey" });
     await passkeyLogin.waitFor();
     await passkeyLogin.click();
     await page.waitForURL((url) => url.pathname === "/", { timeout: 15_000 });
 
-    await page.goto(base + "/sales/opportunity-tracker");
+    await page.goto(browserBase + "/sales/opportunity-tracker");
     await page.getByRole("heading", { name: "Opportunity Tracker" }).waitFor();
     const row = page.getByRole("row").filter({ hasText: "Synthetic Client" }).first();
     await row.waitFor();
@@ -60,7 +67,7 @@ export async function runSalesPilotBrowserJourney({ base, cookies, db, tracker }
       "converted Sales record cannot be converted twice from UI",
     );
 
-    await page.goto(base + "/ta");
+    await page.goto(browserBase + "/ta");
     await page.getByRole("heading", { name: "Requisition" }).waitFor();
     const taBody = await page.locator("body").innerText();
     assert.match(taBody, /Synthetic Client/);

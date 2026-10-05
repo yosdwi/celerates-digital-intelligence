@@ -10,7 +10,7 @@ function sameOrigin(request: Request) {
   const origin = request.headers.get("origin");
   if (!origin) return true;
   try {
-    return new URL(origin).host === new URL(process.env.NEXTAUTH_URL || request.url).host;
+    return new URL(origin).origin === new URL(passkeyRp().origin).origin;
   } catch {
     return false;
   }
