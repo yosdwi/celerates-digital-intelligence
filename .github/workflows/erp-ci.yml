@@ -4,6 +4,10 @@ on:
     paths: ['apps/erp/**', 'services/intelligence-api/**', 'infra/postgres/migrations/**', 'infra/erp-compose.yml', '.github/workflows/erp-ci.yml']
   pull_request:
     paths: ['apps/erp/**', 'services/intelligence-api/**', 'infra/postgres/migrations/**', 'infra/erp-compose.yml', '.github/workflows/erp-ci.yml']
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 jobs:
