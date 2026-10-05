@@ -6,8 +6,6 @@ import { revokeMyPasskey } from "@/lib/security/actions";
 
 type Passkey = { id: string; label: string | null; created_at: string; last_used_at: string | null };
 type CreateResponse = AuthenticatorAttestationResponse & {
-  getPublicKey?: () => ArrayBuffer | null;
-  getPublicKeyAlgorithm?: () => number;
   getTransports?: () => string[];
 };
 
@@ -70,9 +68,6 @@ export function PasskeysPanel({ passkeys }: { passkeys: Passkey[] }) {
         })) as PublicKeyCredential | null;
         if (!credential) throw new Error("credential_cancelled");
         const response = credential.response as CreateResponse;
-        const publicKey = response.getPublicKey?.();
-        const algorithm = response.getPublicKeyAlgorithm?.();
-        if (!publicKey || (algorithm !== -7 && algorithm !== -257)) throw new Error("browser_public_key_unavailable");
 
         const save = await fetch("/api/passkey/register", {
           method: "POST",
@@ -82,8 +77,7 @@ export function PasskeysPanel({ passkeys }: { passkeys: Passkey[] }) {
             challengeId: option.challengeId,
             credentialId: toB64(credential.rawId),
             clientDataJSON: toB64(response.clientDataJSON),
-            publicKeySpki: toB64(publicKey),
-            algorithm,
+            attestationObject: toB64(response.attestationObject),
             transports: response.getTransports?.() ?? [],
             label: label || "Perangkat pribadi",
           }),
@@ -91,6 +85,7 @@ export function PasskeysPanel({ passkeys }: { passkeys: Passkey[] }) {
         const result = (await save.json().catch(() => ({}))) as { ok?: boolean; error?: string };
         if (!save.ok || !result.ok) {
           if (result.error === "invalid_password") return setMessage({ ok: false, text: "Password saat ini salah." });
+          if (result.error === "rate_limited") return setMessage({ ok: false, text: "Terlalu banyak percobaan. Coba lagi nanti." });
           throw new Error(result.error || "save_failed");
         }
         setPassword("");
