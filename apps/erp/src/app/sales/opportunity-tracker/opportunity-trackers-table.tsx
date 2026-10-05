@@ -58,7 +58,17 @@ const VALID_SERVICE_TYPES = new Set(["outsourcing", "headhunting", "outplacement
 const VALID_CLIENT_TYPES = new Set(["existing", "new"]);
 const VALID_LEVELS = new Set(["internship", "entry_level", "junior", "middle", "senior", "lead", "manager", "vp"]);
 
-export function OpportunityTrackersTable({ data, convertedIds }: { data: Tracker[]; convertedIds: string[] }) {
+export function OpportunityTrackersTable({
+  data,
+  convertedIds,
+  canEdit,
+  canDelete,
+}: {
+  data: Tracker[];
+  convertedIds: string[];
+  canEdit: boolean;
+  canDelete: boolean;
+}) {
   const t = useTranslations("sales.opportunityTracker");
   const tc = useTranslations("common");
   const {
@@ -225,10 +235,10 @@ export function OpportunityTrackersTable({ data, convertedIds }: { data: Tracker
           </div>
         </div>
         <div className="mt-auto pt-3 border-t border-slate-100 flex flex-wrap items-center gap-2">
-          <Link href={`/sales/opportunity-tracker/${row.id}/edit`} className="text-xs font-medium text-slate-600 hover:text-slate-900">{tc("edit")}</Link>
-          <span className="text-slate-300">|</span>
-          <DeleteTrackerButton trackerId={row.id} />
-          {canConvert && (
+          {canEdit && <Link href={`/sales/opportunity-tracker/${row.id}/edit`} className="text-xs font-medium text-slate-600 hover:text-slate-900">{tc("edit")}</Link>}
+          {canEdit && canDelete && <span className="text-slate-300">|</span>}
+          {canDelete && <DeleteTrackerButton trackerId={row.id} />}
+          {canEdit && canConvert && (
             <ConvertToRequisitionButton
               opportunityTrackerId={row.id}
               positionName={row.position_name}
@@ -248,14 +258,16 @@ export function OpportunityTrackersTable({ data, convertedIds }: { data: Tracker
               return (
                 <tr key={row.id} className="border-b border-slate-100 last:border-0 hover:bg-violet-50/60">
                   <td className="px-4 py-3 sticky left-0 bg-white z-0 space-y-1.5">
-                    <div className="flex gap-2 items-center">
-                      <Link href={`/sales/opportunity-tracker/${row.id}/edit`} className="text-xs font-medium text-slate-600 hover:text-slate-900">{tc("edit")}</Link>
-                      <span className="text-slate-300">|</span>
-                      <DeleteTrackerButton trackerId={row.id} />
-                    </div>
+                    {(canEdit || canDelete) && (
+                      <div className="flex gap-2 items-center">
+                        {canEdit && <Link href={`/sales/opportunity-tracker/${row.id}/edit`} className="text-xs font-medium text-slate-600 hover:text-slate-900">{tc("edit")}</Link>}
+                        {canEdit && canDelete && <span className="text-slate-300">|</span>}
+                        {canDelete && <DeleteTrackerButton trackerId={row.id} />}
+                      </div>
+                    )}
                     <OptyStatusBadge optyStatusCode={row.opty_status_code} />
-                    <OptyStatusSelector id={row.id} currentOptyStatus={row.opty_status_code} currentSalesQualified={row.sales_qualified} />
-                    {canConvert && (
+                    {canEdit && <OptyStatusSelector id={row.id} currentOptyStatus={row.opty_status_code} currentSalesQualified={row.sales_qualified} />}
+                    {canEdit && canConvert && (
                       <ConvertToRequisitionButton
                         opportunityTrackerId={row.id}
                         positionName={row.position_name}
