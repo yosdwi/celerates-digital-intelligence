@@ -1,6 +1,7 @@
 "use server";
 import { currentClaims, requestMeta, requireActor, requireRecentAuth, StepUpRequiredError } from "@/lib/actor";
 import { db, sql } from "@/db";
+import { mailboxAllowed } from "@/lib/security/email-otp";
 import { audit } from "@/lib/security/audit";
 import { CAPABILITIES, type Capability, type CapabilityScope } from "@/lib/security/policy";
 import { revokeUserSessions } from "@/lib/security/session";
@@ -159,6 +160,9 @@ export async function inviteUser(formData: FormData): Promise<InviteResult> {
 
   if (!email || !full_name) {
     return { ok: false, error: "Email dan nama wajib diisi" };
+  }
+  if (!mailboxAllowed(email).ok) {
+    return { ok: false, error: "Gunakan email perusahaan @celerates.com atau @celerates.co.id" };
   }
   if (!make_owner && (!division_id || !level)) {
     return { ok: false, error: "Pilih divisi dan level akses (atau centang jadikan Owner)" };
