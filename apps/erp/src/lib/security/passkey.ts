@@ -2,7 +2,7 @@
 // Biometric data and private keys never leave the user's authenticator. Registration is verified server-side
 // from the WebAuthn attestation object; ERP persists only credential id, public key, counter and audit metadata.
 import { createHash, createPublicKey, randomBytes, timingSafeEqual, verify as verifySignature } from "node:crypto";
-import type { KeyObject, JsonWebKey } from "node:crypto";
+import type { KeyObject } from "node:crypto";
 import type { Sql, TransactionSql } from "postgres";
 
 type Tx = Sql | TransactionSql;
@@ -168,7 +168,7 @@ function mapValue(map: Map<CborValue, CborValue>, key: string | number) {
 function cosePublicKey(cose: Map<CborValue, CborValue>): { algorithm: -7 | -257; spki: string; key: KeyObject } {
   const kty = mapValue(cose, 1);
   const alg = mapValue(cose, 3);
-  let jwk: JsonWebKey;
+  let jwk: Record<string, string>;
 
   if (kty === 2 && alg === -7 && mapValue(cose, -1) === 1) {
     const x = mapValue(cose, -2);
@@ -184,7 +184,7 @@ function cosePublicKey(cose: Map<CborValue, CborValue>): { algorithm: -7 | -257;
     throw new Error("unsupported_algorithm");
   }
 
-  const key = createPublicKey({ key: jwk, format: "jwk" });
+  const key = createPublicKey({ key: jwk as any, format: "jwk" });
   const spki = (key.export({ type: "spki", format: "der" }) as Buffer).toString("base64url");
   return { algorithm: alg as -7 | -257, spki, key };
 }
