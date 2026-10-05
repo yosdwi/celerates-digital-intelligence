@@ -60,7 +60,7 @@ export async function verifyChallenge(
 /** Corporate mailbox domains that may receive codes, plus explicit, audited per-address exceptions. */
 export function mailboxAllowed(email: string): { ok: boolean; exception: boolean } {
   const lower = email.trim().toLowerCase();
-  const domains = (process.env.AUTH_EMAIL_DOMAINS || "celerates.com").split(",").map((d) => d.trim().toLowerCase()).filter(Boolean);
+  const domains = (process.env.AUTH_EMAIL_DOMAINS || "celerates.com,celerates.co.id").split(",").map((d) => d.trim().toLowerCase()).filter(Boolean);
   const exceptions = (process.env.AUTH_EMAIL_EXCEPTIONS || "").split(",").map((d) => d.trim().toLowerCase()).filter(Boolean);
   if (domains.includes(lower.split("@")[1] ?? "")) return { ok: true, exception: false };
   return exceptions.includes(lower) ? { ok: true, exception: true } : { ok: false, exception: false };
