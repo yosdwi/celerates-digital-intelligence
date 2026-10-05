@@ -1,11 +1,17 @@
 name: P0 verification
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   api:
+    if: github.event_name == 'push' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -33,7 +39,9 @@ jobs:
       - run: uv run --project services/intelligence-api --extra test pytest services/intelligence-api/tests
       - run: uv run --extra test ruff check cdi tests --config pyproject.toml
         working-directory: services/intelligence-api
+
   web:
+    if: github.event_name == 'push' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -43,7 +51,9 @@ jobs:
         working-directory: apps/web
       - name: Verify web proxy survives API address replacement
         run: sh scripts/check-web-proxy.sh
+
   compose:
+    if: github.event_name == 'push' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

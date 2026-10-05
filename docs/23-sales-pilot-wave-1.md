@@ -153,7 +153,9 @@ PASSKEY_RP_NAME=Celerates ERP
 
 - [ ] Apply migrations `0012_passkeys.sql` and `0013_sales_handoff_uniqueness.sql` after checking the target DB for pre-existing duplicate handoffs.
 - [ ] Deploy the pilot build to the approved environment.
-- [ ] Smoke-test login, session revocation, Sales create/update/convert, document flow and downstream visibility.
+- [x] Add disposable automated E2E for corporate bootstrap → passkey enrollment/login → Sales Opportunity visibility → converted-state guard → TA downstream visibility.
+- [ ] Full automated E2E gate is green on the review-ready PR revision.
+- [ ] Smoke-test the same login, session revocation, Sales create/update/convert, document flow and downstream visibility in the approved pilot environment.
 - [ ] Start the single feedback backlog.
 - [ ] Onboard selected Sales users.
 - [ ] Observe real use and close P0/P1.
@@ -191,3 +193,15 @@ PASSKEY_RP_NAME=Celerates ERP
 ```
 
 Technical design should now be written only for decisions needed by this execution path (auth, Sales handoff, deployment, backup/observability and required provider boundaries), not as another broad architecture exercise.
+
+
+## 8. Automated verification strategy
+
+Development follows `docs/development/01-development-execution-rules.md`.
+
+For Wave 1:
+
+- Draft PR revisions run the ERP **Fast Gate** (unit/security/schema + typecheck).
+- The expensive ERP browser/HTTP journey and cross-service P0/Compose checks run when the PR is **ready for review** or on `main`.
+- The Sales browser journey uses a disposable database and Chromium virtual WebAuthn authenticator. It never targets a live ERP and never stores a real biometric.
+- Real-device biometric checks and real Sales/TA accounts remain pilot-environment validation and are not replaced by synthetic E2E.

@@ -101,6 +101,8 @@ try {
   for (const page of ['/finance','/pmo/dashboard','/executive-dashboard']) assert.equal((await request(page)).status,200,'derived invoice projection renders '+page);
   console.log('PASS: contextual API, read-only PMO pages, explicit repeatable preparation, live derived submission rule');
   if(process.env.ERP_BROWSER_TEST==='1') {
+    const { runSalesPilotBrowserJourney }=await import('./sales-pilot-browser.mjs');
+    await runSalesPilotBrowserJourney({base,cookies:[...jar],db,tracker});
     const { runBrowserJourney }=await import('./browser-journey.mjs');
     await runBrowserJourney({base,cookies:[...jar]});
     const [floating]=await db`SELECT * FROM feature_requests WHERE title='Synthetic floating feedback'`;
