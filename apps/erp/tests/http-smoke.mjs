@@ -50,10 +50,10 @@ try {
   assert.equal((await fetch(base+'/marketing',{redirect:'manual'})).status,307);
   assert.equal((await fetch(base+'/api/documents?bucket=candidate-documents&path=x')).status,403);
   const token=process.env.SETUP_TOKEN;
-  let res=await request('/api/setup',{method:'POST',body:form({token,email:'owner@example.test',name:'Synthetic Pilot Reviewer',password:'Synthetic-Only-Password-123'})});assert.equal(res.status,303,'bootstrap');
+  let res=await request('/api/setup',{method:'POST',body:form({token,email:'owner@celerates.com',name:'Synthetic Pilot Reviewer',password:'Synthetic-Only-Password-123'})});assert.equal(res.status,303,'bootstrap');
   res=await request('/api/setup',{method:'POST',body:form({token,email:'second@example.test',name:'Second',password:'Synthetic-Only-Password-123'})});assert.equal(res.status,400,'one-time setup');
   const csrf=await (await request('/api/auth/csrf')).json();
-  res=await request('/api/auth/callback/credentials',{method:'POST',body:new URLSearchParams({csrfToken:csrf.csrfToken,email:'owner@example.test',password:'Synthetic-Only-Password-123',callbackUrl:base,json:'true'})});assert.equal(res.status,200,'login');
+  res=await request('/api/auth/callback/credentials',{method:'POST',body:new URLSearchParams({csrfToken:csrf.csrfToken,email:'owner@celerates.com',password:'Synthetic-Only-Password-123',callbackUrl:base,json:'true'})});assert.equal(res.status,200,'login');
   assert.equal((await request('/marketing')).status,200,'authorized page: '+errors.slice(-3000));
   console.log('PASS: bootstrap and authenticated page');
   await action('/marketing','app/marketing/actions.ts','createLead',[form({client_name:'Synthetic Client',contact_name:'Reviewer',service_type_code:'outsourcing',lead_source_code:'inbound',category_code:'new',sales_pic_name:'Owner',is_qualified:'true',project_name:'Synthetic ERP journey',position_name:'Engineer',headcount_target:2,level_code:'senior',price_amount:20000000,price_period_code:'monthly',estimated_duration_months:6})]);
@@ -71,9 +71,10 @@ try {
   const trackers=await db`SELECT * FROM sales_opportunity_trackers WHERE lead_id=${lead.id}`;assert.equal(trackers.length,1,'retry does not duplicate tracker');
   const tracker=trackers[0];assert.equal(tracker.position_name,'Engineer');assert.equal(tracker.headcount_target,2);assert.equal(tracker.price_amount,20000000);assert.equal(tracker.price_period_code,'monthly');
   await action('/sales/opportunity-tracker','app/sales/opportunity-tracker/actions.ts','convertToRequisition',[tracker.id,form({})]);
+  await action('/sales/opportunity-tracker','app/sales/opportunity-tracker/actions.ts','convertToRequisition',[tracker.id,form({})]);
   console.log('Requisition conversion request complete');
-  const [req]=await db`SELECT * FROM requisitions WHERE opportunity_id=${tracker.id}`;assert.ok(req,'requisition created');assert.equal(req.headcount_target,2);
-  const [opty]=await db`SELECT * FROM opportunities WHERE opportunity_tracker_id=${tracker.id}`;assert.equal(opty.opty_no,tracker.opty_no,'shared business key');
+  const reqRows=await db`SELECT * FROM requisitions WHERE opportunity_id=${tracker.id}`;assert.equal(reqRows.length,1,'retry does not duplicate requisition');const req=reqRows[0];assert.equal(req.headcount_target,2);
+  const optyRows=await db`SELECT * FROM opportunities WHERE opportunity_tracker_id=${tracker.id}`;assert.equal(optyRows.length,1,'retry does not duplicate PQ tracker');const opty=optyRows[0];assert.equal(opty.opty_no,tracker.opty_no,'shared business key');
   context=await (await request('/api/operations/context?path=/sales')).json();
   assert.equal(context.groups.find(g=>g.key==='unassigned-requisitions').count,1);
   assert.equal(context.groups.find(g=>g.key==='qualified-trackers').count,0);
@@ -127,7 +128,7 @@ try {
     await agentJourney({base,request,db,env:intelligenceEnv,python,publicKey:delegationPublicKey,tracker,requisition:req,readToken,cookies:[...jar].map(([k,v])=>k+'='+v).join('; ')});
   }
   if(process.env.CONFORM_REPO&&process.env.ERP_BROWSER_TEST==='1'){const {conformJourney}=await import('./conform-journey.mjs');await conformJourney({base,db,cookies:[...jar]});}
-  await db`UPDATE users SET status='rejected'  WHERE email='owner@example.test'`;
+  await db`UPDATE users SET status='rejected'  WHERE email='owner@celerates.com'`;
   assert.equal((await request('/api/operations/context?path=/finance')).status,403,'revoked session cannot read operational context');
   assert.equal((await request('/api/agent/context?path=/sales')).status,403,'revoked session cannot use the Agent');
   const before=(await db`SELECT count(*)::int AS n FROM leads`)[0].n;
