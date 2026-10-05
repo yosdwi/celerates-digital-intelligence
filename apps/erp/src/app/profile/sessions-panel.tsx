@@ -7,7 +7,7 @@ import { logoutAllDevices, revokeMySession, revokeMyTrustedBrowser } from "@/lib
 type Session = { id: string; auth_method: string; created_at: string; last_seen_at: string; device: string | null; ip_prefix: string | null };
 type Browser = { id: string; device: string | null; created_at: string; expires_at: string };
 const when = (iso: string) => new Date(iso).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" });
-const METHOD: Record<string, string> = { password: "Password", "password+email_otp": "Password + kode email", talent_link: "Tautan WhatsApp" };
+const METHOD: Record<string, string> = { password: "Password", "password+email_otp": "Password + kode email", passkey: "Biometrik / Passkey", talent_link: "Tautan WhatsApp" };
 
 export function SessionsPanel({ sessions, browsers, currentSid }: { sessions: Session[]; browsers: Browser[]; currentSid: string | null }) {
   const [pending, start] = useTransition();
