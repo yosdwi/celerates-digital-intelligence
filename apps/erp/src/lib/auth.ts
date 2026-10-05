@@ -28,13 +28,12 @@ export async function checkPassword(emailInput: unknown, password: unknown, meta
   const [user] = await sql`SELECT id, email, full_name, password_hash, account_type, status FROM users WHERE email = ${email}`;
   const usable = allowed && user?.status === "active" && typeof user.password_hash === "string";
   const valid = await bcrypt.compare(password, usable ? user.password_hash : DUMMY_HASH);
-  const corporate = user?.account_type === "talent" || mailboxAllowed(email).ok;
-  if (usable && valid && corporate) return user as { id: string; email: string; full_name: string; account_type: string };
+  if (usable && valid) return user as { id: string; email: string; full_name: string; account_type: string };
   await audit(sql, {
     action: "login",
     decision: "deny",
     actorUserId: user?.id ?? null,
-    reason: !allowed ? "rate_limited" : usable && valid && !corporate ? "mailbox_not_allowed" : "bad_credentials",
+    reason: allowed ? "bad_credentials" : "rate_limited",
     ipHash: meta.ipHash,
     device: meta.device,
   });
@@ -53,6 +52,10 @@ export const authOptions: NextAuthOptions = {
         const meta = clientMeta((req?.headers ?? {}) as Record<string, string>);
         const user = await checkPassword(credentials?.email, credentials?.password, meta);
         if (!user) return null;
+        if (user.account_type !== "talent" && !mailboxAllowed(user.email).ok) {
+          await audit(sql, { action: "login", decision: "deny", actorUserId: user.id, reason: "mailbox_not_allowed", ipHash: meta.ipHash, device: meta.device });
+          return null;
+        }
         // Backoffice: a browser that has not proved the corporate mailbox gets no session (docs/security/02).
         // Talent accounts with a password keep password-only; their strong path is the WhatsApp link.
         let method: AuthMethod = "password";
