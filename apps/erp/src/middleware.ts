@@ -41,7 +41,7 @@ async function liveClaims(req: NextRequest): Promise<LiveClaims | null> {
 
 export async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
-  if (["/login", "/api/login", "/api/session-check", "/setup", "/api/setup", "/api/health/live", "/api/health/ready", "/logo-celerates.jpg", "/manifest.webmanifest", "/sw.js", "/offline.html"].includes(path) || path.startsWith("/api/auth/") || /^\/icons\/[a-z0-9-]+\.png$/.test(path)) return pass(req);
+  if (["/login", "/api/login", "/api/passkey/login/options", "/api/session-check", "/setup", "/api/setup", "/api/health/live", "/api/health/ready", "/logo-celerates.jpg", "/manifest.webmanifest", "/sw.js", "/offline.html"].includes(path) || path.startsWith("/api/auth/") || /^\/icons\/[a-z0-9-]+\.png$/.test(path)) return pass(req);
   // Only the versioned machine contract delegates to its own fail-closed auth.
   if (path.startsWith("/api/integration/v1/")) return pass(req);
   // Machine-to-machine endpoints (ConForm → Celerates) authenticate themselves with a service bearer token.
