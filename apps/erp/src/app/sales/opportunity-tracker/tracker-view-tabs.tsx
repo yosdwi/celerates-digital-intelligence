@@ -15,7 +15,17 @@ const TABS = [
  * tabel/grid-nya sendiri tidak disentuh sama sekali, cuma ditambah tab
  * "Kanban" sebagai tampilan alternatif baru.
  */
-export function TrackerViewTabs({ data, convertedIds }: { data: Parameters<typeof OpportunityTrackersTable>[0]["data"]; convertedIds: string[] }) {
+export function TrackerViewTabs({
+  data,
+  convertedIds,
+  canEdit,
+  canDelete,
+}: {
+  data: Parameters<typeof OpportunityTrackersTable>[0]["data"];
+  convertedIds: string[];
+  canEdit: boolean;
+  canDelete: boolean;
+}) {
   const t = useTranslations("sales.opportunityTracker");
   const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("list");
 
@@ -39,11 +49,11 @@ export function TrackerViewTabs({ data, convertedIds }: { data: Parameters<typeo
 
       {tab === "list" ? (
         <ExpandableSection title={t("listTitle", { count: data.length })}>
-          <OpportunityTrackersTable data={data} convertedIds={convertedIds} />
+          <OpportunityTrackersTable data={data} convertedIds={convertedIds} canEdit={canEdit} canDelete={canDelete} />
         </ExpandableSection>
       ) : (
         <div className="rounded-2xl border border-white/70 bg-white/75 backdrop-blur-xl shadow-[0_1px_2px_rgba(15,23,42,0.04),0_16px_32px_-16px_rgba(15,23,42,0.12)] overflow-hidden">
-          <OpportunityKanban data={data} />
+          <OpportunityKanban data={data} canEdit={canEdit} />
         </div>
       )}
     </div>
