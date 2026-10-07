@@ -48,7 +48,8 @@ export function RecordPreview({
   const [pending, start] = useTransition();
   const [dialog, setDialog] = useState<null | "convert" | "delete">(null);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const visible = record && !rail.agentOpen;
+  // The Agent is a docked drawer that narrows the page (contract §9), so the preview stays open beside it.
+  const visible = !!record;
 
   // Publish how much of the right edge the panel covers, so the Agent launcher moves out of its way.
   useEffect(() => {
@@ -80,13 +81,13 @@ export function RecordPreview({
   }, [record]);
   useEffect(() => () => setRightRail({ record: null }), []);
 
-  // Escape closes the preview unless a dialog is open (the dialog takes Escape first).
+  // Escape closes the preview unless a dialog or the Agent is open (they take Escape first).
   useEffect(() => {
-    if (!visible) return;
+    if (!visible || rail.agentOpen) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && !dialog && !document.querySelector("[data-crisp-dialog]")) onClose(); };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [visible, dialog, onClose]);
+  }, [visible, rail.agentOpen, dialog, onClose]);
 
   if (!record) return <div ref={wrapRef} hidden />;
   const index = records.findIndex((r) => r.id === record.id);

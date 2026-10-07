@@ -4,7 +4,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Columns3, LayoutGrid, RefreshCw, Search, Table2 } from "lucide-react";
+import {
+  BadgeCheck, Banknote, Briefcase, Building2, CalendarClock, CircleDot, CircleX, Columns3, FileText, Gauge, GitBranch, HandCoins, Hash,
+  LayoutGrid, Layers, Megaphone, NotebookPen, RefreshCw, Search, Signal, Table2, Tag, Timer, UserRound, Users,
+} from "lucide-react";
 import {
   Board, DataTable, EntityCard, Input, SavedViews, SavedViewsSaveBar, StatCard, TableToolbar, ViewToggle,
   applyFilters, applySorts, Button, Dialog, DialogBody, DialogFooter, FormField,
@@ -12,11 +15,12 @@ import {
 } from "@crisp-ui-kit/crisp";
 import { useToast } from "@/components/toast-provider";
 import { updateOptyStatus } from "@/app/sales/opportunity-tracker/actions";
-import { CreateMenu, type FormOptions } from "./forms";
+import { CreateMenu, type CreateRequest, type FormOptions } from "./forms";
+import { HeaderFilter, type HeaderSpec } from "./header-filter";
 import { RecordPreview, type Access } from "./record-preview";
 import {
-  BUILT_IN_VIEWS, CLIENT_TYPES, DEFAULT_SHOWN, LEVELS, SERVICE_TYPES, STAGES, STAGE_LABEL, SERVICE_LABEL, LEVEL_LABEL, CLIENT_TYPE_LABEL,
-  fieldValue, matchesSearch, parseState, rupiah, serializeState,
+  BUILT_IN_VIEWS, CLIENT_TYPES, DEFAULT_SHOWN, FIELD_KEYS, LEVELS, SERVICE_TYPES, STAGES, STAGE_LABEL, SERVICE_LABEL, LEVEL_LABEL, CLIENT_TYPE_LABEL,
+  daysSince, fieldValue, matchesSearch, parseState, rupiah, serializeState,
   type Opportunity, type SavedState, type StoredView, type View, type WorkspaceState,
 } from "./model";
 
@@ -114,6 +118,10 @@ export function OpportunityWorkspace({
     { key: "bante", label: "BANTE", type: "number" },
     { key: "durationMonths", label: "Durasi (bulan)", type: "number" },
     { key: "createdAt", label: "Dibuat", type: "date" },
+    { key: "requirement", label: "Requirement", type: "text" },
+    { key: "detailRequirement", label: "Detail Requirement", type: "text" },
+    { key: "progressNotes", label: "Progress Notes", type: "text" },
+    { key: "droppedReason", label: "Dropped Reason", type: "text" },
   ], [salesPics]);
 
   // The one filtered, searched, sorted set every view shows.
@@ -188,14 +196,33 @@ export function OpportunityWorkspace({
   const closePreview = useCallback(() => commit({ record: null }), [commit]);
   const selected = state.record ? all.find((r) => r.id === state.record) ?? null : null;
 
-  const columns = useMemo(() => tableColumns(shownKeys), [shownKeys]);
+  // Table: Excel-style headers (header-filter.tsx) over every Celerates field; widths follow the longest value.
+  const widths = useMemo(() => columnWidths(serverRecords), [serverRecords]);
+  const valueIndex = useMemo(() => distinctValues(all), [all]);
+  const hideColumn = useCallback((key: string) => setShownKeys(shownKeys.filter((k) => k !== key)), [setShownKeys, shownKeys]);
+  const columns = useMemo(() => ALL_COLUMNS.map((c): DataTableColumn<Opportunity> => {
+    const spec = SPECS[c.key];
+    return {
+      ...c,
+      header: (
+        <HeaderFilter
+          spec={spec}
+          values={valueIndex[c.key] ?? []}
+          filters={state.filters}
+          sorts={state.sorts}
+          onFilters={(filters) => commit({ filters })}
+          onSorts={(sorts) => commit({ sorts })}
+          onHide={() => hideColumn(c.key)}
+        />
+      ),
+      align: spec.align,
+      width: widths[c.key],
+      hidden: !shownKeys.includes(c.key),
+    };
+  }), [valueIndex, state.filters, state.sorts, commit, hideColumn, widths, shownKeys]);
   const [workspaceRef, workspaceHeight] = useHeight<HTMLDivElement>();
-  const counts = useMemo(() => ({
-    total: all.length,
-    qualified: all.filter((d) => d.salesQualified).length,
-    win: all.filter((d) => d.status === "win").length,
-    dropped: all.filter((d) => d.status === "dropped").length,
-  }), [all]);
+  const counts = useMemo(() => Object.fromEntries(KPIS.map((k) => [k.id, all.filter(k.match).length])), [all]);
+  const [create, setCreate] = useState<CreateRequest>(null);
 
   return (
     <div className="flex flex-col bg-white text-[13px] text-slate-800 md:h-[calc(100dvh-6rem)]" data-sales-v2>
@@ -205,14 +232,31 @@ export function OpportunityWorkspace({
           <h1 className="text-lg font-semibold leading-6 text-slate-900">Opportunity Tracker</h1>
           <p className="text-[13px] text-slate-500">Evaluasi requirement klien sebelum lanjut ke proses hiring.</p>
         </div>
-        {access.canEdit ? <CreateMenu options={options} /> : <span className="rounded-md bg-slate-100 px-2 py-1 text-[12px] text-slate-600">Mode lihat saja</span>}
+        {access.canEdit ? <CreateMenu options={options} create={create} onCreate={setCreate} /> : <span className="rounded-md bg-slate-100 px-2 py-1 text-[12px] text-slate-600">Mode lihat saja</span>}
       </header>
 
-      <section aria-label="Ringkasan" className="mx-5 mb-3 grid grid-cols-2 divide-x divide-slate-100 rounded-lg border border-slate-200 lg:grid-cols-4" data-sales-v2-kpi>
-        <StatCard className="px-4 py-2" label="Total Opportunity" value={counts.total} />
-        <StatCard className="px-4 py-2" label="Sales Qualified" value={counts.qualified} />
-        <StatCard className="px-4 py-2" label="Sudah Win" value={counts.win} />
-        <StatCard className="px-4 py-2" label="Dropped" value={counts.dropped} />
+      {/* The one coloured element on the page (contract §12): each card is a built-in view; click to apply, again to clear. */}
+      <section aria-label="Ringkasan" className="mx-5 mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5" data-sales-v2-kpi>
+        {KPIS.map((k) => {
+          const on = active.id === k.id;
+          return (
+            <button
+              key={k.id}
+              type="button"
+              aria-pressed={on}
+              onClick={() => applyView(on ? null : k.id)}
+              data-kpi={k.id}
+              className="rounded-lg border text-left transition-shadow hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2"
+              style={{ background: k.soft, borderColor: on ? k.tone : "transparent", boxShadow: `inset 3px 0 0 ${k.bar}`, outlineColor: k.tone }}
+            >
+              <StatCard
+                className="px-4 py-2"
+                label={<span className="text-[12px] font-medium text-slate-600">{k.label}</span>}
+                value={<span className="text-[22px] font-bold leading-7 tabular-nums" style={{ color: k.tone }}>{counts[k.id]}</span>}
+              />
+            </button>
+          );
+        })}
       </section>
 
       <div className="flex flex-wrap items-center gap-2 border-y border-slate-100 px-5 py-2" data-sales-v2-toolbar>
@@ -299,22 +343,13 @@ export function OpportunityWorkspace({
             columnOrder={[...shownKeys, ...ALL_COLUMN_KEYS.filter((k) => !shownKeys.includes(k))]}
             onColumnOrderChange={(order) => setShownKeys(order.filter((k) => shownKeys.includes(k)))}
             onColumnsChange={(next) => setShownKeys(next.filter((c) => !c.hidden).map((c) => c.key))}
-            columnMenu
             showViewSettings={false}
             showCount={false}
-            sort={state.sorts}
-            onSortChange={(s) => commit({ sorts: s ? [s] : [] })}
             interactive
             onRowClick={(row) => select(row.id)}
             height={workspaceHeight}
             locale="id-ID"
             empty={<p className="p-6 text-center text-slate-500">Tidak ada opportunity yang cocok.</p>}
-            sortAscendingLabel="Urutkan naik"
-            sortDescendingLabel="Urutkan turun"
-            moveColumnLeftLabel="Geser ke kiri"
-            moveColumnRightLabel="Geser ke kanan"
-            hideColumnLabel="Sembunyikan kolom"
-            editColumnLabel="Ganti label kolom"
           />
         )}
 
@@ -328,7 +363,7 @@ export function OpportunityWorkspace({
                   aria-label={`${o.client} ${o.optyNo}`}
                   aria-current={o.id === state.record || undefined}
                   onClick={() => select(o.id)}
-                  author={<span className="font-mono text-[11px] text-slate-500">{o.optyNo} · {STAGE_LABEL[o.status] ?? o.status}</span>}
+                  author={<span className="inline-flex items-center gap-1.5 text-[11px] text-slate-500"><StageDot status={o.status} /><span className="font-mono">{o.optyNo}</span> · {STAGE_LABEL[o.status] ?? o.status}</span>}
                   title={o.client}
                   excerpt={[o.position, o.headcount ? `${o.headcount} orang` : null, rupiah(o.price, o.pricePeriod)].filter(Boolean).join(" · ") || "-"}
                   footer={<span className="text-[12px] text-slate-500">{o.salesPic}{o.salesQualified ? " · Qualified" : ""}{o.pq ? " · Sudah convert" : ""}</span>}
@@ -340,7 +375,7 @@ export function OpportunityWorkspace({
         )}
 
         {state.view === "kanban" && (
-          <div className="h-full" data-sales-v2-board>
+          <div className="h-full px-3 pt-2" data-sales-v2-board>
             <Board<Opportunity & { columnId: string }>
               columns={STAGES.map((s) => ({ id: s.id, title: s.title, accent: s.accent }))}
               cards={records.map((o) => ({ ...o, columnId: o.status }))}
@@ -349,14 +384,9 @@ export function OpportunityWorkspace({
               announceMove={(col, card) => `${card ?? "Kartu"} dipindah ke ${col}`}
               onPreviewCard={(c) => select(c.id)}
               previewCardLabel="Lihat ringkasan"
-              renderCard={(c) => (
-                <button type="button" onClick={() => select(c.id)} className="block w-full text-left" data-card-preview={c.id}>
-                  <span className="block truncate text-[13px] font-medium text-slate-900">{c.client}</span>
-                  <span className="block truncate font-mono text-[11px] text-slate-500">{c.optyNo}</span>
-                  <span className="mt-1 block truncate text-[12px] text-slate-600">{[c.position, c.salesPic].filter(Boolean).join(" · ")}</span>
-                  {c.price != null && <span className="block text-[12px] text-slate-600">{rupiah(c.price, c.pricePeriod)}</span>}
-                </button>
-              )}
+              onNewCard={access.canEdit ? (columnId) => setCreate({ kind: "opportunity", status: columnId }) : undefined}
+              newCardLabel="Opportunity baru"
+              renderCard={(c) => <KanbanCard o={c} onOpen={() => select(c.id)} />}
             />
           </div>
         )}
@@ -397,33 +427,134 @@ function stripIds(s: SavedState) {
   return { q: s.q.trim(), sorts: s.sorts, filters: s.filters.map(({ key, op, value, values, join }) => ({ key, op, value, values, join })) };
 }
 
+// ── Summary cards: built-in views, in the ERP palette ───────────────────────────────────────────────────────
+const OPEN = new Set(["cv_submission", "solutioning", "proposal_sent", "need_action"]);
+const KPIS: { id: string; label: string; tone: string; soft: string; bar: string; match: (o: Opportunity) => boolean }[] = [
+  { id: "all", label: "Total Opportunity", tone: "#194667", soft: "#eef3f7", bar: "#194667", match: () => true },
+  { id: "active", label: "Pipeline aktif", tone: "#1a43b8", soft: "#e8eefd", bar: "#2356e8", match: (o) => OPEN.has(o.status) },
+  { id: "ready", label: "Siap Convert", tone: "#b2410f", soft: "#fdeee7", bar: "#f15525", match: (o) => o.salesQualified && !o.pq },
+  { id: "win", label: "Win", tone: "#0e6b52", soft: "#e1f4ee", bar: "#10b981", match: (o) => o.status === "win" },
+  { id: "dropped", label: "Dropped", tone: "#b42318", soft: "#fdecea", bar: "#ef4444", match: (o) => o.status === "dropped" },
+];
+
+const STAGE_ACCENT: Record<string, string> = Object.fromEntries(STAGES.map((s) => [s.id, s.accent]));
+function StageDot({ status }: { status: string }) {
+  return <span aria-hidden className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ background: STAGE_ACCENT[status] ?? "#8a8f98" }} />;
+}
+
+const initials = (name: string) => name.split(/\s+/).filter((w) => /^[A-Za-z]/.test(w)).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("") || "?";
+
+/** Kanban card, Attio-style: who, what, how much, who owns it, how fresh. The stage colour is the card's left edge (CSS). */
+function KanbanCard({ o, onOpen }: { o: Opportunity; onOpen: () => void }) {
+  const age = daysSince(o.lastCommunication);
+  return (
+    <button type="button" onClick={onOpen} className="block w-full space-y-1 text-left" data-card-preview={o.id}>
+      <span className="flex items-start justify-between gap-2">
+        <span className="min-w-0 truncate text-[13px] font-semibold leading-5 text-slate-900">{o.client}</span>
+        {o.salesQualified && <BadgeCheck size={15} className="mt-0.5 shrink-0 text-emerald-600" aria-label="Sales Qualified" />}
+      </span>
+      <span className="block truncate font-mono text-[11px] text-slate-500">{o.optyNo}{o.leadNo ? ` · ${o.leadNo}` : ""}</span>
+      {(o.position || o.headcount) && (
+        <span className="block truncate text-[12px] text-slate-700">{[o.position, o.level ? LEVEL_LABEL[o.level] ?? o.level : null, o.headcount ? `${o.headcount} HC` : null].filter(Boolean).join(" · ")}</span>
+      )}
+      {o.price != null && <span className="block text-[13px] font-semibold tabular-nums text-slate-900">{rupiah(o.price, o.pricePeriod)}</span>}
+      <span className="mt-1 flex items-center justify-between gap-2 border-t border-slate-100 pt-1.5 text-[11px] text-slate-500">
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span aria-hidden className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#dce8ef] text-[10px] font-semibold text-[#123650]">{initials(o.salesPic)}</span>
+          <span className="truncate">{o.salesPic}</span>
+        </span>
+        <span className="flex shrink-0 items-center gap-1.5">
+          {o.requisition ? <span className="rounded bg-[#e8eefd] px-1 font-semibold text-[#1a43b8]">REQ</span> : o.pq ? <span className="rounded bg-violet-50 px-1 font-semibold text-violet-700">PQ</span> : null}
+          {age != null && <span className={age > 14 ? "font-semibold text-red-600" : ""} title={`Last Communication ${o.lastCommunication}`}>{age}h</span>}
+        </span>
+      </span>
+    </button>
+  );
+}
+
 // ── Table columns: every Celerates field, the useful ones shown by default (contract §7) ──────────────────────
-const ALL_COLUMNS: DataTableColumn<Opportunity>[] = [
-  { key: "client", header: "Client", type: "entity", sortable: true, width: 220, accessor: (o) => o.client },
-  { key: "optyNo", header: "Opty No", sortable: true, width: 150, render: (_, o) => <span className="font-mono text-[12px] text-slate-600">{o.optyNo}</span> },
-  { key: "status", header: "Stage", type: "status", sortable: true, width: 140, accessor: (o) => String(STAGE_ORDER[o.status] ?? 9), format: (_, o) => STAGE_LABEL[o.status] ?? o.status, swatches: STAGE_SWATCH },
-  { key: "position", header: "Positions", sortable: true, width: 180 },
-  { key: "headcount", header: "Headcount", type: "number", align: "right", sortable: true, width: 110 },
-  { key: "price", header: "Price", type: "number", align: "right", sortable: true, width: 170, format: (_, o) => rupiah(o.price, o.pricePeriod) },
-  { key: "salesPic", header: "Sales PIC", sortable: true, width: 150 },
-  { key: "salesQualified", header: "Sales Qualified", width: 130, render: (_, o) => (o.salesQualified ? <span className="text-emerald-700">Qualified</span> : <span className="text-slate-400">Belum</span>) },
-  { key: "lastCommunication", header: "Last Communication", sortable: true, width: 160, accessor: (o) => o.lastCommunication ?? "" },
-  { key: "downstream", header: "Requisition / PQ", width: 190, render: (_, o) => o.requisition ? <span className="font-mono text-[12px]">{o.requisition.no}</span> : o.pq ? <span className="text-[12px]">PQ · Extension</span> : <span className="text-slate-400">-</span> },
-  { key: "leadNo", header: "Leads No", sortable: true, width: 140, render: (_, o) => <span className="font-mono text-[12px] text-slate-600">{o.leadNo ?? ""}</span> },
-  { key: "clientType", header: "Client Type", width: 120, accessor: (o) => (o.clientType ? CLIENT_TYPE_LABEL[o.clientType] ?? o.clientType : "") },
-  { key: "serviceType", header: "Service Type", sortable: true, width: 150, accessor: (o) => (o.serviceType ? SERVICE_LABEL[o.serviceType] ?? o.serviceType : "") },
-  { key: "level", header: "Level", width: 120, accessor: (o) => (o.level ? LEVEL_LABEL[o.level] ?? o.level : "") },
-  { key: "durationMonths", header: "Durasi", type: "number", align: "right", width: 100, format: (_, o) => (o.durationMonths ? `${o.durationMonths} bulan` : "") },
-  { key: "requirement", header: "Requirement", width: 220 },
-  { key: "detailRequirement", header: "Detail Requirement", width: 240 },
-  { key: "closingPrice", header: "Closing Price Deal", type: "number", align: "right", sortable: true, width: 170, format: (_, o) => rupiah(o.closingPrice) },
-  { key: "bante", header: "BANTE", type: "number", align: "right", sortable: true, width: 90 },
-  { key: "progressNotes", header: "Progress Notes", width: 240 },
-  { key: "droppedReason", header: "Dropped Reason", width: 200 },
+// Header alignment follows the values under it: centre for short codes, dates and counts, right for money.
+const SPECS: Record<string, HeaderSpec> = Object.fromEntries(([
+  ["client", "Client", Building2, "values", "left"],
+  ["optyNo", "Opty No", Hash, "text", "left"],
+  ["status", "Stage", CircleDot, "values", "center"],
+  ["position", "Positions", Briefcase, "values", "left"],
+  ["headcount", "Headcount", Users, "number", "center"],
+  ["price", "Price", Banknote, "number", "right"],
+  ["salesPic", "Sales PIC", UserRound, "values", "left"],
+  ["salesQualified", "Sales Qualified", BadgeCheck, "bool", "center"],
+  ["lastCommunication", "Last Communication", CalendarClock, "date", "center"],
+  ["downstream", "Requisition / PQ", GitBranch, "none", "left"],
+  ["leadNo", "Leads No", Megaphone, "text", "left"],
+  ["clientType", "Client Type", Tag, "values", "center"],
+  ["serviceType", "Service Type", Layers, "values", "left"],
+  ["level", "Level", Signal, "values", "center"],
+  ["durationMonths", "Durasi", Timer, "number", "center"],
+  ["requirement", "Requirement", FileText, "text", "left"],
+  ["detailRequirement", "Detail Requirement", FileText, "text", "left"],
+  ["closingPrice", "Closing Price Deal", HandCoins, "number", "right"],
+  ["bante", "BANTE", Gauge, "values", "center"],
+  ["progressNotes", "Progress Notes", NotebookPen, "text", "left"],
+  ["droppedReason", "Dropped Reason", CircleX, "text", "left"],
+] as const).map(([key, label, icon, kind, align]) => [key, { key, label, icon, kind, align, sortable: FIELD_KEYS.has(key) }]));
+
+const ALL_COLUMNS: Omit<DataTableColumn<Opportunity>, "header">[] = [
+  { key: "client", type: "entity", accessor: (o) => o.client },
+  { key: "optyNo", render: (_, o) => <span className="font-mono text-[12px] text-slate-600">{o.optyNo}</span> },
+  { key: "status", type: "status", accessor: (o) => String(STAGE_ORDER[o.status] ?? 9), format: (_, o) => STAGE_LABEL[o.status] ?? o.status, swatches: STAGE_SWATCH },
+  { key: "position" },
+  { key: "headcount", type: "number" },
+  { key: "price", type: "number", format: (_, o) => rupiah(o.price, o.pricePeriod) },
+  { key: "salesPic" },
+  { key: "salesQualified", render: (_, o) => (o.salesQualified ? <span className="font-medium text-emerald-700">Qualified</span> : <span className="text-slate-400">Belum</span>) },
+  { key: "lastCommunication", accessor: (o) => o.lastCommunication ?? "" },
+  { key: "downstream", render: (_, o) => o.requisition ? <span className="font-mono text-[12px]">{o.requisition.no}</span> : o.pq ? <span className="text-[12px]">PQ · Extension</span> : <span className="text-slate-400">-</span> },
+  { key: "leadNo", render: (_, o) => <span className="font-mono text-[12px] text-slate-600">{o.leadNo ?? ""}</span> },
+  { key: "clientType", accessor: (o) => (o.clientType ? CLIENT_TYPE_LABEL[o.clientType] ?? o.clientType : "") },
+  { key: "serviceType", accessor: (o) => (o.serviceType ? SERVICE_LABEL[o.serviceType] ?? o.serviceType : "") },
+  { key: "level", accessor: (o) => (o.level ? LEVEL_LABEL[o.level] ?? o.level : "") },
+  { key: "durationMonths", type: "number", format: (_, o) => (o.durationMonths ? `${o.durationMonths} bulan` : "") },
+  { key: "requirement" },
+  { key: "detailRequirement" },
+  { key: "closingPrice", type: "number", format: (_, o) => rupiah(o.closingPrice) },
+  { key: "bante", type: "number" },
+  { key: "progressNotes" },
+  { key: "droppedReason" },
 ];
 const ALL_COLUMN_KEYS = ALL_COLUMNS.map((c) => c.key);
-const columnsForSettings: TableToolbarColumn[] = ALL_COLUMNS.map((c) => ({ key: c.key, label: String(c.header) }));
+const columnsForSettings: TableToolbarColumn[] = ALL_COLUMNS.map((c) => ({ key: c.key, label: SPECS[c.key].label }));
 
-function tableColumns(shown: string[]): DataTableColumn<Opportunity>[] {
-  return ALL_COLUMNS.map((c) => ({ ...c, hidden: !shown.includes(c.key) }));
+/** What a cell shows, as text: drives the auto column width. */
+function cellText(o: Opportunity, key: string): string {
+  switch (key) {
+    case "price": return rupiah(o.price, o.pricePeriod);
+    case "closingPrice": return rupiah(o.closingPrice);
+    case "downstream": return o.requisition?.no ?? (o.pq ? "PQ · Extension" : "-");
+    case "salesQualified": return o.salesQualified ? "Qualified" : "Belum";
+    case "durationMonths": return o.durationMonths ? `${o.durationMonths} bulan` : "";
+    default: return String(fieldValue(o, key) ?? "");
+  }
+}
+
+/** Width per column from its longest value or header (≈7px a character at 13px), between 80 and 320px. */
+function columnWidths(rows: Opportunity[]): Record<string, number> {
+  return Object.fromEntries(ALL_COLUMN_KEYS.map((key) => {
+    let w = SPECS[key].label.length * 7 + 64; // icon, gaps, sort and filter marks
+    for (const o of rows) w = Math.max(w, cellText(o, key).length * 7 + (key === "client" ? 56 : 28));
+    return [key, Math.min(320, Math.max(80, Math.ceil(w)))];
+  }));
+}
+
+/** Distinct values (with counts) for each checklist column, in the order a person scans them. */
+function distinctValues(rows: Opportunity[]): Record<string, [string, number][]> {
+  const out: Record<string, [string, number][]> = {};
+  for (const [key, spec] of Object.entries(SPECS)) {
+    if (spec.kind !== "values") continue;
+    const counts = new Map<string, number>();
+    for (const o of rows) { const v = String(fieldValue(o, key) ?? ""); counts.set(v, (counts.get(v) ?? 0) + 1); }
+    out[key] = key === "status"
+      ? STAGES.map((s) => [s.title, counts.get(s.title) ?? 0])
+      : [...counts].sort((a, b) => a[0].localeCompare(b[0], "id", { numeric: true }));
+  }
+  return out;
 }

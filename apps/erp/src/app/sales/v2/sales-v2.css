@@ -1,0 +1,37 @@
+/* Sales V2 visual layer (docs/design/SALES-V2-CRISP-UX-CONTRACT.md §12). Unlayered, so it wins over Crisp's
+   @layer crisp-components; every rule is scoped to V2 markup or to Crisp classes, which only V2 renders. */
+
+/* Inter (SIL OFL, self-hosted via @fontsource-variable/inter), the face Attio uses. Crisp asks for VK Sans first,
+   which is never loaded, so without this the UI fell back to the system font. */
+:root { --crisp-font-sans: "Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; }
+[data-sales-v2] { font-family: var(--crisp-font-sans); }
+
+/* Table header: ERP brand tint, semibold, the whole cell is the Excel-style menu button. */
+[data-sales-v2] .crisp-table thead th { background: #eef3f7; color: #123650; font-size: 12px; font-weight: 600; border-bottom: 1px solid #dce8ef; }
+[data-sales-v2] .crisp-table thead th:hover { background: #e3ecf3; }
+[data-sales-v2] [data-header-filter] { cursor: pointer; }
+[data-sales-v2] [data-header-filter][data-active] { color: #1a43b8; }
+
+/* Kanban: each column carries its stage colour; cards get a visible edge and the stage on their left side. */
+[data-sales-v2-board] .crisp-board-col:nth-child(1) { --stage: #8a8f98; }
+[data-sales-v2-board] .crisp-board-col:nth-child(2) { --stage: #3b82f6; }
+[data-sales-v2-board] .crisp-board-col:nth-child(3) { --stage: #8b5cf6; }
+[data-sales-v2-board] .crisp-board-col:nth-child(4) { --stage: #f97316; }
+[data-sales-v2-board] .crisp-board-col:nth-child(5) { --stage: #10b981; }
+[data-sales-v2-board] .crisp-board-col:nth-child(6) { --stage: #ef4444; }
+[data-sales-v2-board] .crisp-board-col-header { padding: 0 6px; border-bottom: 2px solid var(--stage, #cbd5e1); margin-bottom: 6px; }
+[data-sales-v2-board] .crisp-board-col-body { background: color-mix(in srgb, var(--stage, #94a3b8) 7%, #f8fafc); }
+[data-sales-v2-board] .crisp-board-card {
+  border-radius: 8px;
+  box-shadow: inset 3px 0 0 var(--stage, #94a3b8), inset 0 0 0 1px #cbd5e1, 0 1px 2px rgb(15 23 42 / 0.06);
+}
+[data-sales-v2-board] .crisp-board-card:hover {
+  box-shadow: inset 3px 0 0 var(--stage, #94a3b8), inset 0 0 0 1px #94a3b8, 0 3px 8px rgb(15 23 42 / 0.08);
+}
+
+/* Dialogs: the form is the focus. Dim and blur what is behind it; brand header. */
+.crisp-dialog-backdrop { background: rgb(9 34 54 / 0.42); backdrop-filter: blur(3px); }
+[data-sales-v2-dialog] { background: #fff; box-shadow: 0 24px 64px rgb(9 34 54 / 0.32), 0 0 0 1px rgb(9 34 54 / 0.08); }
+[data-sales-v2-dialog] .crisp-dialog-header { background: #eef3f7; border-bottom: 1px solid #dce8ef; box-shadow: inset 0 3px 0 #194667; }
+[data-sales-v2-dialog] .crisp-dialog-title { color: #092236; font-weight: 700; }
+[data-sales-v2-dialog] .crisp-dialog-header svg { color: #194667; }

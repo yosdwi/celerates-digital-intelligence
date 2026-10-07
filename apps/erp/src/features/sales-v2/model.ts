@@ -116,6 +116,7 @@ export type WorkspaceState = {
 export const FIELD_KEYS = new Set([
   "client", "optyNo", "leadNo", "status", "serviceType", "clientType", "position", "level", "headcount", "salesQualified",
   "price", "closingPrice", "salesPic", "lastCommunication", "bante", "converted", "createdAt", "durationMonths",
+  "requirement", "detailRequirement", "progressNotes", "droppedReason",
 ]);
 
 function parseFilters(raw: string | null): ToolbarFilter[] {
@@ -123,14 +124,14 @@ function parseFilters(raw: string | null): ToolbarFilter[] {
   try {
     const list = JSON.parse(raw);
     if (!Array.isArray(list)) return [];
-    return list.slice(0, 20).flatMap((f, i): ToolbarFilter[] => {
+    return list.slice(0, 60).flatMap((f, i): ToolbarFilter[] => {
       if (!f || typeof f !== "object" || !FIELD_KEYS.has(f.key)) return [];
       return [{
         id: typeof f.id === "string" ? f.id.slice(0, 40) : `f${i}`,
         key: f.key,
         op: typeof f.op === "string" ? f.op : undefined,
         value: typeof f.value === "string" ? f.value.slice(0, 200) : "",
-        ...(Array.isArray(f.values) ? { values: f.values.filter((v: unknown): v is string => typeof v === "string").slice(0, 20) } : {}),
+        ...(Array.isArray(f.values) ? { values: f.values.filter((v: unknown): v is string => typeof v === "string").slice(0, 500) } : {}),
         ...(f.join === "or" || f.join === "and" ? { join: f.join } : {}),
         ...(typeof f.group === "string" ? { group: f.group.slice(0, 40) } : {}),
       } as ToolbarFilter];
@@ -169,6 +170,49 @@ export function serializeState(s: WorkspaceState): string {
   return str ? `?${str}` : "";
 }
 
+// ── Header (Excel-style) value filters ──────────────────────────────────────────────────────────────────────
+// A column's checklist is stored as ordinary toolbar filters with ids starting `h:<key>`, so it also shows as a chip in
+// the toolbar, lives in the URL and applies to every view. Whichever side is shorter is written: the ticked values
+// (`isanyof`) or each unticked one (`isnot`; `notempty` for the blank value). That keeps "all but two clients" short.
+const headerId = (key: string) => `h:${key}`;
+export const isHeaderFilter = (f: ToolbarFilter, key: string) => f.id === headerId(key) || f.id.startsWith(`${headerId(key)}:`);
+
+/** Values of `key` currently ticked in its header checklist. */
+export function checkedValues(filters: ToolbarFilter[], key: string, all: string[]): Set<string> {
+  const own = filters.filter((f) => isHeaderFilter(f, key));
+  const included = own.find((f) => f.op === "isanyof")?.values;
+  const excluded = new Set(own.flatMap((f) => (f.op === "isnot" ? [f.value.toLowerCase()] : f.op === "notempty" ? [""] : [])));
+  return new Set(all.filter((v) => (!included || included.some((x) => x.toLowerCase() === v.toLowerCase())) && !excluded.has(v.toLowerCase())));
+}
+
+/** Replace `key`'s header checklist filters so exactly `checked` (out of `all`) passes. */
+export function setCheckedValues(filters: ToolbarFilter[], key: string, all: string[], checked: Set<string>): ToolbarFilter[] {
+  const rest = filters.filter((f) => !isHeaderFilter(f, key));
+  const on = all.filter((v) => checked.has(v));
+  const off = all.filter((v) => !checked.has(v));
+  if (!off.length) return rest;
+  // The URL keeps at most 60 filters (parseFilters), so a long exclusion list falls back to the ticked values.
+  if (off.length > 40 || on.length <= off.length) return [...rest, { id: headerId(key), key, op: "isanyof", value: "", values: on }];
+  return [...rest, ...off.map((v, i): ToolbarFilter => (v === "" ? { id: `${headerId(key)}:${i}`, key, op: "notempty", value: "" } : { id: `${headerId(key)}:${i}`, key, op: "isnot", value: v }))];
+}
+
+/** Replace `key`'s header range filters (number: greaterthan/lessthan, date: after/before). Blank bounds are dropped. */
+export function setRange(filters: ToolbarFilter[], key: string, kind: "number" | "date", min: string, max: string): ToolbarFilter[] {
+  const rest = filters.filter((f) => !isHeaderFilter(f, key));
+  const [lo, hi] = kind === "number" ? (["greaterthan", "lessthan"] as const) : (["after", "before"] as const);
+  return [
+    ...rest,
+    ...(min.trim() ? [{ id: `${headerId(key)}:min`, key, op: lo, value: min.trim() } as ToolbarFilter] : []),
+    ...(max.trim() ? [{ id: `${headerId(key)}:max`, key, op: hi, value: max.trim() } as ToolbarFilter] : []),
+  ];
+}
+
+/** Replace `key`'s header text filter (`contains`). */
+export function setContains(filters: ToolbarFilter[], key: string, text: string): ToolbarFilter[] {
+  const rest = filters.filter((f) => !isHeaderFilter(f, key));
+  return text.trim() ? [...rest, { id: headerId(key), key, op: "contains", value: text.trim().slice(0, 200) }] : rest;
+}
+
 // ── Saved views ──────────────────────────────────────────────────────────────────────────────────────────────
 export type SavedState = Pick<WorkspaceState, "view" | "q" | "filters" | "sorts"> & { shownKeys?: string[] };
 export type StoredView = { id: string; name: string; state: SavedState; builtIn?: boolean };
@@ -183,4 +227,11 @@ export const BUILT_IN_VIEWS: StoredView[] = [
 ];
 
 /** Default columns: what a Sales person works with daily. Every other field stays one click away in View settings. */
+/** Days since a yyyy-mm-dd date (Last Communication age on cards); null when unknown. */
+export function daysSince(date: string | null, now = Date.now()): number | null {
+  if (!date) return null;
+  const t = Date.parse(date + "T00:00:00+07:00");
+  return Number.isNaN(t) ? null : Math.max(0, Math.floor((now - t) / 86400000));
+}
+
 export const DEFAULT_SHOWN = ["client", "optyNo", "status", "position", "headcount", "price", "salesPic", "salesQualified", "lastCommunication", "downstream"];

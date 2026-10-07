@@ -4,7 +4,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { BUILT_IN_VIEWS, DEFAULT_SHOWN, canConvert, matchesSearch, parseState, serializeState, type Opportunity } from "../src/features/sales-v2/model";
+import { applyFilters } from "@crisp-ui-kit/crisp";
+import {
+  BUILT_IN_VIEWS, DEFAULT_SHOWN, canConvert, checkedValues, daysSince, matchesSearch, parseState, serializeState, setCheckedValues, setRange,
+  type Opportunity,
+} from "../src/features/sales-v2/model";
 import { safeSalesReturnPath } from "../src/lib/safe-return";
 
 const read = (p: string) => readFileSync(new URL(`../src/${p}`, import.meta.url), "utf8");
@@ -76,14 +80,60 @@ test("density: no oversized page chrome in V2", () => {
   }
 });
 
-test("right rail: the Agent launcher follows the record panel instead of a z-index contest", () => {
+test("right rail: the Agent docks and narrows the page; the launcher follows the record panel (no z-index contest)", () => {
   const agent = read("components/agent/agent-panel.tsx");
   assert.match(agent, /useRightRail\(\)/);
   assert.match(agent, /rail\.panelWidth \? \{ right: rail\.panelWidth \+ 24 \}/);
   assert.match(agent, /setRightRail\(\{ agentOpen: open \}\)/);
+  assert.match(agent, /setProperty\("--agent-rail"/);
+  assert.match(read("components/app-shell.tsx"), /lg:mr-\[var\(--agent-rail,0px\)\]/);
+  for (const f of ["user-menu", "notification-bell", "activity-log-link", "language-switcher"])
+    assert.match(read(`components/${f}.tsx`), /right-\[calc\(var\(--agent-rail,0px\)\+/, f);
   const preview = read("features/sales-v2/record-preview.tsx");
-  assert.match(preview, /const visible = record && !rail\.agentOpen/);
+  assert.match(preview, /const visible = !!record/);
   assert.match(preview, /setRightRail\(\{ panelWidth:/);
+});
+
+test("Agent: no explanatory boilerplate; first-visit invitation offers voice, ask and the feedback form", () => {
+  const agent = read("components/agent/agent-panel.tsx") + read("components/agent/agent-thread.tsx");
+  assert.doesNotMatch(agent, /Satu tempat untuk bertanya|data\.coverage|ringkasan modul/);
+  assert.match(agent, /data-agent-intro-popup/);
+  assert.match(agent, /Bicara sekarang/);
+  assert.match(agent, /celerates\.agent\.intro\.v1/);
+});
+
+test("header checklist writes the shorter of ticked or unticked values, and round-trips through Crisp's filter", () => {
+  const all = ["A", "B", "C", "D", "E", ""];
+  const rows = all.map((client) => ({ client }));
+  const get = (r: { client: string }) => r.client;
+  // Two of six ticked: isanyof.
+  let f = setCheckedValues([], "client", all, new Set(["A", "B"]));
+  assert.deepEqual(f.map((x) => x.op), ["isanyof"]);
+  assert.deepEqual(applyFilters(rows, f, get).map(get), ["A", "B"]);
+  assert.deepEqual([...checkedValues(f, "client", all)], ["A", "B"]);
+  // All but the blank and "C": two exclusions (blank becomes notempty).
+  f = setCheckedValues([], "client", all, new Set(["A", "B", "D", "E"]));
+  assert.deepEqual(f.map((x) => x.op).sort(), ["isnot", "notempty"]);
+  assert.deepEqual(applyFilters(rows, f, get).map(get), ["A", "B", "D", "E"]);
+  assert.deepEqual([...checkedValues(f, "client", all)], ["A", "B", "D", "E"]);
+  // Everything ticked: no filter; other columns' filters are left alone.
+  const other = { id: "x", key: "status", op: "is" as const, value: "Win" };
+  assert.deepEqual(setCheckedValues([other, ...f], "client", all, new Set(all)), [other]);
+  // Ranges: blank bounds are dropped.
+  assert.deepEqual(setRange([], "price", "number", "100", " ").map((x) => [x.op, x.value]), [["greaterthan", "100"]]);
+  assert.deepEqual(setRange([], "lastCommunication", "date", "", "2026-10-01").map((x) => x.op), ["before"]);
+});
+
+test("Last Communication age in days", () => {
+  assert.equal(daysSince(null), null);
+  assert.equal(daysSince("2026-10-01", Date.parse("2026-10-07T12:00:00+07:00")), 6);
+});
+
+test("create dialog closes only from its close button and keeps a draft (contract §12)", () => {
+  const forms = read("features/sales-v2/forms.tsx");
+  assert.match(forms, /closest\?\.\("\.crisp-dialog-close"\)/);
+  assert.match(forms, /drafts\.current\[kind\] = d/);
+  assert.match(forms, /name="opty_status_code"/);
 });
 
 test("V2 reuses the V1 server actions (no duplicate business logic)", () => {
