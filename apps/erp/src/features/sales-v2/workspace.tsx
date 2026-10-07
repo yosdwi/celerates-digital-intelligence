@@ -9,7 +9,7 @@ import {
   LayoutGrid, Layers, Megaphone, NotebookPen, RefreshCw, Search, Signal, Table2, Tag, Timer, UserRound, Users,
 } from "lucide-react";
 import {
-  Board, DataTable, EntityCard, Input, SavedViews, SavedViewsSaveBar, StatCard, TableToolbar, ViewToggle,
+  Board, DataTable, EntityCard, Input, SavedViews, SavedViewsSaveBar, SnackbarProvider, StatCard, TableToolbar, ViewToggle, useSnackbar,
   applyFilters, applySorts, Button, Dialog, DialogBody, DialogFooter, FormField,
   type DataTableColumn, type TableToolbarColumn,
 } from "@crisp-ui-kit/crisp";
@@ -17,6 +17,7 @@ import { useToast } from "@/components/toast-provider";
 import { updateOptyStatus } from "@/app/sales/opportunity-tracker/actions";
 import { CreateMenu, type CreateRequest, type FormOptions } from "./forms";
 import { HeaderFilter, type HeaderSpec } from "./header-filter";
+import { CONFIRM_STAGES, StageMoveDialog, type PendingMove } from "./stage-move";
 import { RecordPreview, type Access } from "./record-preview";
 import {
   BUILT_IN_VIEWS, CLIENT_TYPES, DEFAULT_SHOWN, FIELD_KEYS, LEVELS, SERVICE_TYPES, STAGES, STAGE_LABEL, SERVICE_LABEL, LEVEL_LABEL, CLIENT_TYPE_LABEL,
@@ -66,13 +67,23 @@ function sortValue(o: Opportunity, key: string): unknown {
   return fieldValue(o, key);
 }
 
-export function OpportunityWorkspace({
-  records: serverRecords, access, options,
-}: { records: Opportunity[]; access: Access; options: FormOptions }) {
+type WorkspaceProps = { records: Opportunity[]; access: Access; options: FormOptions };
+
+/** Crisp's Snackbar (Undo after a Kanban move) needs its provider above the workspace. */
+export function OpportunityWorkspace(props: WorkspaceProps) {
+  return (
+    <SnackbarProvider>
+      <Workspace {...props} />
+    </SnackbarProvider>
+  );
+}
+
+function Workspace({ records: serverRecords, access, options }: WorkspaceProps) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
   const { showToast } = useToast();
+  const snackbar = useSnackbar();
   const state = useMemo(() => parseState(new URLSearchParams(params.toString())), [params]);
 
   // URL is the state. View changes push a history entry (Back undoes them); typing, filters, sort and the preview
@@ -167,22 +178,36 @@ export function OpportunityWorkspace({
   }
   const builtInNotice = () => showToast("Tampilan bawaan tidak bisa diubah. Simpan sebagai tampilan baru.", "error");
 
-  // Kanban drag: same updateOptyStatus V1's board and selector call.
+  // Kanban drag (contract §12): same updateOptyStatus V1's board calls. An ordinary move saves at once with Undo;
+  // Win and Dropped ask first (stage-move.tsx), and the card stays where it was until confirmed.
   const [, startMove] = useTransition();
-  function onCardsChange(next: (Opportunity & { columnId: string })[]) {
-    const moved = next.find((c) => c.columnId !== (all.find((r) => r.id === c.id)?.status));
-    if (!moved || !access.canEdit) return;
-    const before = all.find((r) => r.id === moved.id)!.status;
-    patch(moved.id, { status: moved.columnId });
+  const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
+  const [convertRequest, setConvertRequest] = useState<string | null>(null);
+  const moveTo = useCallback((record: Opportunity, to: string, undoable: boolean) => {
+    const from = record.status;
+    patch(record.id, { status: to });
     startMove(async () => {
       try {
-        await updateOptyStatus(moved.id, moved.columnId);
+        await updateOptyStatus(record.id, to);
         router.refresh();
+        if (undoable)
+          snackbar.show({
+            message: `${record.optyNo} dipindah ke ${STAGE_LABEL[to] ?? to}`,
+            duration: 7000,
+            action: { label: "Batalkan", onClick: () => moveTo({ ...record, status: to }, from, false) },
+          });
       } catch (err) {
-        patch(moved.id, { status: before });
+        patch(record.id, { status: from });
         showToast((err as Error)?.message || "Gagal memindahkan", "error");
       }
     });
+  }, [patch, router, snackbar, showToast]);
+  function onCardsChange(next: (Opportunity & { columnId: string })[]) {
+    const moved = next.find((c) => c.columnId !== (all.find((r) => r.id === c.id)?.status));
+    if (!moved || !access.canEdit) return;
+    const record = all.find((r) => r.id === moved.id)!;
+    if (CONFIRM_STAGES.has(moved.columnId)) setPendingMove({ record, to: moved.columnId });
+    else moveTo(record, moved.columnId, true);
   }
 
   // Coming back (Back, Cancel, Save) with a record in the URL: bring its card into view instead of the board's start.
@@ -225,7 +250,9 @@ export function OpportunityWorkspace({
   const [create, setCreate] = useState<CreateRequest>(null);
 
   return (
-    <div className="flex flex-col bg-white text-[13px] text-slate-800 md:h-[calc(100dvh-6rem)]" data-sales-v2>
+    // Full viewport height: -mb-24 cancels the shell's bottom padding, so the workspace reaches the bottom edge and the
+    // Agent launcher floats over it (the scroll areas leave room for it, sales-v2.css).
+    <div className="flex flex-col bg-white text-[13px] text-slate-800 md:-mb-24 md:h-dvh" data-sales-v2>
       {/* md:pr-56 keeps the primary action clear of the app's fixed top-right controls (language, bell, account). */}
       <header className="flex items-center justify-between gap-4 px-5 pt-4 pb-3 md:pr-56">
         <div className="min-w-0">
@@ -399,8 +426,25 @@ export function OpportunityWorkspace({
           onSelect={select}
           onClose={closePreview}
           onPatch={patch}
+          options={options}
+          convertRequest={convertRequest}
+          onConvertHandled={() => setConvertRequest(null)}
         />
       </div>
+
+      <StageMoveDialog
+        move={pendingMove}
+        returnTo={returnTo}
+        onCancel={() => setPendingMove(null)}
+        onError={(message) => showToast(message, "error")}
+        onMoved={(move, convert) => {
+          setPendingMove(null);
+          patch(move.record.id, { status: move.to });
+          router.refresh();
+          showToast(`${move.record.optyNo} dipindah ke ${STAGE_LABEL[move.to] ?? move.to}`);
+          if (convert) { select(move.record.id); setConvertRequest(move.record.id); }
+        }}
+      />
 
       <Dialog open={!!naming} onOpenChange={(o) => !o && setNaming(null)} title={naming?.mode === "rename" ? "Ganti nama tampilan" : "Simpan tampilan"} width={400}>
         {naming && (

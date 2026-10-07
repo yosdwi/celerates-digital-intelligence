@@ -6,10 +6,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { applyFilters } from "@crisp-ui-kit/crisp";
 import {
-  BUILT_IN_VIEWS, DEFAULT_SHOWN, canConvert, checkedValues, daysSince, matchesSearch, parseState, serializeState, setCheckedValues, setRange,
+  BUILT_IN_VIEWS, DEFAULT_SHOWN, canConvert, checkedValues, daysSince, editValues, matchesSearch, parseState, serializeState, setCheckedValues, setRange,
   type Opportunity,
 } from "../src/features/sales-v2/model";
 import { safeSalesReturnPath } from "../src/lib/safe-return";
+import { submoduleFor } from "../src/lib/module-access";
 
 const read = (p: string) => readFileSync(new URL(`../src/${p}`, import.meta.url), "utf8");
 const q = (s: string) => new URLSearchParams(s);
@@ -80,10 +81,12 @@ test("density: no oversized page chrome in V2", () => {
   }
 });
 
-test("right rail: the Agent docks and narrows the page; the launcher follows the record panel (no z-index contest)", () => {
+test("right rail: the Agent docks and narrows the page; an open record panel replaces the launcher (no z-index contest)", () => {
   const agent = read("components/agent/agent-panel.tsx");
   assert.match(agent, /useRightRail\(\)/);
-  assert.match(agent, /rail\.panelWidth \? \{ right: rail\.panelWidth \+ 24 \}/);
+  assert.match(agent, /const panelOpen = rail\.panelWidth > 0/);
+  assert.match(agent, /open \|\| panelOpen \? "hidden"/);
+  assert.match(read("features/sales-v2/record-preview.tsx"), /openAgent\(\{ prefill:/);
   assert.match(agent, /setRightRail\(\{ agentOpen: open \}\)/);
   assert.match(agent, /setProperty\("--agent-rail"/);
   assert.match(read("components/app-shell.tsx"), /lg:mr-\[var\(--agent-rail,0px\)\]/);
@@ -96,7 +99,10 @@ test("right rail: the Agent docks and narrows the page; the launcher follows the
 
 test("Agent: no explanatory boilerplate; first-visit invitation offers voice, ask and the feedback form", () => {
   const agent = read("components/agent/agent-panel.tsx") + read("components/agent/agent-thread.tsx");
-  assert.doesNotMatch(agent, /Satu tempat untuk bertanya|data\.coverage|ringkasan modul/);
+  assert.doesNotMatch(agent, /Satu tempat untuk bertanya|data\.coverage|ringkasan modul|Kenapa perlu perhatian: \$\{/);
+  assert.match(agent, /useState\(false\);\s*$/m); // Perlu perhatian starts folded
+  assert.match(agent, /placeholder="Bisa ceritakan masukan Anda\?"/);
+  assert.match(agent, /Usulkan fitur baru/);
   assert.match(agent, /data-agent-intro-popup/);
   assert.match(agent, /Bicara sekarang/);
   assert.match(agent, /celerates\.agent\.intro\.v1/);
@@ -132,7 +138,7 @@ test("Last Communication age in days", () => {
 test("create dialog closes only from its close button and keeps a draft (contract §12)", () => {
   const forms = read("features/sales-v2/forms.tsx");
   assert.match(forms, /closest\?\.\("\.crisp-dialog-close"\)/);
-  assert.match(forms, /drafts\.current\[kind\] = d/);
+  assert.match(forms, /drafts\.current\[kind\] = readDraft/);
   assert.match(forms, /name="opty_status_code"/);
 });
 
@@ -148,4 +154,32 @@ test("V2 sits behind the Sales route gate (no new, unguarded route)", async () =
   assert.deepEqual(routeGate("/sales/v2/opportunity-tracker"), { kind: "division", divisions: ["sales"] });
   assert.equal(canOpenRoute({ access: [{ divisionKey: "ta", level: "full" }] }, "/sales/v2/opportunity-tracker"), false);
   assert.equal(canOpenRoute({ access: [{ divisionKey: "sales", level: "viewer" }] }, "/sales/v2/opportunity-tracker"), true);
+});
+
+test("Agent context: /sales/v2/<page> is the same submodule as /sales/<page>, not PQ Tracker", () => {
+  assert.equal(submoduleFor("/sales/v2/opportunity-tracker")?.label, "Opportunity Tracker");
+  assert.equal(submoduleFor("/sales/opportunity-tracker")?.label, "Opportunity Tracker");
+  assert.equal(submoduleFor("/sales/abc/edit")?.label, "PQ Tracker");
+});
+
+test("edit values carry every V1 edit field and post blanks for unset values", () => {
+  const v1 = read("app/sales/opportunity-tracker/[id]/edit/page.tsx");
+  const v1Fields = new Set([...v1.matchAll(/name="([a-z_]+)"/g)].map((m) => m[1]).filter((n) => n !== "return_to"));
+  const o = { client: "PT A", salesPic: "Rina", status: "dropped", salesQualified: false, price: 5000000, lastCommunication: "2026-09-01", clientType: null } as unknown as Opportunity;
+  const v = editValues(o);
+  assert.deepEqual(new Set(Object.keys(v)), v1Fields);
+  assert.equal(v.price_amount, "5000000");
+  assert.equal(v.client_type_code, "");
+  assert.equal(v.sales_qualified, "");
+  // The edit dialog renders the same fields.
+  const forms = read("features/sales-v2/forms.tsx");
+  const edit = forms.slice(forms.indexOf("function EditForm"));
+  for (const f of v1Fields) assert.match(edit, f === "position_name" ? /<PositionInput\b/ : new RegExp(`name="${f}"`), f);
+});
+
+test("Kanban: Win and Dropped ask first; other moves save with Undo", () => {
+  const ws = read("features/sales-v2/workspace.tsx");
+  assert.match(read("features/sales-v2/stage-move.tsx"), /CONFIRM_STAGES = new Set\(\["win", "dropped"\]\)/);
+  assert.match(ws, /label: "Batalkan"/);
+  assert.match(ws, /CONFIRM_STAGES\.has\(moved\.columnId\)/);
 });

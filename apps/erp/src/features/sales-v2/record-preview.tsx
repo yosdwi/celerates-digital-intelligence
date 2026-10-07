@@ -6,7 +6,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Badge, Button, Checkbox, Dialog, DialogBody, DialogFooter, FormField, Input, InputShell, RecordPanel, Select } from "@crisp-ui-kit/crisp";
+import { Sparkles } from "lucide-react";
 import { MoneyInput } from "@/components/form-fields";
+import { openAgent } from "@/components/mobile/events";
 import { useToast } from "@/components/toast-provider";
 import { setRightRail, useRightRail } from "@/lib/right-rail";
 import {
@@ -15,6 +17,7 @@ import {
 import {
   CLIENT_TYPE_LABEL, LEVEL_LABEL, PRIORITIES, SERVICE_LABEL, STAGES, STAGE_LABEL, canConvert, rupiah, type Opportunity,
 } from "./model";
+import { EditOpportunityDialog, type FormOptions } from "./forms";
 
 const SIGNATURE: Record<string, { label: string; tone: "neutral" | "warning" | "success" | "danger" }> = {
   not_sent: { label: "Belum dikirim", tone: "neutral" },
@@ -29,7 +32,7 @@ const isRedirect = (err: unknown) => typeof (err as { digest?: unknown })?.diges
 export type Access = { canEdit: boolean; canDelete: boolean };
 
 export function RecordPreview({
-  record, records, access, returnTo, onSelect, onClose, onPatch,
+  record, records, access, returnTo, onSelect, onClose, onPatch, options, convertRequest, onConvertHandled,
 }: {
   record: Opportunity | null;
   /** The current filtered, sorted list: Previous / Next walk it. */
@@ -41,12 +44,21 @@ export function RecordPreview({
   onClose: () => void;
   /** Optimistic local change while the server action runs. */
   onPatch: (id: string, patch: Partial<Opportunity>) => void;
+  options: FormOptions;
+  /** Set after a Kanban move to Win chose "Pindahkan & Convert": open Convert for this record once. */
+  convertRequest?: string | null;
+  onConvertHandled?: () => void;
 }) {
   const rail = useRightRail();
   const router = useRouter();
   const { showToast } = useToast();
   const [pending, start] = useTransition();
-  const [dialog, setDialog] = useState<null | "convert" | "delete">(null);
+  const [dialog, setDialog] = useState<null | "convert" | "delete" | "edit">(null);
+  useEffect(() => {
+    if (!record || record.id !== convertRequest) return;
+    if (canConvert(record)) setDialog("convert");
+    onConvertHandled?.();
+  }, [record, convertRequest, onConvertHandled]);
   const wrapRef = useRef<HTMLDivElement>(null);
   // The Agent is a docked drawer that narrows the page (contract §9), so the preview stays open beside it.
   const visible = !!record;
@@ -91,6 +103,7 @@ export function RecordPreview({
 
   if (!record) return <div ref={wrapRef} hidden />;
   const index = records.findIndex((r) => r.id === record.id);
+  // The full V1 edit page stays reachable; day-to-day editing is the dialog (contract §12).
   const editHref = `/sales/opportunity-tracker/${record.id}/edit?return_to=${encodeURIComponent(returnTo)}`;
 
   function run(patch: Partial<Opportunity>, action: () => Promise<unknown>) {
@@ -176,7 +189,8 @@ export function RecordPreview({
       <div className="flex flex-wrap items-center gap-2">
         {canConvert(record) && <Button size="sm" intent="primary" onClick={() => setDialog("convert")}>Convert to Requisition</Button>}
         {record.pq && <span className="text-[12px] text-slate-500">Sudah dikonversi</span>}
-        <Button size="sm" intent="neutral" asChild><Link href={editHref}>Edit</Link></Button>
+        <Button size="sm" intent="neutral" onClick={() => setDialog("edit")}>Edit</Button>
+        <Link href={editHref} className="text-[12px] text-slate-500 hover:text-slate-800 hover:underline">Halaman penuh</Link>
         {access.canDelete && !record.pq && !record.requisition && (
           <Button size="sm" intent="ghost" className="ml-auto text-red-600" onClick={() => setDialog("delete")}>Hapus</Button>
         )}
@@ -192,14 +206,27 @@ export function RecordPreview({
       {visible && (
         <RecordPanel
           record={{ id: record.id, name: record.client } as never}
-          title={record.client}
+          title={
+            <span className="flex min-w-0 items-center justify-between gap-2">
+              <span className="truncate">{record.client}</span>
+              {/* The panel owns the right edge while open, so the Agent is reached from here, about this record. */}
+              <button
+                type="button"
+                onClick={() => openAgent({ prefill: `Tentang ${record.optyNo} (${record.client}): ` })}
+                className="inline-flex shrink-0 items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-[12px] font-medium text-slate-700 hover:border-brand-300 hover:text-brand-700"
+                data-sales-v2-ask-agent
+              >
+                <Sparkles size={13} /> Tanya Agent
+              </button>
+            </span>
+          }
           counterLabel={index >= 0 ? `${index + 1} dari ${records.length}` : undefined}
           onPrevious={index > 0 ? () => onSelect(records[index - 1].id) : undefined}
           onNext={index >= 0 && index < records.length - 1 ? () => onSelect(records[index + 1].id) : undefined}
           previousRecordLabel="Sebelumnya"
           nextRecordLabel="Berikutnya"
-          onOpenRecord={access.canEdit ? () => router.push(editHref) : undefined}
-          openRecordLabel="Buka halaman edit"
+          onOpenRecord={access.canEdit ? () => setDialog("edit") : undefined}
+          openRecordLabel="Edit"
           closeLabel="Tutup"
           highlightsLabel="Ringkasan"
           highlights={highlights}
@@ -217,6 +244,7 @@ export function RecordPreview({
       )}
       <ConvertDialog record={record} open={dialog === "convert"} onClose={() => setDialog(null)} returnTo={returnTo} />
       <DeleteDialog record={record} open={dialog === "delete"} onClose={() => setDialog(null)} onDeleted={onClose} />
+      {access.canEdit && <EditOpportunityDialog record={record} open={dialog === "edit"} onClose={() => setDialog(null)} returnTo={returnTo} options={options} />}
     </>
   );
 }

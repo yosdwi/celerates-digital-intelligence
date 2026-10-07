@@ -12,6 +12,14 @@
 [data-sales-v2] [data-header-filter] { cursor: pointer; }
 [data-sales-v2] [data-header-filter][data-active] { color: #1a43b8; }
 
+/* The workspace reaches the bottom edge and the Agent launcher floats over its corner: the scroll areas end with room
+   for it, so the last row or card can always be scrolled clear. */
+[data-sales-v2] .crisp-table-scroll { padding-bottom: 64px; }
+[data-sales-v2-board] .crisp-board-col-body { padding-bottom: 64px; }
+
+/* Columns share the board's width (no empty band on wide screens); below 6 × 268px it scrolls sideways as before. */
+[data-sales-v2-board] .crisp-board-col { flex: 1 0 268px; width: auto; }
+
 /* Kanban: each column carries its stage colour; cards get a visible edge and the stage on their left side. */
 [data-sales-v2-board] .crisp-board-col:nth-child(1) { --stage: #8a8f98; }
 [data-sales-v2-board] .crisp-board-col:nth-child(2) { --stage: #3b82f6; }

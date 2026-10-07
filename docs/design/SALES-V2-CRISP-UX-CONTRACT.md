@@ -64,8 +64,9 @@ Summary cards (StatCard × 5, one row, clickable: each applies its built-in view
 
 - One primary action (New ▾). Sheet Sync, view settings and other dataset utilities live in the toolbar, never in
   the headline. Read-only users see no New control.
-- On desktop the page does not scroll; the table, board and grid scroll inside the workspace. The Agent launcher
-  keeps its reserved strip below the workspace (AppShell `md:pb-24`).
+- On desktop the page does not scroll; the table, board and grid scroll inside the workspace, which reaches the
+  bottom edge (no reserved strip). The Agent launcher floats over the corner; the scroll areas end with 64px of room
+  so the last row or card can be scrolled clear of it. Kanban columns share the width (min 268px).
 
 ## 7. Views and state
 
@@ -81,8 +82,9 @@ Summary cards (StatCard × 5, one row, clickable: each applies its built-in view
 ## 8. Read first, mutate explicitly
 
 - Click on a row, grid card or Kanban card opens the `RecordPanel` preview. It never means Edit.
-- Mutations are explicit buttons in the panel: Change stage, Sales Qualified, Convert to Requisition, Edit (full
-  page), Delete (full access only). Kanban drag still changes stage for editors (same action as V1).
+- Mutations are explicit buttons in the panel: Change stage, Sales Qualified, Convert to Requisition, Edit (a dialog
+  with the V1 edit page's 19 fields and action; "Halaman penuh" still opens the V1 page), Delete (full access only).
+  Kanban drag still changes stage for editors (same action as V1); see §12 for Undo and the Win/Dropped confirm.
 - The panel shows highlights, the record's progress, Requisition / TA fulfilment, PQ, signature status and document
   counts, with links to the pages that own them (documents stay behind their existing step-up checks).
 
@@ -90,7 +92,9 @@ Summary cards (StatCard × 5, one row, clickable: each applies its built-in view
 
 - `lib/right-rail.ts` is a tiny shared store: the width the record panel currently occupies, whether the Agent is
   open, and the selected record (kept for future Agent context).
-- While the panel is open the Agent launcher moves left of it by that width. No z-index escalation.
+- While a record panel is open it owns the right edge: the floating Agent launcher is hidden and the panel header
+  offers "Tanya Agent", which opens the Agent with the record in the composer and in the context chip. Closing the
+  panel brings the launcher back. No z-index escalation.
 - The Agent is a docked right drawer, full height (Railway-style). On screens ≥ 1024px it sets `--agent-rail` and
   the app shell narrows by that width (`lg:mr-[var(--agent-rail)]`); the fixed top-right controls move left by the
   same amount. The page is never covered, so the record panel stays open beside the Agent. Below 1024px the drawer
@@ -130,5 +134,23 @@ Attio is the reference; Crisp already carries its measured geometry and tokens. 
   action already accepts `opty_status_code`).
 - Create dialogs: backdrop dimmed and blurred, brand header. They close only from ×, Batal or Simpan; Escape and a
   click outside are ignored. What was typed is kept as a draft until Simpan succeeds or "Kosongkan form".
+- Kanban moves: an ordinary move saves at once with a Snackbar "Batalkan" (7s). Win and Dropped ask first and the
+  card stays put until confirmed: Dropped takes the optional Dropped Reason (saved with the move through V1's edit
+  action, every other field unchanged); Win offers "Pindahkan & Convert" when the record is Sales Qualified and not yet
+  converted. (The panel's Stage select stays immediate.)
+- Edit is a dialog (same close rules and drafts as Create, kept per record for the session).
+- Celerates Agent (all modules): Perlu perhatian starts folded; an empty conversation leads with "Ada masukan atau
+  kebutuhan fitur?" and a voice button; chips above the composer (Laporkan kendala, Usulkan fitur, Apa yang perlu
+  aku perhatikan hari ini?) fill the composer rather than send; placeholder "Bisa ceritakan masukan Anda?". The
+  context chip resolves `/sales/v2/<page>` as `/sales/<page>`.
 - Celerates Agent (all modules): first visit shows a short invitation above the launcher (Bicara sekarang, ask or
   feedback, formulir masukan), once per browser. Explanatory boilerplate is removed from the drawer.
+
+## 13. Backlog
+
+- Inline field editing, Attio-style (decided 2026-10-07, after the Edit dialog). In Attio the record panel / page
+  lists every attribute, not only the table's columns, and each value is edited in place (click, change, saved).
+  So a field hidden from the table (e.g. Dropped Reason) is still edited inline from the panel; table cells are
+  inline-editable only for visible columns. Needs a per-field V1-compatible save (today only stage and Sales
+  Qualified have one; the rest go through the whole-form update) and per-field validation for required fields.
+

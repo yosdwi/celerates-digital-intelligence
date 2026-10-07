@@ -227,6 +227,23 @@ export const BUILT_IN_VIEWS: StoredView[] = [
 ];
 
 /** Default columns: what a Sales person works with daily. Every other field stays one click away in View settings. */
+/**
+ * The V1 edit form's fields (app/sales/opportunity-tracker/[id]/edit) for a record, as form strings. The edit dialog
+ * starts from these, and a Kanban move that also records a Dropped Reason sends them back unchanged through the same
+ * V1 action (updateOpportunityTracker), so every other field keeps its value. Blank means "not set" (the action
+ * stores null), exactly as the V1 form posts it.
+ */
+export function editValues(o: Opportunity): Record<string, string> {
+  const s = (v: unknown) => (v == null ? "" : String(v));
+  return {
+    client_name: o.client, client_type_code: s(o.clientType), service_type_code: s(o.serviceType), sales_pic_name: o.salesPic,
+    position_name: s(o.position), level_code: s(o.level), headcount_target: s(o.headcount), estimated_duration_months: s(o.durationMonths),
+    price_amount: s(o.price), price_period_code: s(o.pricePeriod), estimated_deal_amount: s(o.closingPrice), bante_score: s(o.bante),
+    last_communication_date: s(o.lastCommunication), sales_qualified: o.salesQualified ? "true" : "", opty_status_code: o.status,
+    requirement_summary: s(o.requirement), detail_requirement: s(o.detailRequirement), progress_notes: s(o.progressNotes), dropped_reason: s(o.droppedReason),
+  };
+}
+
 /** Days since a yyyy-mm-dd date (Last Communication age on cards); null when unknown. */
 export function daysSince(date: string | null, now = Date.now()): number | null {
   if (!date) return null;
