@@ -22,7 +22,7 @@ import { setRightRail, useRightRail } from "@/lib/right-rail";
 import type { SignalTrend } from "@/lib/operations/reader";
 import { ContextualFeedback } from "./feedback";
 import { FollowUps } from "./follow-ups";
-import type { Suggestion } from "./agent-thread";
+import type { Command, Suggestion } from "./agent-thread";
 import type { Attachment } from "./attachment-bar";
 
 const AgentThread = dynamic(() => import("./agent-thread"), {
@@ -66,7 +66,7 @@ export function AgentPanel() {
   const [loading, setLoading] = useState(false);
   const [agent, setAgent] = useState<{ path: string; data?: AgentContext }>();
   const [runs, setRuns] = useState<AgentRun[]>([]);
-  const [threadId] = useState(() => "thread-" + uuid());
+  const [threadId, setThreadId] = useState(() => "thread-" + uuid());
   const [attachment, setAttachment] = useState<Attachment | null>(null);
   const inflight = useRef<AbortController | null>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -239,6 +239,28 @@ export function AgentPanel() {
     const e = agentContext.entity;
     suggestions.push({ label: `Jelaskan ${e.type_label} ${e.label}`, run: () => startRun("explain_entity", {}, `Jelaskan ${e.type_label} ${e.label}`) });
   }
+  // "/" commands (agent-thread adds /bicara and /lampirkan). Same actions as the chips, the form and Perlu perhatian.
+  const page = `${context.label}${agentContext?.context.submodule ? ` › ${agentContext.context.submodule.label}` : ""}`;
+  const commands: Command[] = [
+    { id: "masukan", description: "Ceritakan masukan", fill: "Masukan: " },
+    { id: "fitur", description: "Usulkan fitur baru", fill: `Usul fitur (${page}): ` },
+    { id: "kendala", description: "Laporkan kendala di halaman ini", fill: `Kendala di ${page}: ` },
+    { id: "formulir", description: "Buka formulir masukan", run: () => setForm(true) },
+    { id: "perhatian", description: "Apa yang perlu aku perhatikan hari ini?", run: () => startRun("ask", { query: "Apa yang perlu aku perhatikan hari ini?" }, "Apa yang perlu aku perhatikan hari ini?") },
+    ...(agentContext?.entity
+      ? [{ id: "jelaskan", description: `Jelaskan ${agentContext.entity.type_label} ${agentContext.entity.label}`, run: () => startRun("explain_entity", {}, `Jelaskan ${agentContext.entity!.type_label} ${agentContext.entity!.label}`) }]
+      : rail.record ? [{ id: "jelaskan", description: `Jelaskan ${rail.record.label}`, fill: `Jelaskan ${rail.record.label}` }] : []),
+    {
+      id: "baru",
+      description: "Mulai percakapan baru",
+      run: () => {
+        inflight.current?.abort();
+        setRuns([]);
+        setAttachment(null);
+        setThreadId("thread-" + uuid());
+      },
+    },
+  ];
   // Text to place in the composer (a chip, or "Tanya Agent" from a record), applied once per tick.
   const [prefill, setPrefill] = useState<{ text: string; tick: number } | null>(null);
   const agentReady = agentContext?.enabled === true;
@@ -471,6 +493,7 @@ export function AgentPanel() {
                   onAction={(a) => startRun(a.skill, a.args, a.label)}
                   autoVoice={autoVoice}
                   prefill={prefill}
+                  commands={agentReady ? commands : []}
                 />
               </div>
               <p className="flex shrink-0 items-center justify-between gap-2 border-t border-slate-100 px-4 py-1.5 text-[11px] text-slate-500">

@@ -8,6 +8,7 @@ import {
   ComposerPrimitive,
   MessagePrimitive,
   ThreadPrimitive,
+  unstable_useSlashCommandAdapter,
   useExternalStoreRuntime,
   type AppendMessage,
   type ThreadMessageLike,
@@ -25,6 +26,8 @@ import type { Submission } from "@/lib/agent/run-state";
 
 /** A chip under the thread: `run` starts a run at once; `fill` puts text in the composer for the user to finish. */
 export type Suggestion = { label: string; run?: () => void; fill?: string };
+/** A "/" command in the composer. `fill` places text for the user to finish; `run` acts at once. */
+export type Command = { id: string; description: string; run?: () => void; fill?: string };
 
 function UserMessage() {
   return (
@@ -118,6 +121,7 @@ export default function AgentThread({
   voice,
   autoVoice = false,
   prefill = null,
+  commands = [],
 }: {
   runs: AgentRun[];
   running: boolean;
@@ -137,6 +141,8 @@ export default function AgentThread({
   autoVoice?: boolean;
   /** Text to place in the composer; applied again whenever `tick` changes. */
   prefill?: { text: string; tick: number } | null;
+  /** Panel-level "/" commands; the thread adds /bicara and /lampirkan itself. */
+  commands?: Command[];
 }) {
   const picker = useRef<HTMLInputElement>(null);
   // Set when the composer text came from a transcript; the run is then recorded with modality "voice".
@@ -184,6 +190,23 @@ export default function AgentThread({
     // Once per prefill tick.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefill?.tick]);
+  // "/" commands (assistant-ui slash commands, unstable API pinned at 0.15.22). The typed "/xyz" is stripped on
+  // select; a fill is applied on the next tick so the strip cannot overwrite it.
+  const [voiceSignal, setVoiceSignal] = useState(0);
+  const allCommands: Command[] = [
+    ...commands,
+    ...(voice ? [{ id: "bicara", description: "Ceritakan lewat suara", run: () => setVoiceSignal((n) => n + 1) }] : []),
+    { id: "lampirkan", description: "Lampirkan berkas (CSV, XLSX, PDF, DOCX, TXT, MD)", run: () => picker.current?.click() },
+  ];
+  const slash = unstable_useSlashCommandAdapter({
+    commands: allCommands.map((c) => ({
+      id: c.id,
+      label: `/${c.id}`,
+      description: c.description,
+      execute: () => (c.fill != null ? window.setTimeout(() => fill(c.fill!), 0) : c.run?.()),
+    })),
+    removeOnExecute: true,
+  });
   const transcript = (text: string) => {
     fromVoice.current = true;
     runtime.thread.composer.setText(text);
@@ -233,6 +256,31 @@ export default function AgentThread({
             {fileError}
           </p>
         )}
+        <ComposerPrimitive.Unstable_TriggerPopoverRoot>
+        <ComposerPrimitive.Unstable_TriggerPopover
+          char="/"
+          adapter={slash.adapter}
+          aria-label="Perintah"
+          className="mx-3 mb-1 max-h-64 overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-lg"
+          data-agent-commands
+        >
+          <ComposerPrimitive.Unstable_TriggerPopover.Action onExecute={slash.action.onExecute} removeOnExecute />
+          <ComposerPrimitive.Unstable_TriggerPopoverItems>
+            {(items) =>
+              items.map((item, index) => (
+                <ComposerPrimitive.Unstable_TriggerPopoverItem
+                  key={item.id}
+                  item={item}
+                  index={index}
+                  className="flex w-full items-baseline gap-2 rounded-md px-2 py-1.5 text-left text-xs text-slate-700 data-[highlighted]:bg-slate-100"
+                >
+                  <span className="shrink-0 font-mono font-medium text-brand-700">{item.label}</span>
+                  <span className="truncate text-slate-500">{item.description}</span>
+                </ComposerPrimitive.Unstable_TriggerPopoverItem>
+              ))
+            }
+          </ComposerPrimitive.Unstable_TriggerPopoverItems>
+        </ComposerPrimitive.Unstable_TriggerPopover>
         <ComposerPrimitive.Root className="flex items-end gap-2 border-t border-slate-100 p-3">
           <input
             ref={picker}
@@ -258,7 +306,7 @@ export default function AgentThread({
           <ComposerPrimitive.Input
             aria-label="Pesan untuk Agent"
             data-agent-composer
-            placeholder="Bisa ceritakan masukan Anda?"
+            placeholder="Bisa ceritakan masukan Anda? Ketik / untuk perintah"
             rows={1}
             maxLength={1000}
             className="min-h-10 flex-1 resize-none rounded-xl border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 disabled:bg-slate-50"
@@ -267,6 +315,7 @@ export default function AgentThread({
           {voice && (
             <VoiceButton
               autoStart={autoVoice}
+              startSignal={voiceSignal}
               disabled={!enabled || running}
               onTranscript={transcript}
               onError={setFileError}
@@ -279,6 +328,7 @@ export default function AgentThread({
             <SendHorizontal className="h-4 w-4" />
           </ComposerPrimitive.Send>
         </ComposerPrimitive.Root>
+        </ComposerPrimitive.Unstable_TriggerPopoverRoot>
       </ThreadPrimitive.Root>
     </AssistantRuntimeProvider>
   );

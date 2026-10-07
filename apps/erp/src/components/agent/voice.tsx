@@ -7,7 +7,7 @@ import { Loader2, Mic, Square } from "lucide-react";
 const MAX_MS = 60000;
 const TYPES = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus", "audio/mp4"];
 
-export function VoiceButton({ disabled, onTranscript, onError, autoStart = false, hero = false }: { disabled: boolean; onTranscript: (text: string) => void; onError: (message: string | null) => void; autoStart?: boolean; hero?: boolean }) {
+export function VoiceButton({ disabled, onTranscript, onError, autoStart = false, hero = false, startSignal = 0 }: { disabled: boolean; onTranscript: (text: string) => void; onError: (message: string | null) => void; autoStart?: boolean; hero?: boolean; /** Each change starts recording (the /bicara command). */ startSignal?: number }) {
   const [state, setState] = useState<"idle" | "recording" | "transcribing">("idle");
   const recorder = useRef<MediaRecorder | null>(null);
   const timer = useRef<number | null>(null);
@@ -21,6 +21,12 @@ export function VoiceButton({ disabled, onTranscript, onError, autoStart = false
     if (autoStart && !disabled) void start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (startSignal && !disabled && state === "idle") void start();
+    // Only a new signal starts a recording.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startSignal]);
 
   async function start() {
     onError(null);
