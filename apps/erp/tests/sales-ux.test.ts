@@ -42,3 +42,20 @@ test("SALES-UX-005: shared modal closes on Escape, locks page scroll, returns fo
   assert.match(src, /sticky bottom-0[^"]*border-t/);
   assert.match(src, /role="dialog"/);
 });
+
+test("SALES-UX-013: the page header scrolls away instead of covering content", () => {
+  assert.doesNotMatch(read("components/page-header.tsx"), /sticky/);
+});
+
+test("SALES-UX-004/008 batch 2: Convert is a dialog, primary actions live in the header, Sheet Sync is secondary, FAB has room", () => {
+  const convert = read("app/sales/opportunity-tracker/convert-to-requisition-button.tsx");
+  assert.match(convert, /role="dialog"/);
+  assert.match(convert, /e\.key === "Escape"/);
+  const page = read("app/sales/opportunity-tracker/page.tsx");
+  const header = page.slice(page.indexOf("<PageHeader"), page.indexOf("</PageHeader>"));
+  assert.match(header, /Add Extension Request/);
+  assert.match(header, /createOpportunityTracker/);
+  assert.doesNotMatch(header, /bg-brand-600[^"]*text-white[^"]*"\s*>\s*<RefreshCw/);
+  assert.match(read("components/app-shell.tsx"), /md:pb-24/);
+  assert.match(read("app/sales/opportunity-tracker/opportunity-trackers-table.tsx"), /max-h-\[max\(360px,calc\(100dvh-12rem\)\)\]/);
+});

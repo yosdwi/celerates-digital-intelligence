@@ -144,7 +144,7 @@ export function OpportunitiesTable({
           overflow-x-auto jadi scroll container 2 arah tanpa tinggi tetap, dan
           `sticky` di <thead> jadi nempel ke div ini (yang ikut discroll bareng
           halaman) alih-alih benar-benar diam di layar. */}
-      <div className="overflow-auto max-h-[480px] group-[.is-expanded]:max-h-none group-[.is-expanded]:flex-1 group-[.is-expanded]:min-h-0">
+      <div className="overflow-auto max-h-[max(360px,calc(100dvh-12rem))] group-[.is-expanded]:max-h-none group-[.is-expanded]:flex-1 group-[.is-expanded]:min-h-0">
         <table className="w-full text-sm">
           {/* Header freeze (sticky top) + 4 kolom pertama freeze (sticky left,
               offset kumulatif) -- pola sama persis dengan tabel Talent

@@ -135,7 +135,7 @@ export function OpportunityTrackersTable({
 
       {view === "table" && (
       <>
-      <div className="overflow-auto max-h-[480px] group-[.is-expanded]:max-h-none group-[.is-expanded]:flex-1 group-[.is-expanded]:min-h-0">
+      <div className="overflow-auto max-h-[max(360px,calc(100dvh-12rem))] group-[.is-expanded]:max-h-none group-[.is-expanded]:flex-1 group-[.is-expanded]:min-h-0">
         <table className="w-full text-sm">
           <thead className="sticky top-0 z-20">
             <tr className="border-b border-violet-200 bg-violet-50 text-left text-xs font-semibold uppercase tracking-wide text-violet-700">

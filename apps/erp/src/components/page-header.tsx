@@ -16,7 +16,7 @@ export function PageHeader({
   children?: React.ReactNode;
 }) {
   return (
-    <header className="border-b border-white/60 bg-white/75 backdrop-blur-xl px-8 py-6 sticky top-0 z-30 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
+    <header className="border-b border-white/60 bg-white/75 backdrop-blur-xl px-8 py-6 relative z-30 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
       <div className="flex items-start gap-4">
         <div className="flex-1 min-w-0">
           <p className="text-xs font-semibold uppercase tracking-widest text-brand-500">{eyebrow}</p>
