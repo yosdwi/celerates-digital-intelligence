@@ -151,10 +151,10 @@ export function OpportunitiesTable({
               Assignments di /tm (lihat talent-assignments-table.tsx). */}
           <thead className="sticky top-0 z-20">
             <tr className="border-b border-violet-200 bg-violet-50 text-left text-xs font-semibold uppercase tracking-wide text-violet-700">
-              <th className="px-4 py-3 sticky left-0 bg-violet-50 z-10 min-w-[180px]">{t("actionStatus")}</th>
-              <th className="px-4 py-3 sticky left-[180px] bg-violet-50 z-10 min-w-[160px]">Opty No</th>
-              <th className="px-4 py-3 sticky left-[340px] bg-violet-50 z-10 min-w-[190px]">PQ No</th>
-              <th className="px-4 py-3 sticky left-[530px] bg-violet-50 z-10 min-w-[170px] border-r border-slate-200">{t("pqDocumentCol")}</th>
+              <th className="px-4 py-3 md:sticky md:left-0 bg-violet-50 z-10 min-w-[180px]">{t("actionStatus")}</th>
+              <th className="px-4 py-3 md:sticky md:left-[180px] bg-violet-50 z-10 min-w-[160px]">Opty No</th>
+              <th className="px-4 py-3 md:sticky md:left-[340px] bg-violet-50 z-10 min-w-[190px]">PQ No</th>
+              <th className="px-4 py-3 md:sticky md:left-[530px] bg-violet-50 z-10 min-w-[170px] border-r border-slate-200">{t("pqDocumentCol")}</th>
               <th className="px-4 py-3 min-w-[160px]">{t("pqSignatureCol")}</th>
               <SortableTh
                 label={t("clientCol")}
@@ -256,7 +256,7 @@ export function OpportunitiesTable({
   function renderOpportunityRow(opty: Opportunity) {
     return (
               <tr key={opty.id} className="border-b border-slate-100 last:border-0 hover:bg-violet-50/60">
-                <td className="px-4 py-3 sticky left-0 bg-white z-0 space-y-1.5">
+                <td className="px-4 py-3 md:sticky md:left-0 bg-white z-0 space-y-1.5">
                 <div className="flex gap-2 items-center">
                   <Link href={`/sales/${opty.id}/edit`} className="text-xs font-medium text-slate-600 hover:text-slate-900">{tc("edit")}</Link>
                   <span className="text-slate-300">|</span>
@@ -271,9 +271,9 @@ export function OpportunitiesTable({
                   <StageBadge pipelineStageCode={opty.pipeline_stage_code} />
                   <StageSelector id={opty.id} currentPipelineStage={opty.pipeline_stage_code} currentOptyStatus={opty.opty_status_code} />
                 </td>
-                <td className="px-4 py-3 sticky left-[180px] bg-white z-0 font-mono text-xs text-slate-500">{opty.opty_no}</td>
-                <td className="px-4 py-3 sticky left-[340px] bg-white z-0 font-mono text-xs text-slate-500">{opty.pq_no ?? "-"}</td>
-                <td className="px-4 py-3 sticky left-[530px] bg-white z-0 space-y-1 border-r border-slate-200">
+                <td className="px-4 py-3 md:sticky md:left-[180px] bg-white z-0 font-mono text-xs text-slate-500">{opty.opty_no}</td>
+                <td className="px-4 py-3 md:sticky md:left-[340px] bg-white z-0 font-mono text-xs text-slate-500">{opty.pq_no ?? "-"}</td>
+                <td className="px-4 py-3 md:sticky md:left-[530px] bg-white z-0 space-y-1 border-r border-slate-200">
                   {opty.pqDocAttachments.length === 0 ? (
                     <span className="text-slate-300">-</span>
                   ) : (

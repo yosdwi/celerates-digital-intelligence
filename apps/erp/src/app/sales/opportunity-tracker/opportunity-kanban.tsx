@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { updateOptyStatus } from "./actions";
@@ -43,12 +43,38 @@ const PRICE_PERIOD_LABELS: Record<string, string> = { monthly: "/bulan", project
  * Drag antar kolom manggil updateOptyStatus yang sama persis dengan yang
  * dipakai OptyStatusSelector di tabel.
  */
+const SCROLL_KEY = "sales-kanban-scroll";
+
 export function OpportunityKanban({ data, canEdit }: { data: KanbanTracker[]; canEdit: boolean }) {
   const t = useTranslations("sales.opportunityTracker");
   const [items, setItems] = useState(data);
   useEffect(() => setItems(data), [data]);
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
   const [, startTransition] = useTransition();
+  const boardRef = useRef<HTMLDivElement>(null);
+
+  // Opening a card leaves this page; remember where the user was (board offset + each column) so Back
+  // lands in the same place instead of the top of a fresh board (SALES-UX-002).
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(SCROLL_KEY) ?? "null") as { left: number; tops: number[] } | null;
+      sessionStorage.removeItem(SCROLL_KEY);
+      const board = boardRef.current;
+      if (!saved || !board) return;
+      board.scrollLeft = saved.left;
+      board.querySelectorAll<HTMLElement>("[data-kanban-list]").forEach((el, i) => { el.scrollTop = saved.tops[i] ?? 0; });
+    } catch { /* storage unavailable: start at the top */ }
+  }, []);
+
+  function rememberScroll(e: React.MouseEvent) {
+    if (!(e.target as HTMLElement).closest("a")) return;
+    const board = boardRef.current;
+    if (!board) return;
+    try {
+      const tops = [...board.querySelectorAll<HTMLElement>("[data-kanban-list]")].map((el) => el.scrollTop);
+      sessionStorage.setItem(SCROLL_KEY, JSON.stringify({ left: board.scrollLeft, tops }));
+    } catch { /* ignore */ }
+  }
 
   function handleDragStart(e: React.DragEvent, id: string) {
     e.dataTransfer.setData("text/plain", id);
@@ -65,8 +91,10 @@ export function OpportunityKanban({ data, canEdit }: { data: KanbanTracker[]; ca
   }
 
   return (
-    <div className="overflow-x-auto p-4">
-      <div className="flex gap-4 min-w-max">
+    // The board owns both scrollbars and has a bounded height, so the horizontal scrollbar sits at the bottom of
+    // what is on screen and each column scrolls on its own with its header pinned (SALES-UX-001).
+    <div ref={boardRef} onClickCapture={rememberScroll} data-kanban-board className="overflow-x-auto overflow-y-hidden p-4 h-[calc(100dvh-10rem)] min-h-[420px]">
+      <div className="flex gap-4 min-w-max h-full">
         {COLUMNS.map((col) => {
           const colItems = items.filter((it) => it.opty_status_code === col.key);
           return (
@@ -75,14 +103,14 @@ export function OpportunityKanban({ data, canEdit }: { data: KanbanTracker[]; ca
               onDragOver={(e) => { if (canEdit) { e.preventDefault(); setDragOverKey(col.key); } }}
               onDragLeave={() => canEdit && setDragOverKey((c) => (c === col.key ? null : c))}
               onDrop={(e) => handleDrop(e, col.key)}
-              className={`w-64 shrink-0 rounded-xl p-3 transition-colors ${dragOverKey === col.key ? "bg-violet-50 ring-2 ring-violet-200" : "bg-slate-50/70"}`}
+              className={`w-64 shrink-0 h-full flex flex-col rounded-xl p-3 transition-colors ${dragOverKey === col.key ? "bg-violet-50 ring-2 ring-violet-200" : "bg-slate-50/70"}`}
             >
-              <div className="flex items-center justify-between px-1 mb-3">
+              <div className="flex items-center justify-between px-1 mb-3 shrink-0">
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                   {col.label} <span className="text-slate-400 font-normal">({colItems.length})</span>
                 </h3>
               </div>
-              <div className="space-y-2 min-h-[40px]">
+              <div data-kanban-list className="space-y-2 flex-1 min-h-0 overflow-y-auto pr-1">
                 {colItems.map((it) => (
                   <div
                     key={it.id}

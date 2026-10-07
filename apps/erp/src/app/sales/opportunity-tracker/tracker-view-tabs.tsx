@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { ExpandableSection } from "@/components/expandable-section";
 import { OpportunityTrackersTable } from "./opportunity-trackers-table";
@@ -27,7 +28,12 @@ export function TrackerViewTabs({
   canDelete: boolean;
 }) {
   const t = useTranslations("sales.opportunityTracker");
-  const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("list");
+  // The chosen view lives in the URL (?view=kanban) so Back from an opened record returns to the same view (SALES-UX-002).
+  const [tab, setTabState] = useState<(typeof TABS)[number]["key"]>(useSearchParams().get("view") === "kanban" ? "kanban" : "list");
+  function setTab(next: (typeof TABS)[number]["key"]) {
+    setTabState(next);
+    window.history.replaceState(null, "", next === "kanban" ? "?view=kanban" : window.location.pathname);
+  }
 
   return (
     <div>
@@ -36,6 +42,7 @@ export function TrackerViewTabs({
           <button
             key={tb.key}
             onClick={() => setTab(tb.key)}
+            aria-pressed={tab === tb.key}
             className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all duration-200 ${
               tab === tb.key
                 ? "bg-gradient-to-br from-violet-600 to-violet-400 text-white shadow-[0_4px_10px_-3px_rgba(124,58,237,0.5)]"
