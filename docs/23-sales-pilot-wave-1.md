@@ -129,8 +129,9 @@ PASSKEY_RP_NAME=Celerates ERP
 - [x] Add passkey registration/revocation from Profile.
 - [x] Keep password + corporate mailbox verification as bootstrap/recovery.
 - [x] Revoke registered passkeys during mailbox-backed password reset.
-- [ ] Configure canonical production RP/origin and run real-device checks on Windows, Android/iOS/macOS used by pilot users.
-- [ ] Provision actual Sales pilot users and validate their roles.
+- [x] Configure canonical production RP/origin (`https://ierp.celeratesapps.com`, verified live 2026-10-07).
+- [ ] Run real-device passkey checks on the Windows, Android/iOS/macOS devices used by pilot users (needs real devices and users).
+- [ ] Provision actual Sales pilot users and validate their roles. Production today has only one `sales:full` and one `ta:full` backoffice account; no viewer or editor exists yet. Needs an Owner session in Access Management.
 
 ### Sales flow
 
@@ -147,15 +148,15 @@ PASSKEY_RP_NAME=Celerates ERP
 - [ ] Verify downstream TA can continue from the generated Requisition/PQ state with an actual TA account.
 - [x] Add database-level one-to-one guards for Opportunity → Requisition/PQ Tracker and cover conversion retry in HTTP smoke.
 - [ ] Verify duplicate conversion and orphan-state protections with real pilot scenarios.
-- [ ] Confirm what Google Sheet sync remains transitional during Wave 1 and who is the write-owner during the pilot.
+- [ ] Confirm what Google Sheet sync remains transitional during Wave 1 and who is the write-owner during the pilot. Fact found 2026-10-07: every Sales Sheet sync action (connect, headers, mapping, pull, push, debug) is hard-disabled in this build by `integrationDisabled()` ("Fitur ini belum diaktifkan pada pilot.") and `sheet_connections` has 0 rows, so ERP is the only write-owner today. Whether the Sheet is re-enabled one-way, imported once, or retired is a Product Owner decision.
 
 ### Pilot release
 
-- [ ] Apply migrations `0012_passkeys.sql` and `0013_sales_handoff_uniqueness.sql` after checking the target DB for pre-existing duplicate handoffs.
-- [ ] Deploy the pilot build to the approved environment.
+- [x] Apply migrations `0012_passkeys.sql` and `0013_sales_handoff_uniqueness.sql` after checking the target DB for pre-existing duplicate handoffs (applied once at container start, 2026-10-07; the check was vacuous because production had 0 Sales/PQ/Requisition rows).
+- [x] Deploy the pilot build to the approved environment (`celerates-erp:pilot` is `wave1-952c266`).
 - [x] Add disposable automated E2E for corporate bootstrap → passkey enrollment/login → Sales Opportunity visibility → converted-state guard → TA downstream visibility.
 - [x] Full automated E2E gate is green on the review-ready PR revision (ERP pilot checks + P0 verification green at handoff checkpoint).
-- [ ] Smoke-test the same login, session revocation, Sales create/update/convert, document flow and downstream visibility in the approved pilot environment.
+- [ ] Smoke-test the same login, session revocation, Sales create/update/convert, document flow and downstream visibility in the approved pilot environment. Done so far without credentials: login page, passkey UI bundle, public challenge endpoint, anonymous route protection. Everything that needs a signed-in user is pending.
 - [x] Start the single feedback backlog — GitHub Issue #8 (`Sales Wave 1 — Pilot feedback backlog`).
 - [ ] Onboard selected Sales users.
 - [ ] Observe real use and close P0/P1.
@@ -207,3 +208,33 @@ For Wave 1:
 - The broader `P0 verification` workflow remains responsible for Intelligence API/web/Compose regression and runs at the same review-ready checkpoint.
 - The Sales browser journey uses a disposable database and Chromium virtual WebAuthn authenticator. It never targets a live ERP and never stores a real biometric.
 - Real-device biometric checks and real Sales/TA accounts remain pilot-environment validation and are not replaced by synthetic E2E.
+
+## 9. Pilot environment deployment record (2026-10-07)
+
+Facts below were observed on the pilot VPS during the deployment. Nothing here claims a user or device validation that did not happen.
+
+| Item | Value |
+| --- | --- |
+| Release | `952c26605d9d07adb12b9b69ca282d5e4684e3bf` on `feat/sales-pilot-wave1-passkey` (working tree clean before build) |
+| Image | `celerates-erp:wave1-952c26605d9d07adb12b9b69ca282d5e4684e3bf`, promoted as `celerates-erp:pilot` (`sha256:a0354ac5fc74`) |
+| Previous image kept | `celerates-erp:fb4b452` and `celerates-erp:rollback-20261007T003958Z` (`sha256:2de60e55c758`). The old container ran the `fb4b452` tag, not `:pilot`. |
+| Canonical host | `https://ierp.celeratesapps.com` (already in `NEXTAUTH_URL` and `CELERATES_PUBLIC_URL`; public TLS and `/api/health/ready` OK) |
+| Auth config set | `AUTH_EMAIL_DOMAINS=celerates.com,celerates.co.id`, `PASSKEY_RP_ID=ierp.celeratesapps.com`, `PASSKEY_ORIGIN=https://ierp.celeratesapps.com`, `PASSKEY_RP_NAME=Celerates ERP`. No other env line changed. Previous file kept root-only as `celerates-erp.env.bak-20261007T003519Z`. |
+| Database | `celerates_erp` on `conform-unified-pg`, role `celerates_erp_app` |
+| Restore point | `/var/backups/celerates/celerates_erp-pre-wave1-20261007T003943Z.dump` (custom format, 247955 bytes, 492 TOC entries readable by `pg_restore --list`), taken before the restart |
+| Preflight before restart | GO: 0 requisition and 0 PQ handoff duplicates; 0012 and 0013 pending |
+| Migrations | `0012_passkeys.sql` and `0013_sales_handoff_uniqueness.sql` applied once at start; both unique indexes and both passkey tables present |
+| Health | `/api/health/live` ok and `/api/health/ready` ready on `127.0.0.1:3000` and on the public URL; container healthy, `unless-stopped`, bound to `127.0.0.1:3000` |
+| Preflight after restart | GO: 0012 and 0013 already applied, passkey tables and unique indexes present, 0 duplicates |
+| Anonymous smoke | `/login` 200; login bundle contains the passkey UI; `POST /api/passkey/login/options` returns `rpId=ierp.celeratesapps.com`, `userVerification=required`; `/sales`, `/sales/opportunity-tracker`, `/profile`, `/ta` redirect to login; `/api/passkey/register` and `/api/identity-documents` return 403 |
+| Mailbox policy | The single active backoffice `gmail.com` account is exactly the one listed in `AUTH_EMAIL_EXCEPTIONS`, so the new mailbox check does not lock it out |
+
+Rollback if needed: `docker tag celerates-erp:rollback-20261007T003958Z celerates-erp:pilot` then `infra/pilot/celerates-run.sh erp celerates-erp:pilot`. Migrations are additive and the old image ignores them; restore the dump only if data state must change.
+
+### Not done, and why
+
+- Signed-in smoke (session, Profile/Security, Sales, Opportunity Tracker, TA, session revocation, private documents): needs a real account and its mailbox code. No credential was used or created.
+- Pilot accounts: only `sales:full` and `ta:full` exist (1 each); viewer and editor must be granted by an Owner in Access Management so the grants are audited.
+- Production has 0 opportunities, 0 PQ Trackers, 0 requisitions: the representative Sales to TA journey has to be entered by a Sales user or on a clearly marked synthetic record.
+- Real-device passkey matrix and the password-reset-revokes-passkeys check: need real devices.
+- Google Sheet write-owner: see section 5, Product Owner decision.

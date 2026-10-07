@@ -1,6 +1,6 @@
 # CURRENT HANDOFF — Sales Wave 1 Pilot
 
-**Last updated:** 2026-10-05  
+**Last updated:** 2026-10-07  
 **Repository:** `yosdwi/celerates-digital-intelligence`  
 **Active implementation branch:** `feat/sales-pilot-wave1-passkey`  
 **Current automated-green checkpoint:** `39364a35c00fea36a1d1bcd57b5cb3010be20288`  
@@ -502,3 +502,19 @@ External validation still pending because it requires the actual pilot VPS/datab
 10. confirm the transitional Google Sheet write-owner before controlled rollout.
 
 Do not mark Sales Wave 1 complete until those environment/user gates are evidenced.
+
+---
+
+## 12. Pilot deployment executed (2026-10-07)
+
+Release `952c26605d9d07adb12b9b69ca282d5e4684e3bf` (branch `feat/sales-pilot-wave1-passkey`) is running on the pilot VPS as `celerates-erp:pilot` at `https://ierp.celeratesapps.com`.
+
+Verified: canonical auth/passkey env set; preflight GO before and after; restore point `/var/backups/celerates/celerates_erp-pre-wave1-20261007T003943Z.dump`; migrations 0012 and 0013 applied once; live and ready green locally and publicly; anonymous smoke; rollback image `celerates-erp:rollback-20261007T003958Z` retained. Full table and rollback command: `docs/23-sales-pilot-wave-1.md` section 9.
+
+Facts that change the plan:
+
+- Production has 0 Sales opportunity trackers, 0 PQ Trackers and 0 requisitions, so the duplicate check was vacuous and the journey needs data entered.
+- Only one `sales:full` and one `ta:full` backoffice account exist; no viewer or editor.
+- All Sales Google Sheet sync actions are disabled in this build and no sheet is connected: ERP is the only write-owner. Re-enable, one-time import or retire is a Product Owner decision.
+
+Remaining, in order: (1) Owner signs in and runs the signed-in smoke; (2) grant Sales viewer/editor/full and a TA account in Access Management; (3) run one Sales to TA journey and record `opty_no`; (4) real-device passkey matrix; (5) Issue #8 findings; (6) Sheet decision. Do not call the pilot ready before 1 to 4.

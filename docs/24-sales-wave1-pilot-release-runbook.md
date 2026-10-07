@@ -88,10 +88,12 @@ Before the migration-bearing restart, create an approved PostgreSQL backup/snaps
 sudo mkdir -p /var/backups/celerates
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 
-sudo docker run --rm   --network digital-bast-v2_backend   --env-file /etc/celerates/secrets/celerates-erp.env   -v /var/backups/celerates:/backup   postgres:16-alpine   sh -lc 'pg_dump "$DATABASE_URL" --format=custom --file=/backup/celerates-erp-'"$STAMP"'.dump'
+sudo docker run --rm   --network digital-bast-v2_backend   --env-file /etc/celerates/secrets/celerates-erp.env   -v /var/backups/celerates:/backup   postgres:17-alpine   sh -lc 'pg_dump "$DATABASE_URL" --format=custom --file=/backup/celerates-erp-'"$STAMP"'.dump'
 
 sudo test -s "/var/backups/celerates/celerates-erp-$STAMP.dump"
 ```
+
+The server major version must not be newer than the `pg_dump` image (the pilot database is PostgreSQL 17, so `postgres:17-alpine`). `docker exec conform-unified-pg pg_dump -U <superuser> -d celerates_erp --format=custom` also works and was used on 2026-10-07. Always verify the artifact with `pg_restore --list`.
 
 Use the existing approved backup mechanism instead if the pilot PostgreSQL already has a managed snapshot/runbook.
 
@@ -104,7 +106,8 @@ cd /opt/celerates-digital-intelligence
 RELEASE_SHA="$(git rev-parse HEAD)"
 ROLLBACK_TAG="celerates-erp:rollback-$(date -u +%Y%m%dT%H%M%SZ)"
 
-sudo docker image inspect celerates-erp:pilot >/dev/null 2>&1 &&   sudo docker tag celerates-erp:pilot "$ROLLBACK_TAG" || true
+# Tag the image the container is actually running, not an assumed :pilot tag (on 2026-10-07 it ran celerates-erp:fb4b452 and :pilot did not exist).
+sudo docker tag "$(sudo docker inspect celerates-erp --format '{{.Image}}')" "$ROLLBACK_TAG"
 
 sudo docker tag "celerates-erp:wave1-$RELEASE_SHA" celerates-erp:pilot
 
