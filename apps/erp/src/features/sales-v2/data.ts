@@ -112,11 +112,12 @@ export async function loadOpportunityWorkspace() {
 export type WorkspaceData = Awaited<ReturnType<typeof loadOpportunityWorkspace>>;
 
 /** Google Sheet connection for the Sheet Sync dialog (editors only; the page decides). No tokens, just what V1 shows. */
-export async function loadSheetSync() {
+/** `divisionKey`: V1's key per page ("sales_opportunity_tracker"; "sales" is PQ Tracker). */
+export async function loadSheetSync(divisionKey = "sales_opportunity_tracker") {
   const [c] = await db
     .select({ url: sheetConnections.spreadsheet_url, sheetName: sheetConnections.sheet_name, mapping: sheetConnections.column_mapping })
     .from(sheetConnections)
-    .where(eq(sheetConnections.division_key, "sales_opportunity_tracker"));
+    .where(eq(sheetConnections.division_key, divisionKey));
   return {
     enabled: INTEGRATIONS_ENABLED,
     connection: c ? { url: c.url, sheetName: c.sheetName, mapping: c.mapping ? (JSON.parse(c.mapping) as Record<string, string>) : null } : null,

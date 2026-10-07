@@ -360,7 +360,7 @@ export function AgentPanel() {
         onClick={() => (open ? setOpen(false) : openAgentPanel())}
         aria-expanded={open}
         aria-controls="celerates-agent"
-        className={`fixed bottom-6 right-6 z-40 h-12 items-center gap-2 rounded-full bg-brand-700 px-4 text-sm font-semibold text-white shadow-lg hover:bg-brand-600 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-600 ${open || panelOpen ? "hidden" : "hidden md:inline-flex"}`}
+        className={`fixed bottom-5 right-5 z-40 h-10 items-center gap-2 rounded-full bg-brand-700 px-3.5 text-[13px] font-semibold text-white shadow-lg hover:bg-brand-600 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-600 ${open || panelOpen ? "hidden" : "hidden md:inline-flex"}`}
       >
         <Sparkles className="h-4 w-4" />
         <span>Celerates Agent</span>

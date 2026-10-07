@@ -26,16 +26,19 @@
 [data-sales-v2] .crisp-table-scroll { padding-bottom: 64px; }
 [data-sales-v2-board] .crisp-board-col-body { padding-bottom: 64px; }
 
-/* Columns share the board's width (no empty band on wide screens); below 6 × 268px it scrolls sideways as before. */
+/* Columns share the board's width (no empty band on wide screens); below n × 268px it scrolls sideways as before. */
 [data-sales-v2-board] .crisp-board-col { flex: 1 0 268px; width: auto; }
 
 /* Kanban: each column carries its stage colour; cards get a visible edge and the stage on their left side. */
-[data-sales-v2-board] .crisp-board-col:nth-child(1) { --stage: #8a8f98; }
-[data-sales-v2-board] .crisp-board-col:nth-child(2) { --stage: #3b82f6; }
-[data-sales-v2-board] .crisp-board-col:nth-child(3) { --stage: #8b5cf6; }
-[data-sales-v2-board] .crisp-board-col:nth-child(4) { --stage: #f97316; }
-[data-sales-v2-board] .crisp-board-col:nth-child(5) { --stage: #10b981; }
-[data-sales-v2-board] .crisp-board-col:nth-child(6) { --stage: #ef4444; }
+/* The board sets --stage-1… from its stages (record-workspace.tsx); Crisp columns carry no id, so position it is. */
+[data-sales-v2-board] .crisp-board-col:nth-child(1) { --stage: var(--stage-1); }
+[data-sales-v2-board] .crisp-board-col:nth-child(2) { --stage: var(--stage-2); }
+[data-sales-v2-board] .crisp-board-col:nth-child(3) { --stage: var(--stage-3); }
+[data-sales-v2-board] .crisp-board-col:nth-child(4) { --stage: var(--stage-4); }
+[data-sales-v2-board] .crisp-board-col:nth-child(5) { --stage: var(--stage-5); }
+[data-sales-v2-board] .crisp-board-col:nth-child(6) { --stage: var(--stage-6); }
+[data-sales-v2-board] .crisp-board-col:nth-child(7) { --stage: var(--stage-7); }
+[data-sales-v2-board] .crisp-board-col:nth-child(8) { --stage: var(--stage-8); }
 [data-sales-v2-board] .crisp-board-col-header { padding: 0 6px; border-bottom: 2px solid var(--stage, #cbd5e1); margin-bottom: 6px; }
 [data-sales-v2-board] .crisp-board-col-body { background: color-mix(in srgb, var(--stage, #94a3b8) 7%, #f8fafc); }
 [data-sales-v2-board] .crisp-board-card {
@@ -52,3 +55,8 @@
 [data-sales-v2-dialog] .crisp-dialog-header { background: #eef3f7; border-bottom: 1px solid #dce8ef; box-shadow: inset 0 3px 0 #194667; }
 [data-sales-v2-dialog] .crisp-dialog-title { color: #092236; font-weight: 700; }
 [data-sales-v2-dialog] .crisp-dialog-header svg { color: #194667; }
+
+/* Short laptop viewports (≈650–760 px tall at 125–150 % OS scaling): the subtitle gives its line to the table. */
+@media (max-height: 760px) {
+  [data-sales-v2-subtitle] { display: none; }
+}

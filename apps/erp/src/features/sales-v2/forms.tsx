@@ -32,14 +32,14 @@ export function useCloseFromXOnly(open: boolean, close: () => void) {
   return (o: boolean) => { if (!o && viaClose.current) close(); viaClose.current = false; };
 }
 
-const readDraft = (form: HTMLFormElement | null, skip: string[] = []) => {
+export const readDraft = (form: HTMLFormElement | null, skip: string[] = []) => {
   const d: Record<string, string> = {};
   if (form) new FormData(form).forEach((v, k) => { if (typeof v === "string" && !skip.includes(k)) d[k] = v; });
   return d;
 };
 
 type Pairs = readonly (readonly [string, string])[];
-const opts = (pairs: Pairs) => pairs.map(([value, label]) => ({ value, label }));
+export const opts = (pairs: Pairs) => pairs.map(([value, label]) => ({ value, label }));
 
 export type FormOptions = {
   leadOptions: { id: string; lead_no: string; client_name: string }[];
@@ -48,7 +48,7 @@ export type FormOptions = {
 };
 
 /** A label above a Crisp control; `span` widens it to the full row. */
-function F({ label, required, span, hint, children }: { label: string; required?: boolean; span?: boolean; hint?: string; children: React.ReactNode }) {
+export function F({ label, required, span, hint, children }: { label: string; required?: boolean; span?: boolean; hint?: string; children: React.ReactNode }) {
   return (
     <FormField label={label} required={required} description={hint} className={span ? "sm:col-span-3" : undefined}>
       {children}
@@ -56,10 +56,10 @@ function F({ label, required, span, hint, children }: { label: string; required?
   );
 }
 
-type Draft = Record<string, string>;
+export type Draft = Record<string, string>;
 export type CreateRequest = { kind: "opportunity" | "extension"; status?: string } | null;
 
-function Money({ name, defaultValue }: { name: string; defaultValue?: string }) {
+export function Money({ name, defaultValue }: { name: string; defaultValue?: string }) {
   return (
     <InputShell>
       <MoneyInput name={name} defaultValue={defaultValue} className="crisp-input-value" />
@@ -67,7 +67,7 @@ function Money({ name, defaultValue }: { name: string; defaultValue?: string }) 
   );
 }
 
-function PositionInput({ suggestions, defaultValue }: { suggestions: string[]; defaultValue?: string }) {
+export function PositionInput({ suggestions, defaultValue }: { suggestions: string[]; defaultValue?: string }) {
   const listId = useId();
   return (
     <>
@@ -78,7 +78,7 @@ function PositionInput({ suggestions, defaultValue }: { suggestions: string[]; d
 }
 
 /** Shared submit: run the existing action, close, confirm, refresh the workspace. Errors stay in the dialog. */
-function useSubmit(action: (fd: FormData) => Promise<void>, onDone: () => void) {
+export function useSubmit(action: (fd: FormData) => Promise<void>, onDone: () => void) {
   const [pending, start] = useTransition();
   const router = useRouter();
   const { showToast } = useToast();
@@ -104,7 +104,7 @@ function useSubmit(action: (fd: FormData) => Promise<void>, onDone: () => void) 
 
 type FormProps = { options: FormOptions; draft: Draft; formRef: React.RefObject<HTMLFormElement | null>; onDone: () => void; onCancel: () => void; onReset: () => void };
 
-function DraftFooter({ pending, onCancel, onReset, t, resetLabel = "Kosongkan form" }: { pending: boolean; onCancel: () => void; onReset: () => void; t: (k: string) => string; resetLabel?: string }) {
+export function DraftFooter({ pending, onCancel, onReset, t, resetLabel = "Kosongkan form" }: { pending: boolean; onCancel: () => void; onReset: () => void; t: (k: string) => string; resetLabel?: string }) {
   return (
     <DialogFooter>
       <button type="button" onClick={onReset} disabled={pending} className="mr-auto text-[12px] text-slate-500 hover:text-slate-800 hover:underline">{resetLabel}</button>

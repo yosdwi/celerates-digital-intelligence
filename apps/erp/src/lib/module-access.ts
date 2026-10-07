@@ -148,8 +148,9 @@ export function submoduleFor(pathname: string): { module: string; href: string; 
   let best: { module: string; href: string; label: string; len: number } | null = null;
   for (const m of MODULES)
     for (const s of m.subPages)
-      // A Sales V2 entry (/sales/v2/<page>) also owns its V1 twin (/sales/<page>), so neither falls back to PQ Tracker.
-      for (const h of s.href.startsWith("/sales/v2/") ? [s.href, s.href.replace("/sales/v2/", "/sales/")] : [s.href])
+      // A Sales V2 entry also owns its V1 page (`v1`); the longest match wins, so /sales/opportunity-tracker/… stays
+      // Opportunity Tracker while the rest of /sales/… (V1 PQ pages) is PQ Tracker, as before.
+      for (const h of s.v1 ? [s.href, s.v1] : [s.href])
         if ((clean === h || clean.startsWith(h + "/")) && (!best || h.length > best.len))
           best = { module: m.key, href: s.href, label: s.label, len: h.length };
   return best && { module: best.module, href: best.href, label: best.label };

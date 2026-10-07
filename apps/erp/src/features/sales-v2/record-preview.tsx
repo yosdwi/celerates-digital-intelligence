@@ -1,16 +1,13 @@
 "use client";
 // Read-first record inspection (contract §8): highlights, progress, downstream Requisition / TA / PQ, then explicit
 // actions. Every mutation is an existing V1 server action.
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Badge, Button, Checkbox, Dialog, DialogBody, DialogFooter, FormField, Input, InputShell, RecordPanel, Select } from "@crisp-ui-kit/crisp";
-import { Sparkles } from "lucide-react";
 import { MoneyInput } from "@/components/form-fields";
-import { openAgent } from "@/components/mobile/events";
 import { useToast } from "@/components/toast-provider";
-import { setRightRail, useRightRail } from "@/lib/right-rail";
 import {
   convertToRequisition, deleteOpportunityTracker, updateOptyStatus, updateSalesQualified,
 } from "@/app/sales/opportunity-tracker/actions";
@@ -18,6 +15,7 @@ import {
   CLIENT_TYPE_LABEL, LEVEL_LABEL, PRIORITIES, SERVICE_LABEL, STAGES, STAGE_LABEL, canConvert, rupiah, type Opportunity,
 } from "./model";
 import { EditOpportunityDialog, type FormOptions } from "./forms";
+import { PanelTitle, useRecordPanelRail, type Access } from "./record-workspace";
 
 const SIGNATURE: Record<string, { label: string; tone: "neutral" | "warning" | "success" | "danger" }> = {
   not_sent: { label: "Belum dikirim", tone: "neutral" },
@@ -29,7 +27,7 @@ const PQ_STAGE: Record<string, string> = { win: "Win", drop: "Drop", hold: "Hold
 
 const isRedirect = (err: unknown) => typeof (err as { digest?: unknown })?.digest === "string" && (err as { digest: string }).digest.startsWith("NEXT_REDIRECT");
 
-export type Access = { canEdit: boolean; canDelete: boolean };
+export type { Access };
 
 export function RecordPreview({
   record, records, access, returnTo, onSelect, onClose, onPatch, options, convertRequest, onConvertHandled,
@@ -49,7 +47,6 @@ export function RecordPreview({
   convertRequest?: string | null;
   onConvertHandled?: () => void;
 }) {
-  const rail = useRightRail();
   const router = useRouter();
   const { showToast } = useToast();
   const [pending, start] = useTransition();
@@ -59,47 +56,9 @@ export function RecordPreview({
     if (canConvert(record)) setDialog("convert");
     onConvertHandled?.();
   }, [record, convertRequest, onConvertHandled]);
-  const wrapRef = useRef<HTMLDivElement>(null);
   // The Agent is a docked drawer that narrows the page (contract §9), so the preview stays open beside it.
   const visible = !!record;
-
-  // Publish how much of the right edge the panel covers, so the Agent launcher moves out of its way.
-  useEffect(() => {
-    const panel = wrapRef.current?.parentElement?.querySelector<HTMLElement>(".crisp-recordpanel");
-    if (!visible || !panel) {
-      setRightRail({ panelWidth: 0 });
-      return;
-    }
-    // Layout position (offsetLeft), not getBoundingClientRect: the panel slides in with a transform, so its rect still
-    // sits off-screen when this runs.
-    const publish = () => {
-      const container = panel.offsetParent as HTMLElement | null;
-      const left = (container?.getBoundingClientRect().left ?? 0) + panel.offsetLeft;
-      setRightRail({ panelWidth: Math.max(0, Math.round(window.innerWidth - left)) });
-    };
-    publish();
-    const ro = new ResizeObserver(publish);
-    ro.observe(panel);
-    window.addEventListener("resize", publish);
-    return () => {
-      ro.disconnect();
-      window.removeEventListener("resize", publish);
-      setRightRail({ panelWidth: 0 });
-    };
-  }, [visible, record?.id]);
-
-  useEffect(() => {
-    setRightRail({ record: record ? { type: "opportunity_tracker", id: record.id, label: `${record.optyNo} · ${record.client}` } : null });
-  }, [record]);
-  useEffect(() => () => setRightRail({ record: null }), []);
-
-  // Escape closes the preview unless a dialog or the Agent is open (they take Escape first).
-  useEffect(() => {
-    if (!visible || rail.agentOpen) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && !dialog && !document.querySelector("[data-crisp-dialog]")) onClose(); };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [visible, rail.agentOpen, dialog, onClose]);
+  const wrapRef = useRecordPanelRail(record ? { type: "opportunity_tracker", id: record.id, label: `${record.optyNo} · ${record.client}` } : null, onClose, !!dialog);
 
   if (!record) return <div ref={wrapRef} hidden />;
   const index = records.findIndex((r) => r.id === record.id);
@@ -158,7 +117,7 @@ export function RecordPreview({
           <dt className="text-slate-500">PQ No</dt><dd className="font-mono text-[12px]">{record.pq.no ?? "-"}</dd>
           <dt className="text-slate-500">Pipeline</dt><dd>{PQ_STAGE[record.pq.stage] ?? record.pq.stage}</dd>
           <dt className="text-slate-500">Tanda tangan PQ</dt><dd><Badge tone={SIGNATURE[record.pq.signature]?.tone ?? "neutral"} size="small">{SIGNATURE[record.pq.signature]?.label ?? record.pq.signature}</Badge></dd>
-          <dt className="text-slate-500">Dokumen</dt><dd>{record.pq.documents} file · <Link className="text-brand-700 hover:underline" href={`/sales/${record.pq.id}/edit`}>buka PQ</Link></dd>
+          <dt className="text-slate-500">Dokumen</dt><dd>{record.pq.documents} file · <Link className="text-brand-700 hover:underline" href={`/sales/v2/pq-tracker?record=${record.pq.id}`}>buka PQ</Link></dd>
         </dl>
       ) : undefined,
     },
@@ -206,20 +165,7 @@ export function RecordPreview({
       {visible && (
         <RecordPanel
           record={{ id: record.id, name: record.client } as never}
-          title={
-            <span className="flex min-w-0 items-center justify-between gap-2">
-              <span className="truncate">{record.client}</span>
-              {/* The panel owns the right edge while open, so the Agent is reached from here, about this record. */}
-              <button
-                type="button"
-                onClick={() => openAgent({ prefill: `Tentang ${record.optyNo} (${record.client}): ` })}
-                className="inline-flex shrink-0 items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-[12px] font-medium text-slate-700 hover:border-brand-300 hover:text-brand-700"
-                data-sales-v2-ask-agent
-              >
-                <Sparkles size={13} /> Tanya Agent
-              </button>
-            </span>
-          }
+          title={<PanelTitle name={record.client} prefill={`Tentang ${record.optyNo} (${record.client}): `} />}
           counterLabel={index >= 0 ? `${index + 1} dari ${records.length}` : undefined}
           onPrevious={index > 0 ? () => onSelect(records[index - 1].id) : undefined}
           onNext={index >= 0 && index < records.length - 1 ? () => onSelect(records[index + 1].id) : undefined}

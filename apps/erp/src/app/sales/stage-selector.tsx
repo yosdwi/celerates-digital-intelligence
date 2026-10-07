@@ -3,26 +3,7 @@ import { useState, useTransition } from "react";
 import { useTranslations } from "next-intl";
 import { updatePipelineStage, updateOptyStatus } from "./actions";
 import { useToast } from "@/components/toast-provider";
-
-const PIPELINE_STAGES = [["win", "Win"], ["drop", "Drop"], ["hold", "Hold"], ["on_going", "On Going"]] as const;
-const OPTY_STATUS = [
-  ["on_hold", "Project on Hold"], ["client_not_responding", "Client Not Responding"],
-  ["lost_pitching", "Lost on Pitching Period"], ["waiting_feedback", "Waiting for Feedback"],
-  ["budget_on_hold", "Client Budget on Hold"], ["won", "Project Won"],
-  ["closed_lost", "Closed Lost"], ["on_going_others", "Opty on Going Others"],
-  ["need_action", "Need Action"],
-] as const;
-
-// Pipeline Stage -> Opty Status otomatis -- kalau sales pilih Win/Drop/Hold di
-// dropdown Aksi, Opty Status ikut disamain supaya nggak ada 2 status yang
-// nyata-nyata beda arti (mis. Win di Aksi tapi Opty Status masih "on_hold").
-// "on_going" sengaja TIDAK di-map -- nggak ada satu Opty Status yang pasti
-// cocok buat semua kasus "lagi jalan".
-const STAGE_TO_OPTY_STATUS: Record<string, string | undefined> = {
-  win: "won",
-  drop: "closed_lost",
-  hold: "on_hold",
-};
+import { OPTY_STATUS, PIPELINE_STAGES, STAGE_TO_OPTY_STATUS } from "./pq-constants";
 
 export function StageSelector({
   id,

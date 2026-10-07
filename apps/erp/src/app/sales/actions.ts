@@ -18,6 +18,7 @@ import { OPPORTUNITY_PO_DOC_SOURCE } from "./constants";
 import { PQ_DOCUMENT_SOURCE, PQ_SIGNATURE_SOURCE, PQ_SIGNATURE_STEP } from "./pq-constants";
 import { generateOptyNo, generateOptyNoWithPosition, generatePqNo } from "@/lib/id-generators";
 import { requireDivisionAccess } from "@/lib/require-division-access";
+import { safeSalesReturnPath } from "@/lib/safe-return";
 
 export async function createOpportunity(formData: FormData) {
   await requireActor();
@@ -346,7 +347,8 @@ export async function updateOpportunity(id: string, formData: FormData) {
   await logActivity("sales", "update", `PQ Tracker: ${client_name} — ${project_name}`, "PQ Tracker");
   revalidatePath("/sales");
   await markSaved();
-  redirect("/sales");
+  // Optional return_to (Sales paths only): Sales V2 edits in a dialog and comes back to its own URL.
+  redirect(safeSalesReturnPath(formData.get("return_to"), "/sales"));
 }
 
 export type UpdateStageResult = { ok: true } | { ok: false; error: string };

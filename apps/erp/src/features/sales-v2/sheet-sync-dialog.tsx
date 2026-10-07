@@ -1,6 +1,6 @@
 "use client";
-// Google Sheet Sync as a dialog (contract §12), in place of leaving for /sales/opportunity-tracker/sheet-sync. Same
-// V1 actions and components (connect, column mapping, pull/push); nothing new on the server. While integrations are
+// Google Sheet Sync as a dialog (contract §12), in place of leaving for the V1 sheet-sync page. Same V1 actions and
+// components (connect, column mapping, pull/push) per page: Opportunity Tracker and PQ Tracker each keep their own. While integrations are
 // off on the pilot the dialog says so instead of offering forms that would fail.
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -8,27 +8,43 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { RefreshCw } from "lucide-react";
 import { Button, Callout, Dialog, DialogBody, FormField, Input } from "@crisp-ui-kit/crisp";
-import { connectSheet } from "@/app/sales/opportunity-tracker/sheet-sync/actions";
-import { MappingSection } from "@/app/sales/opportunity-tracker/sheet-sync/mapping-section";
-import { SyncButtons } from "@/app/sales/opportunity-tracker/sheet-sync/sync-buttons";
-import { TARGET_FIELDS } from "@/app/sales/opportunity-tracker/sheet-sync/target-fields";
+import * as ot from "@/app/sales/opportunity-tracker/sheet-sync/actions";
+import { MappingSection as OtMapping } from "@/app/sales/opportunity-tracker/sheet-sync/mapping-section";
+import { SyncButtons as OtSync } from "@/app/sales/opportunity-tracker/sheet-sync/sync-buttons";
+import { TARGET_FIELDS as OT_FIELDS } from "@/app/sales/opportunity-tracker/sheet-sync/target-fields";
+import * as pq from "@/app/sales/sheet-sync/actions";
+import { MappingSection as PqMapping } from "@/app/sales/sheet-sync/mapping-section";
+import { SyncButtons as PqSync } from "@/app/sales/sheet-sync/sync-buttons";
+import { TARGET_FIELDS as PQ_FIELDS } from "@/app/sales/sheet-sync/target-fields";
+import type { TargetField } from "@/components/column-mapping-form";
 import type { SheetSyncData } from "./data";
 
-export function SheetSyncButton({ data }: { data: SheetSyncData }) {
+/** One page's V1 sheet-sync pieces. */
+type Parts = {
+  connectSheet: (fd: FormData) => Promise<unknown>;
+  MappingSection: (p: { targetFields: TargetField[]; savedMapping: Record<string, string> }) => React.ReactNode;
+  SyncButtons: () => React.ReactNode;
+  targetFields: TargetField[];
+};
+export const OT_SHEET_SYNC: Parts = { connectSheet: ot.connectSheet, MappingSection: OtMapping, SyncButtons: OtSync, targetFields: OT_FIELDS };
+export const PQ_SHEET_SYNC: Parts = { connectSheet: pq.connectSheet, MappingSection: PqMapping, SyncButtons: PqSync, targetFields: PQ_FIELDS };
+
+export function SheetSyncButton({ data, parts }: { data: SheetSyncData; parts: Parts }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Button size="sm" intent="ghost" onClick={() => setOpen(true)} data-testid="sales-v2-sheet-sync">
-        <RefreshCw size={13} /> Sheet Sync
+      {/* Label from xl up; below that the icon (with its name as tooltip) keeps the toolbar on one line. */}
+      <Button size="sm" intent="ghost" onClick={() => setOpen(true)} aria-label="Sheet Sync" title="Google Sheet Sync" data-testid="sales-v2-sheet-sync">
+        <RefreshCw size={13} /> <span className="hidden xl:inline">Sheet Sync</span>
       </Button>
       <Dialog open={open} onOpenChange={setOpen} title="Google Sheet Sync" icon={<RefreshCw size={16} />} closeLabel="Tutup" width={640} data-sales-v2-dialog="sheet-sync">
-        {open && <SheetSyncBody data={data} />}
+        {open && <SheetSyncBody data={data} parts={parts} />}
       </Dialog>
     </>
   );
 }
 
-function SheetSyncBody({ data }: { data: SheetSyncData }) {
+function SheetSyncBody({ data, parts: { connectSheet, MappingSection, SyncButtons, targetFields } }: { data: SheetSyncData; parts: Parts }) {
   const t = useTranslations("sales.sheetSync");
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -77,7 +93,7 @@ function SheetSyncBody({ data }: { data: SheetSyncData }) {
             <section>
               <h3 className="mb-1 text-[13px] font-semibold text-slate-800">{t("mapColumns")}</h3>
               <p className="mb-3 text-[12px] text-slate-500">{t("mapColumnsDesc")}</p>
-              <MappingSection targetFields={TARGET_FIELDS} savedMapping={c.mapping ?? {}} />
+              <MappingSection targetFields={targetFields} savedMapping={c.mapping ?? {}} />
             </section>
           )}
           {c?.mapping && (

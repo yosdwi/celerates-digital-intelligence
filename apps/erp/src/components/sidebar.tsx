@@ -18,7 +18,7 @@ import { useSidebarCollapse } from "./sidebar-context";
 // One small icon per page (Attio-style list rows). Pages without an entry get a neutral dot.
 const PAGE_ICON: Record<string, LucideIcon> = {
   "/marketing/dashboard": LayoutDashboard, "/marketing": Target, "/sales/accounts": Building2,
-  "/sales/dashboard": LayoutDashboard, "/sales/v2/opportunity-tracker": Handshake, "/sales": FileText,
+  "/sales/dashboard": LayoutDashboard, "/sales/v2/opportunity-tracker": Handshake, "/sales/v2/pq-tracker": FileText,
   "/ta/client-active": Building, "/pmo/overtime-business-trip": Plane, "/sales/profitability-tracker": PiggyBank,
   "/ta/dashboard": LayoutDashboard, "/ta": ClipboardList, "/ta/candidates": UserSearch, "/ta/pipeline": Workflow, "/ta/onboarding": DoorOpen,
   "/hr/dashboard": LayoutDashboard, "/hr": Users, "/hr/extension-requests": Repeat, "/hr/attendance": CalendarCheck, "/hr/attendance-settings": Settings2,
@@ -60,14 +60,14 @@ export function Sidebar() {
   const firstName = ((session?.user as any)?.fullName ?? session?.user?.name ?? "Sobat Celerates").split(" ")[0];
 
   return (
-    <aside className={`hidden md:flex fixed inset-y-0 left-0 border-r border-slate-800 bg-slate-900 flex-col transition-all duration-200 z-30 ${collapsed ? "w-16" : "w-64"}`}>
-      <div className={`flex items-center gap-3 px-3 py-6 ${collapsed ? "justify-center px-0" : ""}`}>
+    <aside className={`hidden md:flex fixed inset-y-0 left-0 border-r border-slate-800 bg-slate-900 flex-col transition-all duration-200 z-30 ${collapsed ? "w-16" : "w-60"}`}>
+      <div className={`flex items-center gap-2.5 px-3 py-3 ${collapsed ? "justify-center px-0" : ""}`}>
         <Link href="/" className="flex items-center gap-3 min-w-0">
-          <Image src="/logo-celerates.jpg" alt="Celerates" width={36} height={36} className="rounded-lg shrink-0" />
+          <Image src="/logo-celerates.jpg" alt="Celerates" width={28} height={28} className="rounded-md shrink-0" />
           {!collapsed && (
             <div className="min-w-0">
-              <p className="text-base font-semibold text-white leading-none truncate">Celerates</p>
-              <p className="text-xs text-slate-400 leading-none mt-1">ERP</p>
+              <p className="text-sm font-semibold text-white leading-none truncate">Celerates</p>
+              <p className="text-[11px] text-slate-400 leading-none mt-0.5">ERP</p>
             </div>
           )}
         </Link>
@@ -78,7 +78,7 @@ export function Sidebar() {
           <Link
             href="/"
             title={t("home")}
-            className={`flex items-center gap-3 rounded-lg px-2.5 py-2.5 text-sm transition-colors mb-1 ${collapsed ? "justify-center" : ""} ${
+            className={`flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] transition-colors mb-0.5 ${collapsed ? "justify-center" : ""} ${
               pathname === "/" ? "bg-brand-500/10 text-brand-300 font-medium" : "text-slate-300 hover:bg-slate-800"
             }`}
           >
@@ -104,7 +104,7 @@ export function Sidebar() {
               <Link
                 href={target}
                 title={isTimesheetModule ? `${label(mod.label)}${t("talentOnlySuffix")}` : label(mod.label)}
-                className={`flex items-center gap-3 rounded-lg px-2.5 py-2.5 text-sm transition-colors ${collapsed ? "justify-center" : ""} ${moduleLinkClass}`}
+                className={`flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] transition-colors ${collapsed ? "justify-center" : ""} ${moduleLinkClass}`}
               >
                 <Icon className="h-4 w-4 shrink-0" />
                 {!collapsed && (
@@ -135,12 +135,12 @@ export function Sidebar() {
                     return (
                       <div key={sub.href}>
                         {showHeading && (
-                          <p className="px-2 pb-0.5 pt-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{heading}</p>
+                          <p className="px-2 pb-0.5 pt-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{heading}</p>
                         )}
                         <Link
                           href={sub.href}
                           aria-current={isActive ? "page" : undefined}
-                          className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] transition-colors ${
+                          className={`flex items-center gap-2 rounded-md px-2 py-1 text-[13px] transition-colors ${
                             isActive
                               ? (isTimesheetModule ? "bg-orange-500/10 text-orange-300 font-medium" : "bg-brand-500/15 text-white font-medium")
                               : (isTimesheetModule ? "text-slate-400 hover:bg-orange-500/10 hover:text-orange-300" : "text-slate-400 hover:bg-slate-800 hover:text-slate-200")
@@ -160,14 +160,14 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className={`px-4 py-4 border-t border-slate-800 flex items-center gap-2 ${collapsed ? "flex-col" : "justify-between"}`}>
+      <div className={`px-3 py-2 border-t border-slate-800 flex items-center gap-2 ${collapsed ? "flex-col" : "justify-between"}`}>
         <div className="min-w-0">
           {!collapsed && (
             <p className="text-xs font-medium text-slate-300 leading-snug truncate">
               {t("greeting", { name: firstName })}
             </p>
           )}
-          <p className="text-[11px] text-slate-500 mt-1">{collapsed ? "PMTG" : "PT Mitra Talenta Grup"}</p>
+          <p className="text-[11px] text-slate-500 mt-0.5">{collapsed ? "PMTG" : "PT Mitra Talenta Grup"}</p>
         </div>
         <button
           onClick={toggle}

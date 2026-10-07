@@ -165,3 +165,31 @@ Attio is the reference; Crisp already carries its measured geometry and tokens. 
   inline-editable only for visible columns. Needs a per-field V1-compatible save (today only stage and Sales
   Qualified have one; the rest go through the whole-form update) and per-field validation for required fields.
 
+
+## 14. PQ Tracker V2 (2026-10-07)
+
+- Route `/sales/v2/pq-tracker`; Sales › PQ Tracker opens it, V1 stays at `/sales` (and `/sales/[id]/edit`), linked as
+  "Versi lama" beside the title. Sidebar entries carry their V1 path (`SubPage.v1`) so V1 pages keep the same entry.
+- One shared workspace for every V2 page (`features/sales-v2/record-workspace.tsx`): URL state, summary cards,
+  saved views, Excel-style headers, Tabel · Grid · Kanban, Undo / confirm on board moves, the record-panel rail
+  wiring and "Tanya Agent". A page is a `WorkspaceConfig` plus its panel, dialogs and toolbar actions. Opportunity
+  Tracker now runs on it too; Account (CRM) and Dashboard follow on the same kit.
+- Data and actions are V1's: the page reads what `app/sales/page.tsx` reads (PO / PQ documents with signed URLs,
+  PQ signature, Lead Source) plus the PMO Document Tracker row; mutations are `createOpportunity`,
+  `updateOpportunity` (now with the optional `return_to`), `updatePipelineStage` + `updateOptyStatus` (V1's
+  StageSelector rule: Win → Project Won, Drop → Closed Lost, Hold → Project on Hold), `sendPqForSignature`,
+  `deleteOpportunity` (Full access only), `deleteOpportunityAttachment`. V1 constants moved, unchanged, to
+  `app/sales/pq-constants.ts` so V1 and V2 read the same lists.
+- Summary cards: Total PQ, On Going, Perlu Generate PQ, Win, Drop. All 26 V1 columns by default, Client pinned.
+- Kanban by Pipeline Stage (On Going, Hold, Win, Drop). Hold / On Going save with Undo (stage and Opty Status put
+  back); Win and Drop ask first and say what follows (Opty Status; Win notifies TM).
+- Panel: highlights, Notes, Dokumen PQ, Tanda tangan PQ, PO Doc, Dokumen Legal Project (PMO), source Opportunity;
+  footer: Pipeline Stage and Opty Status selects, Kirim untuk TTD (dialog: PQ document + signer), Edit, Halaman
+  penuh, Hapus. Edit is V1's full form in a dialog, the PMO document fields included (V1's update writes them all).
+
+## 15. Density on laptops (QA 2026-10-07)
+
+A 1366 or 1920 laptop at 125–150 % OS scaling gives the browser about 1280 × 650 CSS px. Like Attio, V2 keeps fixed
+compact sizes and never uses zoom or scaling: sidebar 240px with 28–32px rows and a 28px logo; page title 16px and a
+12px subtitle (hidden below 760px of height); summary cards 18px numbers; toolbar on one line at 1280 (Sheet Sync
+shows its label from `xl`); Agent launcher 40px. The page fills the height and the table scrolls inside it.

@@ -1,0 +1,588 @@
+"use client";
+// Sales V2 record workspace, shared by every V2 page (Opportunity Tracker, PQ Tracker, …): one record set, one state
+// (in the URL), three views (Tabel · Grid · Kanban), clickable summary cards, saved views, Excel-style headers and a
+// slot for the page's own record panel. A page supplies a WorkspaceConfig plus its panel, dialogs and toolbar actions.
+// docs/design/SALES-V2-CRISP-UX-CONTRACT.md is the contract this file implements.
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Columns3, LayoutGrid, Search, Sparkles, Table2 } from "lucide-react";
+import {
+  Board, DataTable, EntityCard, Input, SavedViews, SavedViewsSaveBar, StatCard, TableToolbar, ViewToggle, useSnackbar,
+  applyFilters, applySorts, Button, Dialog, DialogBody, DialogFooter, FormField,
+  type DataTableColumn, type TableToolbarColumn,
+} from "@crisp-ui-kit/crisp";
+import { useToast } from "@/components/toast-provider";
+import { openAgent } from "@/components/mobile/events";
+import { setRightRail, useRightRail } from "@/lib/right-rail";
+import { HeaderFilter, type HeaderSpec } from "./header-filter";
+import { parseState, serializeState, type SavedState, type StoredView, type View, type WorkspaceState } from "./model";
+
+export type Access = { canEdit: boolean; canDelete: boolean };
+export type Kpi<T> = { id: string; label: string; tone: string; soft: string; bar: string; match: (o: T) => boolean };
+export type PendingMove<T> = { record: T; to: string };
+
+/** What the page's record panel gets: the selection, the visible list (Previous / Next) and the optimistic patch. */
+export type PanelContext<T> = {
+  record: T | null;
+  records: T[];
+  returnTo: string;
+  select: (id: string) => void;
+  close: () => void;
+  patch: (id: string, p: Partial<T>) => void;
+};
+/** A Kanban move into a confirm stage, waiting for the page's dialog. `onMoved` after the server saved it. */
+export type MoveContext<T> = { move: PendingMove<T> | null; returnTo: string; onCancel: () => void; onMoved: () => void; select: (id: string) => void };
+
+export type WorkspaceConfig<T extends { id: string }> = {
+  title: string;
+  subtitle: string;
+  /** "opportunity", "PQ": used in the search label and the empty state. */
+  noun: string;
+  searchPlaceholder: string;
+  /** localStorage keys: shown columns, personal saved views. */
+  storage: { columns: string; views: string };
+  /** Fields a URL filter or sort may name. */
+  fieldKeys: Set<string>;
+  fieldValue: (o: T, key: string) => unknown;
+  sortValue: (o: T, key: string) => unknown;
+  matchesSearch: (o: T, q: string) => boolean;
+  toolbarColumns: (all: T[]) => TableToolbarColumn[];
+  builtInViews: StoredView[];
+  /** Built-in views that are boards by nature; the others keep the lens the user is in. */
+  boardViews?: string[];
+  kpis: Kpi<T>[];
+  specs: Record<string, HeaderSpec>;
+  columns: Omit<DataTableColumn<T>, "header">[];
+  /** What a cell shows, as text: drives the auto column width. */
+  cellText: (o: T, key: string) => string;
+  /** Checklist order for coded columns (a pipeline in its own order, zero counts kept). */
+  valueOrder?: Record<string, readonly string[]>;
+  defaultShown: string[];
+  grid: (o: T) => { label: string; author: React.ReactNode; title: string; excerpt: string; footer: React.ReactNode; date?: string };
+  board: {
+    stages: readonly { id: string; title: string; accent: string }[];
+    stageOf: (o: T) => string;
+    /** The optimistic change a move to `to` makes (stage, and anything the server sets with it). */
+    withStage: (o: T, to: string) => Partial<T>;
+    /** Save a move with the existing V1 action(s); throws on failure. */
+    move: (o: T, to: string) => Promise<void>;
+    /** Undo of an ordinary move: put `original` back. Defaults to moving it to its old stage. */
+    restore?: (original: T) => Promise<void>;
+    /** Stages a card only enters after the page's confirm dialog (they close the record). */
+    confirm: ReadonlySet<string>;
+    /** Short id for messages ("OPTY-…"). */
+    recordLabel: (o: T) => string;
+    cardLabel: (o: T) => string;
+    renderCard: (o: T, open: () => void) => React.ReactNode;
+    newCardLabel: string;
+  };
+};
+
+function readStorage<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+function writeStorage(key: string, value: unknown) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* private mode: preference not kept */ }
+}
+
+/**
+ * Pixel height of an element. Crisp DataTable applies `height` to its inner scroll box, whose parent has no height of
+ * its own, so "100%" does not bound it; a measured number does (and turns on row virtualization).
+ */
+function useHeight<T extends HTMLElement>() {
+  const ref = useRef<T>(null);
+  const [h, setH] = useState(480);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setH(Math.max(240, Math.floor(el.clientHeight))));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return [ref, h] as const;
+}
+
+/** Crisp's Snackbar (Undo after a Kanban move) needs a SnackbarProvider above this component. */
+export function RecordWorkspace<T extends { id: string }>({
+  config: c, records: serverRecords, access, headerEnd, toolbarEnd, onNewCard, renderPanel, renderMoveDialog,
+}: {
+  config: WorkspaceConfig<T>;
+  records: T[];
+  access: Access;
+  /** Page-level links beside the title (e.g. "Versi lama"). */
+  headerEnd?: React.ReactNode;
+  /** Dataset actions at the end of the toolbar, primary last (Attio: Import / Export · + New). */
+  toolbarEnd?: React.ReactNode;
+  /** A Kanban column's "+": open the page's create dialog with that stage. */
+  onNewCard?: (stage: string) => void;
+  renderPanel: (ctx: PanelContext<T>) => React.ReactNode;
+  renderMoveDialog: (ctx: MoveContext<T>) => React.ReactNode;
+}) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const { showToast } = useToast();
+  const snackbar = useSnackbar();
+  const state = useMemo(() => parseState(new URLSearchParams(params.toString()), c.fieldKeys), [params, c.fieldKeys]);
+
+  // URL is the state. View changes push a history entry (Back undoes them); typing, filters, sort and the preview
+  // replace it, so Back leaves the page instead of replaying every keystroke.
+  const commit = useCallback((next: Partial<WorkspaceState>, mode: "push" | "replace" = "replace") => {
+    const url = pathname + serializeState({ ...state, ...next });
+    window.history[mode === "push" ? "pushState" : "replaceState"](null, "", url);
+  }, [pathname, state]);
+  const returnTo = pathname + serializeState(state);
+
+  // Optimistic overrides (stage drag, quick edits in the panel) until the refreshed server data arrives.
+  const [overrides, setOverrides] = useState<Record<string, Partial<T>>>({});
+  useEffect(() => setOverrides({}), [serverRecords]);
+  const all = useMemo(() => serverRecords.map((r) => (overrides[r.id] ? { ...r, ...overrides[r.id] } : r)), [serverRecords, overrides]);
+  const patch = useCallback((id: string, p: Partial<T>) => setOverrides((o) => ({ ...o, [id]: { ...o[id], ...p } })), []);
+
+  // Search box: typed locally, written to the URL after a short pause; follows the URL on Back/Forward.
+  const [query, setQuery] = useState(state.q);
+  useEffect(() => setQuery(state.q), [state.q]);
+  useEffect(() => {
+    if (query === state.q) return;
+    const t = setTimeout(() => commit({ q: query }), 250);
+    return () => clearTimeout(t);
+  }, [query, state.q, commit]);
+
+  const toolbarColumns = useMemo(() => c.toolbarColumns(all), [c, all]);
+
+  // The one filtered, searched, sorted set every view shows.
+  const records = useMemo(() => {
+    const searched = all.filter((o) => c.matchesSearch(o, state.q));
+    const filtered = applyFilters(searched, state.filters, c.fieldValue, { columns: toolbarColumns });
+    return state.sorts.length ? applySorts(filtered, state.sorts, c.sortValue) : filtered;
+  }, [c, all, state.q, state.filters, state.sorts, toolbarColumns]);
+
+  // Columns shown and their order: a per-browser preference, also carried by saved views.
+  const [shownKeys, setShownKeysState] = useState<string[]>(c.defaultShown);
+  useEffect(() => setShownKeysState(readStorage(c.storage.columns, c.defaultShown)), [c]);
+  const setShownKeys = useCallback((keys: string[]) => { setShownKeysState(keys); writeStorage(c.storage.columns, keys); }, [c]);
+
+  // Saved views: built-in operational views plus personal ones kept in this browser.
+  const [personalViews, setPersonalViews] = useState<StoredView[]>([]);
+  useEffect(() => setPersonalViews(readStorage(c.storage.views, [])), [c]);
+  const savePersonal = (views: StoredView[]) => { setPersonalViews(views); writeStorage(c.storage.views, views); };
+  const views = [...c.builtInViews, ...personalViews];
+  const active = views.find((v) => v.id === (state.savedView ?? "all")) ?? c.builtInViews[0];
+  const current: SavedState = { view: state.view, q: state.q, filters: state.filters, sorts: state.sorts };
+  const dirty = JSON.stringify(stripIds(active.state)) !== JSON.stringify(stripIds(current));
+  const [naming, setNaming] = useState<null | { mode: "create" | "rename"; id?: string; name: string }>(null);
+
+  function applyView(id: string | null) {
+    const v = views.find((x) => x.id === (id ?? "all")) ?? c.builtInViews[0];
+    const view = v.builtIn && !c.boardViews?.includes(v.id) ? state.view : v.state.view;
+    commit({ ...v.state, view, savedView: v.id === "all" ? null : v.id, record: null }, "push");
+    if (v.state.shownKeys) setShownKeys(v.state.shownKeys);
+  }
+  function saveNamed() {
+    if (!naming) return;
+    const name = naming.name.trim().slice(0, 60) || "Tampilan baru";
+    if (naming.mode === "rename" && naming.id) {
+      savePersonal(personalViews.map((v) => (v.id === naming.id ? { ...v, name } : v)));
+    } else {
+      const id = `p${Date.now().toString(36)}`;
+      savePersonal([...personalViews, { id, name, state: { ...current, shownKeys } }]);
+      commit({ savedView: id });
+    }
+    setNaming(null);
+  }
+  const builtInNotice = () => showToast("Tampilan bawaan tidak bisa diubah. Simpan sebagai tampilan baru.", "error");
+
+  // Kanban drag (contract §12): an ordinary move saves at once with Undo; confirm stages ask first (the page's
+  // dialog), and the card stays where it was until confirmed.
+  const { board } = c;
+  const [, startMove] = useTransition();
+  const [pendingMove, setPendingMove] = useState<PendingMove<T> | null>(null);
+  const moveTo = useCallback((record: T, to: string) => {
+    patch(record.id, board.withStage(record, to));
+    startMove(async () => {
+      try {
+        await board.move(record, to);
+        router.refresh();
+        snackbar.show({
+          message: `${board.recordLabel(record)} dipindah ke ${stageTitle(board.stages, to)}`,
+          duration: 7000,
+          action: {
+            label: "Batalkan",
+            onClick: () => {
+              patch(record.id, record);
+              startMove(async () => {
+                try { await (board.restore ? board.restore(record) : board.move(record, board.stageOf(record))); router.refresh(); }
+                catch (err) { showToast((err as Error)?.message || "Gagal membatalkan", "error"); router.refresh(); }
+              });
+            },
+          },
+        });
+      } catch (err) {
+        patch(record.id, record);
+        showToast((err as Error)?.message || "Gagal memindahkan", "error");
+      }
+    });
+  }, [board, patch, router, snackbar, showToast]);
+  function onCardsChange(next: (T & { columnId: string })[]) {
+    const moved = next.find((x) => { const r = all.find((o) => o.id === x.id); return r && x.columnId !== board.stageOf(r); });
+    if (!moved || !access.canEdit) return;
+    const record = all.find((r) => r.id === moved.id)!;
+    if (board.confirm.has(moved.columnId)) setPendingMove({ record, to: moved.columnId });
+    else moveTo(record, moved.columnId);
+  }
+
+  // Coming back (Back, Cancel, Save) with a record in the URL: bring its card into view instead of the board's start.
+  useEffect(() => {
+    if (!state.record) return;
+    document.querySelector(`[data-sales-v2-board] [data-card-id="${CSS.escape(state.record)}"]`)?.scrollIntoView({ block: "nearest", inline: "center" });
+    // Once, on arrival.
+  }, []);
+
+  const select = useCallback((id: string) => commit({ record: id }), [commit]);
+  const closePreview = useCallback(() => commit({ record: null }), [commit]);
+  const selected = state.record ? all.find((r) => r.id === state.record) ?? null : null;
+
+  // Table: Excel-style headers (header-filter.tsx) over every field; widths follow the longest value.
+  const allKeys = useMemo(() => c.columns.map((x) => x.key), [c]);
+  const widths = useMemo(() => columnWidths(c, serverRecords), [c, serverRecords]);
+  const valueIndex = useMemo(() => distinctValues(c, all), [c, all]);
+  const hideColumn = useCallback((key: string) => setShownKeys(shownKeys.filter((k) => k !== key)), [setShownKeys, shownKeys]);
+  const columns = useMemo(() => c.columns.map((col): DataTableColumn<T> => {
+    const spec = c.specs[col.key];
+    return {
+      ...col,
+      header: (
+        <HeaderFilter
+          spec={spec}
+          values={valueIndex[col.key] ?? []}
+          filters={state.filters}
+          sorts={state.sorts}
+          onFilters={(filters) => commit({ filters })}
+          onSorts={(sorts) => commit({ sorts })}
+          onHide={() => hideColumn(col.key)}
+        />
+      ),
+      align: spec.align,
+      width: widths[col.key],
+      hidden: !shownKeys.includes(col.key),
+    };
+  }), [c, valueIndex, state.filters, state.sorts, commit, hideColumn, widths, shownKeys]);
+  const columnsForSettings: TableToolbarColumn[] = useMemo(() => c.columns.map((x) => ({ key: x.key, label: c.specs[x.key].label })), [c]);
+  const [workspaceRef, workspaceHeight] = useHeight<HTMLDivElement>();
+  const counts = useMemo(() => Object.fromEntries(c.kpis.map((k) => [k.id, all.filter(k.match).length])), [c, all]);
+  // Each Kanban column's colour, read by sales-v2.css (Crisp's columns carry no id of their own).
+  const stageVars = Object.fromEntries(board.stages.map((s, i) => [`--stage-${i + 1}`, s.accent])) as React.CSSProperties;
+  const empty = <p className="p-6 text-center text-slate-500">Tidak ada {c.noun} yang cocok.</p>;
+
+  return (
+    // Full viewport height: -mb-24 cancels the shell's bottom padding, so the workspace reaches the bottom edge and the
+    // Agent launcher floats over it (the scroll areas leave room for it, sales-v2.css).
+    <div className="flex flex-col bg-white text-[13px] text-slate-800 md:-mb-24 md:h-dvh" data-sales-v2>
+      {/* md:pr-56 keeps the header clear of the app's fixed top-right controls (language, bell, account). */}
+      {/* Density (contract §5, §15): fixed compact sizes like Attio, never zoom; a 1280 × 650 laptop viewport (1366 or
+          1920 screens at 125–150 % OS scaling) must show the table without the chrome eating the height. */}
+      <header className="flex items-center justify-between gap-4 px-5 pt-3 pb-2 md:pr-56">
+        <div className="min-w-0">
+          <h1 className="text-base font-semibold leading-6 text-slate-900">{c.title}</h1>
+          <p className="truncate text-[12px] leading-4 text-slate-500" data-sales-v2-subtitle>{c.subtitle}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {headerEnd}
+          {!access.canEdit && <span className="rounded-md bg-slate-100 px-2 py-1 text-[12px] text-slate-600">Mode lihat saja</span>}
+        </div>
+      </header>
+
+      {/* The one coloured element on the page (contract §12): each card is a built-in view; click to apply, again to clear. */}
+      <section aria-label="Ringkasan" className={`mx-5 mb-2 grid grid-cols-2 gap-2 sm:grid-cols-3 ${c.kpis.length > 5 ? "lg:grid-cols-6" : "lg:grid-cols-5"}`} data-sales-v2-kpi>
+        {c.kpis.map((k) => {
+          const on = active.id === k.id;
+          return (
+            <button
+              key={k.id}
+              type="button"
+              aria-pressed={on}
+              onClick={() => applyView(on ? null : k.id)}
+              data-kpi={k.id}
+              className="rounded-lg border text-left transition-shadow hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2"
+              style={{ background: k.soft, borderColor: on ? k.tone : "transparent", boxShadow: `inset 3px 0 0 ${k.bar}`, outlineColor: k.tone }}
+            >
+              <StatCard
+                className="px-3 py-1.5"
+                label={<span className="text-[12px] font-medium text-slate-600">{k.label}</span>}
+                value={<span className="text-[18px] font-bold leading-6 tabular-nums" style={{ color: k.tone }}>{counts[k.id]}</span>}
+              />
+            </button>
+          );
+        })}
+      </section>
+
+      <div className="flex flex-wrap items-center gap-2 border-y border-slate-100 px-5 py-1.5" data-sales-v2-toolbar>
+        <SavedViews
+          label={active.name}
+          views={views.map((v) => ({ id: v.id, name: v.name }))}
+          activeId={active.id}
+          onSelect={applyView}
+          onCreate={() => setNaming({ mode: "create", name: "" })}
+          onRename={(id) => (personalViews.some((v) => v.id === id) ? setNaming({ mode: "rename", id, name: personalViews.find((v) => v.id === id)!.name }) : builtInNotice())}
+          onDuplicate={(id) => { const v = views.find((x) => x.id === id); if (v) savePersonal([...personalViews, { id: `p${Date.now().toString(36)}`, name: `${v.name} (salinan)`, state: v.state }]); }}
+          onDelete={(id) => { if (!personalViews.some((v) => v.id === id)) return builtInNotice(); savePersonal(personalViews.filter((v) => v.id !== id)); if (state.savedView === id) applyView(null); }}
+          createLabel="Simpan tampilan saat ini"
+          renameLabel="Ganti nama"
+          duplicateLabel="Duplikat"
+          deleteLabel="Hapus"
+          searchPlaceholder="Cari tampilan…"
+          aria-label="Tampilan tersimpan"
+        />
+        <ViewToggle<View>
+          aria-label="Tampilan data"
+          value={state.view}
+          onValueChange={(v) => commit({ view: v }, "push")}
+          options={[
+            { value: "table", label: "Tabel", icon: <Table2 size={14} /> },
+            { value: "grid", label: "Grid", icon: <LayoutGrid size={14} /> },
+            { value: "kanban", label: "Kanban", icon: <Columns3 size={14} /> },
+          ]}
+        />
+        <div className="w-full sm:w-44">
+          <Input
+            type="search"
+            aria-label={`Cari ${c.noun}`}
+            placeholder={c.searchPlaceholder}
+            value={query}
+            onChange={(e) => setQuery(e.currentTarget.value)}
+            suffix={<Search size={14} className="text-slate-400" />}
+          />
+        </div>
+        <TableToolbar
+          inline
+          columns={toolbarColumns}
+          filters={state.filters}
+          onFiltersChange={(filters) => commit({ filters })}
+          sorts={state.sorts}
+          onSortsChange={(sorts) => commit({ sorts })}
+          viewColumns={columnsForSettings}
+          shownKeys={shownKeys}
+          onShownKeysChange={setShownKeys}
+          showViewSettings={state.view === "table"}
+          count={<span className="text-[12px] text-slate-500" data-sales-v2-count>{records.length} dari {all.length}</span>}
+          sortLabel="Urutkan"
+          filterLabel="Filter"
+          viewSettingsLabel="Kolom"
+        />
+        <div className="ml-auto flex items-center gap-1.5">{toolbarEnd}</div>
+      </div>
+
+      {dirty && (
+        <SavedViewsSaveBar
+          className="px-5"
+          onDiscard={() => applyView(active.id)}
+          onSave={() => {
+            if (active.builtIn) return setNaming({ mode: "create", name: "" });
+            savePersonal(personalViews.map((v) => (v.id === active.id ? { ...v, state: { ...current, shownKeys } } : v)));
+          }}
+          onSaveAsNew={() => setNaming({ mode: "create", name: "" })}
+          discardLabel="Batalkan perubahan"
+          saveLabel={active.builtIn ? "Simpan sebagai tampilan" : "Simpan tampilan"}
+          saveAsNewLabel="Simpan sebagai tampilan baru"
+        />
+      )}
+
+      <div ref={workspaceRef} className="relative h-[70dvh] min-h-0 md:h-auto md:flex-1" data-sales-v2-workspace={state.view}>
+        {state.view === "table" && (
+          <DataTable<T>
+            surface="bleed"
+            data={records}
+            columns={columns}
+            columnOrder={[...shownKeys, ...allKeys.filter((k) => !shownKeys.includes(k))]}
+            onColumnOrderChange={(order) => setShownKeys(order.filter((k) => shownKeys.includes(k)))}
+            onColumnsChange={(next) => setShownKeys(next.filter((x) => !x.hidden).map((x) => x.key))}
+            showViewSettings={false}
+            showCount={false}
+            stickyFirst
+            interactive
+            onRowClick={(row) => select(row.id)}
+            height={workspaceHeight}
+            locale="id-ID"
+            empty={empty}
+          />
+        )}
+
+        {state.view === "grid" && (
+          <div className="h-full overflow-y-auto px-5 py-3" data-sales-v2-grid>
+            {records.length === 0 && empty}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+              {records.map((o) => {
+                const g = c.grid(o);
+                return (
+                  <EntityCard
+                    key={o.id}
+                    aria-label={g.label}
+                    aria-current={o.id === state.record || undefined}
+                    onClick={() => select(o.id)}
+                    author={g.author}
+                    title={g.title}
+                    excerpt={g.excerpt}
+                    footer={g.footer}
+                    date={g.date}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {state.view === "kanban" && (
+          <div className="h-full px-3 pt-2" style={stageVars} data-sales-v2-board>
+            <Board<T & { columnId: string }>
+              columns={board.stages.map((s) => ({ id: s.id, title: s.title, accent: s.accent }))}
+              cards={records.map((o) => ({ ...o, columnId: board.stageOf(o) }))}
+              onCardsChange={access.canEdit ? onCardsChange : undefined}
+              getCardLabel={board.cardLabel}
+              announceMove={(col, card) => `${card ?? "Kartu"} dipindah ke ${col}`}
+              onPreviewCard={(x) => select(x.id)}
+              previewCardLabel="Lihat ringkasan"
+              onNewCard={access.canEdit && onNewCard ? onNewCard : undefined}
+              newCardLabel={board.newCardLabel}
+              renderCard={(x) => board.renderCard(x, () => select(x.id))}
+            />
+          </div>
+        )}
+
+        {renderPanel({ record: selected, records, returnTo, select, close: closePreview, patch })}
+      </div>
+
+      {renderMoveDialog({
+        move: pendingMove,
+        returnTo,
+        select,
+        onCancel: () => setPendingMove(null),
+        onMoved: () => {
+          if (!pendingMove) return;
+          const { record, to } = pendingMove;
+          setPendingMove(null);
+          patch(record.id, board.withStage(record, to));
+          router.refresh();
+          showToast(`${board.recordLabel(record)} dipindah ke ${stageTitle(board.stages, to)}`);
+        },
+      })}
+
+      <Dialog open={!!naming} onOpenChange={(o) => !o && setNaming(null)} title={naming?.mode === "rename" ? "Ganti nama tampilan" : "Simpan tampilan"} width={400}>
+        {naming && (
+          <form onSubmit={(e) => { e.preventDefault(); saveNamed(); }}>
+            <DialogBody>
+              <FormField label="Nama tampilan">
+                <Input autoFocus value={naming.name} maxLength={60} onChange={(e) => setNaming({ ...naming, name: e.currentTarget.value })} />
+              </FormField>
+              <p className="mt-2 text-[12px] text-slate-500">Disimpan di browser ini: tampilan, pencarian, filter, urutan dan kolom.</p>
+            </DialogBody>
+            <DialogFooter>
+              <Button type="button" size="sm" intent="neutral" onClick={() => setNaming(null)}>Batal</Button>
+              <Button type="submit" size="sm" intent="primary">Simpan</Button>
+            </DialogFooter>
+          </form>
+        )}
+      </Dialog>
+    </div>
+  );
+}
+
+const stageTitle = (stages: readonly { id: string; title: string }[], id: string) => stages.find((s) => s.id === id)?.title ?? id;
+
+/** What makes a saved view "changed": the record set and its order. Switching Tabel/Grid/Kanban is only a lens. */
+function stripIds(s: SavedState) {
+  return { q: s.q.trim(), sorts: s.sorts, filters: s.filters.map(({ key, op, value, values, join }) => ({ key, op, value, values, join })) };
+}
+
+/** Width per column from its longest value or header (≈7px a character at 13px), between 80 and 320px. */
+function columnWidths<T extends { id: string }>(c: WorkspaceConfig<T>, rows: T[]): Record<string, number> {
+  return Object.fromEntries(c.columns.map(({ key }) => {
+    let w = c.specs[key].label.length * 7 + 64; // icon, gaps, sort and filter marks
+    for (const o of rows) w = Math.max(w, c.cellText(o, key).length * 7 + (key === c.columns[0].key ? 56 : 28));
+    return [key, Math.min(320, Math.max(80, Math.ceil(w)))];
+  }));
+}
+
+/** Distinct values (with counts) for each checklist column, in the order a person scans them. */
+function distinctValues<T extends { id: string }>(c: WorkspaceConfig<T>, rows: T[]): Record<string, [string, number][]> {
+  const out: Record<string, [string, number][]> = {};
+  for (const [key, spec] of Object.entries(c.specs)) {
+    if (spec.kind !== "values") continue;
+    const counts = new Map<string, number>();
+    for (const o of rows) { const v = String(c.fieldValue(o, key) ?? ""); counts.set(v, (counts.get(v) ?? 0) + 1); }
+    const order = c.valueOrder?.[key];
+    out[key] = order
+      ? [...order.map((v): [string, number] => [v, counts.get(v) ?? 0]), ...[...counts].filter(([v]) => !order.includes(v))]
+      : [...counts].sort((a, b) => a[0].localeCompare(b[0], "id", { numeric: true }));
+  }
+  return out;
+}
+
+// ── Record panel and the right rail (contract §9) ───────────────────────────────────────────────────────────
+/**
+ * Wiring every V2 record panel shares. Publishes how much of the right edge the panel covers (the Agent launcher
+ * steps aside), names the record for the Agent's context, and closes on Escape unless a dialog or the Agent takes it.
+ * Render the returned ref on a hidden element next to the panel.
+ */
+export function useRecordPanelRail(rail: { type: string; id: string; label: string } | null, onClose: () => void, dialogOpen: boolean) {
+  const state = useRightRail();
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const visible = !!rail;
+
+  useEffect(() => {
+    const panel = wrapRef.current?.parentElement?.querySelector<HTMLElement>(".crisp-recordpanel");
+    if (!visible || !panel) {
+      setRightRail({ panelWidth: 0 });
+      return;
+    }
+    // Layout position (offsetLeft), not getBoundingClientRect: the panel slides in with a transform, so its rect still
+    // sits off-screen when this runs.
+    const publish = () => {
+      const container = panel.offsetParent as HTMLElement | null;
+      const left = (container?.getBoundingClientRect().left ?? 0) + panel.offsetLeft;
+      setRightRail({ panelWidth: Math.max(0, Math.round(window.innerWidth - left)) });
+    };
+    publish();
+    const ro = new ResizeObserver(publish);
+    ro.observe(panel);
+    window.addEventListener("resize", publish);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", publish);
+      setRightRail({ panelWidth: 0 });
+    };
+  }, [visible, rail?.id]);
+
+  useEffect(() => { setRightRail({ record: rail }); }, [rail?.type, rail?.id, rail?.label]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => setRightRail({ record: null }), []);
+
+  useEffect(() => {
+    if (!visible || state.agentOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && !dialogOpen && !document.querySelector("[data-crisp-dialog]")) onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [visible, state.agentOpen, dialogOpen, onClose]);
+
+  return wrapRef;
+}
+
+/** Panel title with "Tanya Agent": the panel owns the right edge while open, so the Agent is reached from here. */
+export function PanelTitle({ name, prefill }: { name: string; prefill: string }) {
+  return (
+    <span className="flex min-w-0 items-center justify-between gap-2">
+      <span className="truncate">{name}</span>
+      <button
+        type="button"
+        onClick={() => openAgent({ prefill })}
+        className="inline-flex shrink-0 items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-[12px] font-medium text-slate-700 hover:border-brand-300 hover:text-brand-700"
+        data-sales-v2-ask-agent
+      >
+        <Sparkles size={13} /> Tanya Agent
+      </button>
+    </span>
+  );
+}

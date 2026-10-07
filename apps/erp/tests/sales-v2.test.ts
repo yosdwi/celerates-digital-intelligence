@@ -3,12 +3,13 @@
 // (artifacts/sales-ux-dogfood/), not here.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { applyFilters } from "@crisp-ui-kit/crisp";
 import {
   BUILT_IN_VIEWS, DEFAULT_SHOWN, canConvert, checkedValues, daysSince, editValues, matchesSearch, parseState, serializeState, setCheckedValues, setRange,
   type Opportunity,
 } from "../src/features/sales-v2/model";
+import { PQ_DEFAULT_SHOWN, needsPqNo, pqEditValues, pqFieldValue, withPqStage, type Pq } from "../src/features/sales-v2/pq-model";
 import { safeSalesReturnPath } from "../src/lib/safe-return";
 import { submoduleFor } from "../src/lib/module-access";
 
@@ -59,7 +60,7 @@ test("built-in views and default columns use Celerates fields", () => {
 });
 
 test("V2 renders with Crisp components, not look-alikes", () => {
-  const ws = read("features/sales-v2/workspace.tsx");
+  const ws = read("features/sales-v2/record-workspace.tsx");
   for (const c of ["DataTable", "TableToolbar", "ViewToggle", "SavedViews", "Board", "StatCard", "EntityCard"]) assert.match(ws, new RegExp(`<${c}\\b`), c);
   assert.match(read("features/sales-v2/record-preview.tsx"), /<RecordPanel\b/);
   const forms = read("features/sales-v2/forms.tsx");
@@ -75,7 +76,7 @@ test("Crisp styles are scoped to the V2 route and layered; base.css is never loa
 });
 
 test("density: no oversized page chrome in V2", () => {
-  for (const f of ["features/sales-v2/workspace.tsx", "features/sales-v2/record-preview.tsx", "features/sales-v2/forms.tsx"]) {
+  for (const f of readdirSync(new URL("../src/features/sales-v2/", import.meta.url)).map((n) => `features/sales-v2/${n}`)) {
     const src = read(f);
     assert.doesNotMatch(src, /\b(px-8|py-8|p-8|space-y-8|gap-8|text-2xl|text-3xl|rounded-2xl|shadow-2xl|zoom:|scale\()/, f);
   }
@@ -86,15 +87,16 @@ test("right rail: the Agent docks and narrows the page; an open record panel rep
   assert.match(agent, /useRightRail\(\)/);
   assert.match(agent, /const panelOpen = rail\.panelWidth > 0/);
   assert.match(agent, /open \|\| panelOpen \? "hidden"/);
-  assert.match(read("features/sales-v2/record-preview.tsx"), /openAgent\(\{ prefill:/);
+  const kit = read("features/sales-v2/record-workspace.tsx");
+  assert.match(kit, /openAgent\(\{ prefill \}\)/);
   assert.match(agent, /setRightRail\(\{ agentOpen: open \}\)/);
   assert.match(agent, /setProperty\("--agent-rail"/);
   assert.match(read("components/app-shell.tsx"), /lg:mr-\[var\(--agent-rail,0px\)\]/);
   for (const f of ["user-menu", "notification-bell", "activity-log-link", "language-switcher"])
     assert.match(read(`components/${f}.tsx`), /right-\[calc\(var\(--agent-rail,0px\)\+/, f);
-  const preview = read("features/sales-v2/record-preview.tsx");
-  assert.match(preview, /const visible = !!record/);
-  assert.match(preview, /setRightRail\(\{ panelWidth:/);
+  assert.match(kit, /setRightRail\(\{ panelWidth:/);
+  // Every V2 record panel goes through the shared rail wiring.
+  for (const f of ["record-preview.tsx", "pq-preview.tsx"]) assert.match(read(`features/sales-v2/${f}`), /useRecordPanelRail\(/, f);
 });
 
 test("Agent: no explanatory boilerplate; first-visit invitation offers voice, ask and the feedback form", () => {
@@ -180,10 +182,11 @@ test("edit values carry every V1 edit field and post blanks for unset values", (
 });
 
 test("Kanban: Win and Dropped ask first; other moves save with Undo", () => {
-  const ws = read("features/sales-v2/workspace.tsx");
+  const ws = read("features/sales-v2/record-workspace.tsx");
   assert.match(read("features/sales-v2/stage-move.tsx"), /CONFIRM_STAGES = new Set\(\["win", "dropped"\]\)/);
+  assert.match(read("features/sales-v2/workspace.tsx"), /confirm: CONFIRM_STAGES/);
   assert.match(ws, /label: "Batalkan"/);
-  assert.match(ws, /CONFIRM_STAGES\.has\(moved\.columnId\)/);
+  assert.match(ws, /board\.confirm\.has\(moved\.columnId\)/);
 });
 
 test("navigation: Opportunity Tracker opens V2; the V1 page still resolves to the same entry and stays linked from V2", () => {
@@ -209,4 +212,58 @@ test("V2 toolbar: every column by default, New and Sheet Sync (a dialog) at the 
   assert.match(ws, /<SheetSyncButton\b/);
   assert.doesNotMatch(ws, /href="\/sales\/opportunity-tracker\/sheet-sync"/);
   assert.match(read("app/sales/v2/sales-v2.css"), /--crisp-bg-brand-solid: #194667/);
+});
+
+// ── PQ Tracker V2 (contract §14) ────────────────────────────────────────────────────────────────────────────
+const pq = (p: Partial<Pq> = {}): Pq => ({
+  id: "p1", optyNo: "OPTY2026-001", pqNo: null, fromOnboarding: false, trackerId: null, client: "PT A", clientType: null, project: "Proj",
+  position: null, serviceType: "outsourcing", businessUnit: null, level: null, headcount: null, durationMonths: null, priority: null, bant: null,
+  price: null, pricePeriod: null, requestDate: null, approvalDate: null, startDate: null, endDate: null, salesPic: "Rina", stage: "on_going",
+  optyStatus: null, notes: null, leadSource: null, createdAt: null, poDocUrl: null, poDocs: [], pqDocs: [],
+  signature: { status: "not_sent", signerName: null }, projectDoc: null, ...p,
+});
+
+test("PQ: stage moves carry V1's Opty Status rule; Perlu Generate PQ is V1's rule", () => {
+  assert.deepEqual(withPqStage(pq(), "win"), { stage: "win", optyStatus: "won" });
+  assert.deepEqual(withPqStage(pq(), "drop"), { stage: "drop", optyStatus: "closed_lost" });
+  assert.deepEqual(withPqStage(pq({ optyStatus: "waiting_feedback" }), "on_going"), { stage: "on_going", optyStatus: "waiting_feedback" });
+  assert.equal(needsPqNo(pq({ fromOnboarding: true })), true);
+  assert.equal(needsPqNo(pq({ fromOnboarding: true, pqNo: "PQ-1" })), false);
+  assert.equal(needsPqNo(pq()), false);
+  assert.equal(pqFieldValue(pq({ stage: "hold" }), "stage"), "Hold");
+  assert.equal(pqFieldValue(pq({ optyStatus: "won" }), "optyStatus"), "Project Won");
+});
+
+test("PQ edit posts every field V1's update writes, PMO documents included (nothing gets blanked)", () => {
+  const src = read("app/sales/actions.ts");
+  const update = src.slice(src.indexOf("export async function updateOpportunity("), src.indexOf("export type UpdateStageResult"));
+  const posted = new Set([...update.matchAll(/formData\.get\("(\w+)"\)/g)].map((m) => m[1]));
+  // Files, and the two codes V1 sets from its list (guarded: blank never overwrites), are not part of the form values.
+  for (const k of ["po_doc_file", "pipeline_stage_code", "opty_status_code", "return_to"]) posted.delete(k);
+  assert.deepEqual([...posted].sort(), Object.keys(pqEditValues(pq())).sort());
+  assert.match(update, /redirect\(safeSalesReturnPath\(formData\.get\("return_to"\), "\/sales"\)\)/);
+});
+
+test("PQ V2 reuses V1 PQ actions, shows every V1 column and is the sidebar entry", () => {
+  const all = ["pq-workspace.tsx", "pq-preview.tsx", "pq-forms.tsx"].map((f) => read(`features/sales-v2/${f}`)).join("\n");
+  for (const a of ["createOpportunity", "updateOpportunity", "updatePipelineStage", "updateOptyStatus", "sendPqForSignature", "deleteOpportunity", "deleteOpportunityAttachment"])
+    assert.match(all, new RegExp(`\\b${a}\\b`), a);
+  assert.doesNotMatch(all, /from "@\/db"/);
+  assert.equal(PQ_DEFAULT_SHOWN.length, 26);
+  assert.equal(submoduleFor("/sales/v2/pq-tracker")?.label, "PQ Tracker");
+  assert.equal(submoduleFor("/sales")?.href, "/sales/v2/pq-tracker");
+  assert.equal(submoduleFor("/sales/3f1c/edit")?.label, "PQ Tracker");
+  assert.equal(submoduleFor("/sales/opportunity-tracker/x/edit")?.label, "Opportunity Tracker");
+  assert.match(read("features/sales-v2/pq-workspace.tsx"), /href="\/sales"/);
+});
+
+test("density on laptops: compact sidebar and V2 chrome, no zoom (contract §15)", () => {
+  const sidebar = read("components/sidebar.tsx");
+  assert.match(sidebar, /"w-60"/);
+  assert.match(read("components/app-shell.tsx"), /md:ml-60/);
+  assert.doesNotMatch(sidebar, /py-2\.5|py-6|width=\{36\}/);
+  const kit = read("features/sales-v2/record-workspace.tsx");
+  assert.match(kit, /text-\[18px\]/);
+  assert.match(read("app/sales/v2/sales-v2.css"), /@media \(max-height: 760px\)/);
+  assert.doesNotMatch(read("app/globals.css"), /zoom:|font-size:\s*\d+%/);
 });

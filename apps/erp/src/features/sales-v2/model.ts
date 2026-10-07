@@ -119,13 +119,13 @@ export const FIELD_KEYS = new Set([
   "requirement", "detailRequirement", "progressNotes", "droppedReason",
 ]);
 
-function parseFilters(raw: string | null): ToolbarFilter[] {
+function parseFilters(raw: string | null, keys: ReadonlySet<string>): ToolbarFilter[] {
   if (!raw) return [];
   try {
     const list = JSON.parse(raw);
     if (!Array.isArray(list)) return [];
     return list.slice(0, 60).flatMap((f, i): ToolbarFilter[] => {
-      if (!f || typeof f !== "object" || !FIELD_KEYS.has(f.key)) return [];
+      if (!f || typeof f !== "object" || !keys.has(f.key)) return [];
       return [{
         id: typeof f.id === "string" ? f.id.slice(0, 40) : `f${i}`,
         key: f.key,
@@ -141,16 +141,17 @@ function parseFilters(raw: string | null): ToolbarFilter[] {
   }
 }
 
-export function parseState(params: URLSearchParams): WorkspaceState {
+/** `keys`: the fields this page's filters and sorts may name (Opportunity Tracker's by default). */
+export function parseState(params: URLSearchParams, keys: ReadonlySet<string> = FIELD_KEYS): WorkspaceState {
   const view = params.get("view");
   const sorts = (params.get("sort") ?? "").split(",").flatMap((s): ToolbarSort[] => {
     const [key, dir] = s.split(":");
-    return FIELD_KEYS.has(key) && (dir === "asc" || dir === "desc") ? [{ key, dir }] : [];
+    return keys.has(key) && (dir === "asc" || dir === "desc") ? [{ key, dir }] : [];
   });
   return {
     view: (VIEWS as readonly string[]).includes(view ?? "") ? (view as View) : "table",
     q: (params.get("q") ?? "").slice(0, 200),
-    filters: parseFilters(params.get("filter")),
+    filters: parseFilters(params.get("filter"), keys),
     sorts,
     record: params.get("record"),
     savedView: params.get("sv"),
