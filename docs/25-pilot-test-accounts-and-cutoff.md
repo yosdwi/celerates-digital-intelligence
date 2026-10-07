@@ -37,3 +37,12 @@ This file lists everything that exists only for that testing and exactly how to 
 
 - `administrator.test.ierp@celerates.com` is an Owner and active on an internet-facing system; its only protection is the mailbox code. Disabling it earlier is the safer default if it is not used.
 - Test accounts conflict with the earlier security rule R5.4 (shared test accounts never sign in to an internet-facing pilot); `seed-test-accounts.mjs` still refuses `APP_ENV=pilot` unless `ALLOW_TEST_ACCOUNTS=1`. This pilot decision is the documented exception.
+
+## 5. Deployment record (2026-10-07)
+
+- Image `celerates-erp:wave1-f9abeb8` runs as `celerates-erp:pilot`; previous image `celerates-erp:rollback-20261007T014202Z` (`a0354ac`, release `952c266`). No migration in this release.
+- `AUTH_OTP_WAIVED_EMAILS` lists 9 accounts (every backoffice non-Owner `*.test.ierp@celerates.com`). `administrator.test.ierp@celerates.com` is not listed and the code would ignore it anyway. Env backup: `celerates-erp.env.bak-*` (root only, newest of 2026-10-07).
+- Their passwords were replaced with the random value in `/etc/celerates/secrets/test-accounts-password`; 0 live sessions needed revoking.
+- Verified over the public URL: `sales.test.ierp` and `ta.test.ierp` sign in with no mailbox code (`login/start` returns `signin`), audit shows `password;otp_waived`, session carries only the Sales/TA division and no capabilities or step-up, `/sales/opportunity-tracker` renders the seeded rows and `/ta` the seeded requisitions.
+- Synthetic Sales data seeded at the same time: 300 trackers, 15 clients, 40 converted (backup `celerates_erp-pre-sales-seed-20261007T010604Z.dump`).
+- Not yet verified: conversion by hand, double-submit, viewer/editor behaviour (only `full` accounts exist), session revocation after waived login, load test.
