@@ -58,7 +58,8 @@ export function AgentPanel() {
   const { status } = useSession();
   const [open, setOpen] = useState(false);
   // Ringkasan (Perlu perhatian) is open until the conversation starts; the user can fold or unfold it any time.
-  const [summaryOpen, setSummaryOpen] = useState(true);
+  // Folded by default (QA round 2): the drawer leads with the conversation and feedback, not the rule list.
+  const [summaryOpen, setSummaryOpen] = useState(false);
   const [form, setForm] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const [result, setResult] = useState<{ path: string; data?: OperationalContextResponse & { trends?: Record<string, SignalTrend> }; error?: string }>();
@@ -174,7 +175,7 @@ export function AgentPanel() {
   useEffect(() => {
     const openFromShell = (event: Event) => {
       const detail = (event as CustomEvent<AgentOpenDetail | undefined>).detail;
-      if (detail?.ask || detail?.file) {
+      if (detail?.ask || detail?.file || detail?.prefill) {
         intent.current = detail;
         setIntentTick((n) => n + 1);
       }
@@ -227,13 +228,19 @@ export function AgentPanel() {
     }
     return null;
   };
-  const suggestions: Suggestion[] = [];
+  // Feedback first (pilot): two chips start a message for the user to finish; asking stays one tap away.
+  // "Kenapa perlu perhatian" stays inside Perlu perhatian (Tanyakan per group), not here.
+  const suggestions: Suggestion[] = [
+    { label: "Laporkan kendala di halaman ini", fill: `Kendala di ${context.label}${agentContext?.context.submodule ? ` › ${agentContext.context.submodule.label}` : ""}: ` },
+    { label: "Usulkan fitur baru", fill: "Usul fitur: " },
+  ];
   if (attention.length) suggestions.push({ label: "Apa yang perlu aku perhatikan hari ini?", run: () => startRun("ask", { query: "Apa yang perlu aku perhatikan hari ini?" }, "Apa yang perlu aku perhatikan hari ini?") });
   if (agentContext?.entity) {
     const e = agentContext.entity;
     suggestions.push({ label: `Jelaskan ${e.type_label} ${e.label}`, run: () => startRun("explain_entity", {}, `Jelaskan ${e.type_label} ${e.label}`) });
   }
-  for (const group of attention.slice(0, 2)) suggestions.push({ label: `Kenapa perlu perhatian: ${group.title}?`, run: () => ask(group) });
+  // Text to place in the composer (a chip, or "Tanya Agent" from a record), applied once per tick.
+  const [prefill, setPrefill] = useState<{ text: string; tick: number } | null>(null);
   const agentReady = agentContext?.enabled === true;
   useEffect(() => {
     const pending = intent.current;
@@ -242,6 +249,9 @@ export function AgentPanel() {
       if (!agentReady) return;
       intent.current = null;
       startRun("ask", { query: pending.ask }, pending.ask);
+    } else if (pending.prefill) {
+      intent.current = null;
+      setPrefill({ text: pending.prefill, tick: Date.now() });
     } else if (pending.file) {
       intent.current = null;
       const file = pending.file;
@@ -319,7 +329,8 @@ export function AgentPanel() {
     setRefresh((n) => n + 1);
   };
   const voiceReady = agentReady && agentContext?.capabilities?.voice === true;
-  const launcherStyle = rail.panelWidth ? { right: rail.panelWidth + 24 } : undefined;
+  // A record panel owns the right edge while open; it offers its own "Tanya Agent", so the launcher steps out.
+  const panelOpen = rail.panelWidth > 0;
   return (
     <>
       <button
@@ -327,8 +338,7 @@ export function AgentPanel() {
         onClick={() => (open ? setOpen(false) : openAgentPanel())}
         aria-expanded={open}
         aria-controls="celerates-agent"
-        style={launcherStyle}
-        className={`fixed bottom-6 right-6 z-40 h-12 items-center gap-2 rounded-full bg-brand-700 px-4 text-sm font-semibold text-white shadow-lg hover:bg-brand-600 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-600 ${open ? "hidden" : "hidden md:inline-flex"}`}
+        className={`fixed bottom-6 right-6 z-40 h-12 items-center gap-2 rounded-full bg-brand-700 px-4 text-sm font-semibold text-white shadow-lg hover:bg-brand-600 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-600 ${open || panelOpen ? "hidden" : "hidden md:inline-flex"}`}
       >
         <Sparkles className="h-4 w-4" />
         <span>Celerates Agent</span>
@@ -338,12 +348,11 @@ export function AgentPanel() {
           </span>
         )}
       </button>
-      {intro && !open && (
+      {intro && !open && !panelOpen && (
         <section
           role="dialog"
           aria-label="Perkenalan Agent"
           data-agent-intro-popup
-          style={launcherStyle}
           className="fixed bottom-20 right-6 z-40 hidden w-[320px] rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_16px_48px_rgba(9,34,54,0.18)] md:block"
         >
           <button type="button" aria-label="Tutup perkenalan" onClick={dismissIntro} className="absolute right-2 top-2 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
@@ -403,12 +412,12 @@ export function AgentPanel() {
               <span
                 className="min-w-0 truncate rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-600"
                 data-agent-context
-                data-agent-entity={agentContext?.entity?.type ?? ""}
-                title={agentContext?.entity ? `${agentContext.entity.type_label} ${agentContext.entity.label}` : undefined}
+                data-agent-entity={agentContext?.entity?.type ?? rail.record?.type ?? ""}
+                title={agentContext?.entity ? `${agentContext.entity.type_label} ${agentContext.entity.label}` : rail.record?.label}
               >
                 {context.label}
                 {agentContext?.context.submodule ? ` › ${agentContext.context.submodule.label}` : ""}
-                {agentContext?.entity ? ` · ${agentContext.entity.label}` : ""}
+                {agentContext?.entity ? ` · ${agentContext.entity.label}` : rail.record ? ` · ${rail.record.label}` : ""}
               </span>
             </div>
             <div className="flex shrink-0 items-center">
@@ -461,6 +470,7 @@ export function AgentPanel() {
                   onDetach={() => setAttachment(null)}
                   onAction={(a) => startRun(a.skill, a.args, a.label)}
                   autoVoice={autoVoice}
+                  prefill={prefill}
                 />
               </div>
               <p className="flex shrink-0 items-center justify-between gap-2 border-t border-slate-100 px-4 py-1.5 text-[11px] text-slate-500">

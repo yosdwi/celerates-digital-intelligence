@@ -23,6 +23,9 @@ export async function agentBrowser({ base, cookies }) {
     const panel = page.getByRole('dialog', { name: 'Celerates Agent' });
     // One surface (ADR-017): no tabs. Perlu perhatian is the Ringkasan above the one conversation and composer.
     assert.equal(await panel.getByRole('button', { name: 'Tanya', exact: true }).count(), 0, 'no separate Tanya tab');
+    // Perlu perhatian starts folded (QA round 2: the drawer leads with the conversation); one click opens it.
+    await panel.locator('[data-agent-summary="folded"]').waitFor();
+    await panel.getByRole('button', { name: /^Perlu perhatian/ }).click();
     await panel.locator('[data-agent-summary="open"]').waitFor();
     await panel.getByLabel('Pesan untuk Agent').waitFor();
     const group = panel.locator('[data-agent-summary] article').filter({ has: page.getByRole('heading', { name: 'Requisition belum memiliki TA PIC', exact: true }) });
@@ -85,6 +88,7 @@ export async function agentBrowser({ base, cookies }) {
     await page.keyboard.press('Escape');
     await page.goto(base + '/ta');
     await trigger.click();
+    await panel.getByRole('button', { name: /^Perlu perhatian/ }).click();
     const unassigned = panel.locator('[data-agent-summary] article').filter({ has: page.getByRole('heading', { name: 'Requisition belum memiliki TA PIC', exact: true }) });
     await unassigned.getByRole('button', { name: 'Tindak lanjuti: Requisition belum memiliki TA PIC' }).click();
     const card = panel.locator('[data-proposal][data-proposal-state="pending"]');

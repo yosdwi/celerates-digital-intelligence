@@ -144,7 +144,8 @@ export function moduleForPath(pathname: string): ModuleConfig | undefined {
 
 /** The registry submodule a route belongs to (longest matching submodule route), e.g. /pmo/contracts/<id> → A.Contract. */
 export function submoduleFor(pathname: string): { module: string; href: string; label: string } | null {
-  const clean = pathname.split(/[?#]/)[0];
+  // Sales V2 (/sales/v2/<page>) is the same submodule as /sales/<page>; without this it fell back to PQ Tracker (/sales).
+  const clean = pathname.split(/[?#]/)[0].replace(/^\/sales\/v2(?=\/)/, "/sales");
   let best: { module: string; href: string; label: string } | null = null;
   for (const m of MODULES)
     for (const s of m.subPages)
