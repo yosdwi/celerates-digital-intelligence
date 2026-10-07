@@ -7,13 +7,19 @@ import { Loader2, Mic, Square } from "lucide-react";
 const MAX_MS = 60000;
 const TYPES = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus", "audio/mp4"];
 
-export function VoiceButton({ disabled, onTranscript, onError }: { disabled: boolean; onTranscript: (text: string) => void; onError: (message: string | null) => void }) {
+export function VoiceButton({ disabled, onTranscript, onError, autoStart = false }: { disabled: boolean; onTranscript: (text: string) => void; onError: (message: string | null) => void; autoStart?: boolean }) {
   const [state, setState] = useState<"idle" | "recording" | "transcribing">("idle");
   const recorder = useRef<MediaRecorder | null>(null);
   const timer = useRef<number | null>(null);
   useEffect(() => () => {
     if (timer.current) window.clearTimeout(timer.current);
     recorder.current?.stream.getTracks().forEach((t) => t.stop());
+  }, []);
+
+  // Once, on mount, when the user already pressed "Bicara" in the Agent invitation.
+  useEffect(() => {
+    if (autoStart && !disabled) void start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function start() {

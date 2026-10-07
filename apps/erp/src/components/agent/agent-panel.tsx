@@ -13,7 +13,7 @@ import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { AlertCircle, CheckCircle2, ChevronDown, ChevronUp, ClipboardList, ExternalLink, Lightbulb, RefreshCw, Sparkles, X } from "lucide-react";
+import { AlertCircle, ArrowRight, CheckCircle2, ChevronDown, ChevronUp, ClipboardList, ExternalLink, Lightbulb, Mic, RefreshCw, Sparkles, X } from "lucide-react";
 import { operationalContext, type OperationalContextResponse, type OperationalGroup } from "@/lib/operations/policy";
 import { streamRun, type RunRequest } from "@/lib/agent/ag-ui-client";
 import { applyEvent, newRun, type AgentRun } from "@/lib/agent/run-state";
@@ -41,6 +41,11 @@ type AgentContext = {
   capabilities?: { reasoning: string; voice: boolean };
   console?: boolean;
 };
+
+// First visit: a short invitation above the launcher (pilot: ask, or tell us how the ERP works for you). Once per browser.
+const INTRO_KEY = "celerates.agent.intro.v1";
+// Docked width of the drawer on large screens; the page narrows by this much instead of being covered (Railway-style).
+const RAIL_WIDTH = "400px";
 
 function uuid() {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -81,6 +86,30 @@ export function AgentPanel() {
   // preview instead of on top of it (docs/design/SALES-V2-CRISP-UX-CONTRACT.md §9).
   const rail = useRightRail();
   useEffect(() => setRightRail({ agentOpen: open }), [open]);
+  // Docked on lg+: the app shell and the fixed top-right controls read --agent-rail and move left by the drawer width.
+  useEffect(() => {
+    const mql = window.matchMedia("(min-width: 1024px)");
+    const apply = () => document.documentElement.style.setProperty("--agent-rail", open && mql.matches ? RAIL_WIDTH : "0px");
+    apply();
+    mql.addEventListener("change", apply);
+    return () => mql.removeEventListener("change", apply);
+  }, [open]);
+  const [intro, setIntro] = useState(false);
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    let seen = true;
+    try { seen = localStorage.getItem(INTRO_KEY) === "1"; } catch { /* storage blocked: do not nag */ }
+    if (seen) return;
+    const timer = window.setTimeout(() => setIntro(true), 1200);
+    return () => window.clearTimeout(timer);
+  }, [status]);
+  const dismissIntro = () => {
+    setIntro(false);
+    try { localStorage.setItem(INTRO_KEY, "1"); } catch { /* not kept; shows again next visit */ }
+  };
+  // "Bicara" from the invitation opens the Agent already recording (push-to-talk still only fills the composer).
+  const [autoVoice, setAutoVoice] = useState(false);
+  useEffect(() => { if (!open) setAutoVoice(false); }, [open]);
   useEffect(() => {
     if (status !== "authenticated") {
       setResult(undefined);
@@ -226,7 +255,7 @@ export function AgentPanel() {
 
   // Ringkasan: the proactive part of the Agent. ERP-only data, so it renders at once and without Intelligence.
   const summary = (
-    <section aria-labelledby="agent-summary-title" data-agent-summary={summaryOpen ? "open" : "folded"} className={summaryOpen ? `min-h-0 overflow-y-auto overscroll-contain border-b border-slate-100 px-5 py-4 ${conversing ? "max-h-[45%] shrink-0" : "flex-1"}` : "shrink-0 border-b border-slate-100 px-5 py-2"}>
+    <section aria-labelledby="agent-summary-title" data-agent-summary={summaryOpen ? "open" : "folded"} className={summaryOpen ? `min-h-0 overflow-y-auto overscroll-contain border-b border-slate-100 px-4 py-3 ${conversing ? "max-h-[45%] shrink-0" : "flex-1"}` : "shrink-0 border-b border-slate-100 px-4 py-2"}>
       <div className="flex items-center justify-between gap-2">
         <button type="button" onClick={() => setSummaryOpen(!summaryOpen)} aria-expanded={summaryOpen} className="inline-flex min-w-0 items-center gap-1.5 text-left text-xs font-semibold text-slate-700">
           <ClipboardList className="h-3.5 w-3.5 shrink-0 text-brand-600" />
@@ -240,12 +269,7 @@ export function AgentPanel() {
         </button>
       </div>
       {summaryOpen && (
-        <div className="mt-3 space-y-4">
-          {context.module === "sales" && (
-            <Link href="/intelligence" onClick={() => setOpen(false)} className="block rounded-lg border border-brand-100 bg-brand-50 px-3 py-2 text-xs font-semibold text-brand-700">
-              Review paket & akses Intelligence →
-            </Link>
-          )}
+        <div className="mt-3 space-y-3">
           {loading && !data && (
             <p role="status" className="rounded-xl bg-slate-50 p-4 text-sm text-slate-600">
               Memeriksa kondisi ERP…
@@ -259,7 +283,6 @@ export function AgentPanel() {
           )}
           {data && (
             <>
-              <p className="text-xs leading-relaxed text-slate-500">{data.coverage}</p>
               {attention.map((group) => (
                 <AttentionGroup key={group.key} group={group} trend={data.trends?.[group.key]} onAsk={agentReady && !running ? ask : undefined} onFollowUp={agentReady && !running ? followUp : undefined} />
               ))}
@@ -290,20 +313,24 @@ export function AgentPanel() {
   );
 
   if (status !== "authenticated") return null;
+  const openAgentPanel = () => {
+    dismissIntro();
+    setOpen(true);
+    setRefresh((n) => n + 1);
+  };
+  const voiceReady = agentReady && agentContext?.capabilities?.voice === true;
+  const launcherStyle = rail.panelWidth ? { right: rail.panelWidth + 24 } : undefined;
   return (
     <>
       <button
         ref={trigger}
-        onClick={() => {
-          setOpen(!open);
-          if (!open) setRefresh((n) => n + 1);
-        }}
+        onClick={() => (open ? setOpen(false) : openAgentPanel())}
         aria-expanded={open}
         aria-controls="celerates-agent"
-        style={rail.panelWidth ? { right: rail.panelWidth + 24 } : undefined}
-        className={`fixed bottom-6 right-6 z-40 h-14 items-center gap-2 rounded-full bg-gradient-to-br from-brand-600 to-brand-800 px-5 text-sm font-semibold text-white shadow-lg hover:from-brand-500 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-600 hidden md:inline-flex`}
+        style={launcherStyle}
+        className={`fixed bottom-6 right-6 z-40 h-12 items-center gap-2 rounded-full bg-brand-700 px-4 text-sm font-semibold text-white shadow-lg hover:bg-brand-600 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-600 ${open ? "hidden" : "hidden md:inline-flex"}`}
       >
-        <Sparkles className="h-5 w-5" />
+        <Sparkles className="h-4 w-4" />
         <span>Celerates Agent</span>
         {attention.length > 0 && (
           <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-900" aria-label={`${attention.length} kondisi perlu ditinjau`}>
@@ -311,37 +338,83 @@ export function AgentPanel() {
           </span>
         )}
       </button>
+      {intro && !open && (
+        <section
+          role="dialog"
+          aria-label="Perkenalan Agent"
+          data-agent-intro-popup
+          style={launcherStyle}
+          className="fixed bottom-20 right-6 z-40 hidden w-[320px] rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_16px_48px_rgba(9,34,54,0.18)] md:block"
+        >
+          <button type="button" aria-label="Tutup perkenalan" onClick={dismissIntro} className="absolute right-2 top-2 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+            <X className="h-4 w-4" />
+          </button>
+          {voiceReady && (
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={() => { setAutoVoice(true); openAgentPanel(); }}
+                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white py-1 pl-1 pr-4 text-sm font-medium text-slate-800 shadow-sm hover:border-brand-300"
+              >
+                <span aria-hidden className="h-8 w-8 rounded-full bg-[radial-gradient(circle_at_35%_30%,#e8eefd,#2356e8_75%)]" />
+                <Mic className="h-4 w-4 text-slate-500" /> Bicara sekarang
+              </button>
+            </div>
+          )}
+          <p className="mt-3 text-sm font-semibold text-slate-900">Ada yang ingin ditanyakan atau diceritakan?</p>
+          <p className="mt-1 text-[13px] leading-5 text-slate-600">Kami sedang pilot. Ceritakan pengalaman Anda memakai ERP ini atau kebutuhan yang belum ada.</p>
+          {agentReady && (
+            <form
+              className="mt-3 flex items-center gap-1 rounded-xl border border-slate-300 py-1 pl-3 pr-1 focus-within:ring-2 focus-within:ring-brand-400"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const text = String(new FormData(e.currentTarget).get("q") ?? "").trim();
+                if (!text) return;
+                intent.current = { ask: text };
+                setIntentTick((n) => n + 1);
+                openAgentPanel();
+              }}
+            >
+              <input name="q" aria-label="Pesan untuk Agent" placeholder="Tanya atau beri masukan…" maxLength={1000} autoComplete="off" className="min-w-0 flex-1 bg-transparent py-1 text-sm outline-none" />
+              <button type="submit" aria-label="Kirim" className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-white hover:bg-brand-700">
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </form>
+          )}
+          <button type="button" onClick={() => { setForm(true); openAgentPanel(); }} className="mt-2 text-[12px] font-medium text-slate-500 hover:text-slate-800 hover:underline">
+            Isi formulir masukan
+          </button>
+        </section>
+      )}
       {open && (
         <section
           id="celerates-agent"
           role="dialog"
           aria-labelledby="celerates-agent-title"
-          className="fixed inset-0 z-40 flex h-[100dvh] w-full flex-col overflow-hidden bg-white sm:inset-auto sm:bottom-24 sm:right-6 sm:h-[min(720px,calc(100dvh-7rem))] sm:w-[440px] sm:rounded-2xl sm:border sm:border-slate-200 sm:shadow-2xl"
+          className="fixed inset-0 z-50 flex h-[100dvh] w-full flex-col overflow-hidden bg-white sm:inset-y-0 sm:left-auto sm:right-0 sm:z-40 sm:w-[400px] sm:border-l sm:border-slate-200 sm:shadow-[-8px_0_24px_rgba(9,34,54,0.06)] lg:shadow-none"
         >
-          <header className="flex items-center justify-between gap-3 border-b border-slate-100 bg-slate-50 px-5 py-3">
-            <div className="min-w-0">
-              <h2 id="celerates-agent-title" className="text-base font-semibold text-slate-900">
+          <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-slate-200 px-4">
+            <div className="flex min-w-0 items-center gap-2">
+              <Sparkles className="h-4 w-4 shrink-0 text-brand-600" />
+              <h2 id="celerates-agent-title" className="shrink-0 text-sm font-semibold text-slate-900">
                 Celerates Agent
               </h2>
               {/* MS2 contextual envelope: what "ini" refers to, resolved by ERP from this page (doc 18 §16). */}
-              <p className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-slate-600" data-agent-context data-agent-entity={agentContext?.entity?.type ?? ""}>
-                <span className="max-w-full truncate rounded-full bg-white px-2 py-0.5 font-semibold ring-1 ring-slate-200">
-                  {context.label}
-                  {agentContext?.context.submodule ? ` › ${agentContext.context.submodule.label}` : ""}
-                </span>
-                {agentContext?.entity ? (
-                  <span className="max-w-full truncate rounded-full bg-brand-50 px-2 py-0.5 font-semibold text-brand-700 ring-1 ring-brand-100" title={`${agentContext.entity.type_label} ${agentContext.entity.label}`}>
-                    {agentContext.entity.type_label} · {agentContext.entity.label}
-                  </span>
-                ) : (
-                  <span className="truncate">ringkasan modul</span>
-                )}
-              </p>
+              <span
+                className="min-w-0 truncate rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-600"
+                data-agent-context
+                data-agent-entity={agentContext?.entity?.type ?? ""}
+                title={agentContext?.entity ? `${agentContext.entity.type_label} ${agentContext.entity.label}` : undefined}
+              >
+                {context.label}
+                {agentContext?.context.submodule ? ` › ${agentContext.context.submodule.label}` : ""}
+                {agentContext?.entity ? ` · ${agentContext.entity.label}` : ""}
+              </span>
             </div>
-            <div className="flex shrink-0 items-center gap-1">
+            <div className="flex shrink-0 items-center">
               {agentContext?.console && (
-                <a href="/api/agent/console" target="_blank" rel="noopener" title="Brain Console: kualitas & pembelajaran Agent" className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-brand-600 hover:bg-slate-200" data-agent-console-link>
-                  Brain Console <ExternalLink className="h-3 w-3" />
+                <a href="/api/agent/console" target="_blank" rel="noopener" aria-label="Brain Console" title="Brain Console: kualitas & pembelajaran Agent" className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800" data-agent-console-link>
+                  <ExternalLink className="h-4 w-4" />
                 </a>
               )}
               <button
@@ -351,9 +424,9 @@ export function AgentPanel() {
                   setOpen(false);
                   trigger.current?.focus();
                 }}
-                className="rounded-lg p-2 text-slate-500 hover:bg-slate-200"
+                className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
               >
-                <X className="h-5 w-5" />
+                <X className="h-4 w-4" />
               </button>
             </div>
           </header>
@@ -387,10 +460,16 @@ export function AgentPanel() {
                   attachment={attachment}
                   onDetach={() => setAttachment(null)}
                   onAction={(a) => startRun(a.skill, a.args, a.label)}
+                  autoVoice={autoVoice}
                 />
               </div>
-              <p className="shrink-0 border-t border-slate-100 px-4 py-1.5 text-right text-[11px] text-slate-500">
-                <button type="button" onClick={() => setForm(true)} className="inline-flex items-center gap-1 font-semibold text-pink-700 hover:underline">
+              <p className="flex shrink-0 items-center justify-between gap-2 border-t border-slate-100 px-4 py-1.5 text-[11px] text-slate-500">
+                {context.module === "sales" ? (
+                  <Link href="/intelligence" onClick={() => setOpen(false)} className="hover:text-slate-800 hover:underline">
+                    Paket & akses Intelligence
+                  </Link>
+                ) : <span />}
+                <button type="button" onClick={() => setForm(true)} className="inline-flex items-center gap-1 font-medium hover:text-slate-800 hover:underline">
                   <Lightbulb className="h-3 w-3" /> Formulir masukan
                 </button>
               </p>
