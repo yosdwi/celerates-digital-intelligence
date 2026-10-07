@@ -223,3 +223,19 @@ Sales Wave 1 may move into controlled pilot only when:
 - the representative Sales→TA journey completes without P0;
 - Sheet write ownership is explicit;
 - Issue #8 is the single pilot feedback backlog.
+
+## 13. Synthetic Sales data for pilot testing
+
+`apps/erp/scripts/seed-sales-pilot-data.mjs` adds fictional clients and Opportunity Trackers (default 300, of which 40 already converted to Requisition + PQ Tracker exactly as `convertToRequisition` does). It is for the pilot only, never for the January production cut-over.
+
+```bash
+# add (idempotent, deterministic); the file is mounted so no rebuild is needed on an older image
+sudo docker run --rm --network digital-bast-v2_backend --env-file /etc/celerates/secrets/celerates-erp.env \
+  -e ALLOW_PILOT_SEED_DATA=1 -v "$PWD/apps/erp/scripts/seed-sales-pilot-data.mjs:/app/scripts/seed-sales-pilot-data.mjs:ro" \
+  celerates-erp:pilot node scripts/seed-sales-pilot-data.mjs --count 300 --converted 40
+
+# remove every seeded row (nothing else is touched)
+... same command with: --remove
+```
+
+Marking: `opty_no` = `OPTY<year>-S###`, `requisition_no` = `REQ<year>-S###`, tracker notes start with `[SEED pilot]`, client code starts with `SEED-`. About a quarter of the trackers deliberately fail the handoff guard (not qualified, no position, headcount 0) so the guard can be tried by hand. Take a `pg_dump` first (section 5) and remove the data before real users enter real opportunities.
