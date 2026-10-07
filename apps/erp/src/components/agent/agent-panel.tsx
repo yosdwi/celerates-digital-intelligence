@@ -18,6 +18,7 @@ import { operationalContext, type OperationalContextResponse, type OperationalGr
 import { streamRun, type RunRequest } from "@/lib/agent/ag-ui-client";
 import { applyEvent, newRun, type AgentRun } from "@/lib/agent/run-state";
 import { AttentionGroup } from "./attention";
+import { setRightRail, useRightRail } from "@/lib/right-rail";
 import type { SignalTrend } from "@/lib/operations/reader";
 import { ContextualFeedback } from "./feedback";
 import { FollowUps } from "./follow-ups";
@@ -76,6 +77,10 @@ export function AgentPanel() {
     setOpen(false);
     setForm(false);
   }, [pathname]);
+  // Right-rail contract: a record preview steps aside while the Agent is open, and the launcher sits left of an open
+  // preview instead of on top of it (docs/design/SALES-V2-CRISP-UX-CONTRACT.md §9).
+  const rail = useRightRail();
+  useEffect(() => setRightRail({ agentOpen: open }), [open]);
   useEffect(() => {
     if (status !== "authenticated") {
       setResult(undefined);
@@ -295,6 +300,7 @@ export function AgentPanel() {
         }}
         aria-expanded={open}
         aria-controls="celerates-agent"
+        style={rail.panelWidth ? { right: rail.panelWidth + 24 } : undefined}
         className={`fixed bottom-6 right-6 z-40 h-14 items-center gap-2 rounded-full bg-gradient-to-br from-brand-600 to-brand-800 px-5 text-sm font-semibold text-white shadow-lg hover:from-brand-500 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-600 hidden md:inline-flex`}
       >
         <Sparkles className="h-5 w-5" />
