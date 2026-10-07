@@ -18,6 +18,8 @@ import { updateOptyStatus } from "@/app/sales/opportunity-tracker/actions";
 import { CreateMenu, type CreateRequest, type FormOptions } from "./forms";
 import { HeaderFilter, type HeaderSpec } from "./header-filter";
 import { CONFIRM_STAGES, StageMoveDialog, type PendingMove } from "./stage-move";
+import { SheetSyncButton } from "./sheet-sync-dialog";
+import type { SheetSyncData } from "./data";
 import { RecordPreview, type Access } from "./record-preview";
 import {
   BUILT_IN_VIEWS, CLIENT_TYPES, DEFAULT_SHOWN, FIELD_KEYS, LEVELS, SERVICE_TYPES, STAGES, STAGE_LABEL, SERVICE_LABEL, LEVEL_LABEL, CLIENT_TYPE_LABEL,
@@ -25,7 +27,8 @@ import {
   type Opportunity, type SavedState, type StoredView, type View, type WorkspaceState,
 } from "./model";
 
-const COLUMNS_KEY = "celerates.salesV2.columns";
+// v2: every column is shown by default (as V1 and Attio); the bump resets earlier per-browser choices once.
+const COLUMNS_KEY = "celerates.salesV2.columns.v2";
 const VIEWS_KEY = "celerates.salesV2.savedViews";
 const STAGE_ORDER: Record<string, number> = Object.fromEntries(STAGES.map((s, i) => [s.id, i]));
 // Stage cells carry the stage's position ("0".."5") so the table sorts in pipeline order, shown as its label.
@@ -67,7 +70,7 @@ function sortValue(o: Opportunity, key: string): unknown {
   return fieldValue(o, key);
 }
 
-type WorkspaceProps = { records: Opportunity[]; access: Access; options: FormOptions };
+type WorkspaceProps = { records: Opportunity[]; access: Access; options: FormOptions; sheetSync: SheetSyncData | null };
 
 /** Crisp's Snackbar (Undo after a Kanban move) needs its provider above the workspace. */
 export function OpportunityWorkspace(props: WorkspaceProps) {
@@ -78,7 +81,7 @@ export function OpportunityWorkspace(props: WorkspaceProps) {
   );
 }
 
-function Workspace({ records: serverRecords, access, options }: WorkspaceProps) {
+function Workspace({ records: serverRecords, access, options, sheetSync }: WorkspaceProps) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -259,7 +262,7 @@ function Workspace({ records: serverRecords, access, options }: WorkspaceProps) 
           <h1 className="text-lg font-semibold leading-6 text-slate-900">Opportunity Tracker</h1>
           <p className="text-[13px] text-slate-500">Evaluasi requirement klien sebelum lanjut ke proses hiring.</p>
         </div>
-        {access.canEdit ? <CreateMenu options={options} create={create} onCreate={setCreate} /> : <span className="rounded-md bg-slate-100 px-2 py-1 text-[12px] text-slate-600">Mode lihat saja</span>}
+        {!access.canEdit && <span className="rounded-md bg-slate-100 px-2 py-1 text-[12px] text-slate-600">Mode lihat saja</span>}
       </header>
 
       {/* The one coloured element on the page (contract §12): each card is a built-in view; click to apply, again to clear. */}
@@ -339,11 +342,12 @@ function Workspace({ records: serverRecords, access, options }: WorkspaceProps) 
           filterLabel="Filter"
           viewSettingsLabel="Kolom"
         />
-        {access.canEdit && (
-          <Link href="/sales/opportunity-tracker/sheet-sync" title="Google Sheet Sync" className="ml-auto inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-[12px] text-slate-500 hover:bg-slate-100 hover:text-slate-800">
-            <RefreshCw size={13} /> Sheet Sync
-          </Link>
-        )}
+        {/* Dataset actions sit at the end of the toolbar, primary last (Attio: Import / Export · + New). */}
+        <div className="ml-auto flex items-center gap-1.5">
+          <Link href="/sales/opportunity-tracker" className="px-1 text-[12px] text-slate-400 hover:text-slate-700 hover:underline" title="Tampilan lama (V1)">Versi lama</Link>
+          {sheetSync && <SheetSyncButton data={sheetSync} />}
+          {access.canEdit && <CreateMenu options={options} create={create} onCreate={setCreate} />}
+        </div>
       </div>
 
       {dirty && (
@@ -372,6 +376,7 @@ function Workspace({ records: serverRecords, access, options }: WorkspaceProps) 
             onColumnsChange={(next) => setShownKeys(next.filter((c) => !c.hidden).map((c) => c.key))}
             showViewSettings={false}
             showCount={false}
+            stickyFirst
             interactive
             onRowClick={(row) => select(row.id)}
             height={workspaceHeight}

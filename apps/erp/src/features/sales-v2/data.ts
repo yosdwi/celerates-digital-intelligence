@@ -1,7 +1,8 @@
 import { count, desc, eq, inArray, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
+import { INTEGRATIONS_ENABLED } from "@/lib/integration-policy";
 import {
-  applications, attachments, candidates, employees, leads, onboardingRequests, opportunities, requisitions, salesOpportunityTrackers, signatureRequests,
+  applications, attachments, candidates, employees, leads, onboardingRequests, opportunities, requisitions, salesOpportunityTrackers, sheetConnections, signatureRequests,
 } from "@/db/schema";
 import { PQ_DOCUMENT_SOURCE, PQ_SIGNATURE_SOURCE } from "@/app/sales/pq-constants";
 import { OPPORTUNITY_PO_DOC_SOURCE } from "@/app/sales/constants";
@@ -109,3 +110,17 @@ export async function loadOpportunityWorkspace() {
 }
 
 export type WorkspaceData = Awaited<ReturnType<typeof loadOpportunityWorkspace>>;
+
+/** Google Sheet connection for the Sheet Sync dialog (editors only; the page decides). No tokens, just what V1 shows. */
+export async function loadSheetSync() {
+  const [c] = await db
+    .select({ url: sheetConnections.spreadsheet_url, sheetName: sheetConnections.sheet_name, mapping: sheetConnections.column_mapping })
+    .from(sheetConnections)
+    .where(eq(sheetConnections.division_key, "sales_opportunity_tracker"));
+  return {
+    enabled: INTEGRATIONS_ENABLED,
+    connection: c ? { url: c.url, sheetName: c.sheetName, mapping: c.mapping ? (JSON.parse(c.mapping) as Record<string, string>) : null } : null,
+  };
+}
+export type SheetSyncData = Awaited<ReturnType<typeof loadSheetSync>>;
+

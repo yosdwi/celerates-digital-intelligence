@@ -55,15 +55,16 @@ no `transform: scale`, no global shrinking, no tiny fonts. No `px-8 py-8`/`space
 ## 6. Page structure
 
 ```
-Opportunity Tracker                                   [+ New ▾]   ← New Opportunity / Extension Request
+Opportunity Tracker
 subtitle
 Summary cards (StatCard × 5, one row, clickable: each applies its built-in view)
-[Saved view ▾] [Tabel|Grid|Kanban] [search]  Sort  Filter  View settings   ·  count  · Google Sheet Sync
+[Saved view ▾] [Tabel|Grid|Kanban] [search]  Sort  Filter  Kolom  · count     Versi lama · Sheet Sync · [+ New ▾]
 ┌ bounded workspace (fills the rest of the viewport; scrolls inside, never the document) ┐
 ```
 
-- One primary action (New ▾). Sheet Sync, view settings and other dataset utilities live in the toolbar, never in
-  the headline. Read-only users see no New control.
+- One primary action (New ▾), at the end of the toolbar after Sheet Sync (Attio: Import / Export · + New). Sheet
+  Sync opens a dialog with V1's connect / mapping / sync parts (it states that integrations are off on the pilot).
+  "Versi lama" links the V1 page. Read-only users see neither New nor Sheet Sync.
 - On desktop the page does not scroll; the table, board and grid scroll inside the workspace, which reaches the
   bottom edge (no reserved strip). The Agent launcher floats over the corner; the scroll areas end with 64px of room
   so the last row or card can be scrolled clear of it. Kanban columns share the width (min 268px).
@@ -75,7 +76,8 @@ Summary cards (StatCard × 5, one row, clickable: each applies its built-in view
   View change and saved-view change push history (Back undoes them); typing, filter, sort and the open record replace
   the current entry, so Back leaves the page instead of replaying every keystroke.
   Leaving to the full edit page and coming back restores the same state.
-- Column visibility and order are a per-browser preference (localStorage) and part of a saved view.
+- Every column is shown by default, as in V1 and Attio, with Client pinned on the left (`stickyFirst`). Visibility
+  and order are a per-browser preference (localStorage `celerates.salesV2.columns.v2`) and part of a saved view.
 - Saved views: built-in operational views (Semua, Pipeline aktif, Siap Convert, Win, Dropped) plus personal views
   kept in this browser. Server-side shared views are out of scope until a product decision.
 
@@ -117,7 +119,10 @@ RBAC viewer/editor/full, Sheet Sync access, traceability) is verified and the 13
 Attio is the reference; Crisp already carries its measured geometry and tokens. What V2 adds on top is in
 `app/sales/v2/sales-v2.css` (scoped to V2 markup and Crisp classes) and nowhere else.
 
-- Font: Inter (SIL OFL), self-hosted with `@fontsource-variable/inter` and set as `--crisp-font-sans`. Attio's own
+- Font: Inter (SIL OFL), self-hosted with `@fontsource-variable/inter`. Since 2026-10-07 it is the one ERP font
+  (`globals.css --font-sans`, replacing the system stack and Plus Jakarta Sans); Crisp reads it via `--crisp-font-sans`.
+- Brand: Crisp's cyan brand tokens map to the ERP's: navy `#194667` for primary actions, checkboxes and selection,
+  accent `#2356e8` for links, soft brand text and focus rings. Attio's own
   Tiempos (commercial) and its icon set (proprietary) are not used; icons are lucide (ISC), 14–16px.
 - Colour is reserved for meaning: the summary cards (ERP palette: navy total, blue active pipeline, ember ready to
   convert, green win, red dropped; soft ground, bold number, 3px edge, no gradients) and stage colour. The rest stays
@@ -143,6 +148,12 @@ Attio is the reference; Crisp already carries its measured geometry and tokens. 
   kebutuhan fitur?" and a voice button; chips above the composer (Laporkan kendala, Usulkan fitur, Apa yang perlu
   aku perhatikan hari ini?) fill the composer rather than send; placeholder "Bisa ceritakan masukan Anda?". The
   context chip resolves `/sales/v2/<page>` as `/sales/<page>`.
+- Celerates Agent "/" commands (assistant-ui slash commands, unstable API, version pinned): /masukan, /fitur,
+  /kendala (fill the composer with the page as context), /formulir, /perhatian, /jelaskan (record or entity),
+  /bicara, /lampirkan, /baru (new conversation).
+- Sidebar (all modules): sub-pages are icon rows; optional group headings (Sales: Pipeline); pages owned by another
+  division are listed last under "Bersama divisi lain" with a small shared icon instead of coloured boxes. Sales ›
+  Opportunity Tracker opens V2; the V1 page resolves to the same entry.
 - Celerates Agent (all modules): first visit shows a short invitation above the launcher (Bicara sekarang, ask or
   feedback, formulir masukan), once per browser. Explanatory boilerplate is removed from the drawer.
 

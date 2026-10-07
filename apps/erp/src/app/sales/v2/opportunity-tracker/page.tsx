@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { claimsOf, divisionLevel } from "@/lib/module-access";
-import { loadOpportunityWorkspace } from "@/features/sales-v2/data";
+import { loadOpportunityWorkspace, loadSheetSync } from "@/features/sales-v2/data";
 import { OpportunityWorkspace } from "@/features/sales-v2/workspace";
 
 export const metadata = { title: "Opportunity Tracker (V2)" };
@@ -13,10 +13,10 @@ export default async function SalesV2OpportunityTrackerPage() {
   const session = await getServerSession(authOptions);
   const level = divisionLevel(claimsOf(session?.user), "sales");
   const access = { canEdit: level === "editor" || level === "full", canDelete: level === "full" };
-  const { records, ...options } = await loadOpportunityWorkspace();
+  const [{ records, ...options }, sheetSync] = await Promise.all([loadOpportunityWorkspace(), access.canEdit ? loadSheetSync() : null]);
   return (
     <Suspense>
-      <OpportunityWorkspace records={records} access={access} options={options} />
+      <OpportunityWorkspace records={records} access={access} options={options} sheetSync={sheetSync} />
     </Suspense>
   );
 }

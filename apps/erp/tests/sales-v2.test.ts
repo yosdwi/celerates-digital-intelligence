@@ -101,7 +101,9 @@ test("Agent: no explanatory boilerplate; first-visit invitation offers voice, as
   const agent = read("components/agent/agent-panel.tsx") + read("components/agent/agent-thread.tsx");
   assert.doesNotMatch(agent, /Satu tempat untuk bertanya|data\.coverage|ringkasan modul|Kenapa perlu perhatian: \$\{/);
   assert.match(agent, /useState\(false\);\s*$/m); // Perlu perhatian starts folded
-  assert.match(agent, /placeholder="Bisa ceritakan masukan Anda\?"/);
+  assert.match(agent, /placeholder="Bisa ceritakan masukan Anda\? Ketik \/ untuk perintah"/);
+  for (const c of ["masukan", "fitur", "kendala", "formulir", "perhatian", "jelaskan", "baru", "bicara", "lampirkan"]) assert.match(agent, new RegExp(`id: "${c}"`), c);
+  assert.match(agent, /unstable_useSlashCommandAdapter/);
   assert.match(agent, /Usulkan fitur baru/);
   assert.match(agent, /data-agent-intro-popup/);
   assert.match(agent, /Bicara sekarang/);
@@ -182,4 +184,29 @@ test("Kanban: Win and Dropped ask first; other moves save with Undo", () => {
   assert.match(read("features/sales-v2/stage-move.tsx"), /CONFIRM_STAGES = new Set\(\["win", "dropped"\]\)/);
   assert.match(ws, /label: "Batalkan"/);
   assert.match(ws, /CONFIRM_STAGES\.has\(moved\.columnId\)/);
+});
+
+test("navigation: Opportunity Tracker opens V2; the V1 page still resolves to the same entry and stays linked from V2", () => {
+  assert.equal(submoduleFor("/sales/v2/opportunity-tracker")?.href, "/sales/v2/opportunity-tracker");
+  assert.equal(submoduleFor("/sales/opportunity-tracker/abc/edit")?.href, "/sales/v2/opportunity-tracker");
+  assert.equal(submoduleFor("/sales")?.label, "PQ Tracker");
+  assert.match(read("features/sales-v2/workspace.tsx"), /href="\/sales\/opportunity-tracker"/);
+  // Shared pages: one heading and a small icon, no coloured boxes.
+  const sidebar = read("components/sidebar.tsx");
+  assert.match(sidebar, /t\("sharedPages"\)/);
+  assert.doesNotMatch(sidebar, /border-teal-500|border-orange-500/);
+});
+
+test("one ERP font: Inter, self-hosted, set once in globals.css", () => {
+  assert.match(read("app/layout.tsx"), /@fontsource-variable\/inter/);
+  assert.match(read("app/globals.css"), /--font-sans: "Inter Variable"/);
+  assert.doesNotMatch(read("app/globals.css"), /Plus Jakarta/);
+});
+
+test("V2 toolbar: every column by default, New and Sheet Sync (a dialog) at the end, ERP brand colours", () => {
+  assert.equal(DEFAULT_SHOWN.length, 21);
+  const ws = read("features/sales-v2/workspace.tsx");
+  assert.match(ws, /<SheetSyncButton\b/);
+  assert.doesNotMatch(ws, /href="\/sales\/opportunity-tracker\/sheet-sync"/);
+  assert.match(read("app/sales/v2/sales-v2.css"), /--crisp-bg-brand-solid: #194667/);
 });

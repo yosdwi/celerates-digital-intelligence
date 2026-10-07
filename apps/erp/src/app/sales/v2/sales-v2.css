@@ -1,10 +1,19 @@
 /* Sales V2 visual layer (docs/design/SALES-V2-CRISP-UX-CONTRACT.md §12). Unlayered, so it wins over Crisp's
    @layer crisp-components; every rule is scoped to V2 markup or to Crisp classes, which only V2 renders. */
 
-/* Inter (SIL OFL, self-hosted via @fontsource-variable/inter), the face Attio uses. Crisp asks for VK Sans first,
-   which is never loaded, so without this the UI fell back to the system font. */
-:root { --crisp-font-sans: "Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; }
-[data-sales-v2] { font-family: var(--crisp-font-sans); }
+/* Crisp asks for VK Sans first, which is never loaded; use the ERP's own font (Inter, globals.css --font-sans). */
+/* ERP brand instead of Crisp's cyan: navy for primary actions, checkboxes and selection fills; the ERP accent blue
+   for links, soft brand text and focus rings (globals.css --color-brand-*, --color-j-accent). */
+:root {
+  --crisp-font-sans: var(--font-sans);
+  --crisp-bg-brand-solid: #194667;
+  --crisp-bg-brand-solid-pressed: #123650;
+  --crisp-bg-brand-contrast: #123650;
+  --crisp-fg-brand-contrast: #194667;
+  --crisp-fg-brand-soft: #2356e8;
+  --crisp-ring-brand-soft: #dce8ef;
+  --crisp-stroke-focus-ring: #2356e8;
+}
 
 /* Table header: ERP brand tint, semibold, the whole cell is the Excel-style menu button. */
 [data-sales-v2] .crisp-table thead th { background: #eef3f7; color: #123650; font-size: 12px; font-weight: 600; border-bottom: 1px solid #dce8ef; }

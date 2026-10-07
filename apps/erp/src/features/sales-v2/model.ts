@@ -226,7 +226,6 @@ export const BUILT_IN_VIEWS: StoredView[] = [
   { id: "dropped", name: "Dropped", builtIn: true, state: { view: "table", q: "", filters: [{ id: "b5", key: "status", op: "is", value: "Dropped" }], sorts: [] } },
 ];
 
-/** Default columns: what a Sales person works with daily. Every other field stays one click away in View settings. */
 /**
  * The V1 edit form's fields (app/sales/opportunity-tracker/[id]/edit) for a record, as form strings. The edit dialog
  * starts from these, and a Kanban move that also records a Dropped Reason sends them back unchanged through the same
@@ -251,4 +250,8 @@ export function daysSince(date: string | null, now = Date.now()): number | null 
   return Number.isNaN(t) ? null : Math.max(0, Math.floor((now - t) / 86400000));
 }
 
-export const DEFAULT_SHOWN = ["client", "optyNo", "status", "position", "headcount", "price", "salesPic", "salesQualified", "lastCommunication", "downstream"];
+/** Default columns: every field, as V1 and Attio show them; daily ones first. Hide any from a header or "Kolom". */
+export const DEFAULT_SHOWN = [
+  "client", "optyNo", "status", "position", "headcount", "price", "salesPic", "salesQualified", "lastCommunication", "downstream",
+  "leadNo", "clientType", "serviceType", "level", "durationMonths", "requirement", "detailRequirement", "closingPrice", "bante", "progressNotes", "droppedReason",
+];
