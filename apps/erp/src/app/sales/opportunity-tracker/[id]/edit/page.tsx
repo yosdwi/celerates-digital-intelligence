@@ -8,6 +8,7 @@ import Link from "next/link";
 import { Field, SelectField } from "@/components/form-fields";
 import { PageHeader } from "@/components/page-header";
 import { Pencil } from "lucide-react";
+import { safeSalesReturnPath } from "@/lib/safe-return";
 
 const SERVICE_TYPES = [
   ["outsourcing", "Outsourcing"], ["headhunting", "Headhunting"], ["outplacement", "Outplacement"],
@@ -34,9 +35,11 @@ const LEVELS = [
 const PRICE_PERIOD_LABELS: Record<string, string> = Object.fromEntries(PRICE_PERIODS);
 const LEVEL_LABELS: Record<string, string> = Object.fromEntries(LEVELS);
 
-export default async function EditOpportunityTrackerPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function EditOpportunityTrackerPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ return_to?: string }> }) {
   const t = await getTranslations("sales.opportunityTracker");
   const { id } = await params;
+  // Opened from Sales V2: go back to the same view after Save or Cancel. Without it, V1's list as before.
+  const returnTo = safeSalesReturnPath((await searchParams).return_to);
   const [tracker] = await db
     .select({
       ...getTableColumns(salesOpportunityTrackers),
@@ -79,11 +82,12 @@ export default async function EditOpportunityTrackerPage({ params }: { params: P
   return (
     <div className="min-h-screen">
       <PageHeader icon={Pencil} color="bg-blue-500" eyebrow="Sales" title={t("editTitle", { optyNo: tracker.opty_no })}>
-        <Link href="/sales/opportunity-tracker" className="text-sm font-medium text-blue-700 hover:underline">&larr; {t("backToList")}</Link>
+        <Link href={returnTo} className="text-sm font-medium text-blue-700 hover:underline">&larr; {t("backToList")}</Link>
       </PageHeader>
 
       <main className="px-8 py-8 max-w-3xl mx-auto">
         <form action={updateWithId} className="grid grid-cols-1 gap-4 sm:grid-cols-3 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <input type="hidden" name="return_to" value={returnTo} />
           <Field label={t("fields.clientName")} name="client_name" defaultValue={tracker.client_name} required />
           <SelectField label="Client Type" name="client_type_code" defaultValue={tracker.client_type_code ?? ""} options={CLIENT_TYPES} />
           <SelectField label="Service Type" name="service_type_code" defaultValue={tracker.service_type_code ?? ""} options={SERVICE_TYPES} />
@@ -155,7 +159,7 @@ export default async function EditOpportunityTrackerPage({ params }: { params: P
             <button type="submit" className="rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-brand-700">
               {t("saveChanges")}
             </button>
-            <Link href="/sales/opportunity-tracker" className="rounded-lg border border-slate-300 px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            <Link href={returnTo} className="rounded-lg border border-slate-300 px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
               {t("cancel")}
             </Link>
           </div>
