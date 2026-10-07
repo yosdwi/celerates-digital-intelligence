@@ -121,7 +121,7 @@ export default async function ContractRecordPage({ params }: { params: Promise<{
         )}
       </Section>
 
-      <Section id="invoices" title={t("invoices.title")} action={<Link href={`/pmo/invoices?q=${encodeURIComponent(c.opty_no ?? "")}`} className="text-[13px] font-semibold text-j-accent">{t("seeAll")}</Link>}>
+      <Section id="invoices" title={t("invoices.title")} action={<Link href={`/pmo/invoices?q=${encodeURIComponent(c.opty_no ?? "")}`} className="text-[0.8125rem] font-semibold text-j-accent">{t("seeAll")}</Link>}>
         {c.invoices.length === 0 ? (
           <Card className="p-3.5 text-sm text-j-muted">{t("contract.noInvoices")}</Card>
         ) : (
@@ -173,7 +173,7 @@ export default async function ContractRecordPage({ params }: { params: Promise<{
             <StatusPill tone={HANDOFF_TONE[c.handoff?.status_code ?? "pending"]}>{t(`handoffStatus.${c.handoff?.status_code ?? "pending"}`)}</StatusPill>
           </span>
           {c.handoff?.notified_at && <span className="text-xs text-j-muted">{t("handoff.notifiedBy", { name: c.handoff.notified_by_name ?? "—", at: fmtStamp(c.handoff.notified_at, locale) })}</span>}
-          {c.handoff?.finance_notes && <span className="text-[13px]">{c.handoff.finance_notes}</span>}
+          {c.handoff?.finance_notes && <span className="text-[0.8125rem]">{c.handoff.finance_notes}</span>}
           <span className="text-xs text-j-muted">{t("handoff.perProject")}</span>
         </Card>
       </Section>

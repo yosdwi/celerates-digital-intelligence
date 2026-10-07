@@ -92,19 +92,19 @@ export default async function ExecutiveDashboardPage() {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-5 border-t border-slate-100">
               <div className="flex items-center gap-2.5">
                 <div className="h-9 w-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0"><Target className="h-4 w-4" /></div>
-                <div><p className="text-sm font-bold text-slate-900">{optyRows.filter((o) => o.pipeline_stage_code === "win").length}</p><p className="text-[11px] text-slate-400">{t("optyWin")}</p></div>
+                <div><p className="text-sm font-bold text-slate-900">{optyRows.filter((o) => o.pipeline_stage_code === "win").length}</p><p className="text-[0.6875rem] text-slate-400">{t("optyWin")}</p></div>
               </div>
               <div className="flex items-center gap-2.5">
                 <div className="h-9 w-9 rounded-xl bg-rose-50 text-rose-700 flex items-center justify-center shrink-0"><Wallet className="h-4 w-4" /></div>
-                <div><p className="text-sm font-bold text-slate-900">{invoiceRows.filter((i) => i.status_code === "overdue").length}</p><p className="text-[11px] text-slate-400">{t("invoiceOverdue")}</p></div>
+                <div><p className="text-sm font-bold text-slate-900">{invoiceRows.filter((i) => i.status_code === "overdue").length}</p><p className="text-[0.6875rem] text-slate-400">{t("invoiceOverdue")}</p></div>
               </div>
               <div className="flex items-center gap-2.5">
                 <div className="h-9 w-9 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center shrink-0"><FileCheck2 className="h-4 w-4" /></div>
-                <div><p className="text-sm font-bold text-slate-900">{handoffRows.filter((h) => h.status_code === "notified").length}</p><p className="text-[11px] text-slate-400">{t("completeDocuments")}</p></div>
+                <div><p className="text-sm font-bold text-slate-900">{handoffRows.filter((h) => h.status_code === "notified").length}</p><p className="text-[0.6875rem] text-slate-400">{t("completeDocuments")}</p></div>
               </div>
               <div className="flex items-center gap-2.5">
                 <div className="h-9 w-9 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center shrink-0"><Briefcase className="h-4 w-4" /></div>
-                <div><p className="text-sm font-bold text-slate-900">{assignmentRows.filter((a) => a.status_code === "on_project").length}</p><p className="text-[11px] text-slate-400">{t("onProject")}</p></div>
+                <div><p className="text-sm font-bold text-slate-900">{assignmentRows.filter((a) => a.status_code === "on_project").length}</p><p className="text-[0.6875rem] text-slate-400">{t("onProject")}</p></div>
               </div>
             </div>
           </div>
@@ -152,7 +152,7 @@ export default async function ExecutiveDashboardPage() {
           </div>
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 border-b border-violet-100 bg-violet-50">
+              <tr className="text-left text-[0.6875rem] font-semibold uppercase tracking-wide text-slate-500 border-b border-violet-100 bg-violet-50">
                 <th className="px-6 py-3">{t("position")}</th>
                 <th className="px-4 py-3">Client</th>
                 <th className="px-4 py-3">Headcount</th>

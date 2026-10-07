@@ -292,10 +292,10 @@ export function AgentPanel() {
         <button type="button" onClick={() => setSummaryOpen(!summaryOpen)} aria-expanded={summaryOpen} className="inline-flex min-w-0 items-center gap-1.5 text-left text-xs font-semibold text-slate-700">
           <ClipboardList className="h-3.5 w-3.5 shrink-0 text-brand-600" />
           <span id="agent-summary-title">Perlu perhatian</span>
-          {data && <span className={`rounded-full px-2 py-0.5 text-[11px] ${attention.length ? "bg-amber-100 text-amber-900" : "bg-emerald-50 text-emerald-800"}`}>{attention.length ? `${attention.length} kondisi` : "aman"}</span>}
+          {data && <span className={`rounded-full px-2 py-0.5 text-[0.6875rem] ${attention.length ? "bg-amber-100 text-amber-900" : "bg-emerald-50 text-emerald-800"}`}>{attention.length ? `${attention.length} kondisi` : "aman"}</span>}
           {summaryOpen ? <ChevronUp className="h-3.5 w-3.5 shrink-0" /> : <ChevronDown className="h-3.5 w-3.5 shrink-0" />}
         </button>
-        <button aria-label="Muat ulang ringkasan" disabled={loading} onClick={() => setRefresh((n) => n + 1)} className="inline-flex items-center gap-1.5 rounded-lg p-1.5 text-[11px] text-brand-600 disabled:opacity-50">
+        <button aria-label="Muat ulang ringkasan" disabled={loading} onClick={() => setRefresh((n) => n + 1)} className="inline-flex items-center gap-1.5 rounded-lg p-1.5 text-[0.6875rem] text-brand-600 disabled:opacity-50">
           <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
           {checkedAt ? `Diperiksa ${checkedAt}` : "Kondisi dari ERP"}
         </button>
@@ -360,7 +360,7 @@ export function AgentPanel() {
         onClick={() => (open ? setOpen(false) : openAgentPanel())}
         aria-expanded={open}
         aria-controls="celerates-agent"
-        className={`fixed bottom-5 right-5 z-40 h-10 items-center gap-2 rounded-full bg-brand-700 px-3.5 text-[13px] font-semibold text-white shadow-lg hover:bg-brand-600 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-600 ${open || panelOpen ? "hidden" : "hidden md:inline-flex"}`}
+        className={`fixed bottom-5 right-5 z-40 h-10 items-center gap-2 rounded-full bg-brand-700 px-3.5 text-[0.8125rem] font-semibold text-white shadow-lg hover:bg-brand-600 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-600 ${open || panelOpen ? "hidden" : "hidden md:inline-flex"}`}
       >
         <Sparkles className="h-4 w-4" />
         <span>Celerates Agent</span>
@@ -393,7 +393,7 @@ export function AgentPanel() {
             </div>
           )}
           <p className="mt-3 text-sm font-semibold text-slate-900">Ada yang ingin ditanyakan atau diceritakan?</p>
-          <p className="mt-1 text-[13px] leading-5 text-slate-600">Kami sedang pilot. Ceritakan pengalaman Anda memakai ERP ini atau kebutuhan yang belum ada.</p>
+          <p className="mt-1 text-[0.8125rem] leading-5 text-slate-600">Kami sedang pilot. Ceritakan pengalaman Anda memakai ERP ini atau kebutuhan yang belum ada.</p>
           {agentReady && (
             <form
               className="mt-3 flex items-center gap-1 rounded-xl border border-slate-300 py-1 pl-3 pr-1 focus-within:ring-2 focus-within:ring-brand-400"
@@ -412,7 +412,7 @@ export function AgentPanel() {
               </button>
             </form>
           )}
-          <button type="button" onClick={() => { setForm(true); openAgentPanel(); }} className="mt-2 text-[12px] font-medium text-slate-500 hover:text-slate-800 hover:underline">
+          <button type="button" onClick={() => { setForm(true); openAgentPanel(); }} className="mt-2 text-[0.75rem] font-medium text-slate-500 hover:text-slate-800 hover:underline">
             Isi formulir masukan
           </button>
         </section>
@@ -432,7 +432,7 @@ export function AgentPanel() {
               </h2>
               {/* MS2 contextual envelope: what "ini" refers to, resolved by ERP from this page (doc 18 §16). */}
               <span
-                className="min-w-0 truncate rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-600"
+                className="min-w-0 truncate rounded-md bg-slate-100 px-1.5 py-0.5 text-[0.6875rem] text-slate-600"
                 data-agent-context
                 data-agent-entity={agentContext?.entity?.type ?? rail.record?.type ?? ""}
                 title={agentContext?.entity ? `${agentContext.entity.type_label} ${agentContext.entity.label}` : rail.record?.label}
@@ -496,7 +496,7 @@ export function AgentPanel() {
                   commands={agentReady ? commands : []}
                 />
               </div>
-              <p className="flex shrink-0 items-center justify-between gap-2 border-t border-slate-100 px-4 py-1.5 text-[11px] text-slate-500">
+              <p className="flex shrink-0 items-center justify-between gap-2 border-t border-slate-100 px-4 py-1.5 text-[0.6875rem] text-slate-500">
                 {context.module === "sales" ? (
                   <Link href="/intelligence" onClick={() => setOpen(false)} className="hover:text-slate-800 hover:underline">
                     Paket & akses Intelligence

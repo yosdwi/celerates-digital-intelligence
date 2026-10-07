@@ -13,7 +13,7 @@ import { useMobileData } from "../data";
 import { BottomSheet } from "../primitives";
 import { buttonClass } from "../styles";
 
-const field = "mt-1 w-full rounded-xl border border-[#d5dbe5] bg-j-surface px-3 py-2.5 text-[15px] text-j-ink outline-none focus:border-j-accent";
+const field = "mt-1 w-full rounded-xl border border-[#d5dbe5] bg-j-surface px-3 py-2.5 text-[0.9375rem] text-j-ink outline-none focus:border-j-accent";
 type Result = { ok: true } | { ok: false; error: string };
 
 function Decision({

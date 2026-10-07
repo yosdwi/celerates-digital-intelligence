@@ -86,9 +86,9 @@ export function TimelineView({ tasks }: { tasks: Task[] }) {
           <div className="h-10 border-b border-slate-200 bg-slate-50" />
           {rangedRows.map(({ group, children }) => (
             <div key={group.id} className="h-12 flex items-center gap-2 px-3 border-b border-slate-100 last:border-0">
-              <span className="text-[10px] font-mono text-slate-400 shrink-0">{group.task_no}</span>
+              <span className="text-[0.625rem] font-mono text-slate-400 shrink-0">{group.task_no}</span>
               <span className="text-sm font-medium text-slate-800 truncate" title={group.title}>{group.title}</span>
-              {children.length > 0 && <span className="text-[10px] text-slate-400 shrink-0">({children.length})</span>}
+              {children.length > 0 && <span className="text-[0.625rem] text-slate-400 shrink-0">({children.length})</span>}
             </div>
           ))}
         </div>
@@ -119,7 +119,7 @@ export function TimelineView({ tasks }: { tasks: Task[] }) {
                     style={{ left: offsetPx(range.start), width: Math.max(offsetPx(range.end) - offsetPx(range.start) + DAY_PX, 8) }}
                     title={`${STATUS_LABELS[group.status_code] ?? group.status_code} · ${range.start.toISOString().slice(0, 10)} - ${range.end.toISOString().slice(0, 10)}`}
                   >
-                    <span className="text-[10px] font-medium text-white truncate">{group.title}</span>
+                    <span className="text-[0.625rem] font-medium text-white truncate">{group.title}</span>
                   </div>
                 )}
               </div>

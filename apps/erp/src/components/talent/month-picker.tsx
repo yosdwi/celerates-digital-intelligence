@@ -45,7 +45,7 @@ export function TalentMonthPicker({
       </button>
 
       <label className="relative flex min-w-0 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-center">
-        <span className="truncate text-[18px] font-extrabold tracking-[-0.3px]">{label}</span>
+        <span className="truncate text-[1.125rem] font-extrabold tracking-[-0.3px]">{label}</span>
         <ChevronDown aria-hidden className="h-4 w-4 shrink-0 text-j-muted" />
         <input
           type="month"

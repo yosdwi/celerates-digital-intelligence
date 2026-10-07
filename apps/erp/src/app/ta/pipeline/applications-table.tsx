@@ -170,7 +170,7 @@ export function ApplicationsTable({ data }: { data: ApplicationRow[] }) {
                 <tr key={r.id} className="border-b border-slate-100 last:border-0 hover:bg-violet-50/60">
                   <td className="px-4 py-3 sticky left-0 bg-white z-0 space-y-1">
                     {r.client_submission_status_code && (
-                      <div className="flex items-start gap-1.5 rounded-md border border-teal-200 bg-teal-50 px-2 py-1.5 text-[11px] text-teal-800">
+                      <div className="flex items-start gap-1.5 rounded-md border border-teal-200 bg-teal-50 px-2 py-1.5 text-[0.6875rem] text-teal-800">
                         <Megaphone className="h-3.5 w-3.5 shrink-0 mt-0.5 text-teal-600" />
                         <div>
                           <p className="font-medium">
@@ -287,7 +287,7 @@ export function ApplicationsTable({ data }: { data: ApplicationRow[] }) {
                   </div>
 
                   {r.client_submission_status_code && (
-                    <div className="mt-3 flex items-start gap-1.5 rounded-md border border-teal-200 bg-teal-50 px-2 py-1.5 text-[11px] text-teal-800">
+                    <div className="mt-3 flex items-start gap-1.5 rounded-md border border-teal-200 bg-teal-50 px-2 py-1.5 text-[0.6875rem] text-teal-800">
                       <Megaphone className="h-3.5 w-3.5 shrink-0 mt-0.5 text-teal-600" />
                       <div>
                         <p className="font-medium">

@@ -25,7 +25,7 @@ async function json<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 function ClassBadge({ value }: { value: Cls }) {
-  return <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${CLASS[value].tone}`} title={CLASS[value].note} data-file-class={value}>{CLASS[value].label}</span>;
+  return <span className={`rounded-md px-1.5 py-0.5 text-[0.6875rem] font-semibold ${CLASS[value].tone}`} title={CLASS[value].note} data-file-class={value}>{CLASS[value].label}</span>;
 }
 
 export function FilesExplorer({ initialFile, initialQuery }: { initialFile: string | null; initialQuery: string }) {
@@ -83,7 +83,7 @@ export function FilesExplorer({ initialFile, initialQuery }: { initialFile: stri
                   <span className="font-semibold text-slate-900">{f.title}</span>
                   <ClassBadge value={f.access_class} />
                   <span className="text-xs text-slate-500">{f.kind}{f.page ? ` · hal. ${f.page}` : ""} · {ORIGIN[f.origin]}</span>
-                  {f.state === "pending_review" && <span className="rounded-md bg-red-50 px-1.5 py-0.5 text-[11px] font-semibold text-red-800">Ditahan untuk ditinjau</span>}
+                  {f.state === "pending_review" && <span className="rounded-md bg-red-50 px-1.5 py-0.5 text-[0.6875rem] font-semibold text-red-800">Ditahan untuk ditinjau</span>}
                 </span>
                 {f.snippet && <span className="mt-1 block text-sm text-slate-600">{f.snippet}</span>}
                 {f.links.length > 0 && <span className="mt-1 block text-xs text-slate-500">Tertaut: {f.links.map((l) => l.label ?? l.entity_type).join(" · ")}</span>}

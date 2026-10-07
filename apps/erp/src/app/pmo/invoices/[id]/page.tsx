@@ -43,7 +43,7 @@ export default async function InvoiceRecordPage({ params }: { params: Promise<{ 
       />
 
       {status === "overdue" && inv.stored_status !== "overdue" && (
-        <Card className="border-[#f3c7c2] bg-[#fdf1ef] p-3.5 text-[13px] text-[#8a1f16]">{t("invoice.overdueRule")}</Card>
+        <Card className="border-[#f3c7c2] bg-[#fdf1ef] p-3.5 text-[0.8125rem] text-[#8a1f16]">{t("invoice.overdueRule")}</Card>
       )}
 
       <Section id="facts" title={t("invoice.facts")}>
@@ -79,7 +79,7 @@ export default async function InvoiceRecordPage({ params }: { params: Promise<{ 
           </span>
           {inv.handoff?.notified_at && <span className="text-xs text-j-muted">{t("handoff.notifiedBy", { name: inv.handoff.notified_by_name ?? "—", at: fmtStamp(inv.handoff.notified_at, locale) })}</span>}
           {inv.handoff?.received_at && <span className="text-xs text-j-muted">{t("handoff.receivedBy", { name: inv.handoff.received_by_name ?? "—", at: fmtStamp(inv.handoff.received_at, locale) })}</span>}
-          {inv.handoff?.finance_notes && <span className="rounded-xl bg-j-line-soft p-2.5 text-[13px]">{inv.handoff.finance_notes}</span>}
+          {inv.handoff?.finance_notes && <span className="rounded-xl bg-j-line-soft p-2.5 text-[0.8125rem]">{inv.handoff.finance_notes}</span>}
           <span className="text-xs text-j-muted">{t("handoff.perProject")}</span>
         </Card>
         {inv.handoff?.doc_url && <DocumentCard name={t("handoff.document")} meta={t("handoff.documentMeta")} value={inv.handoff.doc_url} />}
@@ -89,7 +89,7 @@ export default async function InvoiceRecordPage({ params }: { params: Promise<{ 
         <Section id="contract" title={t("contracts.title")}>
           <Link href={`/pmo/contracts/${inv.contract.id}`} className="flex items-center gap-3 rounded-j-card border border-j-line bg-j-surface p-3.5 shadow-j-card" data-related-contract>
             <span className="min-w-0 flex-1">
-              <span className="block text-[15px] font-bold">{inv.client_name}</span>
+              <span className="block text-[0.9375rem] font-bold">{inv.client_name}</span>
               <span className="block text-xs text-j-muted">{`${fmtDate(inv.contract.start_date, locale)} – ${fmtDate(inv.contract.end_date, locale)}`}</span>
             </span>
             <ArrowRight aria-hidden className="h-4 w-4 text-j-faint" />

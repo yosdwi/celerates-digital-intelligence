@@ -55,7 +55,7 @@ export function SalaryHistory({ periods, title = "Riwayat Salary (Talents Book)"
             <div key={p.id} className={`px-6 py-4 ${isCurrent ? "bg-emerald-50/70" : ""}`}>
               <div className="flex flex-wrap items-center gap-2 mb-2">
                 {isCurrent && (
-                  <span className="inline-flex items-center gap-1 rounded-full whitespace-nowrap bg-emerald-600 px-2 py-0.5 text-[10px] font-semibold text-white">
+                  <span className="inline-flex items-center gap-1 rounded-full whitespace-nowrap bg-emerald-600 px-2 py-0.5 text-[0.625rem] font-semibold text-white">
                     <CheckCircle2 className="h-3 w-3" /> SAAT INI
                   </span>
                 )}

@@ -56,8 +56,8 @@ export function StageMoveDialog({
       {record && (
         <form onSubmit={(e) => { e.preventDefault(); save(String(new FormData(e.currentTarget).get("dropped_reason") ?? ""), false); }}>
           <DialogBody>
-            <p className="text-[13px] text-slate-700">
-              <b className="text-slate-900">{record.client}</b> <span className="font-mono text-[12px] text-slate-500">{record.optyNo}</span> akan dipindah dari {STAGE_LABEL[record.status] ?? record.status} ke <b>{label}</b>.
+            <p className="text-[0.8125rem] text-slate-700">
+              <b className="text-slate-900">{record.client}</b> <span className="font-mono text-[0.75rem] text-slate-500">{record.optyNo}</span> akan dipindah dari {STAGE_LABEL[record.status] ?? record.status} ke <b>{label}</b>.
             </p>
             {to === "dropped" && (
               <FormField label="Dropped Reason" description="Opsional, sama seperti di form Edit." className="mt-3">

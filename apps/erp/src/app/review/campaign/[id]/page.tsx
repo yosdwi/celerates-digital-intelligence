@@ -65,7 +65,7 @@ export default async function CampaignReviewPage({ params }: { params: Promise<{
         )}
       </Section>
       <Section id="message" title={t("campaign.message")}>
-        <pre className="whitespace-pre-wrap rounded-j-card border border-j-line bg-j-surface p-3.5 font-sans text-[13px]" data-campaign-message>{campaign.message_preview}</pre>
+        <pre className="whitespace-pre-wrap rounded-j-card border border-j-line bg-j-surface p-3.5 font-sans text-[0.8125rem]" data-campaign-message>{campaign.message_preview}</pre>
       </Section>
       <Section id="policy" title={t("campaign.policy")}>
         <FactRows

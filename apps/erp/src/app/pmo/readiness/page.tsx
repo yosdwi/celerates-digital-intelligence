@@ -71,7 +71,7 @@ export default async function OperationalReadinessPage({ searchParams }: { searc
       <nav className="flex items-center justify-between rounded-j-card border border-j-line bg-j-surface px-2 py-1.5 shadow-j-card" aria-label={t("cycle")} data-readiness-cycle>
         <Link href={`/pmo/readiness?year=${prev.year}&month=${prev.month}`} aria-label={t("prevCycle")} className="flex h-10 w-10 items-center justify-center rounded-xl text-j-accent"><ChevronLeft aria-hidden className="h-5 w-5" /></Link>
         <span className="flex flex-col items-center">
-          <span className="text-[15px] font-bold">{data?.cycle.label ?? `${cycle.year}-${String(cycle.month).padStart(2, "0")}`}</span>
+          <span className="text-[0.9375rem] font-bold">{data?.cycle.label ?? `${cycle.year}-${String(cycle.month).padStart(2, "0")}`}</span>
           {data && <span className="text-xs text-j-muted">{fmtDate(data.cycle.start, locale)} – {fmtDate(data.cycle.end, locale)}</span>}
         </span>
         <Link href={`/pmo/readiness?year=${next.year}&month=${next.month}`} aria-label={t("nextCycle")} className="flex h-10 w-10 items-center justify-center rounded-xl text-j-accent"><ChevronRight aria-hidden className="h-5 w-5" /></Link>
@@ -91,7 +91,7 @@ export default async function OperationalReadinessPage({ searchParams }: { searc
               <Card key={key} className="flex flex-col gap-1 p-3.5" data-summary={key}>
                 <span className="text-xs font-bold text-j-muted">{t(`summary.${key}`)}</span>
                 <span className="flex items-baseline gap-1.5">
-                  <span className="text-[24px] font-extrabold">{value}</span>
+                  <span className="text-[1.5rem] font-extrabold">{value}</span>
                   <span className="text-xs text-j-muted">/ {data.summary.total_talents}</span>
                 </span>
                 <span className={`h-1 rounded-full ${tone === "ok" ? "bg-j-ok" : tone === "warn" ? "bg-j-warn-dot" : tone === "accent" ? "bg-j-accent" : "bg-j-line"}`} aria-hidden />
@@ -108,7 +108,7 @@ export default async function OperationalReadinessPage({ searchParams }: { searc
           )}
 
           <section className="flex flex-col gap-2" data-record-section="bast">
-            <h2 className="text-[15px] font-bold">{t("bastGate")}</h2>
+            <h2 className="text-[0.9375rem] font-bold">{t("bastGate")}</h2>
             <Card className="px-3.5 py-1">
               <ul className="divide-y divide-j-line-soft">
                 {data.bast.map((gate) => (
@@ -140,7 +140,7 @@ export default async function OperationalReadinessPage({ searchParams }: { searc
           />
 
           <section className="flex flex-col gap-2" data-record-section="talents">
-            <h2 className="text-[15px] font-bold">{t("talents")}</h2>
+            <h2 className="text-[0.9375rem] font-bold">{t("talents")}</h2>
             <FilterableList
               label={t("talents")}
               items={items}

@@ -35,7 +35,7 @@ export function ConvertToPqTrackerButton({
       <button onClick={handleClick} disabled={isPending} className="text-xs font-medium text-pink-600 hover:underline block disabled:opacity-50">
         {isPending ? t("sending") : t("convertToPqTracker")}
       </button>
-      {error && <p className="text-[10px] text-red-600 mt-0.5">{error}</p>}
+      {error && <p className="text-[0.625rem] text-red-600 mt-0.5">{error}</p>}
     </div>
   );
 }

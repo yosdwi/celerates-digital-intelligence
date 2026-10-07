@@ -214,7 +214,7 @@ export function ExtensionRequestsTable({ data, isOwner, userOptions }: { data: E
                   <td className="px-4 py-3 text-slate-600">
                     {r.requester_name}
                     {r.pq_opty_no && (
-                      <span className="ml-1.5 inline-flex items-center rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700" title="Dibuat dari Sales, ke-link ke PQ Tracker">
+                      <span className="ml-1.5 inline-flex items-center rounded-full bg-blue-100 px-1.5 py-0.5 text-[0.625rem] font-semibold text-blue-700" title="Dibuat dari Sales, ke-link ke PQ Tracker">
                         PQ: {r.pq_opty_no}
                       </span>
                     )}
@@ -313,7 +313,7 @@ export function ExtensionRequestsTable({ data, isOwner, userOptions }: { data: E
                     <div className="flex justify-between gap-2"><span className="text-slate-400">{t("period")}</span><span className="text-right">{r.propose_start_date ?? "-"} &mdash; {r.propose_end_date ?? "-"}</span></div>
                     <div className="flex justify-between gap-2"><span className="text-slate-400">Basic Salary</span><span className="text-right">{r.proposed_basic_salary_amount ? `Rp ${r.proposed_basic_salary_amount.toLocaleString("id-ID")}` : "-"}</span></div>
                     <div className="flex justify-between gap-2"><span className="text-slate-400">Total Gross</span><span className="text-right">{proposeGross > 0 ? `Rp ${proposeGross.toLocaleString("id-ID")}` : "-"}</span></div>
-                    <div className="flex justify-between gap-2"><span className="text-slate-400">Requester</span><span className="text-right">{r.requester_name}{r.pq_opty_no && <span className="ml-1.5 inline-flex items-center rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">PQ: {r.pq_opty_no}</span>}</span></div>
+                    <div className="flex justify-between gap-2"><span className="text-slate-400">Requester</span><span className="text-right">{r.requester_name}{r.pq_opty_no && <span className="ml-1.5 inline-flex items-center rounded-full bg-blue-100 px-1.5 py-0.5 text-[0.625rem] font-semibold text-blue-700">PQ: {r.pq_opty_no}</span>}</span></div>
                     <div className="flex justify-between gap-2 items-center">
                       <span className="text-slate-400">{t("colSpecialNotes")}</span>
                       <Link

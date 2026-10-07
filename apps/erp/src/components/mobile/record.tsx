@@ -28,11 +28,11 @@ export function ModuleHeader({ moduleKey, title, siblings }: { moduleKey: string
           <ChevronDown aria-hidden className="h-4 w-4 text-j-muted" />
         </button>
       )}
-      <h1 className="text-[28px] font-extrabold leading-tight tracking-[-0.6px]">{title}</h1>
+      <h1 className="text-[1.75rem] font-extrabold leading-tight tracking-[-0.6px]">{title}</h1>
       {siblings && siblings.length > 1 && (
         <nav aria-label={label(mod?.config.label ?? "")} className="-mx-5 flex gap-2 overflow-x-auto px-5 [scrollbar-width:none]">
           {siblings.map((s) => (
-            <Link key={s.href} href={s.href} aria-current={s.active ? "page" : undefined} className={`flex h-9 shrink-0 items-center rounded-xl px-3 text-[13px] ${s.active ? "bg-j-accent-soft font-bold text-j-accent-strong" : "font-semibold text-j-muted"}`}>
+            <Link key={s.href} href={s.href} aria-current={s.active ? "page" : undefined} className={`flex h-9 shrink-0 items-center rounded-xl px-3 text-[0.8125rem] ${s.active ? "bg-j-accent-soft font-bold text-j-accent-strong" : "font-semibold text-j-muted"}`}>
               {s.label}
             </Link>
           ))}
@@ -63,8 +63,8 @@ export function RecordHeader({
         {back.label}
       </Link>
       <span className="text-xs font-bold uppercase tracking-[0.4px] text-j-muted">{eyebrow}</span>
-      <h1 className="text-[26px] font-extrabold leading-tight tracking-[-0.5px]">{title}</h1>
-      {subtitle && <p className="text-[15px] font-semibold text-j-muted">{subtitle}</p>}
+      <h1 className="text-[1.625rem] font-extrabold leading-tight tracking-[-0.5px]">{title}</h1>
+      {subtitle && <p className="text-[0.9375rem] font-semibold text-j-muted">{subtitle}</p>}
       {pills && pills.length > 0 && (
         <div className="mt-1 flex flex-wrap gap-1.5">
           {pills.map((p) => (
@@ -82,7 +82,7 @@ export function Section({ title, action, children, id }: { title: string; action
   return (
     <section aria-labelledby={id} className="flex flex-col gap-2" data-record-section={id}>
       <div className="flex items-center justify-between">
-        <h2 id={id} className="text-[15px] font-bold">
+        <h2 id={id} className="text-[0.9375rem] font-bold">
           {title}
         </h2>
         {action}
@@ -95,7 +95,7 @@ export function Section({ title, action, children, id }: { title: string; action
 export function ProgressMeter({ value, from, to, label }: { value: number; from: string; to: string; label: string }) {
   return (
     <Card className="flex flex-col gap-2.5 p-3.5">
-      <div className="flex justify-between text-[13px]">
+      <div className="flex justify-between text-[0.8125rem]">
         <span className="font-bold">{label}</span>
         <span className="text-j-muted">{value}%</span>
       </div>
@@ -137,7 +137,7 @@ export function DocumentCard({ name, meta, value, pill }: { name: string; meta?:
         {pill && <StatusPill tone={pill.tone}>{pill.label}</StatusPill>}
       </span>
       {value ? (
-        <button type="button" onClick={open} disabled={pending} className="flex h-11 shrink-0 items-center gap-1 rounded-xl px-2.5 text-[13px] font-bold text-j-accent disabled:opacity-50">
+        <button type="button" onClick={open} disabled={pending} className="flex h-11 shrink-0 items-center gap-1 rounded-xl px-2.5 text-[0.8125rem] font-bold text-j-accent disabled:opacity-50">
           {pending ? "…" : t("open")}
           <ExternalLink aria-hidden className="h-3.5 w-3.5" />
         </button>

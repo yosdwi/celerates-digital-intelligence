@@ -55,7 +55,7 @@ function FieldInput({ field, value, onChange, disabled }: { field: Field; value:
   const common = "mt-1 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-400 disabled:bg-slate-50";
   const text = value === undefined || value === null ? "" : String(value);
   return (
-    <label className="block text-[11px] font-medium text-slate-600">
+    <label className="block text-[0.6875rem] font-medium text-slate-600">
       {field.label}
       {field.required && <span className="text-red-600"> *</span>}
       {field.options ? (
@@ -161,11 +161,11 @@ export function ProposalCard({ id, title, onDecided }: { id: string; title?: str
     <article className="rounded-xl border border-brand-200 bg-white p-3" data-proposal data-proposal-state={proposal.state}>
       <div className="flex items-start justify-between gap-2">
         <h4 className="text-xs font-semibold text-slate-900">{proposal.title}</h4>
-        <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ${pending ? "bg-brand-50 text-brand-700 ring-brand-200" : proposal.state === "applied" ? "bg-emerald-50 text-emerald-800 ring-emerald-200" : "bg-slate-100 text-slate-700 ring-slate-200"}`}>
+        <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wide ring-1 ${pending ? "bg-brand-50 text-brand-700 ring-brand-200" : proposal.state === "applied" ? "bg-emerald-50 text-emerald-800 ring-emerald-200" : "bg-slate-100 text-slate-700 ring-slate-200"}`}>
           {STATE_LABEL[proposal.state]}
         </span>
       </div>
-      <p className="mt-1 text-[11px] text-slate-500">
+      <p className="mt-1 text-[0.6875rem] text-slate-500">
         {pending
           ? `Divalidasi ERP untuk akses Anda: ${proposal.counts.ok} siap · ${proposal.counts.warning} perlu dicek · ${proposal.counts.needs_input} perlu dilengkapi · ${proposal.counts.invalid} tidak dapat diterapkan`
           : `${proposal.receipts.applied} diterapkan · ${proposal.receipts.skipped} dilewati · ${proposal.receipts.failed} gagal${proposal.outcome && proposal.receipts.applied ? ` · ${proposal.outcome.resolved} sudah tuntas` : ""}`}
@@ -197,13 +197,13 @@ export function ProposalCard({ id, title, onDecided }: { id: string; title?: str
                 <div className="min-w-0 flex-1 text-xs">
                   <p className="break-words text-slate-800">{item.summary}</p>
                   {pending ? (
-                    <p className={`mt-0.5 text-[11px] font-medium ${v.className}`}>
+                    <p className={`mt-0.5 text-[0.6875rem] font-medium ${v.className}`}>
                       {item.validation.state !== "ok" && <AlertTriangle className="mr-1 inline h-3 w-3" />}
                       {v.label}
                       {item.validation.messages.length > 0 && <span className="font-normal text-slate-600"> — {item.validation.messages.join(" ")}</span>}
                     </p>
                   ) : (
-                    <p className="mt-0.5 text-[11px] text-slate-600">
+                    <p className="mt-0.5 text-[0.6875rem] text-slate-600">
                       {item.receipt?.message ?? "Tidak diproses."}
                       {item.outcome === "resolved" ? " · tuntas" : item.outcome === "open" ? " · masih terbuka" : ""}
                     </p>
@@ -226,7 +226,7 @@ export function ProposalCard({ id, title, onDecided }: { id: string; title?: str
                     </div>
                   )}
                   {item.href && (
-                    <Link href={item.href} className="mt-1 inline-block text-[11px] font-semibold text-brand-600 hover:underline">
+                    <Link href={item.href} className="mt-1 inline-block text-[0.6875rem] font-semibold text-brand-600 hover:underline">
                       Buka di ERP →
                     </Link>
                   )}
@@ -237,13 +237,13 @@ export function ProposalCard({ id, title, onDecided }: { id: string; title?: str
         })}
       </ul>
       {error && (
-        <p role="alert" className="mt-2 rounded-lg bg-amber-50 p-2 text-[11px] text-amber-900">
+        <p role="alert" className="mt-2 rounded-lg bg-amber-50 p-2 text-[0.6875rem] text-amber-900">
           {error}
         </p>
       )}
       {pending ? (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-          <p className="flex items-center gap-1 text-[11px] text-slate-500">
+          <p className="flex items-center gap-1 text-[0.6875rem] text-slate-500">
             <ShieldCheck className="h-3.5 w-3.5" /> Belum ada data berubah.
           </p>
           <div className="flex gap-2">
@@ -257,7 +257,7 @@ export function ProposalCard({ id, title, onDecided }: { id: string; title?: str
           </div>
         </div>
       ) : (
-        <p className="mt-2 text-[11px] text-slate-500">Tercatat di ERP dengan tanda terima per item dan log aktivitas atas nama Anda.</p>
+        <p className="mt-2 text-[0.6875rem] text-slate-500">Tercatat di ERP dengan tanda terima per item dan log aktivitas atas nama Anda.</p>
       )}
     </article>
   );

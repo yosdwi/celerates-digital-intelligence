@@ -9,7 +9,7 @@ import { upsertFinanceHandoff } from "@/app/pmo/actions";
 import { acknowledgeFinanceHandoff, requestRevisionFinanceHandoff } from "@/app/finance/actions";
 import { BottomSheet, buttonClass } from "../primitives";
 
-const field = "mt-1 w-full rounded-xl border border-[#d5dbe5] bg-j-surface px-3 py-2.5 text-[15px] text-j-ink outline-none focus:border-j-accent";
+const field = "mt-1 w-full rounded-xl border border-[#d5dbe5] bg-j-surface px-3 py-2.5 text-[0.9375rem] text-j-ink outline-none focus:border-j-accent";
 
 export function SubmitToFinance({ opportunityId, invoiceId, docUrl, resubmit }: { opportunityId: string; invoiceId: string; docUrl: string | null; resubmit: boolean }) {
   const t = useTranslations("mobile.pmo.handoff");
@@ -42,11 +42,11 @@ export function SubmitToFinance({ opportunityId, invoiceId, docUrl, resubmit }: 
             submit(e.currentTarget, true);
           }}
         >
-          <label className="text-[13px] font-semibold text-j-muted">
+          <label className="text-[0.8125rem] font-semibold text-j-muted">
             {t("docLink")}
             <input name="doc_url" type="url" required defaultValue={docUrl ?? ""} placeholder="https://" className={field} />
           </label>
-          <label className="text-[13px] font-semibold text-j-muted">
+          <label className="text-[0.8125rem] font-semibold text-j-muted">
             {t("notes")}
             <textarea name="notes" rows={2} className={field} />
           </label>
@@ -94,7 +94,7 @@ export function FinanceVerify({ opportunityId }: { opportunityId: string }) {
       </button>
       <BottomSheet open={open} onClose={() => setOpen(false)} title={t("verify")}>
         <form className="flex flex-col gap-3 pb-2" onSubmit={(e) => e.preventDefault()}>
-          <label className="text-[13px] font-semibold text-j-muted">
+          <label className="text-[0.8125rem] font-semibold text-j-muted">
             {t("financeNotes")}
             <textarea name="finance_notes" rows={3} className={field} />
           </label>

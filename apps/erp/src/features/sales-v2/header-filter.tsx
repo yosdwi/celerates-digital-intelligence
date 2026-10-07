@@ -54,7 +54,7 @@ export function HeaderFilter({
         </button>
       }
     >
-      <div className="w-64 p-1 text-[13px]" data-header-menu={spec.key}>
+      <div className="w-64 p-1 text-[0.8125rem]" data-header-menu={spec.key}>
         {spec.sortable && (
           <div className="flex flex-col">
             <MenuButton onClick={() => { onSorts([{ key: spec.key, dir: "asc" }]); setOpen(false); }} pressed={dir === "asc"}>
@@ -130,7 +130,7 @@ function ValueList({ spec, values, filters, onFilters }: { spec: HeaderSpec; val
                 }}
               />
               <span className={`min-w-0 flex-1 truncate ${v ? "" : "italic text-slate-400"}`}>{v || BLANK}</span>
-              <span className="text-[11px] tabular-nums text-slate-400">{n}</span>
+              <span className="text-[0.6875rem] tabular-nums text-slate-400">{n}</span>
             </label>
           </li>
         ))}
@@ -164,10 +164,10 @@ function RangeFields({ spec, filters, onFilters }: { spec: HeaderSpec; filters: 
   const date = spec.kind === "date";
   return (
     <form className="grid grid-cols-2 gap-2 px-1 pb-1" onSubmit={(e) => { e.preventDefault(); onFilters(setRange(filters, spec.key, date ? "date" : "number", min, max)); }}>
-      <label className="text-[11px] font-medium text-slate-500">{date ? "Setelah" : "Lebih dari"}
+      <label className="text-[0.6875rem] font-medium text-slate-500">{date ? "Setelah" : "Lebih dari"}
         <Input size="sm" type={date ? "date" : "number"} value={min} onChange={(e) => setMin(e.currentTarget.value)} />
       </label>
-      <label className="text-[11px] font-medium text-slate-500">{date ? "Sebelum" : "Kurang dari"}
+      <label className="text-[0.6875rem] font-medium text-slate-500">{date ? "Sebelum" : "Kurang dari"}
         <Input size="sm" type={date ? "date" : "number"} value={max} onChange={(e) => setMax(e.currentTarget.value)} />
       </label>
       <Button type="submit" size="sm" intent="primary" className="col-span-2">Terapkan</Button>

@@ -180,13 +180,13 @@ export default async function TalentJourneyPage({ params }: { params: Promise<{ 
                       <td className="px-4 py-3 text-slate-600 space-y-1">
                         {a.performance_appraisal_result && (
                           <div className="flex items-center gap-1">
-                            <span className="text-[10px] uppercase text-slate-400">Appraisal:</span>
+                            <span className="text-[0.625rem] uppercase text-slate-400">Appraisal:</span>
                             {isLink(a.performance_appraisal_result) ? <SmartFileLink value={a.performance_appraisal_result} /> : <span>{a.performance_appraisal_result}</span>}
                           </div>
                         )}
                         {a.performance_review_result && (
                           <div className="flex items-center gap-1">
-                            <span className="text-[10px] uppercase text-slate-400">Review:</span>
+                            <span className="text-[0.625rem] uppercase text-slate-400">Review:</span>
                             {isLink(a.performance_review_result) ? <SmartFileLink value={a.performance_review_result} /> : <span>{a.performance_review_result}</span>}
                           </div>
                         )}

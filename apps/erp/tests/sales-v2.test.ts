@@ -263,7 +263,14 @@ test("density on laptops: compact sidebar and V2 chrome, no zoom (contract §15)
   assert.match(read("components/app-shell.tsx"), /md:ml-60/);
   assert.doesNotMatch(sidebar, /py-2\.5|py-6|width=\{36\}/);
   const kit = read("features/sales-v2/record-workspace.tsx");
-  assert.match(kit, /text-\[18px\]/);
-  assert.match(read("app/sales/v2/sales-v2.css"), /@media \(max-height: 760px\)/);
-  assert.doesNotMatch(read("app/globals.css"), /zoom:|font-size:\s*\d+%/);
+  assert.match(kit, /text-\[1\.125rem\]/);
+  const v2css = read("app/sales/v2/sales-v2.css");
+  assert.match(v2css, /@media \(max-height: 760px\)/);
+  // Laptop tier: one rem step for the whole app plus Crisp's px tokens; never zoom or scale.
+  const globals = read("app/globals.css");
+  assert.match(globals, /@media \(min-width: 768px\) and \(max-width: 1599px\) \{\s*html \{ font-size: 14px; \}/);
+  assert.match(v2css, /--crisp-size-tableRow: 32px/);
+  assert.doesNotMatch(globals + v2css, /\bzoom:|html \{[^}]*transform/);
+  // Font sizes are rem so they follow that step (px would stay large on laptops).
+  for (const f of readdirSync(new URL("../src/features/sales-v2/", import.meta.url))) assert.doesNotMatch(read(`features/sales-v2/${f}`), /text-\[\d+px\]/, f);
 });

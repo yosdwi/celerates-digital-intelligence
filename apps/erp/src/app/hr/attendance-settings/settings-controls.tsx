@@ -13,7 +13,7 @@ export function LeaveTypeToggle({ id, isActive }: { id: string; isActive: boolea
       type="button"
       disabled={isPending}
       onClick={() => startTransition(async () => { await toggleLeaveTypeActive(id, !isActive); router.refresh(); })}
-      className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors ${isActive ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-400"}`}
+      className={`rounded-full px-2.5 py-1 text-[0.6875rem] font-semibold transition-colors ${isActive ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-400"}`}
     >
       {isActive ? "Aktif" : "Nonaktif"}
     </button>

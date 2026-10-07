@@ -38,7 +38,7 @@ export function UserMenu() {
           <div className="px-4 py-2 border-b border-slate-100">
             <p className="text-sm font-medium text-slate-900 truncate">{name}</p>
             <p className="text-xs text-slate-500 truncate">{session.user.email}</p>
-            {isOwner && <span className="inline-block mt-1 text-[10px] uppercase tracking-wide text-brand-600 font-medium">{t("owner")}</span>}
+            {isOwner && <span className="inline-block mt-1 text-[0.625rem] uppercase tracking-wide text-brand-600 font-medium">{t("owner")}</span>}
           </div>
           <Link href="/profile" className="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50" onClick={() => setOpen(false)}>
             {t("editProfile")}

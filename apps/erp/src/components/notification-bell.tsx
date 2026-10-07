@@ -84,7 +84,7 @@ export function NotificationBell() {
       >
         <Bell className="h-4 w-4" />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">
+          <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[0.625rem] font-semibold text-white">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
@@ -113,7 +113,7 @@ export function NotificationBell() {
                     <div className="min-w-0 flex-1">
                       <p className={`text-sm ${!n.is_read ? "font-semibold text-slate-900" : "font-medium text-slate-700"}`}>{n.title}</p>
                       {n.body && <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{n.body}</p>}
-                      <p className="text-[11px] text-slate-400 mt-1">{timeAgo(n.created_at, t)}</p>
+                      <p className="text-[0.6875rem] text-slate-400 mt-1">{timeAgo(n.created_at, t)}</p>
                     </div>
                   </div>
                 </button>

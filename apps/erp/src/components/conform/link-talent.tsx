@@ -29,9 +29,9 @@ export function LinkTalentForm({ employeeId }: { employeeId: string }) {
         }}
       >
         <p className="text-sm">{t("notLinked")}</p>
-        <label className="flex flex-col text-[13px] font-semibold">
+        <label className="flex flex-col text-[0.8125rem] font-semibold">
           {t("email")}
-          <input name="email" type="email" required maxLength={254} className="mt-1 w-full rounded-xl border border-[#d5dbe5] bg-j-surface px-3 py-2.5 text-[15px] font-normal outline-none focus:border-j-accent" />
+          <input name="email" type="email" required maxLength={254} className="mt-1 w-full rounded-xl border border-[#d5dbe5] bg-j-surface px-3 py-2.5 text-[0.9375rem] font-normal outline-none focus:border-j-accent" />
         </label>
         {error && <p role="alert" className="text-sm font-semibold text-[#a8261c]">{error}</p>}
         <button type="submit" disabled={pending} data-action="link-talent" className={`${buttonClass.primary} disabled:opacity-50`}>

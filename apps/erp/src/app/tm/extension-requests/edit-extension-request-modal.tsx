@@ -121,7 +121,7 @@ export function EditExtensionRequestModal({
                 return (
                   <label key={sf.field} className="block">
                     <span className="mb-1 block text-sm font-medium text-slate-700">
-                      {sf.label} {locked && <span className="text-[10px] text-green-600">{t("lockedBadge")}</span>}
+                      {sf.label} {locked && <span className="text-[0.625rem] text-green-600">{t("lockedBadge")}</span>}
                     </span>
                     <select
                       name={sf.field}

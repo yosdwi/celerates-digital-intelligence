@@ -30,7 +30,7 @@ export async function TalentFrame({
           key={item.key}
           href={`${item.href}${query}`}
           aria-current={item.key === tab ? "page" : undefined}
-          className={`flex h-10 items-center justify-center rounded-[10px] px-5 text-[14px] font-bold transition ${
+          className={`flex h-10 items-center justify-center rounded-[10px] px-5 text-[0.875rem] font-bold transition ${
             item.key === tab ? "bg-j-accent text-white shadow-sm" : "text-j-muted hover:bg-j-line-soft hover:text-j-ink"
           }`}
         >
@@ -46,7 +46,7 @@ export async function TalentFrame({
         <header className="flex items-center justify-between gap-4 md:min-h-14 md:border-b md:border-j-line-soft md:pb-4">
           <div className="flex items-center gap-2.5">
             <Image src="/icons/icon-192.png" alt="" width={34} height={34} className="rounded-[10px] border border-j-line bg-white" />
-            <span className="text-[19px] font-extrabold tracking-[-0.3px]">Celerates</span>
+            <span className="text-[1.1875rem] font-extrabold tracking-[-0.3px]">Celerates</span>
           </div>
           {tab && tabs("hidden items-center gap-1 rounded-[14px] border border-j-line bg-j-surface p-1 md:flex")}
           <TalentAccountButton name={name} email={email} />

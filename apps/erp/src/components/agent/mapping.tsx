@@ -17,7 +17,7 @@ export function MappingCard({ data, onRun }: { data: MappingCardData; onRun: (ac
       <summary className="flex cursor-pointer items-center gap-1.5 font-semibold text-slate-800">
         <Columns3 className="h-3.5 w-3.5" /> {data.open ? "Lengkapi pemetaan kolom" : "Ubah pemetaan kolom"}
       </summary>
-      <label className="mt-3 block text-[11px] font-medium text-slate-600">
+      <label className="mt-3 block text-[0.6875rem] font-medium text-slate-600">
         Impor sebagai
         <select
           className={select}
@@ -36,7 +36,7 @@ export function MappingCard({ data, onRun }: { data: MappingCardData; onRun: (ac
       </label>
       <div className="mt-2 grid grid-cols-2 gap-2">
         {spec?.params.map((p) => (
-          <label key={p.name} className="block text-[11px] font-medium text-slate-600">
+          <label key={p.name} className="block text-[0.6875rem] font-medium text-slate-600">
             {p.label}
             {p.required && <span className="text-red-600"> *</span>}
             <select className={select} value={mapping[p.name] ?? ""} onChange={(e) => setMapping({ ...mapping, [p.name]: e.target.value })}>
@@ -51,7 +51,7 @@ export function MappingCard({ data, onRun }: { data: MappingCardData; onRun: (ac
         ))}
       </div>
       <div className="mt-3 flex items-center justify-between gap-2">
-        <p className="text-[11px] text-slate-500">ERP tetap memvalidasi setiap baris sebelum Anda konfirmasi.</p>
+        <p className="text-[0.6875rem] text-slate-500">ERP tetap memvalidasi setiap baris sebelum Anda konfirmasi.</p>
         <button
           type="button"
           disabled={!ready}

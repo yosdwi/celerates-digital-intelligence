@@ -193,3 +193,8 @@ A 1366 or 1920 laptop at 125–150 % OS scaling gives the browser about 1280 × 
 compact sizes and never uses zoom or scaling: sidebar 240px with 28–32px rows and a 28px logo; page title 16px and a
 12px subtitle (hidden below 760px of height); summary cards 18px numbers; toolbar on one line at 1280 (Sheet Sync
 shows its label from `xl`); Agent launcher 40px. The page fills the height and the table scrolls inside it.
+
+Laptop tier (all modules): between 768 and 1599 CSS px wide the root font size is 14px (`globals.css`), so every
+rem-based size steps down 12.5 %, and Crisp's px tokens step down with it (`sales-v2.css`: text 10.5–15px, table
+rows 32px, header 36px, spacing × 0.875). Font sizes are written in rem (`text-[0.8125rem]`, not `text-[13px]`) so
+they follow. 1600px and wider (the 1920 monitor reference) and phones are unchanged. Still no zoom or transform.

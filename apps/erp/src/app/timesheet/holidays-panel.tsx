@@ -150,7 +150,7 @@ export function HolidaysPanel({ data, canDelete = true }: { data: HolidayRow[]; 
             {bulkPreview.failed.length > 0 && (
               <div className="mt-2 text-xs text-red-600 space-y-1">
                 <p>{t("failedRowsNote")}</p>
-                {bulkPreview.failed.map((line, i) => <div key={i} className="font-mono text-[11px]">{line}</div>)}
+                {bulkPreview.failed.map((line, i) => <div key={i} className="font-mono text-[0.6875rem]">{line}</div>)}
               </div>
             )}
           </div>

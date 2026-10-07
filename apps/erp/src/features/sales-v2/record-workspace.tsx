@@ -282,18 +282,18 @@ export function RecordWorkspace<T extends { id: string }>({
   return (
     // Full viewport height: -mb-24 cancels the shell's bottom padding, so the workspace reaches the bottom edge and the
     // Agent launcher floats over it (the scroll areas leave room for it, sales-v2.css).
-    <div className="flex flex-col bg-white text-[13px] text-slate-800 md:-mb-24 md:h-dvh" data-sales-v2>
+    <div className="flex flex-col bg-white text-[0.8125rem] text-slate-800 md:-mb-24 md:h-dvh" data-sales-v2>
       {/* md:pr-56 keeps the header clear of the app's fixed top-right controls (language, bell, account). */}
       {/* Density (contract §5, §15): fixed compact sizes like Attio, never zoom; a 1280 × 650 laptop viewport (1366 or
           1920 screens at 125–150 % OS scaling) must show the table without the chrome eating the height. */}
       <header className="flex items-center justify-between gap-4 px-5 pt-3 pb-2 md:pr-56">
         <div className="min-w-0">
           <h1 className="text-base font-semibold leading-6 text-slate-900">{c.title}</h1>
-          <p className="truncate text-[12px] leading-4 text-slate-500" data-sales-v2-subtitle>{c.subtitle}</p>
+          <p className="truncate text-[0.75rem] leading-4 text-slate-500" data-sales-v2-subtitle>{c.subtitle}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {headerEnd}
-          {!access.canEdit && <span className="rounded-md bg-slate-100 px-2 py-1 text-[12px] text-slate-600">Mode lihat saja</span>}
+          {!access.canEdit && <span className="rounded-md bg-slate-100 px-2 py-1 text-[0.75rem] text-slate-600">Mode lihat saja</span>}
         </div>
       </header>
 
@@ -313,8 +313,8 @@ export function RecordWorkspace<T extends { id: string }>({
             >
               <StatCard
                 className="px-3 py-1.5"
-                label={<span className="text-[12px] font-medium text-slate-600">{k.label}</span>}
-                value={<span className="text-[18px] font-bold leading-6 tabular-nums" style={{ color: k.tone }}>{counts[k.id]}</span>}
+                label={<span className="text-[0.75rem] font-medium text-slate-600">{k.label}</span>}
+                value={<span className="text-[1.125rem] font-bold leading-6 tabular-nums" style={{ color: k.tone }}>{counts[k.id]}</span>}
               />
             </button>
           );
@@ -369,7 +369,7 @@ export function RecordWorkspace<T extends { id: string }>({
           shownKeys={shownKeys}
           onShownKeysChange={setShownKeys}
           showViewSettings={state.view === "table"}
-          count={<span className="text-[12px] text-slate-500" data-sales-v2-count>{records.length} dari {all.length}</span>}
+          count={<span className="text-[0.75rem] text-slate-500" data-sales-v2-count>{records.length} dari {all.length}</span>}
           sortLabel="Urutkan"
           filterLabel="Filter"
           viewSettingsLabel="Kolom"
@@ -478,7 +478,7 @@ export function RecordWorkspace<T extends { id: string }>({
               <FormField label="Nama tampilan">
                 <Input autoFocus value={naming.name} maxLength={60} onChange={(e) => setNaming({ ...naming, name: e.currentTarget.value })} />
               </FormField>
-              <p className="mt-2 text-[12px] text-slate-500">Disimpan di browser ini: tampilan, pencarian, filter, urutan dan kolom.</p>
+              <p className="mt-2 text-[0.75rem] text-slate-500">Disimpan di browser ini: tampilan, pencarian, filter, urutan dan kolom.</p>
             </DialogBody>
             <DialogFooter>
               <Button type="button" size="sm" intent="neutral" onClick={() => setNaming(null)}>Batal</Button>
@@ -578,7 +578,7 @@ export function PanelTitle({ name, prefill }: { name: string; prefill: string })
       <button
         type="button"
         onClick={() => openAgent({ prefill })}
-        className="inline-flex shrink-0 items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-[12px] font-medium text-slate-700 hover:border-brand-300 hover:text-brand-700"
+        className="inline-flex shrink-0 items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-[0.75rem] font-medium text-slate-700 hover:border-brand-300 hover:text-brand-700"
         data-sales-v2-ask-agent
       >
         <Sparkles size={13} /> Tanya Agent

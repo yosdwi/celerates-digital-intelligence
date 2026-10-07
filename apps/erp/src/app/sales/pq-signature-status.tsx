@@ -79,7 +79,7 @@ export function PqSignatureStatus({
             <option key={u.id} value={u.id}>{u.full_name} ({u.email})</option>
           ))}
         </select>
-        {error && <p className="text-[11px] text-red-600">{error}</p>}
+        {error && <p className="text-[0.6875rem] text-red-600">{error}</p>}
         <div className="flex gap-1.5">
           <button type="submit" disabled={isPending} className="rounded bg-brand-600 px-2 py-1 text-xs font-medium text-white disabled:opacity-50">
             {isPending ? t("sig.sending") : t("sig.send")}
@@ -95,9 +95,9 @@ export function PqSignatureStatus({
   return (
     <div className="flex flex-col gap-0.5">
       <span className={`text-xs font-medium ${STATUS_STYLES[info.status]}`}>{STATUS_LABELS[info.status]}</span>
-      {info.signerName && <span className="text-[11px] text-slate-400">{t("sig.signerLabel")}: {info.signerName}</span>}
+      {info.signerName && <span className="text-[0.6875rem] text-slate-400">{t("sig.signerLabel")}: {info.signerName}</span>}
       {info.status === "pending" && (
-        <Link href="/ttd-online" className="text-[11px] font-medium text-brand-600 hover:underline">
+        <Link href="/ttd-online" className="text-[0.6875rem] font-medium text-brand-600 hover:underline">
           {t("sig.viewInSignature")}
         </Link>
       )}

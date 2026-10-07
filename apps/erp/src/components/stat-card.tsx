@@ -28,7 +28,7 @@ export function StatCard({
       return (
         <div className="rounded-2xl p-4 border border-white/70 bg-white/70 backdrop-blur-xl shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_24px_-14px_rgba(15,23,42,0.12)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_1px_2px_rgba(15,23,42,0.05),0_18px_32px_-14px_rgba(15,23,42,0.18)]">
           <p className="text-xs font-medium tracking-wide text-slate-500">{label}</p>
-          <p className="text-[26px] font-extrabold tracking-tight mt-1 text-slate-900 [font-variant-numeric:tabular-nums]">{value}</p>
+          <p className="text-[1.625rem] font-extrabold tracking-tight mt-1 text-slate-900 [font-variant-numeric:tabular-nums]">{value}</p>
           {sublabel && <p className="text-xs font-medium text-slate-400 mt-0.5">{sublabel}</p>}
         </div>
       );
@@ -42,7 +42,7 @@ export function StatCard({
       >
         <span className="pointer-events-none absolute -top-8 -right-8 h-24 w-24 rounded-full bg-white/15" />
         <p className="relative text-xs font-medium tracking-wide text-white/85">{label}</p>
-        <p className="relative text-[26px] font-extrabold tracking-tight mt-1 [font-variant-numeric:tabular-nums]">{value}</p>
+        <p className="relative text-[1.625rem] font-extrabold tracking-tight mt-1 [font-variant-numeric:tabular-nums]">{value}</p>
         {sublabel && <p className="relative text-xs font-medium text-white/75 mt-0.5">{sublabel}</p>}
       </div>
     );

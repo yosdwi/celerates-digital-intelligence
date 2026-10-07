@@ -84,7 +84,7 @@ function Workspace({ records, access, options, sheetSync }: Props) {
       records={records}
       access={access}
       onNewCard={(stage) => setCreate({ stage })}
-      headerEnd={<Link href="/sales" className="text-[12px] text-slate-400 hover:text-slate-700 hover:underline" title="Tampilan lama (V1)">Versi lama</Link>}
+      headerEnd={<Link href="/sales" className="text-[0.75rem] text-slate-400 hover:text-slate-700 hover:underline" title="Tampilan lama (V1)">Versi lama</Link>}
       toolbarEnd={
         <>
           {sheetSync && <SheetSyncButton data={sheetSync} parts={PQ_SHEET_SYNC} />}
@@ -141,13 +141,13 @@ const SIGN_CHIP: Record<string, string> = { pending: "bg-amber-50 text-amber-700
 function KanbanCard({ p, onOpen }: { p: Pq; onOpen: () => void }) {
   return (
     <button type="button" onClick={onOpen} className="block w-full space-y-1 text-left" data-card-preview={p.id}>
-      <span className="block truncate text-[13px] font-semibold leading-5 text-slate-900">{p.client}</span>
-      <span className="block truncate font-mono text-[11px] text-slate-500">{p.pqNo ?? p.optyNo}</span>
-      <span className="block truncate text-[12px] text-slate-700">{[p.project, p.position, p.headcount ? `${p.headcount} HC` : null].filter(Boolean).join(" · ")}</span>
-      {p.price != null && <span className="block text-[13px] font-semibold tabular-nums text-slate-900">{rupiah(p.price, p.pricePeriod)}</span>}
-      <span className="mt-1 flex items-center justify-between gap-2 border-t border-slate-100 pt-1.5 text-[11px] text-slate-500">
+      <span className="block truncate text-[0.8125rem] font-semibold leading-5 text-slate-900">{p.client}</span>
+      <span className="block truncate font-mono text-[0.6875rem] text-slate-500">{p.pqNo ?? p.optyNo}</span>
+      <span className="block truncate text-[0.75rem] text-slate-700">{[p.project, p.position, p.headcount ? `${p.headcount} HC` : null].filter(Boolean).join(" · ")}</span>
+      {p.price != null && <span className="block text-[0.8125rem] font-semibold tabular-nums text-slate-900">{rupiah(p.price, p.pricePeriod)}</span>}
+      <span className="mt-1 flex items-center justify-between gap-2 border-t border-slate-100 pt-1.5 text-[0.6875rem] text-slate-500">
         <span className="flex min-w-0 items-center gap-1.5">
-          <span aria-hidden className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#dce8ef] text-[10px] font-semibold text-[#123650]">{initials(p.salesPic)}</span>
+          <span aria-hidden className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#dce8ef] text-[0.625rem] font-semibold text-[#123650]">{initials(p.salesPic)}</span>
           <span className="truncate">{p.salesPic}</span>
         </span>
         <span className="flex shrink-0 items-center gap-1.5">
@@ -193,13 +193,13 @@ const SPECS: Record<string, HeaderSpec> = Object.fromEntries(([
 const text = (p: Pq, key: string) => String(pqFieldValue(p, key) ?? "");
 const COLUMNS: Omit<DataTableColumn<Pq>, "header">[] = [
   { key: "client", type: "entity", accessor: (p) => p.client },
-  { key: "optyNo", render: (_, p) => <span className="font-mono text-[12px] text-slate-600">{p.optyNo}</span> },
+  { key: "optyNo", render: (_, p) => <span className="font-mono text-[0.75rem] text-slate-600">{p.optyNo}</span> },
   {
     key: "pqNo",
     render: (_, p) => p.pqNo
-      ? <span className="font-mono text-[12px] text-slate-600">{p.pqNo}</span>
-      : needsPqNo(p) ? <span className="rounded bg-[#fdeee7] px-1.5 py-0.5 text-[12px] font-medium text-[#b2410f]">Perlu Generate PQ</span>
-      : <span className="text-[12px] text-slate-400">Menunggu Talent Onboard</span>,
+      ? <span className="font-mono text-[0.75rem] text-slate-600">{p.pqNo}</span>
+      : needsPqNo(p) ? <span className="rounded bg-[#fdeee7] px-1.5 py-0.5 text-[0.75rem] font-medium text-[#b2410f]">Perlu Generate PQ</span>
+      : <span className="text-[0.75rem] text-slate-400">Menunggu Talent Onboard</span>,
   },
   { key: "stage", type: "status", accessor: (p) => String(STAGE_ORDER[p.stage] ?? 9), format: (_, p) => PQ_STAGE_LABEL[p.stage] ?? p.stage, swatches: STAGE_SWATCH },
   { key: "optyStatus", accessor: (p) => text(p, "optyStatus") },
@@ -223,7 +223,7 @@ const COLUMNS: Omit<DataTableColumn<Pq>, "header">[] = [
   {
     key: "poDocs",
     render: (_, p) => (p.poDocs.length || p.poDocUrl
-      ? <span className="block space-y-1">{p.poDocUrl && <a href={p.poDocUrl} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="block truncate text-[12px] text-brand-700 hover:underline">Link PO</a>}<FileLinks files={p.poDocs} /></span>
+      ? <span className="block space-y-1">{p.poDocUrl && <a href={p.poDocUrl} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="block truncate text-[0.75rem] text-brand-700 hover:underline">Link PO</a>}<FileLinks files={p.poDocs} /></span>
       : <span className="text-slate-300">-</span>),
   },
   { key: "salesPic" },
@@ -265,10 +265,10 @@ const CONFIG: WorkspaceConfig<Pq> = {
   defaultShown: PQ_DEFAULT_SHOWN,
   grid: (p) => ({
     label: `${p.client} ${p.pqNo ?? p.optyNo}`,
-    author: <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-500"><span aria-hidden className="inline-block h-2 w-2 rounded-full" style={{ background: PQ_STAGES.find((s) => s.id === p.stage)?.accent ?? "#8a8f98" }} /><span className="font-mono">{p.pqNo ?? p.optyNo}</span> · {PQ_STAGE_LABEL[p.stage] ?? p.stage}</span>,
+    author: <span className="inline-flex items-center gap-1.5 text-[0.6875rem] text-slate-500"><span aria-hidden className="inline-block h-2 w-2 rounded-full" style={{ background: PQ_STAGES.find((s) => s.id === p.stage)?.accent ?? "#8a8f98" }} /><span className="font-mono">{p.pqNo ?? p.optyNo}</span> · {PQ_STAGE_LABEL[p.stage] ?? p.stage}</span>,
     title: p.client,
     excerpt: [p.project, p.position, p.headcount ? `${p.headcount} orang` : null, rupiah(p.price, p.pricePeriod)].filter(Boolean).join(" · ") || "-",
-    footer: <span className="text-[12px] text-slate-500">{p.salesPic}{p.signature.status !== "not_sent" ? ` · TTD ${SIGNATURE_LABEL[p.signature.status].toLowerCase()}` : ""}{needsPqNo(p) ? " · Perlu Generate PQ" : ""}</span>,
+    footer: <span className="text-[0.75rem] text-slate-500">{p.salesPic}{p.signature.status !== "not_sent" ? ` · TTD ${SIGNATURE_LABEL[p.signature.status].toLowerCase()}` : ""}{needsPqNo(p) ? " · Perlu Generate PQ" : ""}</span>,
     date: p.approvalDate ?? p.requestDate ?? undefined,
   }),
   // Kanban by Pipeline Stage, with V1's StageSelector rule (Opty Status follows Win / Drop / Hold).

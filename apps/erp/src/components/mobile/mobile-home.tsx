@@ -47,7 +47,7 @@ export function MobileHome() {
         <header className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <Image src="/icons/icon-192.png" alt="" width={34} height={34} className="rounded-[10px] border border-j-line bg-white" />
-            <span className="text-[19px] font-extrabold tracking-[-0.3px]">Celerates</span>
+            <span className="text-[1.1875rem] font-extrabold tracking-[-0.3px]">Celerates</span>
           </div>
           <div className="flex items-center gap-2.5">
             <Link href="/notifications" aria-label={t("notificationsLabel", { count: unread })} className="relative flex h-11 w-11 items-center justify-center rounded-full border border-j-line bg-j-surface">
@@ -66,12 +66,12 @@ export function MobileHome() {
         </header>
 
         <section className="flex flex-col gap-1">
-          <h1 className="text-[27px] font-extrabold leading-[1.15] tracking-[-0.6px]">{part ? t(`greeting.${part}`, { name: first }) : t("greeting.plain", { name: first })}</h1>
+          <h1 className="text-[1.6875rem] font-extrabold leading-[1.15] tracking-[-0.6px]">{part ? t(`greeting.${part}`, { name: first }) : t("greeting.plain", { name: first })}</h1>
           <p className="text-sm text-j-muted">{user?.isOwner ? t("roleOwner") : t("roleModules", { count: modules.length })}</p>
         </section>
 
         <div className="flex h-[54px] items-center gap-2.5 rounded-2xl border border-[#e1e6ef] bg-j-surface pl-3.5 pr-2 shadow-j-card">
-          <Link href="/search" className="flex h-full min-w-0 flex-1 items-center gap-2.5 text-left text-[15px] text-j-muted" data-home-search>
+          <Link href="/search" className="flex h-full min-w-0 flex-1 items-center gap-2.5 text-left text-[0.9375rem] text-j-muted" data-home-search>
             <Search aria-hidden className="h-5 w-5 shrink-0" strokeWidth={1.9} />
             <span className="truncate">{t("askPlaceholder")}</span>
           </Link>
@@ -120,7 +120,7 @@ export function MobileHome() {
         {status === "authenticated" && modules.length === 0 && <Card className="p-4 text-sm text-j-muted">{t("noModules")}</Card>}
 
         <section aria-labelledby="home-recent" className="flex flex-col gap-2">
-          <SectionHeader id="home-recent" title={t("recent")} action={<Link href="/notifications" className="text-[13px] font-semibold text-j-accent">{t("seeAll")}</Link>} />
+          <SectionHeader id="home-recent" title={t("recent")} action={<Link href="/notifications" className="text-[0.8125rem] font-semibold text-j-accent">{t("seeAll")}</Link>} />
           <Card className="px-3.5 py-1">
             {notifications === null ? (
               <p className="py-3 text-sm text-j-muted">{t("loading")}</p>
@@ -132,7 +132,7 @@ export function MobileHome() {
                   <li key={n.id}>
                     <Link href={n.link ?? "/notifications"} className="flex items-center gap-3 py-3">
                       <span className={`h-2 w-2 shrink-0 rounded-full ${n.is_read ? "bg-[#c5ccd8]" : "bg-j-accent"}`} aria-hidden />
-                      <span className="min-w-0 flex-1 truncate text-[13px] leading-snug">{n.title}</span>
+                      <span className="min-w-0 flex-1 truncate text-[0.8125rem] leading-snug">{n.title}</span>
                       <span className="whitespace-nowrap text-xs text-j-muted">{timeAgo(n.created_at)}</span>
                     </Link>
                   </li>

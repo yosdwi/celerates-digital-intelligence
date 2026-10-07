@@ -31,7 +31,7 @@ export function MobileTabBar() {
   if (status !== "authenticated" || HIDDEN_ON.some((p) => pathname === p || pathname.startsWith(p + "/"))) return null;
 
   const active = pathname === "/" || pathname === "/search" ? "home" : pathname === "/notifications" || pathname === "/review" || pathname.startsWith("/review/") ? "review" : pathname === "/profile" ? "account" : "modules";
-  const item = "relative flex min-h-[56px] flex-col items-center justify-start gap-1 pt-1 text-[11px]";
+  const item = "relative flex min-h-[56px] flex-col items-center justify-start gap-1 pt-1 text-[0.6875rem]";
   const tone = (key: string) => (active === key ? "font-bold text-j-accent" : "font-semibold text-j-muted");
   return (
     <>
@@ -58,7 +58,7 @@ export function MobileTabBar() {
           <Inbox aria-hidden className="h-6 w-6" strokeWidth={1.9} fill={active === "review" ? "#e8eefd" : "none"} />
           {t("tabs.review")}
           {reviewCount > 0 && (
-            <span data-review-badge aria-label={t("review.waiting", { count: reviewCount })} className="absolute left-1/2 top-0 ml-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-j-danger px-1 text-[10px] font-extrabold text-white">
+            <span data-review-badge aria-label={t("review.waiting", { count: reviewCount })} className="absolute left-1/2 top-0 ml-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-j-danger px-1 text-[0.625rem] font-extrabold text-white">
               {reviewCount > 9 ? "9+" : reviewCount}
             </span>
           )}
@@ -115,7 +115,7 @@ function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void })
             </button>
           ))}
         </div>
-        <button type="button" onClick={() => signOut({ callbackUrl: "/login" })} className="flex h-12 items-center justify-center gap-2 rounded-[14px] border border-[#f3c7c2] text-[15px] font-bold text-[#b3261e]">
+        <button type="button" onClick={() => signOut({ callbackUrl: "/login" })} className="flex h-12 items-center justify-center gap-2 rounded-[14px] border border-[#f3c7c2] text-[0.9375rem] font-bold text-[#b3261e]">
           <LogOut aria-hidden className="h-5 w-5" /> {t("logout")}
         </button>
       </div>
@@ -147,7 +147,7 @@ export function MobileContextBar() {
           <span className="truncate text-sm font-bold">{label(current.config.label)}</span>
           {sub && <span className="truncate text-xs text-j-muted">{label(sub.label)}</span>}
         </span>
-        <button type="button" onClick={() => setOpen(true)} className="h-10 rounded-xl border border-j-line px-3 text-[13px] font-bold text-j-accent">
+        <button type="button" onClick={() => setOpen(true)} className="h-10 rounded-xl border border-j-line px-3 text-[0.8125rem] font-bold text-j-accent">
           {t("submodules")}
         </button>
       </div>

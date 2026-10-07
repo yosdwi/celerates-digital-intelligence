@@ -121,14 +121,14 @@ export function TrendBars({ items }: { items: ChartItem[] }) {
         const isPeak = i === peakIndex;
         return (
           <div key={item.label} className="flex-1 flex flex-col items-center gap-2">
-            <span className={`text-[11px] font-semibold ${isPeak ? "text-ember" : "text-slate-400"}`}>{item.value}</span>
+            <span className={`text-[0.6875rem] font-semibold ${isPeak ? "text-ember" : "text-slate-400"}`}>{item.value}</span>
             <div className="w-full flex-1 flex items-end justify-center">
               <div
                 className={`w-1.5 rounded-full ${isPeak ? "bg-ember" : "bg-slate-200"}`}
                 style={{ height: `${heightPct}%` }}
               />
             </div>
-            <span className="text-[10px] text-slate-400 truncate w-full text-center">{item.label}</span>
+            <span className="text-[0.625rem] text-slate-400 truncate w-full text-center">{item.label}</span>
           </div>
         );
       })}
@@ -199,7 +199,7 @@ export function AreaTrendChart({ items, accent = "violet" }: { items: ChartItem[
         <path d={area} fill={`url(#${gradId})`} />
         <path d={line} fill="none" stroke={`url(#${lineId})`} strokeWidth="2.5" strokeLinecap="round" />
       </svg>
-      <div className="flex justify-between text-[11px] text-slate-400 px-1 mt-1">
+      <div className="flex justify-between text-[0.6875rem] text-slate-400 px-1 mt-1">
         {items.map((it) => <span key={it.label}>{it.label}</span>)}
       </div>
     </div>

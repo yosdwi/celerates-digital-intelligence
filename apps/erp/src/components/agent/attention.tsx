@@ -10,15 +10,15 @@ const day = (d: string) => new Date(d + "T00:00:00+07:00").toLocaleDateString("i
 
 /** What changed since the last day observed. An observation from saved snapshots, not the live rule result. */
 function Trend({ trend }: { trend: SignalTrend }) {
-  if (!trend.delta && !trend.added && !trend.resolved) return <p className="mt-1 text-[11px] text-slate-500" data-signal-trend="flat">Sejak {day(trend.since)}: tidak berubah · observasi</p>;
+  if (!trend.delta && !trend.added && !trend.resolved) return <p className="mt-1 text-[0.6875rem] text-slate-500" data-signal-trend="flat">Sejak {day(trend.since)}: tidak berubah · observasi</p>;
   return (
-    <p className="mt-1 text-[11px] text-slate-600" data-signal-trend={trend.delta > 0 ? "up" : trend.delta < 0 ? "down" : "same"}>
+    <p className="mt-1 text-[0.6875rem] text-slate-600" data-signal-trend={trend.delta > 0 ? "up" : trend.delta < 0 ? "down" : "same"}>
       <span className={trend.delta > 0 ? "font-semibold text-amber-800" : trend.delta < 0 ? "font-semibold text-emerald-700" : ""}>
         {trend.delta > 0 ? `▲ ${trend.delta}` : trend.delta < 0 ? `▼ ${-trend.delta}` : "= 0"}
       </span>{" "}
       sejak {day(trend.since)} · {trend.added} baru · {trend.resolved} selesai
       {trend.added_items.length > 0 && <> — baru: {trend.added_items.map((i) => i.label).join(", ")}</>}
-      <span className="ml-1 rounded bg-slate-100 px-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600">Observasi</span>
+      <span className="ml-1 rounded bg-slate-100 px-1 text-[0.625rem] font-semibold uppercase tracking-wide text-slate-600">Observasi</span>
     </p>
   );
 }
@@ -37,7 +37,7 @@ export function AttentionGroup({
     <article className="rounded-xl border border-slate-200 bg-white p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+          <p className="text-[0.6875rem] font-semibold uppercase tracking-wide text-slate-500">
             {MODULES[group.module]}
           </p>
           <h3 className="mt-1 text-sm font-semibold text-slate-900">

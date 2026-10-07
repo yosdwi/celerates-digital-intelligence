@@ -89,7 +89,7 @@ export default async function TalentAttendancePage({ searchParams }: { searchPar
     <section className="rounded-[18px] border border-j-line bg-j-surface p-3.5 shadow-j-card md:p-5" data-attendance-month={`${period.year}-${pad2(period.month)}`}>
       <div className="mb-2 grid grid-cols-7 gap-1 md:mb-3 md:gap-2">
         {weekdays.map((weekday) => (
-          <div key={weekday} className="py-1 text-center text-[11px] font-bold text-j-faint md:text-xs">{weekday}</div>
+          <div key={weekday} className="py-1 text-center text-[0.6875rem] font-bold text-j-faint md:text-xs">{weekday}</div>
         ))}
       </div>
 
@@ -101,7 +101,7 @@ export default async function TalentAttendancePage({ searchParams }: { searchPar
           const day = daysByDate.get(iso);
           const requirement = requirementsByDate.get(iso);
           const actionable = day?.state === "needs_action" && requirement?.state === "needs_action";
-          const cellClass = `relative flex aspect-square min-h-10 items-center justify-center rounded-xl text-[14px] transition md:min-h-[72px] md:rounded-[14px] md:text-[15px] ${tone(day)}`;
+          const cellClass = `relative flex aspect-square min-h-10 items-center justify-center rounded-xl text-[0.875rem] transition md:min-h-[72px] md:rounded-[14px] md:text-[0.9375rem] ${tone(day)}`;
           const aria = `${dayNumber} ${monthLabel}: ${day ? stateLabel[day.state] : "Belum ada data"}${day?.reason ? `, ${day.reason}` : ""}`;
 
           if (actionable && requirement) {
@@ -125,7 +125,7 @@ export default async function TalentAttendancePage({ searchParams }: { searchPar
         })}
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-j-line-soft pt-3 text-[11px] text-j-muted md:mt-5 md:text-xs">
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-j-line-soft pt-3 text-[0.6875rem] text-j-muted md:mt-5 md:text-xs">
         <span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-[#d92d20]" />Perlu dilengkapi</span>
         <span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-[#12a27a]" />Lengkap</span>
         <span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-[#2f5bea]" />Sudah dikirim</span>

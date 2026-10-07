@@ -16,7 +16,7 @@
 }
 
 /* Table header: ERP brand tint, semibold, the whole cell is the Excel-style menu button. */
-[data-sales-v2] .crisp-table thead th { background: #eef3f7; color: #123650; font-size: 12px; font-weight: 600; border-bottom: 1px solid #dce8ef; }
+[data-sales-v2] .crisp-table thead th { background: #eef3f7; color: #123650; font-size: 0.75rem; font-weight: 600; border-bottom: 1px solid #dce8ef; }
 [data-sales-v2] .crisp-table thead th:hover { background: #e3ecf3; }
 [data-sales-v2] [data-header-filter] { cursor: pointer; }
 [data-sales-v2] [data-header-filter][data-active] { color: #1a43b8; }
@@ -59,4 +59,15 @@
 /* Short laptop viewports (≈650–760 px tall at 125–150 % OS scaling): the subtitle gives its line to the table. */
 @media (max-height: 760px) {
   [data-sales-v2-subtitle] { display: none; }
+}
+
+/* Laptop density (globals.css, contract §15): Crisp sizes are px tokens, so they step down with the rem base. */
+@media (min-width: 768px) and (max-width: 1599px) {
+  :root {
+    --crisp-text-xs: 10.5px; --crisp-text-sm: 11.5px; --crisp-text-md: 12px; --crisp-text-lg: 13px; --crisp-text-xl: 15px;
+    --crisp-size-row: 26px; --crisp-size-tableRow: 32px; --crisp-size-tableHeader: 36px; --crisp-size-header: 42px;
+    --crisp-size-chip: 20px; --crisp-size-icon: 15px;
+    --crisp-space-0-5: 2px; --crisp-space-1: 3.5px; --crisp-space-1-5: 5px; --crisp-space-2: 7px; --crisp-space-2-5: 9px;
+    --crisp-space-3: 10.5px; --crisp-space-3-5: 12px; --crisp-space-4: 14px; --crisp-space-5: 17.5px; --crisp-space-6: 21px; --crisp-space-8: 28px;
+  }
 }

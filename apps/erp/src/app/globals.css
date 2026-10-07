@@ -73,6 +73,14 @@
   --grad-navy: linear-gradient(135deg, var(--color-brand-600), var(--color-brand-800));
 }
 
+/* Laptop density (docs/design/SALES-V2-CRISP-UX-CONTRACT.md §15). A laptop at 125–150 % OS scaling gives the browser
+   ~1280–1536 CSS px, so the same UI fills far more of the screen than on a 1920 monitor. Below 1600 px wide every
+   rem-based size (Tailwind type, spacing, widths) steps down 12.5 %, so a laptop shows what the monitor shows. No
+   zoom or transform: layout, viewport units and popover positioning stay exact. Phones (< 768 px) keep 16 px. */
+@media (min-width: 768px) and (max-width: 1599px) {
+  html { font-size: 14px; }
+}
+
 body {
   font-family: var(--font-sans);
   background:

@@ -83,7 +83,7 @@ export function KanbanBoard({ tasks, assigneeNames }: { tasks: Task[]; assigneeN
                 className="flex w-full items-center gap-2 px-4 py-3 text-left"
               >
                 {isCollapsed ? <ChevronRight className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
-                <span className="text-[10px] font-mono text-slate-400">{group.task_no}</span>
+                <span className="text-[0.625rem] font-mono text-slate-400">{group.task_no}</span>
                 <span className="text-sm font-semibold text-slate-900">{group.title}</span>
                 <span className="text-xs text-slate-400">({children.length})</span>
                 <span

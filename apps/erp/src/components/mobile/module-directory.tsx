@@ -29,7 +29,7 @@ export function ModuleDirectory() {
         <ScreenTitle title={t("tabs.modules")} subtitle={t("directorySubtitle", { count: modules.length })} />
         <label className="flex h-[46px] items-center gap-2.5 rounded-j-field bg-j-field px-3.5">
           <Search aria-hidden className="h-[18px] w-[18px] text-j-muted" />
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("searchModules")} aria-label={t("searchModules")} className="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-j-muted" />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("searchModules")} aria-label={t("searchModules")} className="min-w-0 flex-1 bg-transparent text-[0.9375rem] outline-none placeholder:text-j-muted" />
         </label>
         {groups.map((g) =>
           g.items.length === 0 ? null : (

@@ -249,11 +249,11 @@ function NoteRow({ note: n, myDivision }: { note: NoteRow; myDivision: "tm" | "h
         >
           {SPECIAL_NOTE_STATUSES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
-        {n.acknowledged_by_name && <p className="mt-1 text-[10px] text-slate-400">{t("acknowledgedBy", { name: n.acknowledged_by_name })}</p>}
+        {n.acknowledged_by_name && <p className="mt-1 text-[0.625rem] text-slate-400">{t("acknowledgedBy", { name: n.acknowledged_by_name })}</p>}
       </td>
       <td className="px-4 py-3">
         <p className="text-slate-700">{n.created_by_name}</p>
-        <span className={`inline-block mt-0.5 text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded ${n.created_by_division === "tm" ? "bg-sky-100 text-sky-700" : "bg-rose-100 text-rose-700"}`}>
+        <span className={`inline-block mt-0.5 text-[0.625rem] uppercase tracking-wide px-1.5 py-0.5 rounded ${n.created_by_division === "tm" ? "bg-sky-100 text-sky-700" : "bg-rose-100 text-rose-700"}`}>
           {DIVISION_LABELS[n.created_by_division] ?? n.created_by_division}
         </span>
       </td>

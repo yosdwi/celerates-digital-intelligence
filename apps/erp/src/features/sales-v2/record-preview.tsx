@@ -80,7 +80,7 @@ export function RecordPreview({
   }
 
   const highlights = [
-    { key: "opty", label: "Opty No", value: <span className="font-mono text-[12px]">{record.optyNo}</span> },
+    { key: "opty", label: "Opty No", value: <span className="font-mono text-[0.75rem]">{record.optyNo}</span> },
     { key: "stage", label: "Stage", value: STAGE_LABEL[record.status] ?? record.status },
     { key: "pos", label: "Positions", value: record.position ? `${record.position}${record.headcount ? ` × ${record.headcount}` : ""}` : "-" },
     { key: "level", label: "Level", value: record.level ? LEVEL_LABEL[record.level] ?? record.level : "-" },
@@ -91,20 +91,20 @@ export function RecordPreview({
     { key: "service", label: "Service Type", value: record.serviceType ? SERVICE_LABEL[record.serviceType] ?? record.serviceType : "-" },
     { key: "client", label: "Client Type", value: record.clientType ? CLIENT_TYPE_LABEL[record.clientType] ?? record.clientType : "-" },
     { key: "bante", label: "BANTE", value: record.bante ?? "-" },
-    { key: "lead", label: "Leads No", value: record.leadNo ? <span className="font-mono text-[12px]">{record.leadNo}</span> : "-" },
+    { key: "lead", label: "Leads No", value: record.leadNo ? <span className="font-mono text-[0.75rem]">{record.leadNo}</span> : "-" },
     { key: "duration", label: "Durasi", value: record.durationMonths ? `${record.durationMonths} bulan` : "-" },
     { key: "qualified", label: "Sales Qualified", value: record.salesQualified ? "Ya" : "Belum" },
   ];
 
-  const text = (v: string | null) => v ? <p className="whitespace-pre-wrap text-[13px] leading-5 text-slate-700">{v}</p> : null;
+  const text = (v: string | null) => v ? <p className="whitespace-pre-wrap text-[0.8125rem] leading-5 text-slate-700">{v}</p> : null;
   const sections = [
     { key: "req", label: "Requirement", count: record.requirement ? 1 : 0, content: text(record.requirement) ?? undefined },
     { key: "detail", label: "Detail Requirement", count: record.detailRequirement ? 1 : 0, content: text(record.detailRequirement) ?? undefined },
     {
       key: "ta", label: "Requisition · Talent Acquisition", count: record.requisition ? 1 : 0,
       content: record.requisition ? (
-        <dl className="grid grid-cols-2 gap-y-1 text-[13px]">
-          <dt className="text-slate-500">Requisition</dt><dd><Link className="font-mono text-[12px] text-brand-700 hover:underline" href={`/ta/${record.requisition.id}/edit`}>{record.requisition.no}</Link></dd>
+        <dl className="grid grid-cols-2 gap-y-1 text-[0.8125rem]">
+          <dt className="text-slate-500">Requisition</dt><dd><Link className="font-mono text-[0.75rem] text-brand-700 hover:underline" href={`/ta/${record.requisition.id}/edit`}>{record.requisition.no}</Link></dd>
           <dt className="text-slate-500">Kandidat di pipeline</dt><dd>{record.requisition.applications}</dd>
           <dt className="text-slate-500">Onboarding</dt><dd>{record.requisition.onboarding}</dd>
         </dl>
@@ -113,8 +113,8 @@ export function RecordPreview({
     {
       key: "pq", label: "PQ Tracker", count: record.pq ? 1 : 0,
       content: record.pq ? (
-        <dl className="grid grid-cols-2 gap-y-1 text-[13px]">
-          <dt className="text-slate-500">PQ No</dt><dd className="font-mono text-[12px]">{record.pq.no ?? "-"}</dd>
+        <dl className="grid grid-cols-2 gap-y-1 text-[0.8125rem]">
+          <dt className="text-slate-500">PQ No</dt><dd className="font-mono text-[0.75rem]">{record.pq.no ?? "-"}</dd>
           <dt className="text-slate-500">Pipeline</dt><dd>{PQ_STAGE[record.pq.stage] ?? record.pq.stage}</dd>
           <dt className="text-slate-500">Tanda tangan PQ</dt><dd><Badge tone={SIGNATURE[record.pq.signature]?.tone ?? "neutral"} size="small">{SIGNATURE[record.pq.signature]?.label ?? record.pq.signature}</Badge></dd>
           <dt className="text-slate-500">Dokumen</dt><dd>{record.pq.documents} file · <Link className="text-brand-700 hover:underline" href={`/sales/v2/pq-tracker?record=${record.pq.id}`}>buka PQ</Link></dd>
@@ -127,7 +127,7 @@ export function RecordPreview({
   const footer = access.canEdit ? (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2">
-        <span className="w-16 shrink-0 text-[12px] text-slate-500">Stage</span>
+        <span className="w-16 shrink-0 text-[0.75rem] text-slate-500">Stage</span>
         <Select
           aria-label="Change stage"
           size="small"
@@ -136,7 +136,7 @@ export function RecordPreview({
           onValueChange={(v) => v !== record.status && run({ status: v }, () => updateOptyStatus(record.id, v))}
           options={STAGES.map((s) => ({ value: s.id, label: s.title }))}
         />
-        <label className="flex shrink-0 items-center gap-1.5 text-[12px] text-slate-700">
+        <label className="flex shrink-0 items-center gap-1.5 text-[0.75rem] text-slate-700">
           <Checkbox
             checked={record.salesQualified}
             disabled={pending}
@@ -147,16 +147,16 @@ export function RecordPreview({
       </div>
       <div className="flex flex-wrap items-center gap-2">
         {canConvert(record) && <Button size="sm" intent="primary" onClick={() => setDialog("convert")}>Convert to Requisition</Button>}
-        {record.pq && <span className="text-[12px] text-slate-500">Sudah dikonversi</span>}
+        {record.pq && <span className="text-[0.75rem] text-slate-500">Sudah dikonversi</span>}
         <Button size="sm" intent="neutral" onClick={() => setDialog("edit")}>Edit</Button>
-        <Link href={editHref} className="text-[12px] text-slate-500 hover:text-slate-800 hover:underline">Halaman penuh</Link>
+        <Link href={editHref} className="text-[0.75rem] text-slate-500 hover:text-slate-800 hover:underline">Halaman penuh</Link>
         {access.canDelete && !record.pq && !record.requisition && (
           <Button size="sm" intent="ghost" className="ml-auto text-red-600" onClick={() => setDialog("delete")}>Hapus</Button>
         )}
       </div>
     </div>
   ) : (
-    <p className="text-[12px] text-slate-500">Mode lihat saja: perubahan butuh akses Editor Sales.</p>
+    <p className="text-[0.75rem] text-slate-500">Mode lihat saja: perubahan butuh akses Editor Sales.</p>
   );
 
   return (
@@ -177,7 +177,7 @@ export function RecordPreview({
           highlightsLabel="Ringkasan"
           highlights={highlights}
           activityLabel="Progress Notes"
-          activity={text(record.progressNotes) ?? <p className="text-[13px] text-slate-400">Belum ada progress notes.</p>}
+          activity={text(record.progressNotes) ?? <p className="text-[0.8125rem] text-slate-400">Belum ada progress notes.</p>}
           sections={sections}
           footer={footer}
           resizable

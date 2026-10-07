@@ -67,7 +67,7 @@ export function Sidebar() {
           {!collapsed && (
             <div className="min-w-0">
               <p className="text-sm font-semibold text-white leading-none truncate">Celerates</p>
-              <p className="text-[11px] text-slate-400 leading-none mt-0.5">ERP</p>
+              <p className="text-[0.6875rem] text-slate-400 leading-none mt-0.5">ERP</p>
             </div>
           )}
         </Link>
@@ -78,7 +78,7 @@ export function Sidebar() {
           <Link
             href="/"
             title={t("home")}
-            className={`flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] transition-colors mb-0.5 ${collapsed ? "justify-center" : ""} ${
+            className={`flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[0.8125rem] transition-colors mb-0.5 ${collapsed ? "justify-center" : ""} ${
               pathname === "/" ? "bg-brand-500/10 text-brand-300 font-medium" : "text-slate-300 hover:bg-slate-800"
             }`}
           >
@@ -104,14 +104,14 @@ export function Sidebar() {
               <Link
                 href={target}
                 title={isTimesheetModule ? `${label(mod.label)}${t("talentOnlySuffix")}` : label(mod.label)}
-                className={`flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] transition-colors ${collapsed ? "justify-center" : ""} ${moduleLinkClass}`}
+                className={`flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[0.8125rem] transition-colors ${collapsed ? "justify-center" : ""} ${moduleLinkClass}`}
               >
                 <Icon className="h-4 w-4 shrink-0" />
                 {!collapsed && (
                   <span className="flex items-center gap-2 min-w-0">
                     <span className="truncate">{label(mod.label)}</span>
                     {isTimesheetModule && (
-                      <span className="shrink-0 rounded-full bg-orange-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-orange-300">
+                      <span className="shrink-0 rounded-full bg-orange-500/15 px-1.5 py-0.5 text-[0.5625rem] font-semibold uppercase tracking-wide text-orange-300">
                         Talent
                       </span>
                     )}
@@ -119,7 +119,7 @@ export function Sidebar() {
                 )}
               </Link>
               {!collapsed && isTimesheetModule && !isModuleActive && (
-                <p className="px-2.5 mt-0.5 text-[10px] text-slate-500 leading-snug">{t("talentOnlyNote")}</p>
+                <p className="px-2.5 mt-0.5 text-[0.625rem] text-slate-500 leading-snug">{t("talentOnlyNote")}</p>
               )}
 
               {!collapsed && isModuleActive && (
@@ -135,12 +135,12 @@ export function Sidebar() {
                     return (
                       <div key={sub.href}>
                         {showHeading && (
-                          <p className="px-2 pb-0.5 pt-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{heading}</p>
+                          <p className="px-2 pb-0.5 pt-1.5 text-[0.625rem] font-semibold uppercase tracking-wider text-slate-500">{heading}</p>
                         )}
                         <Link
                           href={sub.href}
                           aria-current={isActive ? "page" : undefined}
-                          className={`flex items-center gap-2 rounded-md px-2 py-1 text-[13px] transition-colors ${
+                          className={`flex items-center gap-2 rounded-md px-2 py-1 text-[0.8125rem] transition-colors ${
                             isActive
                               ? (isTimesheetModule ? "bg-orange-500/10 text-orange-300 font-medium" : "bg-brand-500/15 text-white font-medium")
                               : (isTimesheetModule ? "text-slate-400 hover:bg-orange-500/10 hover:text-orange-300" : "text-slate-400 hover:bg-slate-800 hover:text-slate-200")
@@ -167,7 +167,7 @@ export function Sidebar() {
               {t("greeting", { name: firstName })}
             </p>
           )}
-          <p className="text-[11px] text-slate-500 mt-0.5">{collapsed ? "PMTG" : "PT Mitra Talenta Grup"}</p>
+          <p className="text-[0.6875rem] text-slate-500 mt-0.5">{collapsed ? "PMTG" : "PT Mitra Talenta Grup"}</p>
         </div>
         <button
           onClick={toggle}

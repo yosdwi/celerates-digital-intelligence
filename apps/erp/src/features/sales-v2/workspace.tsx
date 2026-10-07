@@ -82,7 +82,7 @@ function Workspace({ records, access, options, sheetSync }: WorkspaceProps) {
       records={records}
       access={access}
       onNewCard={(status) => setCreate({ kind: "opportunity", status })}
-      headerEnd={<Link href="/sales/opportunity-tracker" className="text-[12px] text-slate-400 hover:text-slate-700 hover:underline" title="Tampilan lama (V1)">Versi lama</Link>}
+      headerEnd={<Link href="/sales/opportunity-tracker" className="text-[0.75rem] text-slate-400 hover:text-slate-700 hover:underline" title="Tampilan lama (V1)">Versi lama</Link>}
       toolbarEnd={
         <>
           {sheetSync && <SheetSyncButton data={sheetSync} parts={OT_SHEET_SYNC} />}
@@ -142,17 +142,17 @@ function KanbanCard({ o, onOpen }: { o: Opportunity; onOpen: () => void }) {
   return (
     <button type="button" onClick={onOpen} className="block w-full space-y-1 text-left" data-card-preview={o.id}>
       <span className="flex items-start justify-between gap-2">
-        <span className="min-w-0 truncate text-[13px] font-semibold leading-5 text-slate-900">{o.client}</span>
+        <span className="min-w-0 truncate text-[0.8125rem] font-semibold leading-5 text-slate-900">{o.client}</span>
         {o.salesQualified && <BadgeCheck size={15} className="mt-0.5 shrink-0 text-emerald-600" aria-label="Sales Qualified" />}
       </span>
-      <span className="block truncate font-mono text-[11px] text-slate-500">{o.optyNo}{o.leadNo ? ` · ${o.leadNo}` : ""}</span>
+      <span className="block truncate font-mono text-[0.6875rem] text-slate-500">{o.optyNo}{o.leadNo ? ` · ${o.leadNo}` : ""}</span>
       {(o.position || o.headcount) && (
-        <span className="block truncate text-[12px] text-slate-700">{[o.position, o.level ? LEVEL_LABEL[o.level] ?? o.level : null, o.headcount ? `${o.headcount} HC` : null].filter(Boolean).join(" · ")}</span>
+        <span className="block truncate text-[0.75rem] text-slate-700">{[o.position, o.level ? LEVEL_LABEL[o.level] ?? o.level : null, o.headcount ? `${o.headcount} HC` : null].filter(Boolean).join(" · ")}</span>
       )}
-      {o.price != null && <span className="block text-[13px] font-semibold tabular-nums text-slate-900">{rupiah(o.price, o.pricePeriod)}</span>}
-      <span className="mt-1 flex items-center justify-between gap-2 border-t border-slate-100 pt-1.5 text-[11px] text-slate-500">
+      {o.price != null && <span className="block text-[0.8125rem] font-semibold tabular-nums text-slate-900">{rupiah(o.price, o.pricePeriod)}</span>}
+      <span className="mt-1 flex items-center justify-between gap-2 border-t border-slate-100 pt-1.5 text-[0.6875rem] text-slate-500">
         <span className="flex min-w-0 items-center gap-1.5">
-          <span aria-hidden className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#dce8ef] text-[10px] font-semibold text-[#123650]">{initials(o.salesPic)}</span>
+          <span aria-hidden className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#dce8ef] text-[0.625rem] font-semibold text-[#123650]">{initials(o.salesPic)}</span>
           <span className="truncate">{o.salesPic}</span>
         </span>
         <span className="flex shrink-0 items-center gap-1.5">
@@ -192,7 +192,7 @@ const SPECS: Record<string, HeaderSpec> = Object.fromEntries(([
 
 const ALL_COLUMNS: Omit<DataTableColumn<Opportunity>, "header">[] = [
   { key: "client", type: "entity", accessor: (o) => o.client },
-  { key: "optyNo", render: (_, o) => <span className="font-mono text-[12px] text-slate-600">{o.optyNo}</span> },
+  { key: "optyNo", render: (_, o) => <span className="font-mono text-[0.75rem] text-slate-600">{o.optyNo}</span> },
   { key: "status", type: "status", accessor: (o) => String(STAGE_ORDER[o.status] ?? 9), format: (_, o) => STAGE_LABEL[o.status] ?? o.status, swatches: STAGE_SWATCH },
   { key: "position" },
   { key: "headcount", type: "number" },
@@ -200,8 +200,8 @@ const ALL_COLUMNS: Omit<DataTableColumn<Opportunity>, "header">[] = [
   { key: "salesPic" },
   { key: "salesQualified", render: (_, o) => (o.salesQualified ? <span className="font-medium text-emerald-700">Qualified</span> : <span className="text-slate-400">Belum</span>) },
   { key: "lastCommunication", accessor: (o) => o.lastCommunication ?? "" },
-  { key: "downstream", render: (_, o) => o.requisition ? <span className="font-mono text-[12px]">{o.requisition.no}</span> : o.pq ? <span className="text-[12px]">PQ · Extension</span> : <span className="text-slate-400">-</span> },
-  { key: "leadNo", render: (_, o) => <span className="font-mono text-[12px] text-slate-600">{o.leadNo ?? ""}</span> },
+  { key: "downstream", render: (_, o) => o.requisition ? <span className="font-mono text-[0.75rem]">{o.requisition.no}</span> : o.pq ? <span className="text-[0.75rem]">PQ · Extension</span> : <span className="text-slate-400">-</span> },
+  { key: "leadNo", render: (_, o) => <span className="font-mono text-[0.75rem] text-slate-600">{o.leadNo ?? ""}</span> },
   { key: "clientType", accessor: (o) => (o.clientType ? CLIENT_TYPE_LABEL[o.clientType] ?? o.clientType : "") },
   { key: "serviceType", accessor: (o) => (o.serviceType ? SERVICE_LABEL[o.serviceType] ?? o.serviceType : "") },
   { key: "level", accessor: (o) => (o.level ? LEVEL_LABEL[o.level] ?? o.level : "") },
@@ -248,10 +248,10 @@ const CONFIG: WorkspaceConfig<Opportunity> = {
   defaultShown: DEFAULT_SHOWN,
   grid: (o) => ({
     label: `${o.client} ${o.optyNo}`,
-    author: <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-500"><StageDot status={o.status} /><span className="font-mono">{o.optyNo}</span> · {STAGE_LABEL[o.status] ?? o.status}</span>,
+    author: <span className="inline-flex items-center gap-1.5 text-[0.6875rem] text-slate-500"><StageDot status={o.status} /><span className="font-mono">{o.optyNo}</span> · {STAGE_LABEL[o.status] ?? o.status}</span>,
     title: o.client,
     excerpt: [o.position, o.headcount ? `${o.headcount} orang` : null, rupiah(o.price, o.pricePeriod)].filter(Boolean).join(" · ") || "-",
-    footer: <span className="text-[12px] text-slate-500">{o.salesPic}{o.salesQualified ? " · Qualified" : ""}{o.pq ? " · Sudah convert" : ""}</span>,
+    footer: <span className="text-[0.75rem] text-slate-500">{o.salesPic}{o.salesQualified ? " · Qualified" : ""}{o.pq ? " · Sudah convert" : ""}</span>,
     date: o.lastCommunication ?? undefined,
   }),
   // Kanban (contract §12): the same updateOptyStatus V1's board calls; Win and Dropped ask first (stage-move.tsx).

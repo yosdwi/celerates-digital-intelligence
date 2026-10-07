@@ -45,7 +45,7 @@ export function FinanceHandoffPanel({
             <span className="inline-flex items-center gap-1 text-xs font-medium text-red-600">
               <RotateCcw className="h-3.5 w-3.5" /> {t("financeReturned")}
             </span>
-            {financeNotes && <p className="text-[10px] text-slate-500 line-clamp-2 mt-0.5">{financeNotes}</p>}
+            {financeNotes && <p className="text-[0.625rem] text-slate-500 line-clamp-2 mt-0.5">{financeNotes}</p>}
           </div>
         ) : statusCode === "notified" ? (
           <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-600">
@@ -82,7 +82,7 @@ export function FinanceHandoffPanel({
         className="rounded border border-slate-300 px-2 py-1 text-xs"
       />
       <input name="notes" placeholder={t("notesOptionalPlaceholder")} className="rounded border border-slate-300 px-2 py-1 text-xs" />
-      {notifiedAt && <span className="text-[10px] text-slate-400">{t("lastNotified")}: {notifiedAt} {t("by")} {notifiedByName ?? "-"}</span>}
+      {notifiedAt && <span className="text-[0.625rem] text-slate-400">{t("lastNotified")}: {notifiedAt} {t("by")} {notifiedByName ?? "-"}</span>}
       <div className="flex gap-1.5">
         <button type="submit" disabled={isPending} className="rounded bg-slate-600 px-2 py-1 text-xs font-medium text-white disabled:opacity-50">
           {isPending ? "..." : t("saveLink")}

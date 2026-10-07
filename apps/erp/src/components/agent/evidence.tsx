@@ -16,7 +16,7 @@ const BADGE: Record<EvidenceType, { label: string; className: string }> = {
 
 export function EvidenceBadge({ type }: { type: EvidenceType }) {
   const badge = BADGE[type];
-  return <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ${badge.className}`}>{badge.label}</span>;
+  return <span className={`rounded-md px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wide ring-1 ${badge.className}`}>{badge.label}</span>;
 }
 
 function sourceLine(item: Evidence) {
@@ -35,7 +35,7 @@ export function EvidenceCard({ item, onAskFile }: { item: Evidence; onAskFile?: 
     <article className="rounded-xl border border-slate-200 bg-white p-3" data-evidence-type={item.type}>
       <div className="flex items-start justify-between gap-2">
         <h4 className="text-xs font-semibold text-slate-900">
-          {item.cite && <span className="mr-1.5 rounded bg-slate-100 px-1 font-mono text-[10px] text-slate-600">{item.cite}</span>}
+          {item.cite && <span className="mr-1.5 rounded bg-slate-100 px-1 font-mono text-[0.625rem] text-slate-600">{item.cite}</span>}
           {item.title}
         </h4>
         <EvidenceBadge type={item.type} />
@@ -47,8 +47,8 @@ export function EvidenceCard({ item, onAskFile }: { item: Evidence; onAskFile?: 
           ))}
         </ul>
       )}
-      {!!item.withheld?.length && <p className="mt-2 text-[11px] text-slate-500">Tidak dibagikan ke Agent: {item.withheld.join(", ")}</p>}
-      <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-slate-500">
+      {!!item.withheld?.length && <p className="mt-2 text-[0.6875rem] text-slate-500">Tidak dibagikan ke Agent: {item.withheld.join(", ")}</p>}
+      <div className="mt-2 flex items-center justify-between gap-2 text-[0.6875rem] text-slate-500">
         <span>{meta}</span>
         <span className="flex gap-3">
           {file && item.source?.shared === true && onAskFile && (
@@ -97,7 +97,7 @@ export function RunError({ message }: { message: string }) {
 
 export function ToolTrace({ toolName, result }: { toolName: string; result?: unknown }) {
   return (
-    <li className="flex items-center gap-2 font-mono text-[11px] text-slate-500">
+    <li className="flex items-center gap-2 font-mono text-[0.6875rem] text-slate-500">
       {result === undefined ? <Circle className="h-3 w-3" /> : <FileSearch className="h-3 w-3 text-slate-400" />}
       {toolName}
     </li>
@@ -108,27 +108,27 @@ export function ToolTrace({ toolName, result }: { toolName: string; result?: unk
 export function ProvenanceLine({ value }: { value: Provenance }) {
   if (value.mode === "model" && value.kind === "proposal")
     return (
-      <p className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500" data-provenance="model">
+      <p className="flex flex-wrap items-center gap-1.5 text-[0.6875rem] text-slate-500" data-provenance="model">
         <EvidenceBadge type="inference" />
         Isi usulan disusun model dari {value.read} bukti yang dibaca. ERP sudah memvalidasi setiap item; tidak ada yang berubah sebelum Anda konfirmasi.
       </p>
     );
   if (value.mode === "model" && value.kind === "route")
     return (
-      <p className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500" data-provenance="model">
+      <p className="flex flex-wrap items-center gap-1.5 text-[0.6875rem] text-slate-500" data-provenance="model">
         <EvidenceBadge type="inference" />
         Model membaca pesan ini sebagai masukan, bukan pertanyaan. Periksa jenis dan isinya di draf; tidak ada yang dikirim sebelum Anda setuju.
       </p>
     );
   if (value.mode === "model")
     return (
-      <p className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500" data-provenance="model">
+      <p className="flex flex-wrap items-center gap-1.5 text-[0.6875rem] text-slate-500" data-provenance="model">
         <EvidenceBadge type="inference" />
         Disusun model dari {value.cited.length} bukti yang dikutip{value.cited.length ? ` (${value.cited.join(", ")})` : ""}. Fakta ada di kartu bukti; periksa sebelum bertindak.
       </p>
     );
   return (
-    <p className="text-[11px] text-slate-500" data-provenance="deterministic">
+    <p className="text-[0.6875rem] text-slate-500" data-provenance="deterministic">
       Disusun tanpa model dari aturan, record ERP, dan pengetahuan disetujui.
     </p>
   );

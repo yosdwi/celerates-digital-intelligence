@@ -42,7 +42,7 @@ export function FileLinks({ files }: { files: PqFile[] }) {
     <ul className="space-y-1">
       {files.map((f) => (
         <li key={f.id}>
-          <a href={f.url ?? "#"} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="inline-flex max-w-full items-center gap-1 text-[12px] text-brand-700 hover:underline">
+          <a href={f.url ?? "#"} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="inline-flex max-w-full items-center gap-1 text-[0.75rem] text-brand-700 hover:underline">
             {f.kind === "link" ? <LinkIcon size={12} className="shrink-0" /> : <Paperclip size={12} className="shrink-0" />}
             <span className="truncate">{f.name}</span>
           </a>
@@ -89,8 +89,8 @@ export function PqPreview({
 
   const label = (labels: Record<string, string>, v: string | null) => (v ? labels[v] ?? v : "-");
   const highlights = [
-    { key: "opty", label: "Opty No", value: <span className="font-mono text-[12px]">{record.optyNo}</span> },
-    { key: "pq", label: "PQ No", value: record.pqNo ? <span className="font-mono text-[12px]">{record.pqNo}</span> : needsPqNo(record) ? <Badge tone="warning" size="small">Perlu Generate PQ</Badge> : <span className="text-slate-400">Menunggu Talent Onboard</span> },
+    { key: "opty", label: "Opty No", value: <span className="font-mono text-[0.75rem]">{record.optyNo}</span> },
+    { key: "pq", label: "PQ No", value: record.pqNo ? <span className="font-mono text-[0.75rem]">{record.pqNo}</span> : needsPqNo(record) ? <Badge tone="warning" size="small">Perlu Generate PQ</Badge> : <span className="text-slate-400">Menunggu Talent Onboard</span> },
     { key: "stage", label: "Pipeline Stage", value: PQ_STAGE_LABEL[record.stage] ?? record.stage },
     { key: "status", label: "Opty Status", value: label(OPTY_STATUS_LABEL, record.optyStatus) },
     { key: "project", label: "Project", value: record.project || "-" },
@@ -123,7 +123,7 @@ export function PqPreview({
     {
       key: "sign", label: "Tanda tangan PQ", count: sig.status === "not_sent" ? 0 : 1,
       content: sig.status === "not_sent" ? undefined : (
-        <dl className="grid grid-cols-2 gap-y-1 text-[13px]">
+        <dl className="grid grid-cols-2 gap-y-1 text-[0.8125rem]">
           <dt className="text-slate-500">Status</dt><dd><Badge tone={SIGNATURE_TONE[sig.status]} size="small">{SIGNATURE_LABEL[sig.status]}</Badge></dd>
           <dt className="text-slate-500">Penanda tangan</dt><dd>{sig.signerName ?? "-"}</dd>
           {sig.status === "pending" && <><dt /><dd><Link href="/ttd-online" className="text-brand-700 hover:underline">Lihat di TTD Online</Link></dd></>}
@@ -139,7 +139,7 @@ export function PqPreview({
     {
       key: "pmo", label: "Dokumen Legal Project (PMO)", count: doc ? 1 : 0,
       content: doc ? (
-        <dl className="grid grid-cols-2 gap-y-1 text-[13px]">
+        <dl className="grid grid-cols-2 gap-y-1 text-[0.8125rem]">
           {docRow("PKS", doc.pksNo, doc.pksStatus)}
           {docRow("PO", doc.poNo, doc.poStatus)}
           {docRow("CR", doc.crNo, doc.crStatus)}
@@ -151,7 +151,7 @@ export function PqPreview({
     },
     {
       key: "tracker", label: "Opportunity Tracker", count: record.trackerId ? 1 : 0,
-      content: record.trackerId ? <Link className="text-[13px] text-brand-700 hover:underline" href={`/sales/v2/opportunity-tracker?record=${record.trackerId}`}>Buka opportunity {record.optyNo}</Link> : undefined,
+      content: record.trackerId ? <Link className="text-[0.8125rem] text-brand-700 hover:underline" href={`/sales/v2/opportunity-tracker?record=${record.trackerId}`}>Buka opportunity {record.optyNo}</Link> : undefined,
     },
   ];
 
@@ -159,7 +159,7 @@ export function PqPreview({
   const footer = access.canEdit ? (
     <div className="flex flex-col gap-2">
       <div className="grid grid-cols-[4.5rem_1fr] items-center gap-x-2 gap-y-1.5">
-        <span className="text-[12px] text-slate-500">Pipeline</span>
+        <span className="text-[0.75rem] text-slate-500">Pipeline</span>
         <Select
           aria-label="Pipeline Stage"
           size="small"
@@ -168,7 +168,7 @@ export function PqPreview({
           onValueChange={(v) => v !== record.stage && run(withPqStage(record, v), () => savePqStage(record.id, v))}
           options={PQ_STAGES.map((s) => ({ value: s.id, label: s.title }))}
         />
-        <span className="text-[12px] text-slate-500">Opty Status</span>
+        <span className="text-[0.75rem] text-slate-500">Opty Status</span>
         <Select
           aria-label="Opty Status"
           size="small"
@@ -181,14 +181,14 @@ export function PqPreview({
       </div>
       <div className="flex flex-wrap items-center gap-2">
         {canSign && <Button size="sm" intent="primary" onClick={() => setDialog("sign")}><Send size={13} /> Kirim untuk TTD</Button>}
-        {sig.status === "not_sent" && !record.pqNo && <span className="text-[12px] text-slate-500">Isi PQ Number dulu sebelum TTD</span>}
+        {sig.status === "not_sent" && !record.pqNo && <span className="text-[0.75rem] text-slate-500">Isi PQ Number dulu sebelum TTD</span>}
         <Button size="sm" intent="neutral" onClick={() => setDialog("edit")}>Edit</Button>
-        <Link href={`/sales/${record.id}/edit`} className="text-[12px] text-slate-500 hover:text-slate-800 hover:underline">Halaman penuh</Link>
+        <Link href={`/sales/${record.id}/edit`} className="text-[0.75rem] text-slate-500 hover:text-slate-800 hover:underline">Halaman penuh</Link>
         {access.canDelete && <Button size="sm" intent="ghost" className="ml-auto text-red-600" onClick={() => setDialog("delete")}>Hapus</Button>}
       </div>
     </div>
   ) : (
-    <p className="text-[12px] text-slate-500">Mode lihat saja: perubahan butuh akses Editor Sales.</p>
+    <p className="text-[0.75rem] text-slate-500">Mode lihat saja: perubahan butuh akses Editor Sales.</p>
   );
 
   return (
@@ -208,7 +208,7 @@ export function PqPreview({
         highlightsLabel="Ringkasan"
         highlights={highlights}
         activityLabel="Notes"
-        activity={record.notes ? <p className="whitespace-pre-wrap text-[13px] leading-5 text-slate-700">{record.notes}</p> : <p className="text-[13px] text-slate-400">Belum ada notes.</p>}
+        activity={record.notes ? <p className="whitespace-pre-wrap text-[0.8125rem] leading-5 text-slate-700">{record.notes}</p> : <p className="text-[0.8125rem] text-slate-400">Belum ada notes.</p>}
         sections={sections}
         footer={footer}
         resizable
@@ -251,7 +251,7 @@ function SignDialog({ record, open, onClose, signers }: { record: Pq; open: bool
             <FormField label="Penanda tangan" required>
               <Select name="signer_user_id" required searchable options={signers} placeholder="Pilih penanda tangan" />
             </FormField>
-            {error && <p className="text-[13px] text-red-600" role="alert">{error}</p>}
+            {error && <p className="text-[0.8125rem] text-red-600" role="alert">{error}</p>}
           </DialogBody>
           <DialogFooter>
             <Button type="button" size="sm" intent="neutral" onClick={onClose} disabled={pending}>Batal</Button>

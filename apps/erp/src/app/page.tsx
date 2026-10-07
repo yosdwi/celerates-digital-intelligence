@@ -50,7 +50,7 @@ export default async function HomePage() {
                   </div>
                   <div className="flex-1">
                     <p className="text-sm font-semibold text-slate-700">{moduleLabel(mod.label)}</p>
-                    <span className="text-[10px] uppercase tracking-wide text-slate-400 font-medium">{t("comingSoon")}</span>
+                    <span className="text-[0.625rem] uppercase tracking-wide text-slate-400 font-medium">{t("comingSoon")}</span>
                   </div>
                 </div>
               );

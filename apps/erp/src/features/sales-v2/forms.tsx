@@ -107,7 +107,7 @@ type FormProps = { options: FormOptions; draft: Draft; formRef: React.RefObject<
 export function DraftFooter({ pending, onCancel, onReset, t, resetLabel = "Kosongkan form" }: { pending: boolean; onCancel: () => void; onReset: () => void; t: (k: string) => string; resetLabel?: string }) {
   return (
     <DialogFooter>
-      <button type="button" onClick={onReset} disabled={pending} className="mr-auto text-[12px] text-slate-500 hover:text-slate-800 hover:underline">{resetLabel}</button>
+      <button type="button" onClick={onReset} disabled={pending} className="mr-auto text-[0.75rem] text-slate-500 hover:text-slate-800 hover:underline">{resetLabel}</button>
       <Button type="button" intent="neutral" size="sm" onClick={onCancel} disabled={pending}>{t("cancel")}</Button>
       <Button type="submit" intent="primary" size="sm" loading={pending}>{pending ? t("saving") : t("save")}</Button>
     </DialogFooter>
@@ -123,7 +123,7 @@ function OpportunityForm({ options, draft: d, formRef, onDone, onCancel, onReset
     <form ref={formRef} onSubmit={onSubmit}>
       {status && <input type="hidden" name="opty_status_code" value={status} />}
       <DialogBody className="max-h-[calc(85dvh-8.5rem)] overflow-y-auto">
-        {status && <p className="mb-3 text-[12px] text-slate-600">Stage awal: <b className="text-slate-900">{STAGE_LABEL[status] ?? status}</b></p>}
+        {status && <p className="mb-3 text-[0.75rem] text-slate-600">Stage awal: <b className="text-slate-900">{STAGE_LABEL[status] ?? status}</b></p>}
         <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-3">
           <F label="Dari Marketing Lead" hint={lead ? `Leads No: ${lead.lead_no}` : "Kosongkan kalau bukan dari Marketing."}>
             <Select
@@ -154,7 +154,7 @@ function OpportunityForm({ options, draft: d, formRef, onDone, onCancel, onReset
 
           <F label="BANTE Score"><Select name="bante_score" defaultValue={d.bante_score} options={opts(BANTE_SCORES)} placeholder="-" /></F>
           <F label="Last Communication"><Input name="last_communication_date" type="date" defaultValue={d.last_communication_date} /></F>
-          <label className="flex items-center gap-2 self-end pb-1.5 text-[13px] font-medium text-slate-700">
+          <label className="flex items-center gap-2 self-end pb-1.5 text-[0.8125rem] font-medium text-slate-700">
             <Checkbox name="sales_qualified" value="true" defaultChecked={d.sales_qualified === "true"} /> Sales Qualified
           </label>
 
@@ -286,7 +286,7 @@ function EditForm({ record, draft: d, formRef, returnTo, options, onDone, onCanc
     <form ref={formRef} onSubmit={onSubmit}>
       <input type="hidden" name="return_to" value={returnTo} />
       <DialogBody className="max-h-[calc(85dvh-8.5rem)] overflow-y-auto">
-        {record.leadNo && <p className="mb-3 text-[12px] text-slate-600">Dari Marketing Lead <b className="font-mono text-slate-900">{record.leadNo}</b></p>}
+        {record.leadNo && <p className="mb-3 text-[0.75rem] text-slate-600">Dari Marketing Lead <b className="font-mono text-slate-900">{record.leadNo}</b></p>}
         <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-3">
           <F label="Nama Klien" required><Input name="client_name" required defaultValue={d.client_name} autoFocus /></F>
           <F label="Client Type"><Select name="client_type_code" defaultValue={d.client_type_code || undefined} options={opts(CLIENT_TYPES)} placeholder="-" /></F>
@@ -306,7 +306,7 @@ function EditForm({ record, draft: d, formRef, returnTo, options, onDone, onCanc
 
           <F label="BANTE Score"><Select name="bante_score" defaultValue={d.bante_score || undefined} options={opts(BANTE_SCORES)} placeholder="-" /></F>
           <F label="Last Communication"><Input name="last_communication_date" type="date" defaultValue={d.last_communication_date} /></F>
-          <label className="flex items-center gap-2 self-end pb-1.5 text-[13px] font-medium text-slate-700">
+          <label className="flex items-center gap-2 self-end pb-1.5 text-[0.8125rem] font-medium text-slate-700">
             <Checkbox name="sales_qualified" value="true" defaultChecked={d.sales_qualified === "true"} /> Sales Qualified
           </label>
 

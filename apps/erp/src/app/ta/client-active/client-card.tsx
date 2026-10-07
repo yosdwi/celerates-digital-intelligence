@@ -117,7 +117,7 @@ export function ClientCard({ clientName, items }: { clientName: string; items: C
           <select value={sortValue} onChange={(e) => setSortValue(e.target.value as SortValue)} className="rounded-lg border border-slate-300 px-2 py-1.5 text-xs">
             {SORT_OPTIONS.map(([v, l]) => <option key={v} value={v}>{t("sortPrefix")}: {l}</option>)}
           </select>
-          <span className="text-[11px] text-slate-400 ml-auto">{t("countOf", { shown: visible.length, total: items.length })}</span>
+          <span className="text-[0.6875rem] text-slate-400 ml-auto">{t("countOf", { shown: visible.length, total: items.length })}</span>
         </div>
 
         <div className="overflow-x-auto">

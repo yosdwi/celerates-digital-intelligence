@@ -198,7 +198,7 @@ export function OnboardingTable({
                   ) : (
                     <>
                       <ConvertToPqTrackerButton onboardingRequestId={r.id} alreadyConverted={convertedSet.has(r.id)} />
-                      <p className="text-[10px] text-amber-600 mt-1 mb-1">⚠️ {t("promoteWarning")}</p>
+                      <p className="text-[0.625rem] text-amber-600 mt-1 mb-1">⚠️ {t("promoteWarning")}</p>
                       <PromoteButton onboardingRequestId={r.id} />
                     </>
                   )}
@@ -256,7 +256,7 @@ export function OnboardingTable({
                     <div className="flex flex-wrap gap-2 mt-1.5 pt-1.5 border-t border-slate-100">
                       {r.docAttachments.flatMap((d) =>
                         d.items.map((a) => (
-                          <a key={a.id} href={a.url ?? "#"} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[11px] text-brand-600 hover:underline" title={d.label}>
+                          <a key={a.id} href={a.url ?? "#"} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[0.6875rem] text-brand-600 hover:underline" title={d.label}>
                             {a.kind === "link" ? <LinkIcon className="h-3 w-3 shrink-0" /> : <Paperclip className="h-3 w-3 shrink-0" />} {d.label}: {a.file_name}
                           </a>
                         ))
@@ -361,7 +361,7 @@ export function OnboardingTable({
                     <div className="flex flex-wrap gap-2 mt-1.5 pt-1.5 border-t border-slate-100">
                       {r.docAttachments.flatMap((d) =>
                         d.items.map((a) => (
-                          <a key={a.id} href={a.url ?? "#"} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[11px] text-brand-600 hover:underline" title={d.label}>
+                          <a key={a.id} href={a.url ?? "#"} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[0.6875rem] text-brand-600 hover:underline" title={d.label}>
                             {a.kind === "link" ? <LinkIcon className="h-3 w-3 shrink-0" /> : <Paperclip className="h-3 w-3 shrink-0" />} {d.label}: {a.file_name}
                           </a>
                         ))
@@ -375,7 +375,7 @@ export function OnboardingTable({
                     ) : (
                       <>
                         <ConvertToPqTrackerButton onboardingRequestId={r.id} alreadyConverted={convertedSet.has(r.id)} />
-                        <p className="text-[10px] text-amber-600 mt-1 mb-1">⚠️ {t("promoteWarning")}</p>
+                        <p className="text-[0.625rem] text-amber-600 mt-1 mb-1">⚠️ {t("promoteWarning")}</p>
                         <PromoteButton onboardingRequestId={r.id} />
                       </>
                     )}

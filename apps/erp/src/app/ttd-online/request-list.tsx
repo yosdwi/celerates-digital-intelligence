@@ -53,7 +53,7 @@ function JourneyStepper({ steps, t }: { steps: JourneyStep[]; t: Translator }) {
           <div key={step.label} className="flex items-center flex-1 last:flex-none">
             <div className="flex flex-col items-center gap-1">
               <div
-                className={`h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                className={`h-6 w-6 rounded-full flex items-center justify-center text-[0.625rem] font-bold shrink-0 ${
                   step.status === "signed" ? "bg-gradient-to-br from-violet-600 to-pink-500 text-white" :
                   step.status === "pending" ? "bg-amber-100 text-amber-700 ring-2 ring-amber-300" :
                   step.status === "rejected" ? "bg-rose-100 text-rose-700 ring-2 ring-rose-300" :
@@ -62,7 +62,7 @@ function JourneyStepper({ steps, t }: { steps: JourneyStep[]; t: Translator }) {
               >
                 {step.status === "signed" ? <Check className="h-3 w-3" /> : i + 1}
               </div>
-              <span className="text-[9px] text-slate-400 whitespace-nowrap">{step.label}</span>
+              <span className="text-[0.5625rem] text-slate-400 whitespace-nowrap">{step.label}</span>
             </div>
             {i < steps.length - 1 && (
               <div className={`h-0.5 flex-1 mx-1 rounded-full ${step.status === "signed" ? "bg-violet-400" : "bg-slate-200"}`} />
@@ -85,7 +85,7 @@ function SimpleProgress({ status, t }: { status: string; t: Translator }) {
           style={{ width: `${percent}%` }}
         />
       </div>
-      <div className="flex justify-between text-[10px] text-slate-400 mt-1">
+      <div className="flex justify-between text-[0.625rem] text-slate-400 mt-1">
         <span>{t("requested")}</span>
         <span>{status === "rejected" ? t("rejected") : t("signed")}</span>
       </div>
@@ -188,7 +188,7 @@ export function RequestList({
               )}
               {r.relatedAttachments.length > 0 && (
                 <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2.5">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-700 mb-1.5">
+                  <p className="text-[0.6875rem] font-semibold uppercase tracking-wide text-amber-700 mb-1.5">
                     {t("relatedDocuments")}
                   </p>
                   <ul className="space-y-1">

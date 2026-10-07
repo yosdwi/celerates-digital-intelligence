@@ -62,7 +62,7 @@ export function ApprovalJourney({
           <div
             key={step.code}
             title={step.personEmail ?? undefined}
-            className={`flex items-center justify-between gap-2 rounded-md border px-2 py-1 text-[11px] ${STATUS_STYLES[step.status]}`}
+            className={`flex items-center justify-between gap-2 rounded-md border px-2 py-1 text-[0.6875rem] ${STATUS_STYLES[step.status]}`}
           >
             <span className="font-medium truncate">{step.label}{step.personName ? `: ${step.personName}` : ""}</span>
             <span className="shrink-0 whitespace-nowrap">{STATUS_LABELS[step.status]}</span>
@@ -79,14 +79,14 @@ export function ApprovalJourney({
 
       {statusCode === "pending" && (
         <div className="flex flex-wrap items-center gap-2">
-          <Link href="/ttd-online" className="text-[11px] font-medium text-brand-600 hover:underline">
+          <Link href="/ttd-online" className="text-[0.6875rem] font-medium text-brand-600 hover:underline">
             {t("viewInTtd")}
           </Link>
-          <button onClick={handleReject} disabled={isPending} className="text-[11px] font-medium text-red-600 hover:underline disabled:opacity-50">
+          <button onClick={handleReject} disabled={isPending} className="text-[0.6875rem] font-medium text-red-600 hover:underline disabled:opacity-50">
             Reject
           </button>
           {isOwner && (
-            <button onClick={handleOwnerOverride} disabled={isPending} className="text-[11px] font-medium text-purple-600 hover:underline disabled:opacity-50">
+            <button onClick={handleOwnerOverride} disabled={isPending} className="text-[0.6875rem] font-medium text-purple-600 hover:underline disabled:opacity-50">
               {t("approveWithoutTtd")}
             </button>
           )}

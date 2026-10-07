@@ -118,15 +118,15 @@ function ProjectBillingCard({
 
         <div className="ml-auto flex items-center gap-6 text-right">
           <div>
-            <p className="text-[10px] uppercase tracking-wide text-slate-400">{t("contractValue")}</p>
+            <p className="text-[0.625rem] uppercase tracking-wide text-slate-400">{t("contractValue")}</p>
             <p className="text-sm font-semibold text-slate-900">{c.total_value_amount ? `Rp ${c.total_value_amount.toLocaleString("id-ID")}` : "-"}</p>
           </div>
           <div>
-            <p className="text-[10px] uppercase tracking-wide text-slate-400">{t("duration")}</p>
+            <p className="text-[0.625rem] uppercase tracking-wide text-slate-400">{t("duration")}</p>
             <p className="text-sm font-semibold text-slate-900">{c.contract_duration_months ? t("monthsShort", { count: c.contract_duration_months }) : "-"}</p>
           </div>
           <div>
-            <p className="text-[10px] uppercase tracking-wide text-slate-400">{t("period")}</p>
+            <p className="text-[0.625rem] uppercase tracking-wide text-slate-400">{t("period")}</p>
             <p className="text-sm font-medium text-slate-700">{formatDate(c.start_date)} &ndash; {formatDate(c.end_date)}</p>
           </div>
         </div>
@@ -136,7 +136,7 @@ function ProjectBillingCard({
         <div className="border-t border-slate-100 overflow-x-auto">
           <table className="text-sm">
             <thead>
-              <tr className="bg-violet-50 text-[10px] font-medium uppercase tracking-wide text-slate-400">
+              <tr className="bg-violet-50 text-[0.625rem] font-medium uppercase tracking-wide text-slate-400">
                 <th className="px-4 py-1.5 sticky left-0 bg-violet-50 z-0 min-w-[160px] text-left">
                   <span className="inline-flex items-center gap-1"><Wallet className="h-3 w-3" /> {t("billing")}</span>
                 </th>
@@ -191,7 +191,7 @@ function Chip({ icon: Icon, label, tone = "slate" }: { icon: typeof Tag; label: 
     amber: "bg-amber-100 text-amber-700",
   };
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full whitespace-nowrap px-2 py-0.5 text-[11px] font-medium capitalize ${styles[tone]}`}>
+    <span className={`inline-flex items-center gap-1 rounded-full whitespace-nowrap px-2 py-0.5 text-[0.6875rem] font-medium capitalize ${styles[tone]}`}>
       <Icon className="h-3 w-3" /> {label}
     </span>
   );

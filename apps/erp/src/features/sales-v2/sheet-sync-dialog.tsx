@@ -59,12 +59,12 @@ function SheetSyncBody({ data, parts: { connectSheet, MappingSection, SyncButton
         </Callout>
       )}
       {c ? (
-        <div className="rounded-md bg-emerald-50 px-3 py-2 text-[13px] text-emerald-900">
+        <div className="rounded-md bg-emerald-50 px-3 py-2 text-[0.8125rem] text-emerald-900">
           {t("connectedTo")}: <Link href={c.url} target="_blank" rel="noopener" className="underline">{c.url}</Link>
-          <span className="block text-[12px] text-emerald-700">Sheet: {c.sheetName}</span>
+          <span className="block text-[0.75rem] text-emerald-700">Sheet: {c.sheetName}</span>
         </div>
       ) : (
-        <p className="text-[13px] text-slate-600">Belum ada Google Sheet yang terhubung.</p>
+        <p className="text-[0.8125rem] text-slate-600">Belum ada Google Sheet yang terhubung.</p>
       )}
 
       {data.enabled && (
@@ -86,19 +86,19 @@ function SheetSyncBody({ data, parts: { connectSheet, MappingSection, SyncButton
             <FormField label={t("sheetTabNameLabel")}>
               <Input name="sheet_name" defaultValue={c?.sheetName ?? "Sheet1"} />
             </FormField>
-            {error && <p className="text-[13px] text-red-600">{error}</p>}
+            {error && <p className="text-[0.8125rem] text-red-600">{error}</p>}
             <div><Button type="submit" size="sm" intent="primary" loading={pending}>{c ? t("updateConnection") : t("connectButton")}</Button></div>
           </form>
           {c && (
             <section>
-              <h3 className="mb-1 text-[13px] font-semibold text-slate-800">{t("mapColumns")}</h3>
-              <p className="mb-3 text-[12px] text-slate-500">{t("mapColumnsDesc")}</p>
+              <h3 className="mb-1 text-[0.8125rem] font-semibold text-slate-800">{t("mapColumns")}</h3>
+              <p className="mb-3 text-[0.75rem] text-slate-500">{t("mapColumnsDesc")}</p>
               <MappingSection targetFields={targetFields} savedMapping={c.mapping ?? {}} />
             </section>
           )}
           {c?.mapping && (
             <section>
-              <h3 className="mb-2 text-[13px] font-semibold text-slate-800">{t("synchronization")}</h3>
+              <h3 className="mb-2 text-[0.8125rem] font-semibold text-slate-800">{t("synchronization")}</h3>
               <SyncButtons />
             </section>
           )}

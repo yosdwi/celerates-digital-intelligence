@@ -26,7 +26,7 @@ const STATUS_BADGE: Record<string, string> = {
 function AccountTypeBadge({ accountType, talentLabel, backofficeLabel }: { accountType: string; talentLabel: string; backofficeLabel: string }) {
   const isTalent = accountType === "talent";
   return (
-    <span className={`inline-flex items-center rounded-full whitespace-nowrap px-2 py-0.5 text-[10px] font-medium ${isTalent ? "bg-purple-100 text-purple-700" : "bg-slate-100 text-slate-600"}`}>
+    <span className={`inline-flex items-center rounded-full whitespace-nowrap px-2 py-0.5 text-[0.625rem] font-medium ${isTalent ? "bg-purple-100 text-purple-700" : "bg-slate-100 text-slate-600"}`}>
       {isTalent ? talentLabel : backofficeLabel}
     </span>
   );

@@ -48,12 +48,12 @@ export function ClientSubmissionStatus({
           </span>
         )}
         {info.updatedByName && (
-          <span className="text-[10px] text-slate-400">
+          <span className="text-[0.625rem] text-slate-400">
             {info.updatedByName} &middot; {info.updatedAt ? new Date(info.updatedAt).toLocaleDateString("id-ID") : ""}
           </span>
         )}
-        {info.note && <span className="text-[10px] text-slate-500 italic max-w-[180px] truncate" title={info.note}>{info.note}</span>}
-        <button onClick={() => setOpen(true)} className="text-[11px] font-medium text-teal-600 hover:underline">
+        {info.note && <span className="text-[0.625rem] text-slate-500 italic max-w-[180px] truncate" title={info.note}>{info.note}</span>}
+        <button onClick={() => setOpen(true)} className="text-[0.6875rem] font-medium text-teal-600 hover:underline">
           Update Status
         </button>
       </div>
@@ -67,7 +67,7 @@ export function ClientSubmissionStatus({
         {CLIENT_SUBMISSION_STATUSES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
       </select>
       <textarea name="client_submission_note" defaultValue={info.note ?? ""} placeholder={t("notePlaceholder")} rows={2} className="rounded border border-slate-300 px-2 py-1 text-xs" />
-      {error && <p className="text-[11px] text-red-600">{error}</p>}
+      {error && <p className="text-[0.6875rem] text-red-600">{error}</p>}
       <div className="flex gap-1.5">
         <button type="submit" disabled={isPending} className="rounded bg-teal-600 px-2 py-1 text-xs font-medium text-white disabled:opacity-50">
           {isPending ? tc("saving") : tc("save")}

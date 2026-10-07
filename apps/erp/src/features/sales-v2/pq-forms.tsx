@@ -130,7 +130,7 @@ function EditForm({ record, draft: d, formRef, returnTo, options, onDone, onCanc
     <form ref={formRef} onSubmit={onSubmit}>
       <input type="hidden" name="return_to" value={returnTo} />
       <DialogBody className="max-h-[calc(85dvh-8.5rem)] overflow-y-auto">
-        <p className="mb-3 text-[12px] text-slate-600">
+        <p className="mb-3 text-[0.75rem] text-slate-600">
           Pipeline <b className="text-slate-900">{PQ_STAGE_LABEL[record.stage] ?? record.stage}</b> · diubah dari panel, seperti di V1.
         </p>
         <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-3">
@@ -168,7 +168,7 @@ function EditForm({ record, draft: d, formRef, returnTo, options, onDone, onCanc
         </div>
 
         <fieldset className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
-          <legend className="px-1 text-[12px] font-semibold text-slate-700">Dokumen Legal Project · sinkron dengan Document Tracker PMO</legend>
+          <legend className="px-1 text-[0.75rem] font-semibold text-slate-700">Dokumen Legal Project · sinkron dengan Document Tracker PMO</legend>
           <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-4">
             <div className="sm:col-span-3"><F label="Project Details"><Textarea name="project_details" rows={2} defaultValue={d.project_details} /></F></div>
             <F label="Sales Type"><Select name="sales_type_code" defaultValue={d.sales_type_code || undefined} options={opts(SALES_TYPES)} placeholder="-" /></F>
@@ -181,7 +181,7 @@ function EditForm({ record, draft: d, formRef, returnTo, options, onDone, onCanc
             <F label="No Dokumen Lain"><Input name="other_doc_no" defaultValue={d.other_doc_no} /></F>
             <F label="Status Dokumen Lain"><Select name="other_doc_status_code" defaultValue={d.other_doc_status_code || undefined} options={opts(DOC_STATUS_OPTIONS)} placeholder="-" /></F>
           </div>
-          <p className="mt-2 text-[12px] text-slate-500">Upload file/link dokumennya tetap lewat Document Tracker PMO.</p>
+          <p className="mt-2 text-[0.75rem] text-slate-500">Upload file/link dokumennya tetap lewat Document Tracker PMO.</p>
         </fieldset>
 
         <div className="mt-4 grid grid-cols-1 gap-3">

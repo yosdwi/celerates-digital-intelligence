@@ -70,7 +70,7 @@ export function ModuleTile({ module, signal, onOpen }: { module: ResolvedModule;
       <ModuleGlyph module={module} />
       <span className="line-clamp-2">{label(module.config.label)}</span>
       {signal ? (
-        <span aria-label={`${signal} perlu perhatian`} className="absolute right-2 top-2 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-j-warn-dot px-1 text-[10px] font-extrabold text-white">
+        <span aria-label={`${signal} perlu perhatian`} className="absolute right-2 top-2 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-j-warn-dot px-1 text-[0.625rem] font-extrabold text-white">
           {signal}
         </span>
       ) : null}
@@ -124,11 +124,11 @@ export function ModuleLandingSheet({ module, signals, onClose }: { module: Resol
                 <li key={sub.href}>
                   <Link href={sub.href} onClick={onClose} className="flex min-h-[52px] items-center gap-3 py-2 text-j-ink" data-submodule={sub.href}>
                     <span className="flex min-w-0 flex-1 flex-col">
-                      <span className="text-[15px] font-semibold">{label(sub.label)}</span>
+                      <span className="text-[0.9375rem] font-semibold">{label(sub.label)}</span>
                       {collab && <span className="text-xs text-j-muted">{t("ownedBy", { module: label(collab.label) })}</span>}
                     </span>
                     {desktop && (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-j-muted">
+                      <span className="inline-flex items-center gap-1 text-[0.6875rem] font-semibold text-j-muted">
                         <Monitor aria-hidden className="h-3.5 w-3.5" /> {t("desktop")}
                       </span>
                     )}
