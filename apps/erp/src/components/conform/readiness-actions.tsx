@@ -184,7 +184,7 @@ export function ReadinessActions(props: {
 
       <BottomSheet open={sheet === "summary"} onClose={() => setSheet(null)} title={t("summaryGroup.title")}>
         <div className="flex flex-col gap-3 pb-2">
-          {summary ? <pre className="whitespace-pre-wrap rounded-xl bg-j-field p-3 font-jakarta text-[13px]" data-summary-preview>{summary.text}</pre> : <p className="text-sm text-j-muted">…</p>}
+          {summary ? <pre className="whitespace-pre-wrap rounded-xl bg-j-field p-3 font-sans text-[13px]" data-summary-preview>{summary.text}</pre> : <p className="text-sm text-j-muted">…</p>}
           {summary && !summary.groupConfigured && <p className="text-xs text-[#8a4b06]">{t("summaryGroup.noGroup")}</p>}
           {sent && <p role="status" className="text-sm font-semibold text-j-ok" data-summary-sent>{sent}</p>}
           {error && <p role="alert" className="text-sm font-semibold text-[#a8261c]">{error}</p>}

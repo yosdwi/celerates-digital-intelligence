@@ -41,7 +41,7 @@ export async function TalentFrame({
   );
 
   return (
-    <div className="min-h-[100dvh] bg-j-bg font-jakarta text-j-ink" data-talent-home={tab ?? "none"}>
+    <div className="min-h-[100dvh] bg-j-bg font-sans text-j-ink" data-talent-home={tab ?? "none"}>
       <div className="mx-auto flex max-w-xl flex-col gap-4 px-5 pb-[calc(40px+env(safe-area-inset-bottom))] pt-[max(16px,env(safe-area-inset-top))] md:max-w-6xl md:gap-6 md:px-8 md:pb-12 md:pt-6">
         <header className="flex items-center justify-between gap-4 md:min-h-14 md:border-b md:border-j-line-soft md:pb-4">
           <div className="flex items-center gap-2.5">

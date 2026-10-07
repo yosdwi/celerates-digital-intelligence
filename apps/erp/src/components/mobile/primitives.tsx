@@ -13,7 +13,7 @@ export function MobileScreen({ children, className, label, withActions }: { chil
     <div
       aria-label={label}
       className={cx(
-        "min-h-[100dvh] bg-j-bg font-jakarta text-j-ink px-5 pt-[max(20px,env(safe-area-inset-top))] md:min-h-0 md:py-8",
+        "min-h-[100dvh] bg-j-bg font-sans text-j-ink px-5 pt-[max(20px,env(safe-area-inset-top))] md:min-h-0 md:py-8",
         withActions ? "pb-[calc(176px+env(safe-area-inset-bottom))]" : "pb-[calc(104px+env(safe-area-inset-bottom))]",
         className,
       )}
@@ -188,7 +188,7 @@ export function StickyActions({ children }: { children: React.ReactNode }) {
   return (
     <div
       data-sticky-actions
-      className="fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] z-20 flex gap-2.5 border-t border-j-line bg-j-surface/95 px-5 py-3 font-jakarta backdrop-blur md:static md:z-auto md:mt-2 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none"
+      className="fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] z-20 flex gap-2.5 border-t border-j-line bg-j-surface/95 px-5 py-3 font-sans backdrop-blur md:static md:z-auto md:mt-2 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none"
     >
       {children}
     </div>
@@ -237,7 +237,7 @@ export function BottomSheet({
       : "md:left-1/2 md:max-w-lg md:-translate-x-1/2";
 
   return (
-    <div className="fixed inset-0 z-50 font-jakarta text-j-ink">
+    <div className="fixed inset-0 z-50 font-sans text-j-ink">
       <button type="button" aria-label="Tutup" tabIndex={-1} onClick={onClose} className="absolute inset-0 h-full w-full bg-[rgba(14,23,38,0.4)]" />
       <div
         ref={panel}

@@ -38,7 +38,7 @@ export function MobileTabBar() {
       <nav
         aria-label={t("navLabel")}
         data-mobile-tabbar
-        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-j-line bg-j-surface px-1.5 pb-[env(safe-area-inset-bottom)] pt-2 font-jakarta md:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-j-line bg-j-surface px-1.5 pb-[env(safe-area-inset-bottom)] pt-2 font-sans md:hidden"
       >
         <Link href="/" aria-current={active === "home" ? "page" : undefined} className={`${item} ${tone("home")}`}>
           <Home aria-hidden className="h-6 w-6" strokeWidth={1.9} fill={active === "home" ? "#e8eefd" : "none"} />
@@ -141,7 +141,7 @@ export function MobileContextBar() {
   const sub = current.subPages.find((s) => s.href === pathname);
   return (
     <>
-      <div className="sticky top-0 z-20 flex items-center gap-2.5 border-b border-j-line bg-j-surface/95 px-4 py-2 pt-[max(8px,env(safe-area-inset-top))] font-jakarta text-j-ink backdrop-blur md:hidden" data-mobile-context={current.key}>
+      <div className="sticky top-0 z-20 flex items-center gap-2.5 border-b border-j-line bg-j-surface/95 px-4 py-2 pt-[max(8px,env(safe-area-inset-top))] font-sans text-j-ink backdrop-blur md:hidden" data-mobile-context={current.key}>
         <ModuleGlyph module={current} size="sm" />
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="truncate text-sm font-bold">{label(current.config.label)}</span>

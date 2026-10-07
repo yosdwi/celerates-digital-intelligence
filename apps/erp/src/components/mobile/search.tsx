@@ -65,7 +65,7 @@ export function MobileSearch({ initialQuery }: { initialQuery: string }) {
   const askAgent = () => openAgent({ ask: q });
 
   return (
-    <div className="min-h-[100dvh] bg-j-bg font-jakarta text-j-ink" data-mobile-search>
+    <div className="min-h-[100dvh] bg-j-bg font-sans text-j-ink" data-mobile-search>
       <div className="mx-auto flex max-w-xl flex-col gap-4 px-5 pb-[calc(104px+env(safe-area-inset-bottom))] pt-[max(12px,env(safe-area-inset-top))]">
         <form
           role="search"

@@ -42,7 +42,7 @@ export function MobileHome() {
   const attention = (signals ?? []).filter((g) => g.count > 0);
 
   return (
-    <div className="min-h-[100dvh] bg-j-bg font-jakarta text-j-ink" data-mobile-home>
+    <div className="min-h-[100dvh] bg-j-bg font-sans text-j-ink" data-mobile-home>
       <div className="mx-auto flex max-w-xl flex-col gap-4 px-5 pb-[calc(104px+env(safe-area-inset-bottom))] pt-[max(16px,env(safe-area-inset-top))]">
         <header className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">

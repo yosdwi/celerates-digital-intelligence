@@ -37,7 +37,7 @@ export default async function TalentRequirementPage({ params, searchParams }: { 
   );
   if (!requirement)
     return (
-      <div className="min-h-[100dvh] bg-j-bg font-jakarta text-j-ink">
+      <div className="min-h-[100dvh] bg-j-bg font-sans text-j-ink">
         <div className="mx-auto flex max-w-xl flex-col gap-4 px-5 pt-[max(16px,env(safe-area-inset-top))]">
           {back}
           <Card className="p-4 text-sm text-j-muted" data-requirement-gone>{unavailable ? t("unavailable") : t("nothingForDate")}</Card>
@@ -47,7 +47,7 @@ export default async function TalentRequirementPage({ params, searchParams }: { 
   const c = requirement.correction;
   const rejected = requirement.state === "needs_action" && c?.status === "rejected";
   return (
-    <div className="min-h-[100dvh] bg-j-bg font-jakarta text-j-ink" data-talent-requirement={date}>
+    <div className="min-h-[100dvh] bg-j-bg font-sans text-j-ink" data-talent-requirement={date}>
       <div className="mx-auto flex max-w-xl flex-col gap-4 px-5 pb-[calc(120px+env(safe-area-inset-bottom))] pt-[max(16px,env(safe-area-inset-top))]">
         <header className="flex flex-col gap-1.5">
           {back}

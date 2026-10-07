@@ -7,7 +7,7 @@ import { Link2Off, Loader2, ShieldAlert } from "lucide-react";
 
 export function LinkNotice({ title, body, kind }: { title: string; body: string; kind: "invalid" | "other-account" }) {
   return (
-    <div className="flex min-h-[100dvh] items-center justify-center bg-j-bg px-6 font-jakarta text-j-ink" data-link-notice={kind}>
+    <div className="flex min-h-[100dvh] items-center justify-center bg-j-bg px-6 font-sans text-j-ink" data-link-notice={kind}>
       <div className="flex max-w-sm flex-col items-center gap-3 text-center">
         <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#fde8e6] text-[#a8261c]">
           {kind === "invalid" ? <Link2Off aria-hidden className="h-7 w-7" /> : <ShieldAlert aria-hidden className="h-7 w-7" />}
@@ -35,7 +35,7 @@ export function GoSignIn({ code, target }: { code: string; target: string }) {
   }, [code, target]);
   if (failed) return <LinkNotice title={t("invalidTitle")} body={t("invalidBody")} kind="invalid" />;
   return (
-    <div className="flex min-h-[100dvh] items-center justify-center bg-j-bg font-jakarta text-j-ink" data-go-signing-in>
+    <div className="flex min-h-[100dvh] items-center justify-center bg-j-bg font-sans text-j-ink" data-go-signing-in>
       <p className="flex items-center gap-2 text-sm font-semibold text-j-muted">
         <Loader2 aria-hidden className="h-5 w-5 animate-spin" /> {t("opening")}
       </p>

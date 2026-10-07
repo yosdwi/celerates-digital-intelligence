@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import { requireActor } from "@/lib/actor";
 import { requireTalentSession } from "@/lib/talent/actor";
-import "@fontsource-variable/plus-jakarta-sans";
+import "@fontsource-variable/inter";
 import "./globals.css";
 import { getLocale, getMessages, getTimeZone } from "next-intl/server";
 import { Sidebar } from "@/components/sidebar";
