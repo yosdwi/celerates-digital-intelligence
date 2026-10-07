@@ -6,7 +6,7 @@ import { allowAttempt } from "@/lib/login-throttle";
 import { isBetaWhitelisted } from "@/lib/beta";
 import { redeemGrant } from "@/lib/talent/identity";
 import { audit } from "@/lib/security/audit";
-import { emailOtpRequired, mailboxAllowed } from "@/lib/security/email-otp";
+import { mailboxAllowed, otpRequiredFor, otpWaived } from "@/lib/security/email-otp";
 import { verifyPasskeyAssertion } from "@/lib/security/passkey";
 import {
   clientMeta, createSession, findTrustedBrowser, loadSession, readCookie, revokeSession, TRUSTED_BROWSER_COOKIE, type AuthMethod, type SessionClaims,
@@ -25,10 +25,10 @@ export async function checkPassword(emailInput: unknown, password: unknown, meta
   if (typeof emailInput !== "string" || typeof password !== "string" || !emailInput || !password || emailInput.length > 254 || password.length > 72) return null;
   const email = emailInput.trim().toLowerCase();
   const allowed = (await allowAttempt(sql, "login:" + email, 20)) && (await allowAttempt(sql, "login-ip:" + meta.ip, 60));
-  const [user] = await sql`SELECT id, email, full_name, password_hash, account_type, status FROM users WHERE email = ${email}`;
+  const [user] = await sql`SELECT id, email, full_name, password_hash, account_type, status, is_owner FROM users WHERE email = ${email}`;
   const usable = allowed && user?.status === "active" && typeof user.password_hash === "string";
   const valid = await bcrypt.compare(password, usable ? user.password_hash : DUMMY_HASH);
-  if (usable && valid) return user as { id: string; email: string; full_name: string; account_type: string };
+  if (usable && valid) return user as { id: string; email: string; full_name: string; account_type: string; is_owner: boolean };
   await audit(sql, {
     action: "login",
     decision: "deny",
@@ -60,13 +60,15 @@ export const authOptions: NextAuthOptions = {
         // Talent accounts with a password keep password-only; their strong path is the WhatsApp link.
         let method: AuthMethod = "password";
         const browser = user.account_type === "talent" ? null : await findTrustedBrowser(sql, user.id, readCookie(meta.cookie, TRUSTED_BROWSER_COOKIE));
-        if (user.account_type !== "talent" && emailOtpRequired() && !browser) {
+        if (user.account_type !== "talent" && otpRequiredFor(user) && !browser) {
           await audit(sql, { action: "login", decision: "deny", actorUserId: user.id, reason: "email_verification_required", ipHash: meta.ipHash, device: meta.device });
           return null;
         }
         if (browser?.fresh) method = "password+email_otp";
         const sid = await createSession(sql, { userId: user.id, method, trustedBrowserId: browser?.id, stepUp: browser?.fresh, device: meta.device, ipPrefix: meta.ipPrefix });
-        await audit(sql, { action: "login", decision: "allow", actorUserId: user.id, sessionId: sid, reason: method, ipHash: meta.ipHash, device: meta.device });
+        // A waived sign-in is visible in the audit log as such, so it can be counted and removed later.
+        const waived = user.account_type !== "talent" && !browser && otpWaived(user);
+        await audit(sql, { action: "login", decision: "allow", actorUserId: user.id, sessionId: sid, reason: waived ? "password;otp_waived" : method, ipHash: meta.ipHash, device: meta.device });
         return { id: user.id, email: user.email, name: user.full_name, sid };
       },
     }),

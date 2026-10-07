@@ -521,6 +521,39 @@ test("backoffice login: new browser → password → corporate-mailbox code → 
   assert.ok((await auditRows("password_reset")).length === 1);
 });
 
+test("pilot OTP waiver: listed test accounts sign in with the password alone and it is audited; an Owner or unlisted account never does", async () => {
+  const { POST } = await import("../src/app/api/login/route");
+  const { authOptions } = await import("../src/lib/auth");
+  const otp = await import("../src/lib/security/email-otp");
+  const credentials = authOptions.providers.find((p) => p.id === "credentials") as unknown as { options: { authorize: (c: unknown, r: unknown) => Promise<{ id: string; sid: string } | null> } };
+  const authorize = (email: string) => credentials.options.authorize({ email, password: PASSWORD }, { headers: { cookie: "", "user-agent": "Mozilla/5.0 (Windows NT 10.0) Chrome/130.0", "cf-connecting-ip": "203.0.113.9" } });
+  const start = (email: string) =>
+    POST(new Request("http://localhost:3000/api/login", { method: "POST", headers: { "content-type": "application/json", cookie: "", origin: "http://localhost:3000", "cf-connecting-ip": "203.0.113.9" }, body: JSON.stringify({ action: "start", email, password: PASSWORD }) }));
+  process.env.AUTH_OTP_WAIVED_EMAILS = " HR.sec@celerates.com , owner.sec@celerates.com ";
+  try {
+    assert.equal(otp.otpWaived({ email: "hr.sec@celerates.com" }), true, "exact match, case and spaces ignored");
+    assert.equal(otp.otpWaived({ email: "owner.sec@celerates.com", is_owner: true }), false, "never an Owner, even when listed");
+    assert.equal(otp.otpWaived({ email: "ta.sec@celerates.com" }), false);
+
+    outbox.length = 0;
+    assert.deepEqual(await (await start("hr.sec@celerates.com")).json(), { next: "signin" });
+    assert.equal(outbox.length, 0, "no mailbox code is sent");
+    const user = await authorize("hr.sec@celerates.com");
+    assert.ok(user?.sid, "the password alone opens a session");
+    const [session] = await sql`SELECT auth_method, step_up_at FROM auth_sessions WHERE id = ${user!.sid}`;
+    assert.equal(session.auth_method, "password");
+    assert.equal(session.step_up_at, null, "no step-up: sensitive actions still need a real code or a passkey");
+    const [entry] = await sql`SELECT reason FROM sensitive_access_log WHERE session_id = ${user!.sid} AND action = 'login'`;
+    assert.equal(entry.reason, "password;otp_waived", "the waiver is visible in the audit log");
+
+    assert.deepEqual(await (await start("owner.sec@celerates.com")).json(), { next: "otp" }, "a listed Owner still needs the code");
+    assert.equal(await authorize("owner.sec@celerates.com"), null);
+    assert.equal(await authorize("ta.sec@celerates.com"), null, "an unlisted account still needs the code");
+  } finally {
+    delete process.env.AUTH_OTP_WAIVED_EMAILS;
+  }
+});
+
 test("middleware: a copied cookie is refused on the very next request after its session is revoked", async () => {
   const { encode } = await import("next-auth/jwt");
   const { NextRequest } = await import("next/server");

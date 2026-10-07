@@ -69,6 +69,18 @@ export function mailboxAllowed(email: string): { ok: boolean; exception: boolean
 /** Email codes are required unless explicitly switched off for the cutover (AUTH_EMAIL_OTP=off). */
 export const emailOtpRequired = () => process.env.AUTH_EMAIL_OTP !== "off";
 
+/**
+ * Pilot only: synthetic test accounts named in AUTH_OTP_WAIVED_EMAILS (exact addresses) sign in with the password alone.
+ * Never for an Owner, whatever the list says. Remove the variable before the production cut-over (docs/25).
+ */
+export function otpWaived(user: { email: string; is_owner?: boolean }): boolean {
+  if (user.is_owner) return false;
+  const waived = (process.env.AUTH_OTP_WAIVED_EMAILS || "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+  return waived.includes(user.email.trim().toLowerCase());
+}
+
+export const otpRequiredFor = (user: { email: string; is_owner?: boolean }) => emailOtpRequired() && !otpWaived(user);
+
 export function mailConfigured() {
   return Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_FROM && (process.env.SMTP_PASSWORD || process.env.SMTP_PASSWORD_FILE));
 }

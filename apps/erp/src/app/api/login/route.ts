@@ -10,7 +10,7 @@ import { sql } from "@/db";
 import { checkPassword } from "@/lib/auth";
 import { allowAttempt } from "@/lib/login-throttle";
 import { audit } from "@/lib/security/audit";
-import { emailOtpRequired, issueChallenge, mail, mailboxAllowed, verifyChallenge, type OtpPurpose } from "@/lib/security/email-otp";
+import { issueChallenge, mail, mailboxAllowed, otpRequiredFor, verifyChallenge, type OtpPurpose } from "@/lib/security/email-otp";
 import { revokeAllPasskeys } from "@/lib/security/passkey";
 import {
   clientMeta, createTrustedBrowser, findTrustedBrowser, readCookie, revokeUserSessions, TRUSTED_BROWSER_COOKIE, TRUSTED_BROWSER_SECONDS,
@@ -86,7 +86,7 @@ export async function POST(request: Request) {
         await audit(sql, { action: "login", decision: "deny", actorUserId: user.id, reason: "mailbox_not_allowed", ipHash: meta.ipHash, device: meta.device });
         return json({ error: "mailbox_not_allowed" }, 403);
       }
-      if (user.account_type === "talent" || !emailOtpRequired()) return json({ next: "signin" });
+      if (user.account_type === "talent" || !otpRequiredFor(user)) return json({ next: "signin" });
       if (await findTrustedBrowser(sql, user.id, readCookie(meta.cookie, TRUSTED_BROWSER_COOKIE))) return json({ next: "signin" });
       const error = await sendCode(user, "login", meta);
       return error ? json({ error }, error === "rate_limited" ? 429 : error === "mail_unavailable" ? 503 : 403) : json({ next: "otp" });

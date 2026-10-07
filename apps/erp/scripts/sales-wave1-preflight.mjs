@@ -79,6 +79,8 @@ function validateEnvironment() {
   if ((process.env.AUTH_EMAIL_OTP || '').toLowerCase() === 'off') {
     addBlocker('AUTH_EMAIL_OTP=off is not allowed for the real-user pilot.');
   }
+  const waived = (process.env.AUTH_OTP_WAIVED_EMAILS || '').split(',').map((v) => v.trim()).filter(Boolean);
+  if (waived.length) addWarning(`AUTH_OTP_WAIVED_EMAILS skips the mailbox code for ${waived.length} test account(s) (pilot only). It must be empty before the production cut-over.`);
   for (const name of ['S3_ENDPOINT', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY']) {
     if (!process.env[name]) addBlocker(`${name} is required by the ERP runtime.`);
   }
