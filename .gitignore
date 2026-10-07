@@ -18,3 +18,7 @@ apps/erp/.next/
 !.env.example
 !**/.env.example
 backups/
+
+# local UX audit evidence (screenshots stay local; probe scripts are tracked)
+artifacts/sales-ux-dogfood/screenshots/
+artifacts/sales-ux-dogfood/videos/
