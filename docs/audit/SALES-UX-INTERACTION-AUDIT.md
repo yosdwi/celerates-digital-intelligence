@@ -7,7 +7,7 @@
 
 | | P0 | P1 | P2 |
 | --- | --- | --- | --- |
-| Count | 0 | 6 | 6 |
+| Count | 0 | 6 | 7 |
 
 Five highest-impact issues:
 
@@ -58,7 +58,7 @@ Viewports measured: 1920×1080, 1440×900, 1366×768, 390×844 (Opportunity Trac
 - **Actual:** board `clientHeight` = `scrollHeight` = 11,234 px (every column stretched to its longest, 11,202 px); the board is the horizontal scroller, so its scrollbar is at y = 11,665. `scrollWidth` 1,648 vs `clientWidth` 1,044. Win starts at x = 1,393 and Dropped at 1,665 (viewport 1,366). Even at 1920×1080 Dropped is off-screen (sw 1,648 > cw 1,214). After scrolling 3,000 px the column headers are at y = −2,541 (not pinned). No page-level overflow; the page scrolls vertically, the board horizontally, nobody scrolls the columns.
 - **Evidence:** `screenshots/02-kanban-top-1366.png`; probe output (table in the viewport matrix below).
 - **Root cause:** `opportunity-kanban.tsx` — wrapper `overflow-x-auto p-4` with no height bound and stretching flex columns.
-- **Fix (done in 850e77a, not yet re-measured live):** board is the single scroller for X (`overflow-x-auto overflow-y-hidden`, `h-[calc(100dvh-10rem)] min-h-[420px]`); each column is `flex flex-col h-full` with a pinned header and its own `overflow-y-auto` card list.
+- **Fix (done in 850e77a, re-measured live — see Verification):** board is the single scroller for X (`overflow-x-auto overflow-y-hidden`, `h-[calc(100dvh-10rem)] min-h-[420px]`); each column is `flex flex-col h-full` with a pinned header and its own `overflow-y-auto` card list.
 
 ### SALES-UX-002 · P1 · Kanban/Navigation — opening a card destroys the working context
 - **Repro:** Kanban → scroll page to 4,000 px and board to 400 px → click a card → browser Back.
@@ -127,14 +127,39 @@ Page-level horizontal overflow: none at any size.
 
 ## Verification status of the fixes
 
-- Source guards: `tests/sales-ux.test.ts` (5 tests) pass; `tsc --noEmit` clean. These pin the intended layout; they do not measure it.
-- **Live re-measurement is pending.** Image `celerates-erp:wave1-850e77a` is built, but the promote-to-pilot step was refused by the environment's permission check, so the running pilot still serves the pre-fix build. The numbers above are all *before*. After deploy, re-run `viewport-probe.js` at 1366×768 and 390×844 and the Kanban Back test; expected: Kanban board bottom ≤ viewport, scrollbar reachable, Back returns to `?view=kanban`.
+`850e77a` was deployed to the pilot on 2026-10-07 (image `celerates-erp:wave1-850e77a`, no migration, health live/ready 200; rollback tag `celerates-erp:rollback-20261007T030551Z` = previous `f9abeb8`). Re-measured live with the same probes, signed in as `sales.test.ierp`:
+
+| Check | Before | After |
+| --- | --- | --- |
+| Kanban height, 1366×768 | 11,234 px | 608 px |
+| Kanban height, 390×844 | 11,234 px | 684 px |
+| Kanban board bottom (h-scrollbar), 1366×768, board scrolled into view | y = 11,665 | y = 768 = inside the viewport |
+| Column body (1366×768) | no inner scroll | scrolls on its own: 11,150 px content in a 524 px box |
+| Column header after scrolling a column 1,500 px | y = −2,541 (after page scroll) | stays at y = 188 (board top 160) |
+| Back after card click (board offset 300, column 800, Kanban view) | List tab, `scrollY` 389, offsets lost | `?view=kanban`, Kanban shown, offset 300, column 800 restored |
+| Direct link `?view=kanban` | n/a | opens Kanban |
+| Table row height | 149 px (127–157) | 119 px |
+| Table first-cell position at 390 px | `sticky` (668 px pinned in 324 px) | `static` — all columns scroll |
+| Modal, Escape | stayed open | closes; focus returns to the trigger button |
+| Modal, focus on open | trigger button behind the overlay | first field (`lead_id`) |
+| Modal, Save/Cancel at 1366×768 | y = 843 (off-screen) | bottom 693 (inside the 768 viewport, sticky footer) |
+| Body scroll lock | none | `body.style.overflow = hidden` while open, restored on close |
+
+Caveats, not hidden:
+- The Kanban board's own top is still y = 431 at load, so its bottom (1,039) needs one page scroll (~270 px) before the scrollbar is on screen. After that scroll it is reachable; the horizontal scroller no longer sits 11,000 px away. Win and Dropped still need a horizontal scroll (board `scrollWidth` 1,648 vs 1,044).
+- The table's own scrollbar is still below the fold at 1366×768 and 1440×900 (table top 589, bottom 1,069); only the row height and the mobile sticky issue changed. This stays open under SALES-UX-004.
+- Body scroll lock was confirmed by the style value only; agent-browser's `scroll` command scrolls programmatically, so a real wheel/touch test is still needed.
+- The 390 px table was verified by computed style (`static`), not by a fresh screenshot.
+- Source guards: `tests/sales-ux.test.ts` (5 tests) pass; `tsc --noEmit` clean. They pin intent only.
+
+### SALES-UX-013 · P2 · Sticky page header takes vertical space (found while re-testing)
+The page header is `position: sticky; top: 0` (about 130 px with the Sheet Sync button at 1366×768). It covers elements scrolled beneath it — agent-browser reported the Add and full-screen buttons as "covered by h1" after a page scroll. It is part of why content gets so little room at 768 px height. Recommended: make the header non-sticky on pages with data tables, or compact it.
 
 ## Recommended Execution Order
 
-1. **Batch 1 (done, awaiting live check):** 001, 002 (context part), 003, 004 (duplicate badge), 005.
+1. **Batch 1 (done and live-checked, see Verification):** 001, 002 (context part), 003, 004 (duplicate badge), 005.
 2. **Batch 2 — table/page chrome:** 004 remainder (Convert as popover/sheet, shorter header block), 008 (Sheet Sync demotion, FAB padding), narrower sticky set.
 3. **Batch 3 — one coherent view system:** 007 + 002 detail drawer (product decision on inspect vs edit).
 4. **Batch 4 — data-contract:** 006 Extension prefill, 010 CRM account listing.
-5. **Batch 5 — polish:** 009, 011, 012, modal translucency.
+5. **Batch 5 — polish:** 009, 011, 012, 013, modal translucency.
 6. **Needs real users/devices:** viewer/editor accounts, touch drag, iOS/Android, PQ documents/signature.
