@@ -35,7 +35,7 @@ export default async function SalesDashboardPage() {
         title="Dashboard"
         subtitle={t("subtitle")}
       >
-        <Link href="/sales/opportunity-tracker" className="text-xs text-brand-500 hover:underline">Opportunity Tracker &rarr;</Link>
+        <Link href="/sales/v2/opportunity-tracker" className="text-xs text-brand-500 hover:underline">Opportunity Tracker &rarr;</Link>
         <Link href="/sales" className="text-xs text-brand-500 hover:underline">PQ Tracker &rarr;</Link>
       </PageHeader>
 

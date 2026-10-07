@@ -13,6 +13,7 @@
     "saveFailed": "Gagal menyimpan, coba lagi."
   },
   "sidebar": {
+    "sharedPages": "Bersama divisi lain",
     "home": "Beranda",
     "greeting": "Selamat bekerja, {name} 👋",
     "hideMenu": "Sembunyikan menu",

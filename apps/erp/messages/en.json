@@ -13,6 +13,7 @@
     "saveFailed": "Failed to save, please try again."
   },
   "sidebar": {
+    "sharedPages": "Shared with other divisions",
     "home": "Home",
     "greeting": "Have a great day, {name} 👋",
     "hideMenu": "Hide menu",

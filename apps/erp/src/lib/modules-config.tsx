@@ -1,6 +1,8 @@
 import { Megaphone, TrendingUp, Users, UserCog, Briefcase, FileSpreadsheet, Landmark, Gauge, KanbanSquare, PenTool, Lightbulb, GraduationCap, Clock, Bot, Fingerprint, FolderOpen, LucideIcon } from "lucide-react";
 
-export type SubPage = { href: string; label: string; collab?: boolean; collabColor?: "teal" | "orange" };
+/** `collab`: a page owned by another division, listed here too (shown under "Bersama divisi lain").
+ *  `group`: a small heading shown above the first item of a run with the same group. */
+export type SubPage = { href: string; label: string; collab?: boolean; collabColor?: "teal" | "orange"; group?: string };
 export type ModuleConfig = {
   key: string;
   label: string;
@@ -24,8 +26,9 @@ export const MODULES: ModuleConfig[] = [
     key: "sales", label: "Sales", icon: TrendingUp, color: "bg-blue-500", enabled: true,
     basePath: "/sales", subPages: [
       { href: "/sales/dashboard", label: "Dashboard" },
-      { href: "/sales/opportunity-tracker", label: "Opportunity Tracker" },
-      { href: "/sales", label: "PQ Tracker" },
+      // Sales V2 (docs/design/SALES-V2-CRISP-UX-CONTRACT.md); V1 stays at /sales/opportunity-tracker, linked from V2.
+      { href: "/sales/v2/opportunity-tracker", label: "Opportunity Tracker", group: "Pipeline" },
+      { href: "/sales", label: "PQ Tracker", group: "Pipeline" },
       { href: "/sales/accounts", label: "Account (CRM)" },
       { href: "/ta/client-active", label: "Client Active", collab: true },
       { href: "/pmo/overtime-business-trip", label: "Overtime & Business Trip", collab: true, collabColor: "orange" },

@@ -131,7 +131,7 @@ const ENTITIES: CatalogEntity[] = [
     ],
     search: ["opty_no", "client_name", "requirement_summary", "position_name"],
     routes: ["/sales/opportunity-tracker/{id}/edit"],
-    listHref: "/sales/opportunity-tracker",
+    listHref: "/sales/v2/opportunity-tracker",
     edges: [
       { name: "lead", label: "Lead asal", target: "lead", kind: "fk", sql: "SELECT lead_id AS id FROM sales_opportunity_trackers WHERE id=$1 AND lead_id IS NOT NULL" },
       { name: "requisitions", label: "Requisition", target: "requisition", kind: "fk", sql: "SELECT id FROM requisitions WHERE opportunity_id=$1" },

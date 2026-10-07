@@ -29,7 +29,7 @@ const specs = [
     title: "Opportunity belum diteruskan",
     unit: "opportunity tracker",
     source: "Opportunity Tracker → Requisition / PQ",
-    href: "/sales/opportunity-tracker",
+    href: "/sales/v2/opportunity-tracker",
     action: "Tinjau Opportunity",
     itemPath: "/sales/opportunity-tracker",
     rule: "Sales Qualified, tidak Dropped, belum memiliki Requisition maupun PQ yang terhubung. Bukan pernyataan deal sudah Win.",

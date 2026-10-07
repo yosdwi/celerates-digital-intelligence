@@ -1,14 +1,34 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronLeft, ChevronRight, Home } from "lucide-react";
+import {
+  ArrowLeftRight, BookUser, Bot, Building, Building2, Calculator, CalendarCheck, CalendarOff, ChevronLeft, ChevronRight, ClipboardList, Clock,
+  Database, Dot, DoorOpen, FileSignature, FileText, FolderCheck, FolderOpen, Gauge, GraduationCap, Handshake, History, Home, House, KanbanSquare,
+  Landmark, LayoutDashboard, Lightbulb, MapPin, PenTool, PiggyBank, Plane, Receipt, Repeat, Settings2, Share2, ShieldCheck, StickyNote, Target,
+  UserSearch, Users, Workflow, type LucideIcon,
+} from "lucide-react";
 import { MODULES } from "@/lib/modules-config";
-import { claimsOf, navModules } from "@/lib/module-access";
+import { claimsOf, navModules, submoduleFor } from "@/lib/module-access";
 import { NAV_LABEL_KEYS } from "@/lib/nav-i18n";
 import Image from "next/image";
 import { useSession } from "next-auth/react";
 import { useTranslations } from "next-intl";
 import { useSidebarCollapse } from "./sidebar-context";
+
+// One small icon per page (Attio-style list rows). Pages without an entry get a neutral dot.
+const PAGE_ICON: Record<string, LucideIcon> = {
+  "/marketing/dashboard": LayoutDashboard, "/marketing": Target, "/sales/accounts": Building2,
+  "/sales/dashboard": LayoutDashboard, "/sales/v2/opportunity-tracker": Handshake, "/sales": FileText,
+  "/ta/client-active": Building, "/pmo/overtime-business-trip": Plane, "/sales/profitability-tracker": PiggyBank,
+  "/ta/dashboard": LayoutDashboard, "/ta": ClipboardList, "/ta/candidates": UserSearch, "/ta/pipeline": Workflow, "/ta/onboarding": DoorOpen,
+  "/hr/dashboard": LayoutDashboard, "/hr": Users, "/hr/extension-requests": Repeat, "/hr/attendance": CalendarCheck, "/hr/attendance-settings": Settings2,
+  "/tm/special-notes": StickyNote, "/tm/dashboard": LayoutDashboard, "/tm": BookUser, "/tm/database-salary": Database, "/tm/cogs-calculator": Calculator,
+  "/tm/extension-requests": Repeat, "/pmo/dashboard": LayoutDashboard, "/pmo/contracts": FileSignature, "/pmo": FolderCheck, "/pmo/invoices": Receipt,
+  "/pmo/readiness": ShieldCheck, "/finance": Landmark, "/timesheet": Clock, "/timesheet/converter": ArrowLeftRight, "/attendance": House,
+  "/attendance/live": MapPin, "/attendance/history": History, "/attendance/time-off": CalendarOff, "/executive-dashboard": Gauge, "/tasks": KanbanSquare,
+  "/files": FolderOpen, "/ttd-online": PenTool, "/feature-requests": Lightbulb, "/school": GraduationCap, "/school/my-learning": GraduationCap,
+  "/automation/reminders": Bot, "/automation/documents": FileText,
+};
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -31,6 +51,9 @@ export function Sidebar() {
   const activeModule = MODULES.find(
     (m) => pathname === m.basePath || pathname.startsWith(m.basePath + "/")
   );
+
+  // The page the current URL belongs to (longest match; a V1 Sales page counts as its V2 entry).
+  const currentHref = submoduleFor(pathname)?.href;
 
   if (status !== "authenticated") return null;
 
@@ -100,37 +123,34 @@ export function Sidebar() {
               )}
 
               {!collapsed && isModuleActive && (
-                <div className="ml-3 mt-0.5 mb-1 space-y-0.5 border-l border-slate-800 pl-3">
-                  {subPages.map((sub) => {
-                    const isActive = pathname === sub.href;
-                    if (sub.collab) {
-                      const c = sub.collabColor ?? "teal";
-                      const activeClass = c === "orange" ? "bg-orange-500/10 text-orange-300 font-medium border-orange-500/30" : "bg-teal-500/10 text-teal-300 font-medium border-teal-500/30";
-                      const idleClass = c === "orange" ? "text-orange-400/90 border-orange-500/20 hover:bg-orange-500/10" : "text-teal-400/90 border-teal-500/20 hover:bg-teal-500/10";
-                      const dotClass = c === "orange" ? "bg-orange-400" : "bg-teal-400";
-                      return (
-                        <Link
-                          key={sub.href}
-                          href={sub.href}
-                          className={`flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs transition-colors border ${isActive ? activeClass : idleClass}`}
-                        >
-                          <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${dotClass}`} />
-                          <span className="truncate">{label(sub.label)}</span>
-                        </Link>
-                      );
-                    }
+                <div className="ml-3 mt-0.5 mb-1 space-y-px border-l border-slate-800 pl-2">
+                  {/* Own pages first (with optional group headings), then pages shared with other divisions under one
+                      heading. Same row style for both: a shared page is marked by its heading and a small icon, not a box. */}
+                  {[...subPages.filter((s) => !s.collab), ...subPages.filter((s) => s.collab)].map((sub, i, list) => {
+                    const isActive = currentHref === sub.href;
+                    const heading = sub.collab ? t("sharedPages") : sub.group;
+                    const prev = list[i - 1];
+                    const showHeading = heading && (!prev || (prev.collab ? t("sharedPages") : prev.group) !== heading);
+                    const PageIcon = PAGE_ICON[sub.href] ?? Dot;
                     return (
-                      <Link
-                        key={sub.href}
-                        href={sub.href}
-                        className={`block rounded-lg px-2.5 py-2 text-xs transition-colors ${
-                          isActive
-                            ? (isTimesheetModule ? "bg-orange-500/10 text-orange-300 font-medium" : "bg-brand-500/10 text-brand-300 font-medium")
-                            : (isTimesheetModule ? "text-slate-400 hover:bg-orange-500/10 hover:text-orange-300" : "text-slate-400 hover:bg-slate-800 hover:text-slate-200")
-                        }`}
-                      >
-                        {label(sub.label)}
-                      </Link>
+                      <div key={sub.href}>
+                        {showHeading && (
+                          <p className="px-2 pb-0.5 pt-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{heading}</p>
+                        )}
+                        <Link
+                          href={sub.href}
+                          aria-current={isActive ? "page" : undefined}
+                          className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] transition-colors ${
+                            isActive
+                              ? (isTimesheetModule ? "bg-orange-500/10 text-orange-300 font-medium" : "bg-brand-500/15 text-white font-medium")
+                              : (isTimesheetModule ? "text-slate-400 hover:bg-orange-500/10 hover:text-orange-300" : "text-slate-400 hover:bg-slate-800 hover:text-slate-200")
+                          }`}
+                        >
+                          <PageIcon className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+                          <span className="min-w-0 flex-1 truncate">{label(sub.label)}</span>
+                          {sub.collab && <Share2 className="h-3 w-3 shrink-0 text-slate-500" aria-label={t("sharedPages")} />}
+                        </Link>
+                      </div>
                     );
                   })}
                 </div>

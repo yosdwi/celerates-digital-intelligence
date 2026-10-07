@@ -298,8 +298,9 @@ test("delegated catalog reads: sensitivity, relationships, search, signal parity
     assert.equal(stored, moved.find((g) => g.key === "unassigned-requisitions")!.count, "a changed count refreshes the snapshot at once");
 
     // `Perlu perhatian` wording/links snapshot: any change here must be deliberate.
+    // 2026-10-07: "Tinjau Opportunity" now opens Sales V2 (/sales/v2/opportunity-tracker).
     const metadata = panel.groups.map(({ key, module, title, rule, source, unit, href, action }) => ({ key, module, title, rule, source, unit, href, action }));
-    assert.equal(createHash("sha256").update(JSON.stringify(metadata)).digest("hex"), "08eeb5fd7a4b55ef15ae6b64a1c518fe6f08a2b5fc08ef10ff9983c28ebd970a");
+    assert.equal(createHash("sha256").update(JSON.stringify(metadata)).digest("hex"), "3b55c738962c156bded13a5cc41934a0078702eb144cd68b5747e15ecfc151ff");
 
     // MS2 contextual envelope: PMO contract/invoice are readable to PMO readers only; values stay presence-only.
     const [opty] = await sql`INSERT INTO opportunities (opty_no,client_name,project_name,service_type_code,sales_pic_name,price_amount) VALUES ('OPTY-77','PT Arunika Synthetic','Project X','outsourcing','Sales',424242) RETURNING id`;
