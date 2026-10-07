@@ -152,6 +152,22 @@ Caveats, not hidden:
 - The 390 px table was verified by computed style (`static`), not by a fresh screenshot.
 - Source guards: `tests/sales-ux.test.ts` (5 tests) pass; `tsc --noEmit` clean. They pin intent only.
 
+### Batch 2 (`6586eb9`, deployed 2026-10-07, rollback tag `celerates-erp:rollback-20261007T044840Z` = batch 1)
+
+Live checks at 1366×768 as `sales.test.ierp`:
+
+| Check | Before | After |
+| --- | --- | --- |
+| SALES-UX-013 page header | `sticky`, 130 px pinned, covered buttons | `relative`, scrolls away |
+| Add Extension / Add Opportunity | own row below KPI cards | in the page header; Sheet Sync is a quiet outlined button next to them |
+| KPI cards top | y = 195 | y = 207 (header grew by the buttons) but the separate button row (~64 px) is gone |
+| Table scroller | fixed 480 px, bottom y = 1,069 (off-screen) | `max(360px, 100dvh−12rem)` = 576 px; after one page scroll its bottom is y = 768 = scrollbar on screen, 4 rows visible |
+| Convert to Requisition | inline form grew the row to 303 px in a 190 px cell | dialog (fields 5, top 221 / bottom 547 in a 768 viewport, focus on *Positions*, Escape closes); row stays 127 px |
+| PQ Tracker | button *Tambah Opportunity Baru*, Sheet Sync primary | *Tambah PQ Baru* in the header, Sheet Sync secondary |
+| FAB | covered the bottom-right content | content gets `md:pb-24` (96 px) so the last rows/pagination clear it |
+
+Not done in batch 2: the table sticky block is still 668 px at 1366 (needs a column-order decision); other tables that share the `max-h-[480px]` pattern (TM, PMO, TA, Marketing, HR) were not changed; the Convert dialog's submit was not re-run after the move (the form body and action are unchanged; the earlier double-click test was on the inline form).
+
 ### SALES-UX-013 · P2 · Sticky page header takes vertical space (found while re-testing)
 The page header is `position: sticky; top: 0` (about 130 px with the Sheet Sync button at 1366×768). It covers elements scrolled beneath it — agent-browser reported the Add and full-screen buttons as "covered by h1" after a page scroll. It is part of why content gets so little room at 768 px height. Recommended: make the header non-sticky on pages with data tables, or compact it.
 
