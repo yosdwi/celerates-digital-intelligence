@@ -100,8 +100,9 @@ export function KanbanBoard<T extends { id: string }>({
           onCardsChange={onCardsChange}
           getCardLabel={board.cardLabel}
           announceMove={(col, card) => `${card ?? "Kartu"} dipindah ke ${col}`}
-          onPreviewCard={(x) => onOpen(x.id)}
-          previewCardLabel="Lihat ringkasan"
+          // No onPreviewCard (QA page 7): with it Crisp wraps the card's content in a row that stops pointerdown, so only
+          // the card's edges could start a drag. Without it the whole card drags past Crisp's 4px threshold, and a
+          // click (below it) reaches the card's own button, which opens the record.
           renderCard={(x) => board.renderCard(x, () => onOpen(x.id))}
         />
         {menu && st && (

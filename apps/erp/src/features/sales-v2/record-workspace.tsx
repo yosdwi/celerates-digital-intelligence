@@ -127,6 +127,8 @@ export type WorkspaceConfig<T extends { id: string }> = {
   };
 };
 
+const FILTER_ICONS_KEY = "sales-v2:filter-icons";
+
 function readStorage<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(key);
@@ -213,6 +215,31 @@ export function RecordWorkspace<T extends { id: string }>({
   const [shownKeys, setShownKeysState] = useState<string[]>(c.defaultShown);
   useEffect(() => setShownKeysState(readStorage(c.storage.columns, c.defaultShown)), [c]);
   const setShownKeys = useCallback((keys: string[]) => { setShownKeysState(keys); writeStorage(c.storage.columns, keys); }, [c]);
+
+  // Table filter as in Google Sheets (QA page 8, 2026-10-08): in the table, the toolbar's Filter turns the ▼ on every
+  // column header on or off instead of opening Crisp's filter builder (the header's own panel already filters that
+  // column, so the builder only repeated it). Crisp has no prop to swap that trigger's action (it has showSort and
+  // showViewSettings only), so its click is caught on the way down. Grid and Kanban have no headers: there Filter
+  // stays Crisp's builder. On or off is a per-browser preference.
+  const [filterIcons, setFilterIconsState] = useState(false);
+  useEffect(() => setFilterIconsState(readStorage(FILTER_ICONS_KEY, false)), []);
+  const setFilterIcons = (on: boolean) => { setFilterIconsState(on); writeStorage(FILTER_ICONS_KEY, on); };
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const tableFilter = state.view === "table";
+  useEffect(() => {
+    const trigger = toolbarRef.current?.querySelector(".lucide-list-filter")?.closest("button");
+    if (!trigger) return;
+    if (tableFilter) trigger.setAttribute("aria-pressed", String(filterIcons));
+    else trigger.removeAttribute("aria-pressed");
+  });
+  const onToolbarClickCapture = (e: React.MouseEvent) => {
+    if (!tableFilter) return;
+    const trigger = (e.target as Element).closest(".crisp-tabletoolbar-tool");
+    if (!trigger?.querySelector(":scope > .lucide-list-filter")) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setFilterIcons(!filterIcons);
+  };
 
   // Saved views: built-in operational views plus personal ones kept in this browser.
   const [personalViews, setPersonalViews] = useState<StoredView[]>([]);
@@ -360,6 +387,7 @@ export function RecordWorkspace<T extends { id: string }>({
         onFilters={(filters) => commit({ filters })}
         onSorts={(sorts) => commit({ sorts })}
         onHide={onHide}
+        showIcon={filterIcons}
       />
     );
     const regular = c.columns.filter((col) => !frozenKeys.includes(col.key)).map((col): DataTableColumn<T> => ({
@@ -371,7 +399,8 @@ export function RecordWorkspace<T extends { id: string }>({
       hidden: !shownKeys.includes(col.key),
     }));
     if (!frozenKeys.length) return regular;
-    // V1's frozen block as one pinned column: each part keeps its width and header menu, cells stack like V1's.
+    // V1's frozen block as one pinned column: each part keeps its width and header menu, cells stack like V1's. The last
+    // part (OT's Client) takes whatever the block is widened by (QA page 9: a wider block still cut the name short).
     const parts = frozenKeys.map((key) => {
       const col = c.columns.find((x) => x.key === key)!;
       return { col, width: (col.width as number | undefined) ?? widths[key] };
@@ -381,13 +410,13 @@ export function RecordWorkspace<T extends { id: string }>({
       width: parts.reduce((n, p) => n + p.width, 0),
       header: (
         <span className="flex w-full items-stretch" data-sales-v2-frozen-head>
-          {parts.map(({ col, width }) => <span key={col.key} className="flex shrink-0 items-center pr-3" style={{ width }}>{header(col.key)}</span>)}
+          {parts.map(({ col, width }, i) => <span key={col.key} className={`flex items-center pr-3 ${i === parts.length - 1 ? "min-w-0 flex-1" : "shrink-0"}`} style={{ width }}>{header(col.key)}</span>)}
         </span>
       ),
       render: (_, row) => (
         <span className="flex w-full items-center" data-sales-v2-frozen>
-          {parts.map(({ col, width }) => (
-            <span key={col.key} className="min-w-0 shrink-0 truncate pr-3" style={{ width }} title={c.cellText(row, col.key) || undefined}>
+          {parts.map(({ col, width }, i) => (
+            <span key={col.key} className={`min-w-0 truncate pr-3 ${i === parts.length - 1 ? "flex-1" : "shrink-0"}`} style={{ width }} title={c.cellText(row, col.key) || undefined}>
               {col.render ? col.render(undefined as never, row) : c.cellText(row, col.key)}
             </span>
           ))}
@@ -395,7 +424,7 @@ export function RecordWorkspace<T extends { id: string }>({
       ),
     };
     return [frozen, ...regular];
-  }, [c, frozenKeys, valueIndex, state.filters, state.sorts, commit, hideColumn, widths, shownKeys, access.canEdit]);
+  }, [c, frozenKeys, valueIndex, state.filters, state.sorts, commit, hideColumn, widths, shownKeys, access.canEdit, filterIcons]);
   const columnsForSettings: TableToolbarColumn[] = useMemo(() => c.columns.filter((x) => !frozenKeys.includes(x.key)).map((x) => ({ key: x.key, label: c.specs[x.key].label })), [c, frozenKeys]);
   const [workspaceRef, workspaceHeight] = useHeight<HTMLDivElement>();
   const counts = useMemo(() => Object.fromEntries(c.kpis.map((k) => [k.id, all.filter(k.match).length])), [c, all]);
@@ -485,6 +514,7 @@ export function RecordWorkspace<T extends { id: string }>({
             suffix={<Search size={14} className="text-slate-400" />}
           />
         </div>
+        <div ref={toolbarRef} className="contents" onClickCapture={onToolbarClickCapture} data-sales-v2-filter-icons={tableFilter && filterIcons ? "" : undefined}>
         <TableToolbar
           inline
           columns={toolbarColumns}
@@ -501,6 +531,7 @@ export function RecordWorkspace<T extends { id: string }>({
           filterLabel="Filter"
           viewSettingsLabel="Kolom"
         />
+        </div>
         <div className="ml-auto flex items-center gap-1.5">
           {/* Icons with their name on hover keep the toolbar on one line on a laptop (QA 2026-10-08). */}
           <Tooltip content="Riwayat perubahan"><Button size="sm" intent="ghost" aria-label="Riwayat perubahan" onClick={() => setFeedOf({ recordId: null })} data-sales-v2-history-open><History size={14} /></Button></Tooltip>

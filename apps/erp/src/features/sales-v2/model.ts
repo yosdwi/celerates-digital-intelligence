@@ -102,6 +102,8 @@ export function matchesSearch(o: Opportunity, q: string) {
 // ── URL state ────────────────────────────────────────────────────────────────────────────────────────────────
 export const VIEWS = ["table", "grid", "kanban"] as const;
 export type View = (typeof VIEWS)[number];
+/** A page opens on its board (QA 2026-10-08, every Sales V2 page); a plain URL stays plain. */
+export const DEFAULT_VIEW: View = "kanban";
 
 export type WorkspaceState = {
   view: View;
@@ -149,7 +151,7 @@ export function parseState(params: URLSearchParams, keys: ReadonlySet<string> = 
     return keys.has(key) && (dir === "asc" || dir === "desc") ? [{ key, dir }] : [];
   });
   return {
-    view: (VIEWS as readonly string[]).includes(view ?? "") ? (view as View) : "table",
+    view: (VIEWS as readonly string[]).includes(view ?? "") ? (view as View) : DEFAULT_VIEW,
     q: (params.get("q") ?? "").slice(0, 200),
     filters: parseFilters(params.get("filter"), keys),
     sorts,
@@ -161,7 +163,7 @@ export function parseState(params: URLSearchParams, keys: ReadonlySet<string> = 
 /** Query string for a state; defaults are left out so a plain URL stays plain. */
 export function serializeState(s: WorkspaceState): string {
   const p = new URLSearchParams();
-  if (s.view !== "table") p.set("view", s.view);
+  if (s.view !== DEFAULT_VIEW) p.set("view", s.view);
   if (s.q.trim()) p.set("q", s.q);
   if (s.filters.length) p.set("filter", JSON.stringify(s.filters.map(({ id, key, op, value, values, join, group }) => ({ id, key, op, value, values, join, group }))));
   if (s.sorts.length) p.set("sort", s.sorts.map((x) => `${x.key}:${x.dir}`).join(","));

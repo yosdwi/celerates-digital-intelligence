@@ -8,7 +8,8 @@ import { signOut, useSession } from "next-auth/react";
 import { useLocale, useTranslations } from "next-intl";
 import { Activity, Home, Inbox, LayoutGrid, LogOut, ShieldCheck, Sparkles, UserRound } from "lucide-react";
 import { setLocale } from "@/lib/locale-actions";
-import { isMobileNative, moduleForPath } from "@/lib/module-access";
+import { isMobileNative } from "@/lib/module-access";
+import { useNavModule } from "@/lib/nav-module";
 import { useMobileData } from "./data";
 import { ACCOUNT_OPEN_EVENT, openAgent } from "./events";
 import { ModuleGlyph, ModuleLandingSheet, useModuleLabel, useOpenModules } from "./modules";
@@ -132,10 +133,8 @@ export function MobileContextBar() {
   const { signals } = useMobileData();
   const label = useModuleLabel();
   const [open, setOpen] = useState(false);
-  const current = useMemo(() => {
-    const config = moduleForPath(pathname);
-    return config ? modules.find((m) => m.key === config.key) ?? null : null;
-  }, [pathname, modules]);
+  const config = useNavModule(pathname);
+  const current = useMemo(() => (config ? modules.find((m) => m.key === config.key) ?? null : null), [config, modules]);
   useEffect(() => setOpen(false), [pathname]);
   if (status !== "authenticated" || !current || isMobileNative(pathname)) return null;
   const sub = current.subPages.find((s) => s.href === pathname);

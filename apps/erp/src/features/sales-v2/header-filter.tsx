@@ -3,7 +3,7 @@
 // filter (value checklist, range or text) and Hide. Filters are ordinary toolbar filters (model.ts), so they also show
 // as toolbar chips, live in the URL and apply to Grid and Kanban too.
 import { useMemo, useState } from "react";
-import { ArrowDownAZ, ArrowUpAZ, ArrowDown, ArrowUp, EyeOff, Filter, type LucideIcon } from "lucide-react";
+import { ArrowDownAZ, ArrowUpAZ, ArrowDown, ArrowUp, EyeOff, ListFilter, type LucideIcon } from "lucide-react";
 import { Button, Checkbox, Input, Popover, type ToolbarFilter, type ToolbarSort } from "@crisp-ui-kit/crisp";
 import { checkedValues, isHeaderFilter, setCheckedValues, setContains, setRange } from "./model";
 
@@ -21,7 +21,7 @@ export type HeaderSpec = {
 const BLANK = "(Kosong)";
 
 export function HeaderFilter({
-  spec, values, filters, sorts, onFilters, onSorts, onHide,
+  spec, values, filters, sorts, onFilters, onSorts, onHide, showIcon,
 }: {
   spec: HeaderSpec;
   /** Distinct values with their record counts (values and bool kinds). */
@@ -32,6 +32,8 @@ export function HeaderFilter({
   onSorts: (next: ToolbarSort[]) => void;
   /** Absent for a frozen column, which is always shown. */
   onHide?: () => void;
+  /** The toolbar's Filter is on: every header shows its ▼, as in Google Sheets. A filtered column shows it anyway. */
+  showIcon?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const active = filters.some((f) => isHeaderFilter(f, spec.key)) || (spec.kind === "bool" && filters.some((f) => f.key === spec.key));
@@ -51,7 +53,15 @@ export function HeaderFilter({
           <Icon size={14} strokeWidth={1.75} className="shrink-0 opacity-70" aria-hidden />
           <span className="truncate">{spec.label}</span>
           {dir && (dir === "asc" ? <ArrowUp size={12} aria-label="naik" /> : <ArrowDown size={12} aria-label="turun" />)}
-          {active && <Filter size={12} className="shrink-0 fill-current text-[#2356e8]" aria-label="difilter" />}
+          {(showIcon || active) && (
+            <span
+              className={`ml-auto inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border ${active ? "border-[#2356e8] bg-[#2356e8] text-white" : "border-slate-300 bg-white text-slate-500"}`}
+              aria-label={active ? "difilter" : "filter"}
+              data-header-filter-icon
+            >
+              <ListFilter size={12} strokeWidth={2} aria-hidden />
+            </span>
+          )}
         </button>
       }
     >

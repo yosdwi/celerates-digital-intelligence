@@ -8,9 +8,9 @@ import {
   Landmark, LayoutDashboard, Lightbulb, MapPin, PenTool, PiggyBank, Plane, Receipt, Repeat, Settings2, Share2, ShieldCheck, StickyNote, Target,
   UserSearch, Users, Workflow, type LucideIcon,
 } from "lucide-react";
-import { MODULES } from "@/lib/modules-config";
 import { claimsOf, navModules, submoduleFor } from "@/lib/module-access";
 import { NAV_LABEL_KEYS } from "@/lib/nav-i18n";
+import { useNavModule } from "@/lib/nav-module";
 import Image from "next/image";
 import { useSession } from "next-auth/react";
 import { useTranslations } from "next-intl";
@@ -49,9 +49,8 @@ export function Sidebar() {
   // Timesheet needs PMO Full (or Owner); Executive is Owner-only; Feature Request is reached through Masukan.
   const visibleModules = navModules(claimsOf(session?.user));
 
-  const activeModule = MODULES.find(
-    (m) => pathname === m.basePath || pathname.startsWith(m.basePath + "/")
-  );
+  // The module the page is shown under: Sales → Client Active stays in Sales (lib/nav-module.ts).
+  const activeModule = useNavModule(pathname);
 
   // The page the current URL belongs to (longest match; a V1 Sales page counts as its V2 entry).
   const currentHref = submoduleFor(pathname)?.href;

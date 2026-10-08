@@ -13,6 +13,7 @@ import { PQ_DEFAULT_SHOWN, needsPqNo, pqEditValues, pqFieldValue, withPqStage, t
 import { ACCOUNT_BUILT_IN_VIEWS, accountFieldValue, accountFormData, accountMatchesSearch, type Account } from "../src/features/sales-v2/account-model";
 import { safeSalesReturnPath } from "../src/lib/safe-return";
 import { submoduleFor } from "../src/lib/module-access";
+import { navModuleFor } from "../src/lib/nav-module";
 
 const read = (p: string) => readFileSync(new URL(`../src/${p}`, import.meta.url), "utf8");
 const q = (s: string) => new URLSearchParams(s);
@@ -25,12 +26,15 @@ test("URL state round-trips view, search, filters, sort, saved view and record",
   };
   const back = parseState(q(serializeState(state).slice(1)));
   assert.deepEqual(back, { ...state, filters: [{ ...state.filters[0] }] });
-  assert.equal(serializeState({ view: "table", q: " ", filters: [], sorts: [], record: null, savedView: null }), "");
+  // Kanban is every page's default (QA page 7), so a plain URL opens the board and the table names itself.
+  assert.equal(serializeState({ view: "kanban", q: " ", filters: [], sorts: [], record: null, savedView: null }), "");
+  assert.equal(serializeState({ view: "table", q: "", filters: [], sorts: [], record: null, savedView: null }), "?view=table");
+  assert.equal(parseState(q("")).view, "kanban");
 });
 
 test("URL state drops anything it does not know instead of trusting it", () => {
   const s = parseState(q("view=evil&sort=password:asc,price:sideways&filter=" + encodeURIComponent(JSON.stringify([{ key: "users", value: "x" }, { key: "client", op: "contains", value: "A" }]))));
-  assert.equal(s.view, "table");
+  assert.equal(s.view, "kanban");
   assert.deepEqual(s.sorts, []);
   assert.deepEqual(s.filters.map((f) => f.key), ["client"]);
   assert.deepEqual(parseState(q("filter=%7Bnot-json")).filters, []);
@@ -356,7 +360,7 @@ test("QA 2026-10-08: Attio-style table: V1's frozen columns slim, fields edited 
   assert.match(kit, /onEdit=\{edit\}/);
   assert.match(kit, /rowContextMenu=\{c\.rowMenu/);
   assert.doesNotMatch(kit, /onRowClick=/);
-  assert.match(kit, /className="min-w-0 shrink-0 truncate pr-3" style=\{\{ width \}\} title=/);
+  assert.match(kit, /className={`min-w-0 truncate pr-3 \$\{i === parts\.length - 1 \? "flex-1" : "shrink-0"\}`} style=\{\{ width \}\} title=/);
   // The V1 update actions are split, not duplicated: update = save + redirect.
   assert.match(read("app/sales/opportunity-tracker/actions.ts"), /await saveOpportunityTracker\(id, formData\);\n[^]*?await markSaved\(\);\n  redirect\(/);
   assert.match(read("app/sales/actions.ts"), /await saveOpportunity\(id, formData\);\n[^]*?await markSaved\(\);\n[^]*?redirect\(/);
@@ -491,4 +495,36 @@ test("Crisp's own text reads in Indonesian on Sales V2 (CrispMessagesProvider at
   const src = read("features/sales-v2/crisp-messages.tsx");
   for (const en of ["Add sort", "Ascending", "Sorted by", "Search attributes…", "Add filter", "is not", "View edit history", "Clear value"])
     assert.match(src, new RegExp(`"${en.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}": "`), en);
+});
+
+test("QA pages 7–10: Kanban scrolls as one board, whole cards drag, Client fills the frozen block", () => {
+  const css = read("app/sales/v2/sales-v2.css");
+  assert.match(css, /\[data-sales-v2-board\] \.crisp-board-row \{[^}]*overflow: auto/);
+  assert.match(css, /\[data-sales-v2-board\] \.crisp-board-col-body \{ overflow: visible; \}/);
+  assert.match(css, /\[data-sales-v2-board\] \.crisp-board-col-header \{ position: sticky; top: 0;/);
+  // onPreviewCard makes Crisp stop pointerdown over the card's content: only its edges dragged.
+  assert.doesNotMatch(read("features/sales-v2/board-menu.tsx"), /onPreviewCard=/);
+  const ws = read("features/sales-v2/record-workspace.tsx");
+  assert.match(ws, /i === parts\.length - 1 \? "flex-1" : "shrink-0"/);
+  assert.match(ws, /i === parts\.length - 1 \? "min-w-0 flex-1" : "shrink-0"/);
+});
+
+test("QA page 8: in the table the toolbar's Filter toggles the header ▼ instead of Crisp's builder", () => {
+  const ws = read("features/sales-v2/record-workspace.tsx");
+  assert.match(ws, /onClickCapture=\{onToolbarClickCapture\}/);
+  assert.match(ws, /if \(!tableFilter\) return;[\s\S]*lucide-list-filter[\s\S]*e\.stopPropagation\(\);[\s\S]*setFilterIcons\(!filterIcons\)/);
+  assert.match(ws, /showIcon=\{filterIcons\}/);
+  assert.match(read("features/sales-v2/header-filter.tsx"), /\(showIcon \|\| active\) &&/);
+});
+
+test("QA page 10: a page shared with your module keeps you in it; a direct visit shows its owner", () => {
+  assert.equal(navModuleFor("/ta/client-active", "sales")?.key, "sales");
+  assert.equal(navModuleFor("/ta/client-active", null)?.key, "ta");
+  assert.equal(navModuleFor("/ta/client-active", undefined)?.key, "ta");
+  assert.equal(navModuleFor("/pmo/overtime-business-trip", "sales")?.key, "sales");
+  assert.equal(navModuleFor("/sales/v2/accounts?record=x", "marketing")?.key, "marketing");
+  // Not shared there: the owner, whatever the tab remembers.
+  assert.equal(navModuleFor("/ta/pipeline", "sales")?.key, "ta");
+  assert.equal(navModuleFor("/sales/v2/opportunity-tracker", "ta")?.key, "sales");
+  for (const f of ["components/sidebar.tsx", "components/mobile/tab-bar.tsx"]) assert.match(read(f), /useNavModule\(pathname\)/);
 });

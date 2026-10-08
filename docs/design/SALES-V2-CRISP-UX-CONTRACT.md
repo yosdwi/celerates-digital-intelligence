@@ -264,3 +264,18 @@ Decided with the Product Owner before any change (feedback doc "Feedback UI UX")
   (`GOOGLE_SERVICE_ACCOUNT_JSON`, JSON or base64, server env): share the sheet with its email as Editor. Every sync
   action needs Sales Editor (`requireSalesSheetSync`); before, they only checked for a session. Other modules' sheet
   sync stays off (`integrationDisabled`).
+
+## 18. QA round 2026-10-08, doc pages 7–10
+
+- Every Sales V2 page (OT, PQ, Account) opens on Kanban; `?view=table` / `?view=grid` name the others.
+- Kanban scrolls as one board, like Jira: one scroll box (down and sideways), stage headers pinned, columns as tall as
+  the tallest. Title, summary cards and toolbar stay put; the page itself never scrolls.
+- A whole card drags (past Crisp's 4px threshold); a click opens the record. The card's panel icon is gone (it was
+  what blocked dragging, CRISP-UPSTREAM-ISSUES §5).
+- Table filter as in Google Sheets: in the table, the toolbar's Filter shows or hides a ▼ on every column header; the
+  ▼ (or the header) opens the column's panel (sort, search, value checklist / range / contains), applied at once. A
+  filtered column's ▼ is solid blue. Grid and Kanban keep Crisp's filter builder (no headers there).
+- The frozen block's last part (OT: Client, 220px by default) takes whatever the block is widened by.
+- Pages shared with other divisions keep you in the module you came from (sidebar and phone context bar,
+  `lib/nav-module.ts`); a direct link shows the owning module.
+- Loading and navigation speed: plan in `docs/design/FRONTEND-LOADING-ARCHITECTURE.md`.

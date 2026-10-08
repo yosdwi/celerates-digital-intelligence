@@ -217,7 +217,7 @@ const SPECS: Record<string, HeaderSpec> = Object.fromEntries(([
 // Stage chips in Crisp's tag palette, keyed by stage code (the select editor reads the same code).
 const STAGE_SWATCH = Object.fromEntries(STAGES.map((s) => [s.id, s.swatch])) as Record<string, 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12>;
 const ALL_COLUMNS: Omit<DataTableColumn<Opportunity>, "header">[] = [
-  { key: "client", width: 150, render: (_, o) => <RecordLink id={o.id}>{o.client}</RecordLink> },
+  { key: "client", width: 220, render: (_, o) => <RecordLink id={o.id}>{o.client}</RecordLink> },
   { key: "optyNo", width: 112, render: (_, o) => <span className="font-mono text-[0.75rem] text-slate-600">{o.optyNo}</span> },
   { key: "status", type: "status", accessor: (o) => o.status, format: (_, o) => STAGE_LABEL[o.status] ?? o.status, swatches: STAGE_SWATCH, editor: "select", options: STAGES.map((s) => ({ value: s.id, label: s.title })) },
   { key: "position" },

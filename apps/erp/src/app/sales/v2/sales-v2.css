@@ -41,10 +41,21 @@
 /* The workspace reaches the bottom edge and the Agent launcher floats over its corner: the scroll areas end with room
    for it, so the last row or card can always be scrolled clear. */
 [data-sales-v2] .crisp-table-scroll { padding-bottom: 64px; }
-[data-sales-v2-board] .crisp-board-col-body { padding-bottom: 64px; }
 
-/* Columns share the board's width (no empty band on wide screens); below n × 268px it scrolls sideways as before. */
-[data-sales-v2-board] .crisp-board-col { flex: 1 0 268px; width: auto; }
+/* Kanban scrolls as one board, like Jira (QA page 7, 2026-10-08): Crisp's Board scrolls each column on its own and has
+   no option for this. The board's row becomes the one scroll box (down and sideways); columns grow with their cards
+   and share the tallest one's height so each stage's lane runs to the end, and stage headers stay pinned on top. The
+   page itself does not scroll: title, summary cards and toolbar stay put above. Columns share the board's width; below
+   n × 268px it scrolls sideways. */
+[data-sales-v2-board] .crisp-board-row {
+  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(268px, 1fr); align-items: stretch;
+  overflow: auto; overscroll-behavior: contain; padding-bottom: 64px;
+}
+[data-sales-v2-board] .crisp-board-col { width: auto; max-height: none; }
+[data-sales-v2-board] .crisp-board-col-body { overflow: visible; }
+[data-sales-v2-board] .crisp-board-col-header { position: sticky; top: 0; z-index: 2; background: #fff; }
+/* A card scrolled into view (a record in the URL) lands below the pinned header, not under it. */
+[data-sales-v2-board] .crisp-board-card { scroll-margin-top: 48px; }
 
 /* Kanban: each column carries its stage colour; cards get a visible edge and the stage on their left side. */
 /* The board sets --stage-1… from its stages (record-workspace.tsx); Crisp columns carry no id, so position it is. */
@@ -110,3 +121,6 @@
    DialogBody + DialogFooter is a block, so a long form pushed the footer (Batal / Simpan) out of sight on short
    laptop viewports. Making the form the card's flex column lets Crisp's body scroll and keeps the footer in view. */
 .crisp-dialog-card > form { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+
+/* The toolbar's Filter while it shows the table's header ▼ (record-workspace.tsx, QA page 8). */
+[data-sales-v2] .crisp-tabletoolbar-tool[aria-pressed="true"] { background: #e8eefd; color: #1a43b8; border-style: solid; border-color: #9db4f5; }

@@ -31,3 +31,26 @@ move while its menu is open.
 
 `--crisp-ring-popover` is transparent and the popover shadow faint; over a white, dense table a menu reads as part
 of the table. Not a bug (tokens are the theming path): we set a visible ring and a stronger shadow in our tokens.
+
+## 4. Board scrolls each column on its own; no whole-board scroll
+
+`Board` gives each `.crisp-board-col-body` its own `overflow-y: auto` (and the column `max-height: 100%`). Jira-style
+boards scroll the whole board as one, with column headers pinned. There is no prop for it. **Ask:** a
+`scroll="column" | "board"` option (board: the row scrolls both ways, columns grow and share the tallest one's
+height, headers `position: sticky`). **Our workaround:** `apps/erp/src/app/sales/v2/sales-v2.css` (search
+"Kanban scrolls as one board").
+
+## 5. `onPreviewCard` makes most of a card undraggable
+
+With `onPreviewCard`, the card's content is wrapped in `.crisp-board-card-titlerow` with
+`onPointerDown={(e) => e.stopPropagation()}`, so a drag can only start on the card's padding. **Expected:** only the
+action buttons stop propagation; the content still drags past the 4px threshold. **Our workaround:** we don't pass
+`onPreviewCard`; the card's own content opens the record on click.
+
+## 6. TableToolbar: no way to hide or take over the Filter trigger
+
+`showSort` and `showViewSettings` exist, but not `showFilter` (or an `onFilterTriggerClick`). Our table filters from
+each column header, as in Google Sheets, and the toolbar's Filter only shows or hides those header icons. **Ask:**
+`showFilter?: boolean` and/or `onFilterTriggerClick?: () => void` plus `filterTriggerPressed?: boolean`. **Our
+workaround:** a capturing click handler around the toolbar in `record-workspace.tsx` (search "Table filter as in
+Google Sheets").
