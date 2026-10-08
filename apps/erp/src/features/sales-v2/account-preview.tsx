@@ -10,7 +10,9 @@ import { Building2, Calendar, FileText, Mail, Phone, Plus, UserPlus, X } from "l
 import { ActivityFeedRow, Badge, Button, Checkbox, Dialog, DialogBody, DialogFooter, Input, RecordPanel, Select, Textarea } from "@crisp-ui-kit/crisp";
 import { useToast } from "@/components/toast-provider";
 import { createActivity, createClient, createContact, deleteActivity, deleteClient, deleteContact, updateClient } from "@/app/sales/accounts/actions";
-import { F, DraftFooter, opts, readDraft, useCloseFromXOnly, useSubmit, type Draft } from "./forms";
+import { AiFill, F, DraftFooter, fillHint, opts, readDraft, useCloseFromXOnly, useSubmit, type AiFillResult, type Draft } from "./forms";
+import { createAccountContacts } from "@/app/sales/ai-actions";
+import { mergeFill, type AiContact } from "./ai-fill";
 import { rupiah } from "./model";
 import { PQ_STAGE_LABEL } from "./pq-model";
 import { ACCOUNT_STATUSES, ACTIVITY_LABEL, ACTIVITY_TYPES, accountFormData, lastActivityOf, picOf, type Account } from "./account-model";
@@ -46,6 +48,8 @@ export function AccountPreview({
   const router = useRouter();
   const { showToast } = useToast();
   const [dialog, setDialog] = useState<Dialogs>(null);
+  // "Jadikan kontak" from a mail by someone not yet a contact: the contact form starts from the sender.
+  const [contactFrom, setContactFrom] = useState<ContactFrom | null>(null);
   const { edit, showHistory } = useRowActions();
   useEffect(() => {
     if (!record || !request || record.id !== request.id) return;
@@ -120,7 +124,7 @@ export function AccountPreview({
   const sections = [
     {
       key: "email", label: "Email", count: record.emails,
-      content: <AccountEmails account={{ id: record.id, name: record.name }} contacts={record.contacts} canSend={access.canEdit} />,
+      content: <AccountEmails account={{ id: record.id, name: record.name }} contacts={record.contacts} canSend={access.canEdit} onMakeContact={access.canEdit ? (c) => { setContactFrom(c); setDialog("contact"); } : undefined} />,
     },
     {
       key: "contacts", label: "Kontak PIC", count: record.contacts.length,
@@ -182,7 +186,7 @@ export function AccountPreview({
     <p className="text-[0.75rem] text-slate-500">Mode lihat saja: perubahan butuh akses Editor Sales.</p>
   );
 
-  const close = () => setDialog(null);
+  const close = () => { setDialog(null); setContactFrom(null); };
   const confirm = typeof dialog === "object" && dialog ? dialog : null;
   return (
     <>
@@ -214,7 +218,7 @@ export function AccountPreview({
         data-testid="sales-v2-record-panel"
       />
       {access.canEdit && <AccountDialog record={record} open={dialog === "edit"} onClose={close} />}
-      {access.canEdit && <ContactDialog record={record} open={dialog === "contact"} onClose={close} />}
+      {access.canEdit && <ContactDialog record={record} open={dialog === "contact"} onClose={close} from={contactFrom} />}
       {access.canEdit && <ActivityDialog record={record} open={dialog === "activity"} onClose={close} />}
       <ConfirmDialog
         open={dialog === "delete"}
@@ -256,13 +260,13 @@ function ConfirmDialog({ open, onClose, title, description, run }: { open: boole
 }
 
 // ── Forms: V1's Add Account, Add Contact and Log Activity fields ────────────────────────────────────────────────
-function AccountFields({ d }: { d: Draft }) {
+function AccountFields({ d, ai = () => undefined }: { d: Draft; ai?: (key: string) => string | undefined }) {
   return (
     <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-3">
-      <F label="Nama Klien" required><Input name="name" required defaultValue={d.name} autoFocus /></F>
-      <F label="Industri"><Input name="industry" defaultValue={d.industry} /></F>
+      <F label="Nama Klien" required hint={ai("name")}><Input name="name" required defaultValue={d.name} autoFocus /></F>
+      <F label="Industri" hint={ai("industry")}><Input name="industry" defaultValue={d.industry} /></F>
       <F label="Status"><Select name="status_code" defaultValue={d.status_code || "prospect"} options={statusOptions} /></F>
-      <F label="Notes" span><Textarea name="notes" rows={3} defaultValue={d.notes} /></F>
+      <F label="Notes" span hint={ai("notes")}><Textarea name="notes" rows={3} defaultValue={d.notes} /></F>
     </div>
   );
 }
@@ -293,22 +297,51 @@ export function CreateAccount({ names, open, status, onOpen, onClose }: { names:
   const draft = useRef<Draft>({});
   const formRef = useRef<HTMLFormElement>(null);
   const [resetTick, setResetTick] = useState(0);
+  const [aiKeys, setAiKeys] = useState<string[]>([]);
+  const [contacts, setContacts] = useState<AiContact[]>([]);
+  const [skip, setSkip] = useState<Set<number>>(new Set());
   const close = () => { draft.current = readDraft(formRef.current); onClose(); };
   const onOpenChange = useCloseFromXOnly(open, close);
+  const clear = () => { draft.current = {}; setAiKeys([]); setContacts([]); setSkip(new Set()); };
   // The name is unique (uq_crm_clients_name); say so here instead of the database error.
   const { pending, onSubmit, t } = useSubmit(async (fd) => {
-    if (names.has(String(fd.get("name") ?? "").trim())) throw new Error("Account dengan nama ini sudah ada.");
+    const name = String(fd.get("name") ?? "").trim();
+    if (names.has(name)) throw new Error("Account dengan nama ini sudah ada.");
     await createClient(fd);
-  }, () => { draft.current = {}; onClose(); });
+    const keep = contacts.filter((_, i) => !skip.has(i));
+    if (keep.length) await createAccountContacts(name, keep);
+  }, () => { clear(); onClose(); });
+  const onFill = ({ fields, contacts: found }: AiFillResult) => {
+    const { draft: next, filled } = mergeFill(readDraft(formRef.current), fields, { status_code: "prospect" }, aiKeys);
+    draft.current = next;
+    setAiKeys((k) => Array.from(new Set([...k, ...filled])));
+    if (found.length) { setContacts(found); setSkip(new Set()); }
+    setResetTick((n) => n + 1);
+  };
   const d = status ? { ...draft.current, status_code: status } : draft.current;
   return (
     <>
       <Button intent="primary" size="sm" onClick={onOpen} data-testid="sales-v2-new"><Plus size={14} strokeWidth={2.25} /> New</Button>
       <Dialog open={open} onOpenChange={onOpenChange} title="Tambah Account" icon={<Building2 size={16} />} closeLabel="Tutup" width={640} data-sales-v2-dialog="account-create">
         {open && (
-          <form key={resetTick} ref={formRef} onSubmit={onSubmit}>
-            <DialogBody><AccountFields d={d} /></DialogBody>
-            <DraftFooter pending={pending} onCancel={close} onReset={() => { draft.current = {}; setResetTick((n) => n + 1); }} t={t} />
+          <form ref={formRef} onSubmit={onSubmit}>
+            <DialogBody>
+              <AiFill form="account" label="Isi dari signature email / profil perusahaan (AI)" placeholder="Tempel signature email, profil perusahaan atau catatan meeting…" onFill={onFill} />
+              <div key={resetTick}><AccountFields d={d} ai={fillHint(aiKeys)} /></div>
+              {!!contacts.length && (
+                <fieldset className="mt-3 rounded-lg border border-violet-200 px-3 py-2" data-ai-contacts>
+                  <legend className="px-1 text-[0.75rem] font-semibold text-violet-900">✦ Kontak yang ditemukan AI · ikut disimpan</legend>
+                  {contacts.map((c, i) => (
+                    <label key={i} className="flex items-center gap-2 py-1 text-[0.8125rem] text-slate-800">
+                      <Checkbox checked={!skip.has(i)} onChange={(e) => { const on = e.target.checked; setSkip((s) => { const n = new Set(s); if (on) n.delete(i); else n.add(i); return n; }); }} />
+                      <b className="font-medium">{c.name}</b>
+                      <span className="truncate text-slate-600">{[c.role_title, c.email, c.phone].filter(Boolean).join(" · ")}</span>
+                    </label>
+                  ))}
+                </fieldset>
+              )}
+            </DialogBody>
+            <DraftFooter pending={pending} onCancel={close} onReset={() => { clear(); setResetTick((n) => n + 1); }} t={t} />
           </form>
         )}
       </Dialog>
@@ -316,19 +349,47 @@ export function CreateAccount({ names, open, status, onOpen, onClose }: { names:
   );
 }
 
-function ContactDialog({ record, open, onClose }: { record: Account; open: boolean; onClose: () => void }) {
+export type ContactFrom = { name: string | null; email: string; text: string };
+
+function ContactDialog({ record, open, onClose, from }: { record: Account; open: boolean; onClose: () => void; from: ContactFrom | null }) {
   const onOpenChange = useCloseFromXOnly(open, onClose);
   const { pending, onSubmit, t } = useSubmit((fd) => createContact(record.id, fd), onClose);
+  const formRef = useRef<HTMLFormElement>(null);
+  const [d, setD] = useState<Draft>({});
+  const [aiKeys, setAiKeys] = useState<string[]>([]);
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (!open) return;
+    setD(from ? { name: from.name ?? "", email: from.email } : {});
+    setAiKeys([]);
+    setTick((n) => n + 1);
+  }, [open, from]);
+  const ai = fillHint(aiKeys);
+  const onFill = ({ fields }: AiFillResult) => {
+    const { draft, filled } = mergeFill(readDraft(formRef.current), fields, {}, aiKeys);
+    setAiKeys((k) => Array.from(new Set([...k, ...filled])));
+    setD(draft);
+    setTick((n) => n + 1);
+  };
   return (
     <Dialog open={open} onOpenChange={onOpenChange} title={`Tambah kontak · ${record.name}`} icon={<UserPlus size={16} />} closeLabel="Tutup" width={640} data-sales-v2-dialog="account-contact">
       {open && (
-        <form onSubmit={onSubmit}>
+        <form ref={formRef} onSubmit={onSubmit}>
           <DialogBody>
-            <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
-              <F label="Nama" required><Input name="name" required autoFocus /></F>
-              <F label="Jabatan"><Input name="role_title" /></F>
-              <F label="Email"><Input name="email" type="email" /></F>
-              <F label="Telepon"><Input name="phone" /></F>
+            <AiFill
+              key={from?.email ?? "new"}
+              form="contact"
+              label={from ? "Lengkapi dari isi email (AI)" : "Isi dari signature email / kartu nama (AI)"}
+              placeholder="Tempel signature email atau kartu nama…"
+              initialText={from?.text.slice(-4000) ?? ""}
+              defaultOpen={!!from}
+              onFill={onFill}
+            />
+            <div key={tick} className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
+              <F label="Nama" required hint={ai("name")}><Input name="name" required autoFocus defaultValue={d.name} /></F>
+              <F label="Jabatan" hint={ai("role_title")}><Input name="role_title" defaultValue={d.role_title} /></F>
+              <F label="Email" hint={ai("email")}><Input name="email" type="email" defaultValue={d.email} /></F>
+              <F label="Telepon" hint={ai("phone")}><Input name="phone" defaultValue={d.phone} /></F>
               <label className="flex items-center gap-2 text-[0.8125rem] font-medium text-slate-700">
                 <Checkbox name="is_primary" value="true" /> Kontak utama
               </label>

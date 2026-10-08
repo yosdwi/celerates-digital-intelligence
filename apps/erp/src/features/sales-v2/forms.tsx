@@ -12,7 +12,9 @@ import { MoneyInput } from "@/components/form-fields";
 import { useToast } from "@/components/toast-provider";
 import { createOpportunityTracker, updateOpportunityTracker } from "@/app/sales/opportunity-tracker/actions";
 import { createExtensionRequestFromSales } from "@/app/sales/actions";
-import { BANTE_SCORES, BUSINESS_UNITS, CLIENT_TYPES, LEVELS, PRICE_PERIODS, PRIORITIES, SERVICE_TYPES, STAGES, STAGE_LABEL, editValues, type Opportunity } from "./model";
+import { getExtensionPrefill } from "@/app/sales/ai-actions";
+import { BANTE_SCORES, BUSINESS_UNITS, CLIENT_TYPES, LEVELS, LEVEL_LABEL, PRICE_PERIODS, PRIORITIES, SERVICE_TYPES, STAGES, STAGE_LABEL, editValues, type Opportunity } from "./model";
+import { mergeFill, updateSuggestions, type AiForm, type AiResult, type Suggestion } from "./ai-fill";
 
 export const isRedirect = (err: unknown) => typeof (err as { digest?: unknown })?.digest === "string" && (err as { digest: string }).digest.startsWith("NEXT_REDIRECT");
 
@@ -114,29 +116,54 @@ export function DraftFooter({ pending, onCancel, onReset, t, resetLabel = "Koson
   );
 }
 
-/** Pasted client email or RFQ → AI proposes the fields (roadmap #3, api/agent/extract). Nothing is saved: the values
- *  land in the form, marked, for the person to check. The pasted text is not kept. */
-function AiFill({ onFill }: { onFill: (fields: Draft) => void }) {
-  const [text, setText] = useState("");
+export type AiFillResult = AiResult & { lastMail: string | null };
+
+/** The ✦ / ↺ hint on a field the AI or the Extension prefill filled; otherwise the field's own hint. */
+export const fillHint = (aiKeys: string[], prefilled: string[] = []) => (key: string, hint?: string) =>
+  aiKeys.includes(key) ? "✦ Diisi AI, periksa" : prefilled.includes(key) ? "↺ Dari kontrak sebelumnya, periksa" : hint;
+
+/**
+ * AI form fill (roadmap #3, api/agent/extract): pasted text, or a PO / PKS file where `file` is set, → proposed fields.
+ * Nothing is saved: the caller puts the values in its form, marked, for the person to check. Neither the text nor the
+ * file is kept. With `opportunityId` and nothing pasted, the server reads that Opportunity's latest emails.
+ */
+export function AiFill({ form, onFill, label, placeholder, file = false, initialText = "", opportunityId, defaultOpen = false }: {
+  form: AiForm; onFill: (r: AiFillResult) => void; label: string; placeholder: string; file?: boolean; initialText?: string; opportunityId?: string; defaultOpen?: boolean;
+}) {
+  const [text, setText] = useState(initialText);
+  const [doc, setDoc] = useState<File | null>(null);
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const run = () => start(async () => {
+  const call = (body: BodyInit, json: boolean) => start(async () => {
     setError(null);
-    const res = await fetch("/api/agent/extract", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) }).catch(() => null);
-    const body = await res?.json().catch(() => ({}));
-    if (!res?.ok) { setError(body?.error ?? "AI belum tersedia."); return; }
-    const fields = (body?.fields ?? {}) as Draft;
-    if (!Object.keys(fields).length) { setError("AI tidak menemukan data yang bisa diisi dari teks ini."); return; }
-    onFill(fields);
+    const res = await fetch("/api/agent/extract", { method: "POST", headers: json ? { "Content-Type": "application/json" } : undefined, body }).catch(() => null);
+    const out = await res?.json().catch(() => ({}));
+    if (!res?.ok) { setError(out?.error ?? "AI belum tersedia."); return; }
+    const r: AiFillResult = { fields: out?.fields ?? {}, contacts: out?.contacts ?? [], lastMail: out?.lastMail ?? null };
+    if (!Object.keys(r.fields).length && !r.contacts.length && !r.lastMail) { setError("AI tidak menemukan data yang bisa diisi."); return; }
+    onFill(r);
   });
+  const fromEmails = !!opportunityId && !text.trim();
+  const runText = () => call(JSON.stringify({ form, text, opportunityId }), true);
+  const runFile = () => { if (!doc) return; const fd = new FormData(); fd.set("form", form); fd.set("file", doc); call(fd, false); };
   return (
-    <details className="mb-3 rounded-lg border border-violet-200 bg-violet-50/50 px-3 py-2" data-ai-fill>
-      <summary className="flex cursor-pointer items-center gap-1.5 text-[0.8125rem] font-medium text-violet-900"><Sparkles size={14} /> Isi dari email / RFQ klien (AI)</summary>
+    <details className="mb-3 rounded-lg border border-violet-200 bg-violet-50/50 px-3 py-2" data-ai-fill={form} open={defaultOpen || undefined}>
+      <summary className="flex cursor-pointer items-center gap-1.5 text-[0.8125rem] font-medium text-violet-900"><Sparkles size={14} /> {label}</summary>
       <div className="mt-2 space-y-2">
-        <Textarea value={text} onChange={(e) => setText(e.target.value)} rows={5} placeholder="Tempel isi email atau RFQ di sini…" aria-label="Teks email atau RFQ" />
-        <div className="flex items-center gap-2">
-          <Button type="button" size="sm" intent="primary" loading={pending} disabled={text.trim().length < 10} onClick={run}><Sparkles size={13} /> Isi dengan AI</Button>
-          <span className="text-[0.75rem] text-slate-500">Hasil AI ditandai ✦ di form; periksa sebelum menyimpan.</span>
+        {file && (
+          <div className="flex flex-wrap items-center gap-2">
+            <input type="file" accept=".pdf,.docx,.png,.jpg,.jpeg" aria-label="Berkas PO / PKS" className="max-w-full text-[0.75rem]" onChange={(e) => setDoc(e.target.files?.[0] ?? null)} />
+            <Button type="button" size="sm" intent="primary" loading={pending && !!doc} disabled={!doc || pending} onClick={runFile}><Sparkles size={13} /> Baca dokumen</Button>
+          </div>
+        )}
+        <Textarea value={text} onChange={(e) => setText(e.target.value)} rows={4} placeholder={placeholder} aria-label={label} />
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" size="sm" intent={file ? "neutral" : "primary"} loading={pending && !doc} disabled={pending || (!fromEmails && text.trim().length < 10)} onClick={runText}>
+            <Sparkles size={13} /> {fromEmails ? "Usulkan dari email terbaru" : "Isi dengan AI"}
+          </Button>
+          <span className="text-[0.75rem] text-slate-500">
+            {pending && file && doc ? "Membaca dokumen; hasil scan bisa makan waktu sampai 1 menit." : "Hasil AI ditandai ✦; periksa sebelum menyimpan."}
+          </span>
         </div>
         {error && <p className="text-[0.75rem] text-red-600">{error}</p>}
       </div>
@@ -144,9 +171,11 @@ function AiFill({ onFill }: { onFill: (fields: Draft) => void }) {
   );
 }
 
-function OpportunityForm({ options, draft: d, formRef, onDone, onCancel, onReset, status, aiKeys = [], onAiFill }: FormProps & { status?: string; aiKeys?: string[]; onAiFill?: (fields: Draft) => void }) {
+type FillProps = { aiKeys?: string[]; onAiFill?: (r: AiFillResult) => void };
+
+function OpportunityForm({ options, draft: d, formRef, onDone, onCancel, onReset, status, aiKeys = [], onAiFill }: FormProps & FillProps & { status?: string }) {
   const { pending, onSubmit, t } = useSubmit(createOpportunityTracker, onDone);
-  const ai = (key: string, hint?: string) => (aiKeys.includes(key) ? "✦ Diisi AI, periksa" : hint);
+  const ai = fillHint(aiKeys);
   const [leadId, setLeadId] = useState(d.lead_id ?? "");
   const lead = options.leadOptions.find((l) => l.id === leadId);
   const clientDefault = leadId === (d.lead_id ?? "") && d.client_name != null ? d.client_name : lead?.client_name ?? "";
@@ -155,7 +184,7 @@ function OpportunityForm({ options, draft: d, formRef, onDone, onCancel, onReset
       {status && <input type="hidden" name="opty_status_code" value={status} />}
       <DialogBody>
         {status && <p className="mb-3 text-[0.75rem] text-slate-600">Stage awal: <b className="text-slate-900">{STAGE_LABEL[status] ?? status}</b></p>}
-        {onAiFill && <AiFill onFill={onAiFill} />}
+        {onAiFill && <AiFill form="opportunity" label="Isi dari email / RFQ klien (AI)" placeholder="Tempel isi email atau RFQ di sini…" onFill={onAiFill} />}
         <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-3">
           <F label="Dari Marketing Lead" hint={lead ? `Leads No: ${lead.lead_no}` : "Kosongkan kalau bukan dari Marketing."}>
             <Select
@@ -199,43 +228,48 @@ function OpportunityForm({ options, draft: d, formRef, onDone, onCancel, onReset
   );
 }
 
-function ExtensionForm({ options, draft: d, formRef, onDone, onCancel, onReset }: FormProps) {
+function ExtensionForm({ options, draft: d, formRef, onDone, onCancel, onReset, aiKeys = [], prefilled = [], onAiFill, onPick }: FormProps & FillProps & { prefilled?: string[]; onPick: (employeeId: string) => void }) {
   const { pending, onSubmit, t } = useSubmit(createExtensionRequestFromSales, onDone);
+  const ai = fillHint(aiKeys, prefilled);
   return (
     <form ref={formRef} onSubmit={onSubmit}>
       <DialogBody>
+        {onAiFill && <AiFill form="extension" label="Isi dari email perpanjangan klien (AI)" placeholder="Tempel email klien soal perpanjangan (periode baru, rate baru)…" onFill={onAiFill} />}
         <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-3">
-          <F label="Talent yang di-extend" required span hint="Bikin PQ baru buat deal perpanjangan ini + otomatis masuk sebagai request pending di TM Extension Request (TM lengkapi rincian gaji & approval chain-nya).">
-            <Select name="employee_id" required searchable defaultValue={d.employee_id} options={options.employeeOptions} placeholder="Pilih talent" />
+          <F label="Talent yang di-extend" required span hint="Bikin PQ baru buat deal perpanjangan ini + otomatis masuk sebagai request pending di TM Extension Request (TM lengkapi rincian gaji & approval chain-nya). Memilih talent mengisi form dari kontraknya sekarang.">
+            <Select name="employee_id" required searchable defaultValue={d.employee_id} options={options.employeeOptions} placeholder="Pilih talent" onValueChange={onPick} />
           </F>
 
-          <F label="Client Name" required><Input name="client_name" required defaultValue={d.client_name} /></F>
-          <F label="Client Type"><Select name="client_type_code" defaultValue={d.client_type_code} options={opts(CLIENT_TYPES)} placeholder="-" /></F>
-          <F label="Project Name" required><Input name="project_name" required defaultValue={d.project_name} /></F>
+          <F label="Client Name" required hint={ai("client_name")}><Input name="client_name" required defaultValue={d.client_name} /></F>
+          <F label="Client Type" hint={ai("client_type_code")}><Select name="client_type_code" defaultValue={d.client_type_code} options={opts(CLIENT_TYPES)} placeholder="-" /></F>
+          <F label="Project Name" required hint={ai("project_name")}><Input name="project_name" required defaultValue={d.project_name} /></F>
 
-          <F label="Positions"><PositionInput suggestions={options.positionSuggestions} defaultValue={d.position_name} /></F>
-          <F label="Service Type" required><Select name="service_type_code" required defaultValue={d.service_type_code} options={opts(SERVICE_TYPES)} placeholder="-" /></F>
-          <F label="Business Unit"><Select name="business_unit_code" defaultValue={d.business_unit_code} options={opts(BUSINESS_UNITS)} placeholder="-" /></F>
+          <F label="Positions" hint={ai("position_name")}><PositionInput suggestions={options.positionSuggestions} defaultValue={d.position_name} /></F>
+          <F label="Service Type" required hint={ai("service_type_code")}><Select name="service_type_code" required defaultValue={d.service_type_code} options={opts(SERVICE_TYPES)} placeholder="-" /></F>
+          <F label="Business Unit" hint={ai("business_unit_code")}><Select name="business_unit_code" defaultValue={d.business_unit_code} options={opts(BUSINESS_UNITS)} placeholder="-" /></F>
 
-          <F label="Level"><Select name="level_code" defaultValue={d.level_code} options={opts(LEVELS)} placeholder="-" /></F>
-          <F label="Headcount"><Input name="headcount_target" type="number" defaultValue={d.headcount_target} /></F>
-          <F label="Estimasi Durasi (bulan)"><Input name="estimated_duration_months" type="number" defaultValue={d.estimated_duration_months} /></F>
+          <F label="Level" hint={ai("level_code")}><Select name="level_code" defaultValue={d.level_code} options={opts(LEVELS)} placeholder="-" /></F>
+          <F label="Headcount" hint={ai("headcount_target")}><Input name="headcount_target" type="number" defaultValue={d.headcount_target} /></F>
+          <F label="Estimasi Durasi (bulan)" hint={ai("estimated_duration_months")}><Input name="estimated_duration_months" type="number" defaultValue={d.estimated_duration_months} /></F>
 
-          <F label="Priority"><Select name="priority_code" defaultValue={d.priority_code} options={opts(PRIORITIES)} placeholder="-" /></F>
-          <F label="Price"><Money name="price_amount" defaultValue={d.price_amount} /></F>
-          <F label="Price Period"><Select name="price_period_code" defaultValue={d.price_period_code ?? "monthly"} options={opts(PRICE_PERIODS)} /></F>
+          <F label="Priority" hint={ai("priority_code")}><Select name="priority_code" defaultValue={d.priority_code} options={opts(PRIORITIES)} placeholder="-" /></F>
+          <F label="Price" hint={ai("price_amount")}><Money name="price_amount" defaultValue={d.price_amount} /></F>
+          <F label="Price Period" hint={ai("price_period_code")}><Select name="price_period_code" defaultValue={d.price_period_code ?? "monthly"} options={opts(PRICE_PERIODS)} /></F>
 
-          <F label="Sales PIC" required><Input name="sales_pic_name" required defaultValue={d.sales_pic_name} /></F>
-          <F label="Start Date"><Input name="start_date" type="date" defaultValue={d.start_date} /></F>
-          <F label="End Date"><Input name="end_date" type="date" defaultValue={d.end_date} /></F>
+          <F label="Sales PIC" required hint={ai("sales_pic_name")}><Input name="sales_pic_name" required defaultValue={d.sales_pic_name} /></F>
+          <F label="Start Date" hint={ai("start_date")}><Input name="start_date" type="date" defaultValue={d.start_date} /></F>
+          <F label="End Date" hint={ai("end_date")}><Input name="end_date" type="date" defaultValue={d.end_date} /></F>
 
-          <F label="Notes" span><Textarea name="notes" rows={3} defaultValue={d.notes} /></F>
+          <F label="Notes" span hint={ai("notes")}><Textarea name="notes" rows={3} defaultValue={d.notes} /></F>
         </div>
       </DialogBody>
       <DraftFooter pending={pending} onCancel={onCancel} onReset={onReset} t={t} />
     </form>
   );
 }
+
+/** Values a create form starts with: an AI proposal may replace them. */
+const DEFAULTS: Draft = { price_period_code: "monthly" };
 
 const TITLES = { opportunity: "Tambah Opportunity Baru", extension: "Add Extension Request" } as const;
 
@@ -248,18 +282,31 @@ export function CreateMenu({ options, create, onCreate }: { options: FormOptions
   const formRef = useRef<HTMLFormElement>(null);
   const [resetTick, setResetTick] = useState(0);
   const [aiKeys, setAiKeys] = useState<string[]>([]);
+  const [prefilled, setPrefilled] = useState<string[]>([]);
   const kind = create?.kind;
   const close = () => { if (kind) drafts.current[kind] = readDraft(formRef.current, ["opty_status_code"]); onCreate(null); };
   const onOpenChange = useCloseFromXOnly(!!create, close);
-  const done = () => { if (kind) drafts.current[kind] = {}; setAiKeys([]); onCreate(null); };
-  const reset = () => { if (kind) drafts.current[kind] = {}; setAiKeys([]); setResetTick((n) => n + 1); };
-  // AI fill keeps what was typed and overwrites only the fields the AI found, then remounts the form with them.
-  const aiFill = (fields: Draft) => {
-    drafts.current.opportunity = { ...readDraft(formRef.current, ["opty_status_code"]), ...fields };
-    setAiKeys(Object.keys(fields));
-    setResetTick((n) => n + 1);
+  const clearMarks = () => { setAiKeys([]); setPrefilled([]); };
+  const done = () => { if (kind) drafts.current[kind] = {}; clearMarks(); onCreate(null); };
+  const reset = () => { if (kind) drafts.current[kind] = {}; clearMarks(); setResetTick((n) => n + 1); };
+  const remount = (draft: Draft) => { if (kind) drafts.current[kind] = draft; setResetTick((n) => n + 1); };
+  // AI fill only fills what is empty, at its default, or machine-filled before; then remounts the form with it.
+  const aiFill = ({ fields }: AiFillResult) => {
+    const { draft, filled } = mergeFill(readDraft(formRef.current, ["opty_status_code"]), fields, DEFAULTS, [...aiKeys, ...prefilled]);
+    setAiKeys((k) => Array.from(new Set([...k, ...filled])));
+    setPrefilled((k) => k.filter((x) => !filled.includes(x)));
+    remount(draft);
   };
-  const props = { options, formRef, draft: (kind && drafts.current[kind]) || {}, onDone: done, onCancel: close, onReset: reset };
+  // Extension: picking the talent copies their current contract (no AI) into what is still empty or was copied before.
+  const pick = (employeeId: string) => {
+    getExtensionPrefill(employeeId).then((pre) => {
+      const { draft, filled } = mergeFill({ ...readDraft(formRef.current), employee_id: employeeId }, pre, DEFAULTS, prefilled);
+      setPrefilled(filled);
+      setAiKeys((k) => k.filter((x) => !filled.includes(x)));
+      remount(draft);
+    }, () => {});
+  };
+  const props = { options, formRef, draft: (kind && drafts.current[kind]) || {}, onDone: done, onCancel: close, onReset: reset, aiKeys, onAiFill: aiFill };
 
   return (
     <>
@@ -284,8 +331,8 @@ export function CreateMenu({ options, create, onCreate }: { options: FormOptions
         width={760}
         data-sales-v2-dialog={kind}
       >
-        {kind === "opportunity" && <OpportunityForm key={`o${resetTick}`} {...props} status={create?.status} aiKeys={aiKeys} onAiFill={aiFill} />}
-        {kind === "extension" && <ExtensionForm key={`e${resetTick}`} {...props} />}
+        {kind === "opportunity" && <OpportunityForm key={`o${resetTick}`} {...props} status={create?.status} />}
+        {kind === "extension" && <ExtensionForm key={`e${resetTick}`} {...props} prefilled={prefilled} onPick={pick} />}
       </Dialog>
     </>
   );
@@ -298,8 +345,14 @@ const editDrafts = new Map<string, Draft>();
 export function EditOpportunityDialog({ record, open, onClose, returnTo, options }: { record: Opportunity; open: boolean; onClose: () => void; returnTo: string; options: FormOptions }) {
   const formRef = useRef<HTMLFormElement>(null);
   const [resetTick, setResetTick] = useState(0);
+  const [aiKeys, setAiKeys] = useState<string[]>([]);
   const close = () => { editDrafts.set(record.id, readDraft(formRef.current, ["return_to"])); onClose(); };
   const onOpenChange = useCloseFromXOnly(open, close);
+  const apply = (values: Draft) => {
+    editDrafts.set(record.id, { ...readDraft(formRef.current, ["return_to"]), ...values });
+    setAiKeys((k) => Array.from(new Set([...k, ...Object.keys(values)])));
+    setResetTick((n) => n + 1);
+  };
   return (
     <Dialog open={open} onOpenChange={onOpenChange} title={`Edit ${record.optyNo}`} icon={<SquarePen size={16} />} closeLabel="Tutup" width={760} data-sales-v2-dialog="edit">
       {open && (
@@ -310,49 +363,103 @@ export function EditOpportunityDialog({ record, open, onClose, returnTo, options
           formRef={formRef}
           returnTo={returnTo}
           options={options}
-          onDone={() => { editDrafts.delete(record.id); onClose(); }}
+          onDone={() => { editDrafts.delete(record.id); setAiKeys([]); onClose(); }}
           onCancel={close}
-          onReset={() => { editDrafts.delete(record.id); setResetTick((n) => n + 1); }}
+          onReset={() => { editDrafts.delete(record.id); setAiKeys([]); setResetTick((n) => n + 1); }}
+          aiKeys={aiKeys}
+          onApply={apply}
         />
       )}
     </Dialog>
   );
 }
 
-function EditForm({ record, draft: d, formRef, returnTo, options, onDone, onCancel, onReset }: Omit<FormProps, "options"> & { record: Opportunity; returnTo: string; options: FormOptions }) {
+const today = () => new Date().toLocaleDateString("sv-SE");
+const PERIOD_LABEL: Record<string, string> = Object.fromEntries(PRICE_PERIODS);
+function shown(key: string, v: string) {
+  if (!v) return "-";
+  if (key === "opty_status_code") return STAGE_LABEL[v] ?? v;
+  if (key === "level_code") return LEVEL_LABEL[v] ?? v;
+  if (key === "price_period_code") return PERIOD_LABEL[v] ?? v;
+  if (key === "price_amount") return `Rp ${Number(v).toLocaleString("id-ID")}`;
+  return v;
+}
+
+/** Edit Opportunity: the AI reads the account's latest emails (or pasted notes) and proposes changes; the person ticks
+ *  which to take. Taken values land in the form, marked ✦; nothing is saved until Simpan. */
+function UpdateFromEmail({ record, formRef, onApply }: { record: Opportunity; formRef: React.RefObject<HTMLFormElement | null>; onApply: (values: Draft) => void }) {
+  const [rows, setRows] = useState<Suggestion[] | null>(null);
+  const [skip, setSkip] = useState<Set<string>>(new Set());
+  const take = rows?.filter((r) => !skip.has(r.key)) ?? [];
+  return (
+    <>
+      <AiFill
+        form="opportunity_update"
+        opportunityId={record.id}
+        label="Usulan update dari email terbaru (AI)"
+        placeholder="Kosongkan untuk membaca email terbaru akun ini, atau tempel catatan call / chat klien…"
+        onFill={({ fields, lastMail }) => { setRows(updateSuggestions(readDraft(formRef.current, ["return_to"]), fields, lastMail, today())); setSkip(new Set()); }}
+      />
+      {rows && !rows.length && <p className="mb-3 text-[0.75rem] text-slate-600">Tidak ada perubahan yang diusulkan; data sudah sesuai email terbaru.</p>}
+      {!!rows?.length && (
+        <div className="mb-3 rounded-lg border border-violet-200 bg-white" data-ai-suggestions>
+          <ul className="divide-y divide-slate-100">
+            {rows.map((r) => (
+              <li key={r.key} className="flex items-start gap-2 px-3 py-2 text-[0.8125rem]">
+                <Checkbox checked={!skip.has(r.key)} onChange={(e) => { const on = e.target.checked; setSkip((s) => { const n = new Set(s); if (on) n.delete(r.key); else n.add(r.key); return n; }); }} aria-label={`Terapkan ${r.label}`} />
+                <span className="w-36 shrink-0 font-medium text-slate-700">{r.label}</span>
+                <span className="min-w-0 flex-1 break-words text-slate-800">
+                  {r.note && r.key === "progress_notes" ? <>+ {r.note}</> : <><span className="text-slate-500 line-through">{shown(r.key, r.current)}</span> → <b>{shown(r.key, r.proposed)}</b>{r.note ? <span className="text-slate-500"> ({r.note})</span> : null}</>}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <div className="flex items-center gap-2 border-t border-slate-100 px-3 py-2">
+            <Button type="button" size="sm" intent="primary" disabled={!take.length} onClick={() => { onApply(Object.fromEntries(take.map((r) => [r.key, r.proposed]))); }}>Terapkan yang dipilih ({take.length})</Button>
+            <button type="button" className="text-[0.75rem] text-slate-500 hover:underline" onClick={() => setRows(null)}>Abaikan</button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function EditForm({ record, draft: d, formRef, returnTo, options, onDone, onCancel, onReset, aiKeys = [], onApply }: Omit<FormProps, "options"> & { record: Opportunity; returnTo: string; options: FormOptions; aiKeys?: string[]; onApply: (values: Draft) => void }) {
   const { pending, onSubmit, t } = useSubmit((fd) => updateOpportunityTracker(record.id, fd), onDone);
+  const ai = fillHint(aiKeys);
   return (
     <form ref={formRef} onSubmit={onSubmit}>
       <input type="hidden" name="return_to" value={returnTo} />
       <DialogBody>
         {record.leadNo && <p className="mb-3 text-[0.75rem] text-slate-600">Dari Marketing Lead <b className="font-mono text-slate-900">{record.leadNo}</b></p>}
+        <UpdateFromEmail record={record} formRef={formRef} onApply={onApply} />
         <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-3">
           <F label="Nama Klien" required><Input name="client_name" required defaultValue={d.client_name} autoFocus /></F>
           <F label="Client Type"><Select name="client_type_code" defaultValue={d.client_type_code || undefined} options={opts(CLIENT_TYPES)} placeholder="-" /></F>
-          <F label="Stage"><Select name="opty_status_code" defaultValue={d.opty_status_code} options={STAGES.map((s) => ({ value: s.id, label: s.title }))} /></F>
+          <F label="Stage" hint={ai("opty_status_code")}><Select name="opty_status_code" defaultValue={d.opty_status_code} options={STAGES.map((s) => ({ value: s.id, label: s.title }))} /></F>
 
           <F label="Service Type"><Select name="service_type_code" defaultValue={d.service_type_code || undefined} options={opts(SERVICE_TYPES)} placeholder="-" /></F>
           <F label="Sales PIC" required><Input name="sales_pic_name" required defaultValue={d.sales_pic_name} /></F>
-          <F label="Positions"><PositionInput suggestions={options.positionSuggestions} defaultValue={d.position_name} /></F>
+          <F label="Positions" hint={ai("position_name")}><PositionInput suggestions={options.positionSuggestions} defaultValue={d.position_name} /></F>
 
-          <F label="Level"><Select name="level_code" defaultValue={d.level_code || undefined} options={opts(LEVELS)} placeholder="-" /></F>
-          <F label="Headcount"><Input name="headcount_target" type="number" defaultValue={d.headcount_target} /></F>
-          <F label="Estimasi Durasi (bulan)"><Input name="estimated_duration_months" type="number" defaultValue={d.estimated_duration_months} /></F>
+          <F label="Level" hint={ai("level_code")}><Select name="level_code" defaultValue={d.level_code || undefined} options={opts(LEVELS)} placeholder="-" /></F>
+          <F label="Headcount" hint={ai("headcount_target")}><Input name="headcount_target" type="number" defaultValue={d.headcount_target} /></F>
+          <F label="Estimasi Durasi (bulan)" hint={ai("estimated_duration_months")}><Input name="estimated_duration_months" type="number" defaultValue={d.estimated_duration_months} /></F>
 
-          <F label="Price"><Money name="price_amount" defaultValue={d.price_amount} /></F>
-          <F label="Price Period"><Select name="price_period_code" defaultValue={d.price_period_code || undefined} options={opts(PRICE_PERIODS)} placeholder="-" /></F>
+          <F label="Price" hint={ai("price_amount")}><Money name="price_amount" defaultValue={d.price_amount} /></F>
+          <F label="Price Period" hint={ai("price_period_code")}><Select name="price_period_code" defaultValue={d.price_period_code || undefined} options={opts(PRICE_PERIODS)} placeholder="-" /></F>
           <F label="Closing Price Deal"><Money name="estimated_deal_amount" defaultValue={d.estimated_deal_amount} /></F>
 
           <F label="BANTE Score"><Select name="bante_score" defaultValue={d.bante_score || undefined} options={opts(BANTE_SCORES)} placeholder="-" /></F>
-          <F label="Last Communication"><Input name="last_communication_date" type="date" defaultValue={d.last_communication_date} /></F>
+          <F label="Last Communication" hint={ai("last_communication_date")}><Input name="last_communication_date" type="date" defaultValue={d.last_communication_date} /></F>
           <label className="flex items-center gap-2 self-end pb-1.5 text-[0.8125rem] font-medium text-slate-700">
             <Checkbox name="sales_qualified" value="true" defaultChecked={d.sales_qualified === "true"} /> Sales Qualified
           </label>
 
           <F label="Requirement Summary" span><Textarea name="requirement_summary" rows={2} defaultValue={d.requirement_summary} /></F>
           <F label="Detail Requirement" span><Textarea name="detail_requirement" rows={3} defaultValue={d.detail_requirement} /></F>
-          <F label="Progress Notes" span><Textarea name="progress_notes" rows={3} defaultValue={d.progress_notes} /></F>
-          <F label="Dropped Reason" span><Textarea name="dropped_reason" rows={2} defaultValue={d.dropped_reason} /></F>
+          <F label="Progress Notes" span hint={ai("progress_notes")}><Textarea name="progress_notes" rows={3} defaultValue={d.progress_notes} /></F>
+          <F label="Dropped Reason" span hint={ai("dropped_reason")}><Textarea name="dropped_reason" rows={2} defaultValue={d.dropped_reason} /></F>
         </div>
       </DialogBody>
       <DraftFooter pending={pending} onCancel={onCancel} onReset={onReset} t={t} resetLabel="Kembalikan ke data tersimpan" />

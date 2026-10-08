@@ -16,7 +16,7 @@ import { submoduleFor } from "../src/lib/module-access";
 import { navModuleFor } from "../src/lib/nav-module";
 import { buildJourney, type JourneyInput } from "../src/features/sales-v2/journey-model";
 import { fillTemplate, matchAccount, parseAddressList, snippet, threadKey } from "../src/lib/mail/model";
-import { normalizeAiFill } from "../src/features/sales-v2/ai-fill";
+import { extensionPrefill, mergeFill, normalizeAiFill, normalizeAiResult, pqCreateFields, updateSuggestions } from "../src/features/sales-v2/ai-fill";
 
 const read = (p: string) => readFileSync(new URL(`../src/${p}`, import.meta.url), "utf8");
 const q = (s: string) => new URLSearchParams(s);
@@ -638,6 +638,69 @@ test("AI form fill: only known fields, V1 codes and sane numbers reach the form"
   assert.deepEqual(normalizeAiFill(null), {});
   const forms = read("features/sales-v2/forms.tsx");
   assert.match(forms, /fetch\("\/api\/agent\/extract"/);
-  assert.match(forms, /aiKeys=\{aiKeys\} onAiFill=\{aiFill\}/);
-  assert.match(read("app/api/agent/extract/route.ts"), /normalizeAiFill\(out\?\.fields\)/);
+  assert.match(forms, /onAiFill: aiFill/);
+  assert.match(read("app/api/agent/extract/route.ts"), /normalizeAiResult\(out\?\.fields, form\)/);
+});
+
+test("AI form fill per form: PQ dates and numbers, account contacts, nothing outside the form", () => {
+  assert.deepEqual(normalizeAiResult({
+    po_no: " PO/2026/0042 ", start_date: "2026-11-01", end_date: "2026-02-30", approval_date: "1 Nov 2026", business_unit_code: "TM",
+    price_amount: "Rp 18.500.000", opty_status_code: "win",
+  }, "pq").fields, { po_no: "PO/2026/0042", start_date: "2026-11-01", business_unit_code: "tm", price_amount: "18500000" });
+  const acc = normalizeAiResult({
+    name: "PT Maju Jaya", industry: "Fintech", contacts: [
+      { name: "Budi", role_title: "HR Manager", email: "Budi@MajuJaya.co.id", phone: "0812" }, { name: "", email: "x@y.z" }, { name: "Sari", email: "not-an-email" },
+    ],
+  }, "account");
+  assert.deepEqual(acc.fields, { name: "PT Maju Jaya", industry: "Fintech" });
+  assert.deepEqual(acc.contacts, [
+    { name: "Budi", role_title: "HR Manager", email: "budi@majujaya.co.id", phone: "0812" },
+    { name: "Sari", role_title: undefined, email: undefined, phone: undefined },
+  ]);
+  assert.deepEqual(normalizeAiResult({ opty_status_code: "Need Action", progress_note: "Klien minta CV minggu depan" }, "opportunity_update").fields,
+    { opty_status_code: "need_action", progress_note: "Klien minta CV minggu depan" });
+});
+
+test("AI never overwrites what was typed: only empty, default or machine-filled fields take a proposal", () => {
+  const current = { client_name: "PT Ketik Sendiri", price_period_code: "monthly", headcount_target: "", level_code: "junior" };
+  const r = mergeFill(current, { client_name: "PT AI", price_period_code: "project", headcount_target: "3", level_code: "senior" }, { price_period_code: "monthly" }, ["level_code"]);
+  assert.deepEqual(r.draft, { client_name: "PT Ketik Sendiri", price_period_code: "project", headcount_target: "3", level_code: "senior" });
+  assert.deepEqual(r.filled.sort(), ["headcount_target", "level_code", "price_period_code"]);
+  assert.deepEqual(mergeFill({ a: "x" }, { a: "x" }).filled, [], "an unchanged value is not marked");
+});
+
+test("Extension prefill copies the running contract and starts the day after it ends", () => {
+  const pq = { client: "PT Maju Jaya", project: "Core Banking", position: "QA Engineer", service: "outsourcing", businessUnit: "tm", level: "middle",
+    pricePeriod: "monthly", price: 20_000_000, duration: 6, priority: "p1", salesPic: "Rina" };
+  assert.deepEqual(extensionPrefill({ employeeName: "Andi", employeePosition: null, assignment: { start: "2026-05-01", end: "2026-10-31", price: 22_000_000 }, pq, requisition: null }), {
+    client_name: "PT Maju Jaya", client_type_code: "existing", project_name: "Core Banking", position_name: "QA Engineer", service_type_code: "outsourcing",
+    business_unit_code: "tm", level_code: "middle", headcount_target: "1", priority_code: "p1", price_amount: "22000000", price_period_code: "monthly",
+    sales_pic_name: "Rina", estimated_duration_months: "6", start_date: "2026-11-01", end_date: "2027-04-30",
+    notes: "Perpanjangan Andi, kontrak sebelumnya 2026-05-01 s/d 2026-10-31.",
+  });
+  // No PQ: the requisition still names client and role; no contract end, no dates.
+  assert.deepEqual(extensionPrefill({ employeeName: null, employeePosition: "Dev", assignment: null, pq: null,
+    requisition: { client: "PT B", position: "Backend", service: null, level: "senior", salesPic: null } }),
+  { client_name: "PT B", client_type_code: "existing", position_name: "Backend", level_code: "senior", headcount_target: "1" });
+});
+
+test("New PQ keeps PO / PKS numbers in Notes; Edit Opportunity proposals list only real changes", () => {
+  assert.deepEqual(pqCreateFields({ client_name: "PT A", po_no: "PO-1", pks_no: "PKS-9", project_details: "QA 2 orang", sales_type_code: "farming" }),
+    { client_name: "PT A", notes: "No PO: PO-1 · No PKS: PKS-9\nQA 2 orang" });
+  const rows = updateSuggestions(
+    { opty_status_code: "proposal_sent", headcount_target: "3", progress_notes: "2026-10-01: kirim proposal", last_communication_date: "2026-10-01" },
+    { opty_status_code: "need_action", headcount_target: "3", progress_note: "Klien minta revisi harga", dropped_reason: "x" },
+    "2026-10-07", "2026-10-08",
+  );
+  assert.deepEqual(rows.map((r) => [r.key, r.proposed]), [
+    ["opty_status_code", "need_action"],
+    ["progress_notes", "2026-10-08: Klien minta revisi harga\n2026-10-01: kirim proposal"],
+    ["last_communication_date", "2026-10-07"],
+  ]);
+  const forms = read("features/sales-v2/forms.tsx");
+  assert.match(forms, /<UpdateFromEmail record=\{record\}/);
+  assert.match(forms, /onValueChange=\{onPick\}/);
+  assert.match(read("features/sales-v2/pq-forms.tsx"), /<AiFill form="pq" file/);
+  assert.match(read("features/sales-v2/account-preview.tsx"), /createAccountContacts\(name, keep\)/);
+  assert.match(read("features/sales-v2/email-panel.tsx"), /Jadikan kontak/);
 });

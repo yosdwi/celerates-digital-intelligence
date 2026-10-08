@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useSession } from "next-auth/react";
 import { Badge, Button, Dialog, DialogBody, DialogFooter, FormField, Input, Select, Textarea } from "@crisp-ui-kit/crisp";
-import { Mail, RefreshCw, Reply } from "lucide-react";
+import { Mail, RefreshCw, Reply, UserPlus } from "lucide-react";
 import { useToast } from "@/components/toast-provider";
 import {
   deleteEmailTemplate, getAccountEmails, listEmailTemplates, saveEmailTemplate, sendAccountEmail, syncMailboxNow,
@@ -33,11 +33,13 @@ const ago = (iso: string) => {
   return m < 1 ? "baru saja" : m < 60 ? `${m} menit lalu` : m < 1440 ? `${Math.round(m / 60)} jam lalu` : `${Math.round(m / 1440)} hari lalu`;
 };
 
-export function AccountEmails({ account, contacts, canSend, context = {} }: {
+export function AccountEmails({ account, contacts, canSend, context = {}, onMakeContact }: {
   account: { id: string; name: string };
   contacts: EmailContact[];
   canSend: boolean;
   context?: EmailContext;
+  /** Offered on incoming mail from someone who is not a contact yet (matched by the company's domain). */
+  onMakeContact?: (c: { name: string | null; email: string; text: string }) => void;
 }) {
   const { showToast } = useToast();
   const [data, setData] = useState<{ emails: MailRow[]; status: MailStatus } | null>(null);
@@ -54,6 +56,7 @@ export function AccountEmails({ account, contacts, canSend, context = {} }: {
   const threads = useMemo(() => groupThreads(data?.emails ?? []), [data]);
   const primary = contacts.find((c) => c.primary && c.email) ?? contacts.find((c) => c.email);
   const sendable = canSend && !!data?.status.mailbox;
+  const known = useMemo(() => new Set(contacts.map((c) => c.email?.toLowerCase()).filter(Boolean)), [contacts]);
 
   const reply = (t: Thread) => {
     const lastIn = [...t.messages].reverse().find((m) => m.direction === "in");
@@ -100,7 +103,7 @@ export function AccountEmails({ account, contacts, canSend, context = {} }: {
             </button>
             {open === t.key && (
               <div className="space-y-3 border-t border-slate-100 bg-slate-50/60 px-3 py-3">
-                {t.messages.map((m) => <Message key={m.id} m={m} />)}
+                {t.messages.map((m) => <Message key={m.id} m={m} onMakeContact={onMakeContact && m.direction === "in" && !known.has(m.from) ? () => onMakeContact({ name: m.fromName, email: m.from, text: m.body ?? "" }) : undefined} />)}
                 {sendable && <Button size="sm" intent="neutral" onClick={() => reply(t)}><Reply size={13} /> Balas</Button>}
               </div>
             )}
@@ -121,7 +124,7 @@ export function AccountEmails({ account, contacts, canSend, context = {} }: {
   );
 }
 
-function Message({ m }: { m: MailRow }) {
+function Message({ m, onMakeContact }: { m: MailRow; onMakeContact?: () => void }) {
   const [all, setAll] = useState(false);
   const body = m.body ?? "";
   const long = body.length > 1500;
@@ -131,6 +134,7 @@ function Message({ m }: { m: MailRow }) {
         <Badge tone={m.direction === "out" ? "brand" : "neutral"} size="small">{m.direction === "out" ? "Keluar" : "Masuk"}</Badge>
         <span className="font-medium text-slate-800">{m.fromName ?? m.from}</span>
         <span>→ {m.to.join(", ")}{m.cc.length ? ` · cc ${m.cc.join(", ")}` : ""}</span>
+        {onMakeContact && <button type="button" className="inline-flex items-center gap-1 text-brand-700 hover:underline" onClick={onMakeContact}><UserPlus size={12} /> Jadikan kontak</button>}
         <span className="ml-auto">{when(m.sentAt)}{m.source === "erp" && m.by ? ` · dikirim ${m.by} dari ERP` : ""}</span>
       </header>
       <p className="whitespace-pre-wrap break-words text-[0.8125rem] leading-5 text-slate-800">{long && !all ? `${body.slice(0, 1500)}…` : body}</p>
