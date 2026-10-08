@@ -474,12 +474,21 @@ test("edit history: the panel's Aktivitas is the record timeline; the page's Riw
   assert.match(ws, /showHistory: \(recordId\) => setFeedOf/);
 });
 
-test("QA page 6: popovers scroll inside and the page never scrolls under them; toolbar tools are icons", () => {
+test("QA page 6: toolbar menus scroll inside, float clearly, the page never scrolls under them; toolbar tools are icons", () => {
   const css = read("app/sales/v2/sales-v2.css");
-  assert.match(css, /\.crisp-popover-content \{ max-height: min\(60dvh, 480px\); overflow-y: auto; overscroll-behavior: contain; \}/);
-  assert.match(css, /\.crisp-menu-content \{ overscroll-behavior: contain; \}/);
+  // Crisp's TableToolbar menus (not its Popover / Menu) were the ones running off the screen (seen at 1366 × 768).
+  assert.match(css, /\.crisp-tabletoolbar-menu:not\(:has\(\.crisp-tabletoolbar-menu\)\) \{ max-height: min\(70dvh, 520px\); overflow-y: auto;/);
+  assert.match(css, /--crisp-ring-popover: rgb\(15 23 42 \/ 0\.12\);/);
+  assert.match(read("components/agent/agent-panel.tsx"), /intro && !open && !panelOpen && !pathname\.startsWith\("\/sales\/v2\/"\)/);
   const ws = read("features/sales-v2/record-workspace.tsx");
   assert.match(ws, /md:h-dvh md:overflow-hidden" data-sales-v2>/);
   assert.match(ws, /<Tooltip content="Riwayat perubahan"><Button size="sm" intent="ghost" aria-label="Riwayat perubahan"/);
   assert.match(read("features/sales-v2/sheet-sync-dialog.tsx"), /<Tooltip content="Google Sheet Sync">/);
+});
+
+test("Crisp's own text reads in Indonesian on Sales V2 (CrispMessagesProvider at the V2 layout)", async () => {
+  assert.match(read("app/sales/v2/layout.tsx"), /<SalesCrispMessages>\{children\}<\/SalesCrispMessages>/);
+  const src = read("features/sales-v2/crisp-messages.tsx");
+  for (const en of ["Add sort", "Ascending", "Sorted by", "Search attributes…", "Add filter", "is not", "View edit history", "Clear value"])
+    assert.match(src, new RegExp(`"${en.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}": "`), en);
 });

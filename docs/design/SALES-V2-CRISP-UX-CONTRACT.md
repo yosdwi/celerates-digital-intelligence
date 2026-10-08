@@ -249,10 +249,13 @@ Decided with the Product Owner before any change (feedback doc "Feedback UI UX")
   record when opened from the panel's "Riwayat lengkap", a record name opening that record (`getModuleHistory`, same
   guard). No changed-cell marker in the table: noise in a dense grid.
 - Page scroll (QA page 6): the V2 page is exactly the viewport and never scrolls (md:overflow-hidden); only the table,
-  grid or board does. Before, the page could scroll under a fixed Crisp menu or popover, leaving it over the table.
-  Crisp popovers get a height limit (min(60dvh, 480px), scrolling inside; Kolom lists every column) and menus and
-  popovers contain their scroll. Riwayat and Sheet Sync are icon buttons with a Crisp Tooltip, so the toolbar stays
-  on one line on a laptop.
+  grid or board does. Before, the page could scroll under a fixed Crisp menu, leaving it over the table. Seen at
+  1366 × 768: the overflowing menus are TableToolbar's own (`.crisp-tabletoolbar-menu`: Kolom 683px tall, the sort
+  field picker 763px, no limit in Crisp 0.61); a leaf toolbar menu is capped (min(70dvh, 520px)) and scrolls inside.
+  Popover elevation through Crisp's tokens (visible ring, stronger shadow). Crisp's own text in Indonesian through
+  its CrispMessagesProvider (features/sales-v2/crisp-messages.tsx, at the V2 layout). The Agent's intro card does
+  not open over a V2 workspace. Riwayat and Sheet Sync are icon buttons with a Crisp Tooltip, so the toolbar stays
+  on one line. Upstream drafts: docs/design/CRISP-UPSTREAM-ISSUES.md.
 - Form dialogs: the <form> is the dialog card's flex column, so Crisp's body scrolls and Batal / Simpan stay in view;
   before, a long form clipped them on short laptop screens (Crisp caps a dialog at 74vh).
 - Kanban: no per-column "+" (New is in the toolbar). A column header opens sort, a filter (the table's controls) for

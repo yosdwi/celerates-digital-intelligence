@@ -13,6 +13,11 @@
   --crisp-fg-brand-soft: #2356e8;
   --crisp-ring-brand-soft: #dce8ef;
   --crisp-stroke-focus-ring: #2356e8;
+  /* Menus and popovers float clearly over a dense white table (Crisp's ring is transparent, its shadow faint). */
+  --crisp-ring-popover: rgb(15 23 42 / 0.12);
+  --crisp-shadow-popover1: rgb(15 23 42 / 0.06);
+  --crisp-shadow-popover2: rgb(15 23 42 / 0.18);
+  --crisp-shadow-popover3: rgb(15 23 42 / 0.22);
 }
 
 /* Table header: V1's violet header row (bg-violet-50, violet-700, uppercase, semibold; QA 2026-10-08); the whole cell
@@ -61,10 +66,11 @@
   box-shadow: inset 3px 0 0 var(--stage, #94a3b8), inset 0 0 0 1px #94a3b8, 0 3px 8px rgb(15 23 42 / 0.08);
 }
 
-/* Menus and popovers (QA 2026-10-08): Crisp's popover has no height limit, so a long one (Kolom: every column) ran off
-   a laptop screen; it scrolls inside now, and reaching either end of a list never scrolls the page under it. */
-.crisp-popover-content { max-height: min(60dvh, 480px); overflow-y: auto; overscroll-behavior: contain; }
-.crisp-menu-content { overscroll-behavior: contain; }
+/* Toolbar menus (QA page 6, 2026-10-08): TableToolbar's own menus (Kolom, a sort's or filter's field picker) have no
+   height limit in Crisp 0.61, unlike its Menu (360px), so a long list ran off a laptop screen with its last items out
+   of reach. A menu that holds no other menu scrolls inside; one that does (Sort holding its field picker) is left
+   alone so the picker is not clipped. Remove once Crisp limits them itself. */
+.crisp-tabletoolbar-menu:not(:has(.crisp-tabletoolbar-menu)) { max-height: min(70dvh, 520px); overflow-y: auto; overscroll-behavior: contain; }
 
 /* Dialogs: the form is the focus. Dim and blur what is behind it; brand header. */
 .crisp-dialog-backdrop { background: rgb(9 34 54 / 0.42); backdrop-filter: blur(3px); }

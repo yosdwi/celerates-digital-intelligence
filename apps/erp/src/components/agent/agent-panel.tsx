@@ -396,7 +396,8 @@ export function AgentPanel() {
           </span>
         )}
       </button>
-      {intro && !open && !panelOpen && (
+      {/* Not over a Sales V2 workspace (QA 2026-10-08): there it covered the table and the toolbar's menus. */}
+      {intro && !open && !panelOpen && !pathname.startsWith("/sales/v2/") && (
         <section
           role="dialog"
           aria-label="Perkenalan Agent"
