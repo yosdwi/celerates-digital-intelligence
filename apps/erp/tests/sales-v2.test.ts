@@ -15,6 +15,7 @@ import { safeSalesReturnPath } from "../src/lib/safe-return";
 import { submoduleFor } from "../src/lib/module-access";
 import { navModuleFor } from "../src/lib/nav-module";
 import { buildJourney, type JourneyInput } from "../src/features/sales-v2/journey-model";
+import { fillTemplate, matchAccount, parseAddressList, snippet, threadKey } from "../src/lib/mail/model";
 
 const read = (p: string) => readFileSync(new URL(`../src/${p}`, import.meta.url), "utf8");
 const q = (s: string) => new URLSearchParams(s);
@@ -283,7 +284,7 @@ test("density on laptops: compact sidebar and V2 chrome, no zoom (contract §15)
 
 const account = (p: Partial<Account> = {}): Account => ({
   id: "a1", name: "PT Maju", industry: "Banking", status: "prospect", notes: null, createdBy: null, createdAt: null,
-  leads: 0, opportunities: 2, activeOpportunities: 1, contracts: 0, monthlyValue: 0, invoices: 3, overdueInvoices: 0,
+  leads: 0, opportunities: 2, activeOpportunities: 1, contracts: 0, monthlyValue: 0, invoices: 3, overdueInvoices: 0, emails: 0,
   contacts: [{ id: "c1", name: "Rina", role: "HR", email: "rina@maju.co", phone: null, primary: true }], activities: [],
   history: { leads: [], opportunities: [], contracts: [], invoices: [] }, ...p,
 });
@@ -590,4 +591,33 @@ test("Deal 360: steps follow the deal downstream and name the stuck hand-offs wi
   const preview = read("features/sales-v2/record-preview.tsx");
   assert.match(preview, /onOpenRecord=\{\(\) => router\.push\(`\/sales\/v2\/opportunity-tracker\/\$\{record\.id\}/);
   assert.match(preview, /<PanelJourney record=\{record\}/);
+});
+
+test("Sales email: mail matches its Account by contact, then company domain; threads, templates, addresses", () => {
+  const contacts = [
+    { id: "c1", clientId: "acme", email: "Budi@Acme.co.id" },
+    { id: "c2", clientId: "solo", email: "rina@gmail.com" },
+  ];
+  const own = new Set(["celerates.co.id"]);
+  // A known contact wins; our own side never decides.
+  assert.deepEqual(matchAccount(["sales@celerates.co.id", "budi@acme.co.id"], contacts, own), { clientId: "acme", contactId: "c1" });
+  // Someone else at the same company: matched by domain, no contact.
+  assert.deepEqual(matchAccount(["ceo@acme.co.id"], contacts, own), { clientId: "acme", contactId: null });
+  // A free-mail contact matches only by full address; another gmail user is nobody's.
+  assert.deepEqual(matchAccount(["rina@gmail.com"], contacts, own), { clientId: "solo", contactId: "c2" });
+  assert.equal(matchAccount(["someone@gmail.com", "sales@celerates.co.id"], contacts, own), null);
+
+  assert.equal(threadKey("<c>", "<b>", "<a> <b>"), "<a>");
+  assert.equal(threadKey("<c>", "<b>", null), "<b>");
+  assert.equal(threadKey("<c>"), "<c>");
+
+  assert.equal(fillTemplate("Halo {{kontak.nama}} dari {{ account.nama }}, {{opty.no}}", { "kontak.nama": "Budi", "account.nama": "PT Acme" }),
+    "Halo Budi dari PT Acme, {{opty.no}}");
+  assert.deepEqual(parseAddressList("a@x.com, B@Y.co.id; a@x.com bad"), { valid: ["a@x.com", "b@y.co.id"], invalid: ["bad"] });
+  assert.equal(snippet("> quoted\nHello   there"), "Hello there");
+
+  // The panel loads mail only when its Email section opens; the Opportunity page has an Email tab.
+  assert.match(read("features/sales-v2/account-preview.tsx"), /key: "email", label: "Email", count: record\.emails/);
+  assert.match(read("features/sales-v2/deal-page.tsx"), /id: "email", label: "Email"/);
+  assert.match(read("instrumentation.ts"), /startMailSync\(\)/);
 });

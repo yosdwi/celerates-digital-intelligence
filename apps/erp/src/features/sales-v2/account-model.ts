@@ -36,6 +36,8 @@ export type Account = {
   contacts: Contact[];
   /** Newest first. */
   activities: Activity[];
+  /** Mail stored for the account (crm_emails); the panel's Email section loads them when opened. */
+  emails: number;
   history: RelatedHistory;
 };
 

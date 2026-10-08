@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, uuid, text, boolean, integer, bigint, smallint, date, timestamp, check, uniqueIndex, index, doublePrecision, AnyPgColumn } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, boolean, integer, bigint, smallint, date, timestamp, check, uniqueIndex, index, doublePrecision, primaryKey, AnyPgColumn } from "drizzle-orm/pg-core";
 
 
 export const leads = pgTable("leads", {
@@ -1275,4 +1275,51 @@ export const crmClientActivities = pgTable("crm_client_activities", {
   created_at: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({
   idxClient: index("idx_crm_client_activities_client").on(t.client_id),
+}));
+
+/** Mail to and from Account contacts (drizzle/0015): read over IMAP or sent from the ERP (lib/mail). */
+export const crmEmails = pgTable("crm_emails", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  mailbox: text("mailbox").notNull(),
+  message_id: text("message_id").notNull().unique(),
+  thread_key: text("thread_key").notNull(),
+  in_reply_to: text("in_reply_to"),
+  direction: text("direction").notNull(), // in | out
+  from_address: text("from_address").notNull(),
+  from_name: text("from_name"),
+  to_addresses: text("to_addresses").array().notNull().default(sql`'{}'`),
+  cc_addresses: text("cc_addresses").array().notNull().default(sql`'{}'`),
+  subject: text("subject").notNull().default(""),
+  body_text: text("body_text"),
+  snippet: text("snippet"),
+  sent_at: timestamp("sent_at", { withTimezone: true }).notNull(),
+  client_id: uuid("client_id").references(() => crmClients.id, { onDelete: "set null" }),
+  contact_id: uuid("contact_id").references(() => crmClientContacts.id, { onDelete: "set null" }),
+  source: text("source").notNull(), // imap | erp
+  created_by_name: text("created_by_name"),
+  created_at: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  idxClient: index("idx_crm_emails_client").on(t.client_id, t.sent_at),
+  idxThread: index("idx_crm_emails_thread").on(t.thread_key),
+}));
+
+export const crmEmailTemplates = pgTable("crm_email_templates", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: text("name").notNull(),
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
+  created_by_name: text("created_by_name"),
+  created_at: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updated_at: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const mailSyncState = pgTable("mail_sync_state", {
+  mailbox: text("mailbox").notNull(),
+  folder: text("folder").notNull(),
+  uid_validity: bigint("uid_validity", { mode: "number" }),
+  last_uid: bigint("last_uid", { mode: "number" }).notNull().default(0),
+  last_synced_at: timestamp("last_synced_at", { withTimezone: true }),
+  last_error: text("last_error"),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.mailbox, t.folder] }),
 }));

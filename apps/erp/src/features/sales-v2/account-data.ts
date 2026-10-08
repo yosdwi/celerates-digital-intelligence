@@ -1,6 +1,6 @@
-import { desc } from "drizzle-orm";
+import { count, desc, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
-import { crmClientActivities, crmClientContacts, crmClients } from "@/db/schema";
+import { crmClientActivities, crmClientContacts, crmClients, crmEmails } from "@/db/schema";
 import { getAccountHistoryMap, getAccountStatsMap } from "@/lib/crm";
 import type { Account, Activity, Contact } from "./account-model";
 
@@ -8,12 +8,14 @@ import type { Account, Activity, Contact } from "./account-model";
 export async function loadAccountWorkspace(): Promise<Account[]> {
   const rows = await db.select().from(crmClients).orderBy(desc(crmClients.created_at));
   const names = rows.map((r) => r.name);
-  const [stats, history, contactRows, activityRows] = await Promise.all([
+  const [stats, history, contactRows, activityRows, emailCounts] = await Promise.all([
     getAccountStatsMap(names),
     getAccountHistoryMap(names),
     db.select().from(crmClientContacts).orderBy(desc(crmClientContacts.is_primary), crmClientContacts.created_at),
     db.select().from(crmClientActivities).orderBy(desc(crmClientActivities.activity_date), desc(crmClientActivities.created_at)),
+    db.select({ clientId: crmEmails.client_id, n: count() }).from(crmEmails).where(isNotNull(crmEmails.client_id)).groupBy(crmEmails.client_id),
   ]);
+  const emails = new Map(emailCounts.map((e) => [e.clientId!, e.n]));
 
   const contacts = new Map<string, Contact[]>();
   const contactName = new Map<string, string>();
@@ -49,6 +51,7 @@ export async function loadAccountWorkspace(): Promise<Account[]> {
       overdueInvoices: s?.overdueInvoiceCount ?? 0,
       contacts: contacts.get(r.id) ?? [],
       activities: activities.get(r.id) ?? [],
+      emails: emails.get(r.id) ?? 0,
       history: history.get(r.name) ?? { leads: [], opportunities: [], contracts: [], invoices: [] },
     };
   });

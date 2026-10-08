@@ -8,6 +8,7 @@ import { Badge, RecordPage, type Column } from "@crisp-ui-kit/crisp";
 import { LEVEL_LABEL, SERVICE_LABEL, STAGES, STAGE_LABEL, rupiah } from "./model";
 import { HistoryProvider, type Access } from "./record-workspace";
 import { RecordTimeline } from "./history";
+import { AccountEmails } from "./email-panel";
 import { OPPORTUNITY_CONFIG } from "./workspace";
 import { ACCOUNT_STATUS_LABEL } from "./account-model";
 import type { DealPageData } from "./journey-data";
@@ -86,6 +87,11 @@ export function DealPage({ data, access, returnTo }: { data: DealPageData; acces
           labels={{ breadcrumb: "Opportunity Tracker", editRecord: "Edit", recordDetails: "Detail", recordActions: "Aksi", searchFields: "Cari field", viewAll: "Lihat semua", showLess: "Lebih sedikit" }}
           tabs={[
             { id: "journey", label: "Perjalanan", count: journey.actions.length || undefined, render: () => <Journey data={data} /> },
+            {
+              id: "email", label: "Email", render: () => data.account
+                ? <div className="max-w-3xl py-2"><AccountEmails account={{ id: data.account.id, name: data.account.name }} contacts={data.contacts} canSend={access.canEdit} context={{ "opty.no": t.optyNo, "opty.posisi": t.position }} /></div>
+                : <p className="py-2 text-slate-500">{t.client} belum ada di Account (CRM). Tambahkan account dan kontaknya supaya email tercatat di sini.</p>,
+            },
             {
               id: "activity", label: "Aktivitas", render: () => (
                 <div className="max-w-3xl space-y-3 py-2">

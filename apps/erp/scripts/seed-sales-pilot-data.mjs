@@ -265,6 +265,9 @@ async function removeJourney(tx, trackerIds) {
   await del('applications', tx`DELETE FROM applications WHERE candidate_id = ANY(${candIds}) OR requisition_id = ANY(${reqIds}) RETURNING id`);
   await del('candidates', tx`DELETE FROM candidates WHERE id = ANY(${candIds}) RETURNING id`);
   const accIds = (await tx`SELECT id FROM crm_clients WHERE notes LIKE ${like}`).map((r) => r.id);
+  if ((await tx`SELECT to_regclass('public.crm_emails') AS t`)[0].t) {
+    await del('emails', tx`DELETE FROM crm_emails WHERE client_id = ANY(${accIds}) RETURNING id`);
+  }
   await del('activities', tx`DELETE FROM crm_client_activities WHERE client_id = ANY(${accIds}) RETURNING id`);
   await del('contacts', tx`DELETE FROM crm_client_contacts WHERE client_id = ANY(${accIds}) RETURNING id`);
   await del('accounts', tx`DELETE FROM crm_clients WHERE id = ANY(${accIds}) RETURNING id`);

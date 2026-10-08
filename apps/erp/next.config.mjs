@@ -2,6 +2,8 @@ import createNextIntlPlugin from "next-intl/plugin";
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 export default withNextIntl({
   output: "standalone", devIndicators: false,
+  // IMAP and MIME parsing for Sales email (lib/mail): plain Node packages, loaded at runtime rather than bundled.
+  serverExternalPackages: ["imapflow", "mailparser"],
   // Served through Cloudflare Tunnel (TLS terminated at the edge, forwarded to this container
   // plain) -- Next's own Server Action origin check can't reliably derive the public origin from
   // request headers there, so every Server Action (upload evidence included) 403'd. Declare it.

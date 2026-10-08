@@ -2,6 +2,7 @@
 // Account record panel (contract §8, §16): V1's Account 360 in the panel (stats, activity timeline, contacts, related
 // leads / PQ / contracts / invoices), then explicit actions. Every mutation is a V1 CRM server action
 // (app/sales/accounts/actions.ts); the forms keep V1's fields, names and required flags.
+import { AccountEmails } from "./email-panel";
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -117,6 +118,10 @@ export function AccountPreview({
   );
 
   const sections = [
+    {
+      key: "email", label: "Email", count: record.emails,
+      content: <AccountEmails account={{ id: record.id, name: record.name }} contacts={record.contacts} canSend={access.canEdit} />,
+    },
     {
       key: "contacts", label: "Kontak PIC", count: record.contacts.length,
       content: record.contacts.length || access.canEdit ? (
