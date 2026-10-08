@@ -336,18 +336,30 @@ test("QA 2026-10-08: slim sidebar scroll, Agent width follows the screen and can
   assert.match(read("app/sales/v2/sales-v2.css"), /background: #f5f3ff; color: #6d28d9/);
 });
 
-test("QA 2026-10-08: V1's frozen columns and stacked Aksi / Status cell in OT and PQ", () => {
+test("QA 2026-10-08: V1's frozen columns, slim; quick actions in cells and the row menu, not a tall Aksi column", () => {
   const ot = read("features/sales-v2/workspace.tsx");
   const pq = read("features/sales-v2/pq-workspace.tsx");
-  // V1 sticks these four (md:sticky in the V1 tables), in this order.
-  assert.match(ot, /frozen: \["actions", "optyNo", "leadNo", "client"\]/);
-  assert.match(pq, /frozen: \["actions", "optyNo", "pqNo", "pqDocs"\]/);
-  for (const a of ["updateOptyStatus", "updateSalesQualified"]) assert.match(ot.slice(ot.indexOf("function ActionsCell")), new RegExp(a));
-  assert.match(pq.slice(pq.indexOf("function ActionsCell")), /savePqStage[\s\S]*updateOptyStatus/);
+  // V1 sticks Aksi / Status plus these (md:sticky in the V1 tables); Aksi became in-cell edits and the row menu.
+  assert.match(ot, /frozen: \["optyNo", "leadNo", "client"\]/);
+  assert.match(pq, /frozen: \["optyNo", "pqNo", "pqDocs"\]/);
+  for (const src of [ot, pq]) {
+    assert.doesNotMatch(src, /ActionsCell|key: "actions"/);
+    assert.match(src, /\n  rowMenu,/);
+    assert.match(src, /<InlineSelect /);
+  }
+  assert.match(ot, /updateOptyStatus\(o\.id, v\)/);
+  assert.match(ot, /updateSalesQualified\(o\.id, v\)/);
+  assert.match(pq, /savePqStage\(p\.id, v\)/);
   const kit = read("features/sales-v2/record-workspace.tsx");
-  // Rows taller than Crisp's 36px virtualization row: bounded scroll box, no `height` (which turns virtualization on).
-  assert.match(kit, /scrollProps=\{\{ style: \{ overflowY: "auto", height: workspaceHeight/);
-  assert.doesNotMatch(kit, /\n\s+height=\{workspaceHeight\}/);
+  assert.match(kit, /rowContextMenu=\{c\.rowMenu/);
+  // Frozen parts stay one line (a long value ends in "…" with the whole value on hover).
+  assert.match(kit, /className="min-w-0 shrink-0 truncate pr-3" style=\{\{ width \}\} title=/);
+});
+
+test("QA 2026-10-08: form dialogs keep Batal / Simpan in view (no clipped footer on short laptop screens)", () => {
+  const dir = new URL("../src/features/sales-v2/", import.meta.url);
+  for (const f of readdirSync(dir).filter((n) => n.endsWith(".tsx"))) assert.doesNotMatch(read(`features/sales-v2/${f}`), /85dvh/, f);
+  assert.match(read("app/sales/v2/sales-v2.css"), /\.crisp-dialog-card > form \{ display: flex; flex-direction: column; flex: 1; min-height: 0; \}/);
 });
 
 test("QA 2026-10-08: Kanban has no per-column +; a column header opens sort, filter and hide for that column", () => {

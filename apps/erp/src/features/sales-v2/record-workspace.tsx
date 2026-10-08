@@ -9,7 +9,7 @@ import { Columns3, LayoutGrid, Search, Sparkles, Table2 } from "lucide-react";
 import {
   DataTable, EntityCard, Input, SavedViews, SavedViewsSaveBar, StatCard, TableToolbar, ViewToggle, useSnackbar,
   applyFilters, applySorts, Button, Dialog, DialogBody, DialogFooter, FormField,
-  type DataTableColumn, type TableToolbarColumn,
+  type ContextMenuOption, type DataTableColumn, type TableToolbarColumn,
 } from "@crisp-ui-kit/crisp";
 import { useToast } from "@/components/toast-provider";
 import { GRADIENTS, type StatColor } from "@/components/stat-card";
@@ -86,9 +86,12 @@ export type WorkspaceConfig<T extends { id: string }> = {
   /**
    * V1's frozen columns, in order (QA 2026-10-08): shown together as the table's first column, which Crisp pins while
    * the rest scrolls (it pins one column; its column virtualization would drop a separately pinned second one). Always
-   * shown and first; each keeps its own header menu.
+   * shown and first; each keeps its own header menu. One line each, sized to its values: a longer value ends in "…"
+   * and shows whole on hover and in the panel.
    */
   frozen?: string[];
+  /** Right-click menu on a table row (QA 2026-10-08): the record's quick actions, only those its user may take. */
+  rowMenu?: (o: T, row: RowActions) => ContextMenuOption[];
   grid: (o: T) => { label: string; author: React.ReactNode; title: string; excerpt: string; footer: React.ReactNode; date?: string };
   board: {
     stages: readonly { id: string; title: string; accent: string }[];
@@ -329,9 +332,9 @@ export function RecordWorkspace<T extends { id: string }>({
         </span>
       ),
       render: (_, row) => (
-        <span className="flex w-full items-start" data-sales-v2-frozen>
+        <span className="flex w-full items-center" data-sales-v2-frozen>
           {parts.map(({ col, width }) => (
-            <span key={col.key} className="min-w-0 shrink-0 whitespace-normal break-words pr-3" style={{ width }}>
+            <span key={col.key} className="min-w-0 shrink-0 truncate pr-3" style={{ width }} title={c.cellText(row, col.key) || undefined}>
               {col.render ? col.render(undefined as never, row) : c.cellText(row, col.key)}
             </span>
           ))}
@@ -476,6 +479,7 @@ export function RecordWorkspace<T extends { id: string }>({
             stickyFirst
             interactive
             onRowClick={(row) => select(row.id)}
+            rowContextMenu={c.rowMenu ? (row) => c.rowMenu!(row, rowActions) : undefined}
             // A bounded scroll box without Crisp's row virtualization: that assumes 36px rows, and V1's Aksi column
             // stacks taller ones (the frozen block, QA 2026-10-08); a few hundred rows render fine.
             scrollProps={{ style: { overflowY: "auto", height: workspaceHeight, maxHeight: workspaceHeight } }}

@@ -56,7 +56,7 @@ function CreateForm({ options, draft: d, formRef, returnPath, onDone, onCancel, 
   const { pending, onSubmit, t } = useSubmit(createOpportunity, onDone);
   return (
     <form ref={formRef} onSubmit={onSubmit}>
-      <DialogBody className="max-h-[calc(85dvh-8.5rem)] overflow-y-auto">
+      <DialogBody>
         <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-3">
           <F label="Nama Klien" required><Input name="client_name" required defaultValue={d.client_name} autoFocus /></F>
           <F label="Client Type"><Select name="client_type_code" defaultValue={d.client_type_code} options={opts(CLIENT_TYPES)} placeholder="-" /></F>
@@ -129,7 +129,7 @@ function EditForm({ record, draft: d, formRef, returnTo, options, onDone, onCanc
   return (
     <form ref={formRef} onSubmit={onSubmit}>
       <input type="hidden" name="return_to" value={returnTo} />
-      <DialogBody className="max-h-[calc(85dvh-8.5rem)] overflow-y-auto">
+      <DialogBody>
         <p className="mb-3 text-[0.75rem] text-slate-600">
           Pipeline <b className="text-slate-900">{PQ_STAGE_LABEL[record.stage] ?? record.stage}</b> · diubah dari panel, seperti di V1.
         </p>

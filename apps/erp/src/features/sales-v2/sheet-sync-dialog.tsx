@@ -52,7 +52,7 @@ function SheetSyncBody({ data, parts: { connectSheet, MappingSection, SyncButton
   const c = data.connection;
 
   return (
-    <DialogBody className="max-h-[calc(85dvh-8.5rem)] space-y-4 overflow-y-auto">
+    <DialogBody className="space-y-4">
       {!data.enabled && (
         <Callout tone="warning" title="Belum dikonfigurasi">
           Service account Google belum dipasang di server, jadi sinkronisasi belum bisa jalan. Data di bawah hanya untuk dilihat.

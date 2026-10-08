@@ -122,7 +122,7 @@ function OpportunityForm({ options, draft: d, formRef, onDone, onCancel, onReset
   return (
     <form ref={formRef} onSubmit={onSubmit}>
       {status && <input type="hidden" name="opty_status_code" value={status} />}
-      <DialogBody className="max-h-[calc(85dvh-8.5rem)] overflow-y-auto">
+      <DialogBody>
         {status && <p className="mb-3 text-[0.75rem] text-slate-600">Stage awal: <b className="text-slate-900">{STAGE_LABEL[status] ?? status}</b></p>}
         <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-3">
           <F label="Dari Marketing Lead" hint={lead ? `Leads No: ${lead.lead_no}` : "Kosongkan kalau bukan dari Marketing."}>
@@ -171,7 +171,7 @@ function ExtensionForm({ options, draft: d, formRef, onDone, onCancel, onReset }
   const { pending, onSubmit, t } = useSubmit(createExtensionRequestFromSales, onDone);
   return (
     <form ref={formRef} onSubmit={onSubmit}>
-      <DialogBody className="max-h-[calc(85dvh-8.5rem)] overflow-y-auto">
+      <DialogBody>
         <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-3">
           <F label="Talent yang di-extend" required span hint="Bikin PQ baru buat deal perpanjangan ini + otomatis masuk sebagai request pending di TM Extension Request (TM lengkapi rincian gaji & approval chain-nya).">
             <Select name="employee_id" required searchable defaultValue={d.employee_id} options={options.employeeOptions} placeholder="Pilih talent" />
@@ -285,7 +285,7 @@ function EditForm({ record, draft: d, formRef, returnTo, options, onDone, onCanc
   return (
     <form ref={formRef} onSubmit={onSubmit}>
       <input type="hidden" name="return_to" value={returnTo} />
-      <DialogBody className="max-h-[calc(85dvh-8.5rem)] overflow-y-auto">
+      <DialogBody>
         {record.leadNo && <p className="mb-3 text-[0.75rem] text-slate-600">Dari Marketing Lead <b className="font-mono text-slate-900">{record.leadNo}</b></p>}
         <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-3">
           <F label="Nama Klien" required><Input name="client_name" required defaultValue={d.client_name} autoFocus /></F>

@@ -226,11 +226,16 @@ Decided with the Product Owner before any change (feedback doc "Feedback UI UX")
   to 300–560px, at most 45 % of the window, kept per browser. The page beside it narrows with it.
 - Colours as V1: summary cards in V1's gradients (components/stat-card.tsx `GRADIENTS`), table header V1's violet
   row, the active Tabel · Grid · Kanban tile V1's violet gradient. Primary actions stay ERP navy (V1 does too).
-- Frozen columns as V1: Opportunity Tracker Aksi / Status, Opty No, Leads No, Klien; PQ Tracker Aksi / Status, Opty No,
-  PQ No, Dokumen PQ. Crisp pins one column and windows the others, so they render as one pinned block (each part with
-  its own header menu, always shown, first). The Aksi / Status cell stacks V1's controls on V1's actions; Edit, Hapus
-  and Convert open the record panel with that dialog. Rows grow with it, so Crisp's row virtualization (36px rows) is
-  off and the table scrolls in a bounded box.
+- Frozen columns as V1, slim (revised the same day after QA: a stacked Aksi column made every row ~90px): Opportunity
+  Tracker Opty No, Leads No, Klien (~370px); PQ Tracker Opty No, PQ No, Dok. PQ as a file count (~300px). Crisp pins
+  one column and windows the others, so they render as one pinned block, each part one line with its own header menu
+  (a longer value ends in "…", whole on hover and in the panel). Rows stay 32px.
+- V1's Aksi / Status became quick actions that cost no space: Stage / Sales Qualified (OT) and Pipeline Stage / Opty
+  Status (PQ) are edited in their cells (`cells.tsx`), and a right-click on a row offers Buka, Edit, Sales Qualified,
+  Convert, Kirim untuk TTD, stage moves and Hapus, each only when allowed. A row click opens the panel, home of every
+  action and of the Agent. Crisp's row virtualization stays off (it assumes 36px rows; the laptop tier has 32px).
+- Form dialogs: the <form> is the dialog card's flex column, so Crisp's body scrolls and Batal / Simpan stay in view;
+  before, a long form clipped them on short laptop screens (Crisp caps a dialog at 74vh).
 - Kanban: no per-column "+" (New is in the toolbar). A column header opens sort, a filter (the table's controls) for
   that column's cards, and Hide; this lasts for the visit.
 - Google Sheet Sync (OT and PQ) is on, both ways like V1, through a Google service account

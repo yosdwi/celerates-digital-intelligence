@@ -63,7 +63,7 @@ export function PqPreview({
   onClose: () => void;
   onPatch: (id: string, patch: Partial<Pq>) => void;
   options: PqOptions;
-  /** A dialog the Aksi column asked for (edit, delete): opened once this record is shown. */
+  /** A dialog the row's menu asked for (edit, delete, sign): opened once this record is shown. */
   request?: PanelRequest | null;
   onRequestHandled?: () => void;
 }) {
@@ -73,7 +73,10 @@ export function PqPreview({
   const [dialog, setDialog] = useState<null | "edit" | "delete" | "sign">(null);
   useEffect(() => {
     if (!record || !request || record.id !== request.id) return;
-    if (request.action === "edit" ? access.canEdit : request.action === "delete" && access.canDelete) setDialog(request.action as "edit" | "delete");
+    const can = request.action === "edit" ? access.canEdit
+      : request.action === "delete" ? access.canDelete
+      : request.action === "sign" && access.canEdit && record.signature.status === "not_sent" && !!record.pqNo;
+    if (can) setDialog(request.action as "edit" | "delete" | "sign");
     onRequestHandled?.();
   }, [record, request, onRequestHandled, access]);
   const wrapRef = useRecordPanelRail(record ? { type: "commercial_pq", id: record.id, label: `${record.pqNo ?? record.optyNo} · ${record.client}` } : null, onClose, !!dialog);

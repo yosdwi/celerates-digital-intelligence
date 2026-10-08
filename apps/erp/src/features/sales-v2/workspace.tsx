@@ -7,7 +7,7 @@ import {
   BadgeCheck, Banknote, Briefcase, Building2, CalendarClock, CircleDot, CircleX, FileText, Gauge, GitBranch, HandCoins, Hash,
   Layers, Megaphone, NotebookPen, Signal, Tag, Timer, UserRound, Users,
 } from "lucide-react";
-import { Button, Checkbox, Select, SnackbarProvider, type DataTableColumn, type TableToolbarColumn } from "@crisp-ui-kit/crisp";
+import { SnackbarProvider, type ContextMenuOption, type DataTableColumn, type TableToolbarColumn } from "@crisp-ui-kit/crisp";
 import { useToast } from "@/components/toast-provider";
 import { updateOptyStatus, updateSalesQualified } from "@/app/sales/opportunity-tracker/actions";
 import { CreateMenu, type CreateRequest, type FormOptions } from "./forms";
@@ -16,15 +16,14 @@ import { CONFIRM_STAGES, StageMoveDialog } from "./stage-move";
 import { SheetSyncButton, OT_SHEET_SYNC } from "./sheet-sync-dialog";
 import type { SheetSyncData } from "./data";
 import { RecordPreview } from "./record-preview";
-import { RecordWorkspace, useRowActions, type Access, type WorkspaceConfig } from "./record-workspace";
+import { RecordWorkspace, useRowActions, type Access, type RowActions, type WorkspaceConfig } from "./record-workspace";
+import { InlineCheck, InlineSelect } from "./cells";
 import {
   BUILT_IN_VIEWS, CLIENT_TYPES, DEFAULT_SHOWN, FIELD_KEYS, LEVELS, SERVICE_TYPES, STAGES, STAGE_LABEL, SERVICE_LABEL, LEVEL_LABEL, CLIENT_TYPE_LABEL,
   canConvert, daysSince, fieldValue, matchesSearch, rupiah, type Opportunity,
 } from "./model";
 
 const STAGE_ORDER: Record<string, number> = Object.fromEntries(STAGES.map((s, i) => [s.id, i]));
-// Stage cells carry the stage's position ("0".."5") so the table sorts in pipeline order, shown as its label.
-const STAGE_SWATCH = Object.fromEntries(STAGES.map((s, i) => [String(i), s.swatch])) as Record<string, 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12>;
 
 /** Sort reads stage order for Stage and raw numbers for amounts; everything else as displayed. */
 function sortValue(o: Opportunity, key: string): unknown {
@@ -163,51 +162,35 @@ function KanbanCard({ o, onOpen }: { o: Opportunity; onOpen: () => void }) {
   );
 }
 
-/**
- * V1's Aksi / Status cell (opportunity-trackers-table.tsx), stacked as there: Edit | Hapus, the stage, Sales Qualified,
- * Convert to Requisition. Edit, Hapus and Convert open the record with the panel's dialog; stage and Sales Qualified
- * save in place with the same V1 actions as the panel.
- */
-function ActionsCell({ o }: { o: Opportunity }) {
-  const { access, open, run } = useRowActions();
-  const canDelete = access.canDelete && !o.pq && !o.requisition;
-  return (
-    // The row opens the panel on click; controls in this cell (and their popovers) must not.
-    <span className="block space-y-1.5 py-1" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} data-sales-v2-actions>
-      {(access.canEdit || canDelete) && (
-        <span className="flex items-center gap-2 text-[0.75rem] font-medium">
-          {access.canEdit && <button type="button" className="text-slate-600 hover:text-slate-900" onClick={() => open(o.id, "edit")}>Edit</button>}
-          {access.canEdit && canDelete && <span className="text-slate-300">|</span>}
-          {canDelete && <button type="button" className="text-red-600 hover:text-red-700" onClick={() => open(o.id, "delete")}>Hapus</button>}
-        </span>
-      )}
-      {access.canEdit ? (
-        <>
-          <Select
-            aria-label={`Stage ${o.optyNo}`}
-            size="small"
-            value={o.status}
-            onValueChange={(v) => v !== o.status && run(o, { status: v }, () => updateOptyStatus(o.id, v))}
-            options={STAGES.map((s) => ({ value: s.id, label: s.title }))}
-          />
-          <label className="flex items-center gap-1.5 text-[0.75rem] text-slate-700">
-            <Checkbox checked={o.salesQualified} onChange={(e) => { const v = e.currentTarget.checked; run(o, { salesQualified: v }, () => updateSalesQualified(o.id, v)); }} />
-            Sales Qualified
-          </label>
-          {canConvert(o) && <Button size="sm" intent="primary" className="w-full" onClick={() => open(o.id, "convert")}>Convert to Requisition</Button>}
-        </>
-      ) : (
-        <span className="flex items-center gap-1.5 text-[0.75rem] text-slate-700"><StageDot status={o.status} /> {STAGE_LABEL[o.status] ?? o.status}</span>
-      )}
-      {o.pq && <span className="block text-[0.75rem] text-slate-400">Sudah di-convert</span>}
-    </span>
+/** Stage and Sales Qualified edited in their cells (QA 2026-10-08), with the same V1 actions as the panel. */
+function StageCell({ o }: { o: Opportunity }) {
+  const { access, run } = useRowActions();
+  return <InlineSelect value={o.status} options={STAGE_OPTIONS} label="Stage" canEdit={access.canEdit} onChange={(v) => run(o, { status: v }, () => updateOptyStatus(o.id, v))} />;
+}
+function QualifiedCell({ o }: { o: Opportunity }) {
+  const { access, run } = useRowActions();
+  return <InlineCheck checked={o.salesQualified} label="Qualified" canEdit={access.canEdit} onChange={(v) => run(o, { salesQualified: v }, () => updateSalesQualified(o.id, v))} />;
+}
+const STAGE_OPTIONS = STAGES.map((s) => ({ value: s.id, label: s.title, swatch: s.swatch }));
+
+/** Right-click on a row: V1's quick actions (Aksi / Status), each only when this user and this record allow it. */
+function rowMenu(o: Opportunity, { access, open, run }: RowActions): ContextMenuOption[] {
+  const items: ContextMenuOption[] = [{ label: "Buka", onSelect: () => open(o.id) }];
+  if (!access.canEdit) return items;
+  items.push(
+    { label: "Edit", onSelect: () => open(o.id, "edit") },
+    { label: o.salesQualified ? "Batalkan Sales Qualified" : "Tandai Sales Qualified", onSelect: () => run(o, { salesQualified: !o.salesQualified }, () => updateSalesQualified(o.id, !o.salesQualified)) },
   );
+  if (canConvert(o)) items.push({ label: "Convert to Requisition", onSelect: () => open(o.id, "convert") });
+  items.push({ separator: true });
+  for (const s of STAGES) items.push({ label: `Stage: ${s.title}`, disabled: s.id === o.status, onSelect: () => run(o, { status: s.id }, () => updateOptyStatus(o.id, s.id)) });
+  if (access.canDelete && !o.pq && !o.requisition) items.push({ separator: true }, { label: "Hapus", danger: true, onSelect: () => open(o.id, "delete") });
+  return items;
 }
 
 // ── Table columns: every Celerates field, the useful ones shown by default (contract §7) ──────────────────────
 // Header alignment follows the values under it: centre for short codes, dates and counts, right for money.
 const SPECS: Record<string, HeaderSpec> = Object.fromEntries(([
-  ["actions", "Aksi / Status", CircleDot, "none", "left"],
   ["client", "Client", Building2, "values", "left"],
   ["optyNo", "Opty No", Hash, "text", "left"],
   ["status", "Stage", CircleDot, "values", "center"],
@@ -232,18 +215,17 @@ const SPECS: Record<string, HeaderSpec> = Object.fromEntries(([
 ] as const).map(([key, label, icon, kind, align]) => [key, { key, label, icon, kind, align, sortable: FIELD_KEYS.has(key) }]));
 
 const ALL_COLUMNS: Omit<DataTableColumn<Opportunity>, "header">[] = [
-  { key: "actions", width: 200, render: (_, o) => <ActionsCell o={o} /> },
-  { key: "client", width: 180, render: (_, o) => <span className="font-medium text-slate-900">{o.client}</span> },
-  { key: "optyNo", width: 130, render: (_, o) => <span className="font-mono text-[0.75rem] text-slate-600">{o.optyNo}</span> },
-  { key: "status", type: "status", accessor: (o) => String(STAGE_ORDER[o.status] ?? 9), format: (_, o) => STAGE_LABEL[o.status] ?? o.status, swatches: STAGE_SWATCH },
+  { key: "client", width: 150, render: (_, o) => <span className="font-medium text-slate-900">{o.client}</span> },
+  { key: "optyNo", width: 112, render: (_, o) => <span className="font-mono text-[0.75rem] text-slate-600">{o.optyNo}</span> },
+  { key: "status", render: (_, o) => <StageCell o={o} /> },
   { key: "position" },
   { key: "headcount", type: "number" },
   { key: "price", type: "number", format: (_, o) => rupiah(o.price, o.pricePeriod) },
   { key: "salesPic" },
-  { key: "salesQualified", render: (_, o) => (o.salesQualified ? <span className="font-medium text-emerald-700">Qualified</span> : <span className="text-slate-400">Belum</span>) },
+  { key: "salesQualified", render: (_, o) => <QualifiedCell o={o} /> },
   { key: "lastCommunication", accessor: (o) => o.lastCommunication ?? "" },
   { key: "downstream", render: (_, o) => o.requisition ? <span className="font-mono text-[0.75rem]">{o.requisition.no}</span> : o.pq ? <span className="text-[0.75rem]">PQ · Extension</span> : <span className="text-slate-400">-</span> },
-  { key: "leadNo", width: 130, render: (_, o) => <span className="font-mono text-[0.75rem] text-slate-600">{o.leadNo ?? "-"}</span> },
+  { key: "leadNo", width: 104, render: (_, o) => <span className="font-mono text-[0.75rem] text-slate-600">{o.leadNo ?? "-"}</span> },
   { key: "clientType", accessor: (o) => (o.clientType ? CLIENT_TYPE_LABEL[o.clientType] ?? o.clientType : "") },
   { key: "serviceType", accessor: (o) => (o.serviceType ? SERVICE_LABEL[o.serviceType] ?? o.serviceType : "") },
   { key: "level", accessor: (o) => (o.level ? LEVEL_LABEL[o.level] ?? o.level : "") },
@@ -288,8 +270,10 @@ const CONFIG: WorkspaceConfig<Opportunity> = {
   cellText,
   valueOrder: { status: STAGES.map((s) => s.title) },
   defaultShown: DEFAULT_SHOWN,
-  // V1 freezes Aksi / Status, Opty No, Leads No and Klien (opportunity-trackers-table.tsx).
-  frozen: ["actions", "optyNo", "leadNo", "client"],
+  // V1 freezes Aksi / Status, Opty No, Leads No and Klien (opportunity-trackers-table.tsx); Aksi became in-cell edits,
+  // the row's right-click menu and the panel (QA 2026-10-08).
+  frozen: ["optyNo", "leadNo", "client"],
+  rowMenu,
   grid: (o) => ({
     label: `${o.client} ${o.optyNo}`,
     author: <span className="inline-flex items-center gap-1.5 text-[0.6875rem] text-slate-500"><StageDot status={o.status} /><span className="font-mono">{o.optyNo}</span> · {STAGE_LABEL[o.status] ?? o.status}</span>,

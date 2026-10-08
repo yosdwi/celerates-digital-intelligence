@@ -7,25 +7,25 @@ import {
   Banknote, Briefcase, Building2, CalendarCheck, CalendarClock, CalendarRange, CircleDot, FileSignature, FileText, FolderKanban, Gauge,
   Hash, Layers, ListChecks, Megaphone, NotebookPen, Paperclip, Receipt, Signal, Tag, Timer, UserRound, Users, Flag, Network,
 } from "lucide-react";
-import { Badge, Button, Dialog, DialogFooter, Select, SnackbarProvider, type DataTableColumn, type TableToolbarColumn } from "@crisp-ui-kit/crisp";
+import { Button, Dialog, DialogFooter, SnackbarProvider, type ContextMenuOption, type DataTableColumn, type TableToolbarColumn } from "@crisp-ui-kit/crisp";
 import { OPTY_STATUS, STAGE_TO_OPTY_STATUS } from "@/app/sales/pq-constants";
 import { useToast } from "@/components/toast-provider";
 import type { HeaderSpec } from "./header-filter";
 import { SheetSyncButton, PQ_SHEET_SYNC } from "./sheet-sync-dialog";
 import type { SheetSyncData } from "./data";
-import { RecordWorkspace, useRowActions, type Access, type MoveContext, type WorkspaceConfig } from "./record-workspace";
+import { RecordWorkspace, useRowActions, type Access, type MoveContext, type RowActions, type WorkspaceConfig } from "./record-workspace";
+import { InlineSelect } from "./cells";
 import { BUSINESS_UNITS, CLIENT_TYPES, LEVELS, PRIORITIES, SERVICE_TYPES, rupiah } from "./model";
 import {
   LEAD_SOURCE_LABEL, OPTY_STATUS_LABEL, PQ_BUILT_IN_VIEWS, PQ_DEFAULT_SHOWN, PQ_FIELD_KEYS, PQ_STAGES, PQ_STAGE_LABEL, SIGNATURE_LABEL,
   needsPqNo, pqFieldValue, pqMatchesSearch, withPqStage, type Pq,
 } from "./pq-model";
 import { CreatePq, type PqCreateRequest } from "./pq-forms";
-import { FileLinks, PqPreview, ok, savePqStage } from "./pq-preview";
+import { PqPreview, ok, savePqStage } from "./pq-preview";
 import { updateOptyStatus, updatePipelineStage } from "@/app/sales/actions";
 import type { PqOptions } from "./pq-data";
 
 const STAGE_ORDER: Record<string, number> = Object.fromEntries(PQ_STAGES.map((s, i) => [s.id, i]));
-const STAGE_SWATCH = Object.fromEntries(PQ_STAGES.map((s, i) => [String(i), s.swatch])) as Record<string, 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12>;
 // Win and Drop close the PQ (Win also tells TM to start talent assignment), so they ask first.
 const CONFIRM = new Set(["win", "drop"]);
 
@@ -159,58 +159,39 @@ function KanbanCard({ p, onOpen }: { p: Pq; onOpen: () => void }) {
   );
 }
 
-/**
- * V1's Aksi / Status cell (app/sales/opportunities-table.tsx), stacked as there: Edit | Hapus, Perlu Generate PQ or
- * Menunggu Talent Onboard, then StageSelector's two selects (Pipeline Stage with its Opty Status rule, Opty Status).
- */
-function ActionsCell({ p }: { p: Pq }) {
-  const { access, open, run } = useRowActions();
-  return (
-    // The row opens the panel on click; controls in this cell (and their popovers) must not.
-    <span className="block space-y-1.5 py-1" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} data-sales-v2-actions>
-      {(access.canEdit || access.canDelete) && (
-        <span className="flex items-center gap-2 text-[0.75rem] font-medium">
-          {access.canEdit && <button type="button" className="text-slate-600 hover:text-slate-900" onClick={() => open(p.id, "edit")}>Edit</button>}
-          {access.canEdit && access.canDelete && <span className="text-slate-300">|</span>}
-          {access.canDelete && <button type="button" className="text-red-600 hover:text-red-700" onClick={() => open(p.id, "delete")}>Hapus</button>}
-        </span>
-      )}
-      {!p.pqNo && (needsPqNo(p) ? <Badge tone="warning" size="small">Perlu Generate PQ</Badge> : <span className="block text-[0.75rem] text-slate-400">Menunggu Talent Onboard</span>)}
-      {access.canEdit ? (
-        <>
-          <Select
-            aria-label={`Pipeline Stage ${p.pqNo ?? p.optyNo}`}
-            size="small"
-            value={p.stage}
-            onValueChange={(v) => v !== p.stage && run(p, withPqStage(p, v), () => savePqStage(p.id, v))}
-            options={PQ_STAGES.map((s) => ({ value: s.id, label: s.title }))}
-          />
-          <Select
-            aria-label={`Opty Status ${p.pqNo ?? p.optyNo}`}
-            size="small"
-            value={p.optyStatus ?? ""}
-            placeholder="- Opty Status -"
-            onValueChange={(v) => v !== p.optyStatus && run(p, { optyStatus: v }, () => ok(updateOptyStatus(p.id, v)))}
-            options={OPTY_STATUS.map(([value, l]) => ({ value, label: l }))}
-          />
-        </>
-      ) : (
-        <span className="block text-[0.75rem] text-slate-700">{PQ_STAGE_LABEL[p.stage] ?? p.stage}{p.optyStatus ? ` · ${OPTY_STATUS_LABEL[p.optyStatus] ?? p.optyStatus}` : ""}</span>
-      )}
-    </span>
-  );
+/** Pipeline Stage (with V1's Opty Status rule) and Opty Status edited in their cells (QA 2026-10-08). */
+function StageCell({ p }: { p: Pq }) {
+  const { access, run } = useRowActions();
+  return <InlineSelect value={p.stage} options={STAGE_OPTIONS} label="Pipeline Stage" canEdit={access.canEdit} onChange={(v) => run(p, withPqStage(p, v), () => savePqStage(p.id, v))} />;
+}
+function OptyStatusCell({ p }: { p: Pq }) {
+  const { access, run } = useRowActions();
+  return <InlineSelect value={p.optyStatus ?? ""} options={OPTY_OPTIONS} label="Opty Status" canEdit={access.canEdit} onChange={(v) => run(p, { optyStatus: v }, () => ok(updateOptyStatus(p.id, v)))} />;
+}
+const STAGE_OPTIONS = PQ_STAGES.map((s) => ({ value: s.id, label: s.title, swatch: s.swatch }));
+const OPTY_OPTIONS = OPTY_STATUS.map(([value, label]) => ({ value, label }));
+
+/** Right-click on a row: V1's quick actions (Aksi / Status), each only when this user and this record allow it. */
+function rowMenu(p: Pq, { access, open, run }: RowActions): ContextMenuOption[] {
+  const items: ContextMenuOption[] = [{ label: "Buka", onSelect: () => open(p.id) }];
+  if (!access.canEdit) return items;
+  items.push({ label: "Edit", onSelect: () => open(p.id, "edit") });
+  if (p.signature.status === "not_sent" && p.pqNo) items.push({ label: "Kirim untuk TTD", onSelect: () => open(p.id, "sign") });
+  items.push({ separator: true });
+  for (const s of PQ_STAGES) items.push({ label: `Pipeline: ${s.title}`, disabled: s.id === p.stage, onSelect: () => run(p, withPqStage(p, s.id), () => savePqStage(p.id, s.id)) });
+  if (access.canDelete) items.push({ separator: true }, { label: "Hapus", danger: true, onSelect: () => open(p.id, "delete") });
+  return items;
 }
 
 // ── Table columns: every V1 column, Client first and pinned ─────────────────────────────────────────────────
 const SPECS: Record<string, HeaderSpec> = Object.fromEntries(([
-  ["actions", "Aksi / Status", CircleDot, "none", "left"],
   ["client", "Client", Building2, "values", "left"],
   ["optyNo", "Opty No", Hash, "text", "left"],
   ["pqNo", "PQ No", Receipt, "text", "left"],
   ["stage", "Pipeline Stage", CircleDot, "values", "center"],
   ["optyStatus", "Opty Status", ListChecks, "values", "left"],
   ["signature", "TTD PQ", FileSignature, "values", "center"],
-  ["pqDocs", "Dokumen PQ", Paperclip, "none", "left"],
+  ["pqDocs", "Dok. PQ", Paperclip, "none", "left"],
   ["project", "Project", FolderKanban, "text", "left"],
   ["position", "Positions", Briefcase, "values", "left"],
   ["clientType", "Client Type", Tag, "values", "center"],
@@ -234,18 +215,18 @@ const SPECS: Record<string, HeaderSpec> = Object.fromEntries(([
 
 const text = (p: Pq, key: string) => String(pqFieldValue(p, key) ?? "");
 const COLUMNS: Omit<DataTableColumn<Pq>, "header">[] = [
-  { key: "actions", width: 190, render: (_, p) => <ActionsCell p={p} /> },
   { key: "client", render: (_, p) => <span className="font-medium text-slate-900">{p.client}</span> },
-  { key: "optyNo", width: 150, render: (_, p) => <span className="font-mono text-[0.75rem] text-slate-600">{p.optyNo}</span> },
+  { key: "optyNo", width: 112, render: (_, p) => <span className="font-mono text-[0.75rem] text-slate-600">{p.optyNo}</span> },
   // As V1: the number or "-"; Perlu Generate PQ / Menunggu Talent Onboard sit in the Aksi cell.
-  { key: "pqNo", width: 180, render: (_, p) => <span className="font-mono text-[0.75rem] text-slate-600">{p.pqNo ?? "-"}</span> },
-  { key: "stage", type: "status", accessor: (p) => String(STAGE_ORDER[p.stage] ?? 9), format: (_, p) => PQ_STAGE_LABEL[p.stage] ?? p.stage, swatches: STAGE_SWATCH },
-  { key: "optyStatus", accessor: (p) => text(p, "optyStatus") },
+  { key: "pqNo", width: 120, render: (_, p) => <span className="font-mono text-[0.75rem] text-slate-600">{p.pqNo ?? "-"}</span> },
+  { key: "stage", render: (_, p) => <StageCell p={p} /> },
+  { key: "optyStatus", render: (_, p) => <OptyStatusCell p={p} /> },
   {
     key: "signature",
     render: (_, p) => <span className={p.signature.status === "not_sent" ? "text-slate-400" : `rounded px-1.5 py-0.5 font-medium ${SIGN_CHIP[p.signature.status]}`}>{SIGNATURE_LABEL[p.signature.status]}</span>,
   },
-  { key: "pqDocs", width: 160, render: (_, p) => (p.pqDocs.length ? <FileLinks files={p.pqDocs} /> : <span className="text-slate-300">-</span>) },
+  // Frozen and narrow: how many files; the panel lists them (Dokumen PQ).
+  { key: "pqDocs", width: 64, render: (_, p) => (p.pqDocs.length ? <span className="inline-flex items-center gap-1 text-slate-700"><Paperclip size={12} aria-hidden />{p.pqDocs.length}</span> : <span className="text-slate-300">-</span>) },
   { key: "project" },
   { key: "position" },
   { key: "clientType", accessor: (p) => text(p, "clientType") },
@@ -258,11 +239,13 @@ const COLUMNS: Omit<DataTableColumn<Pq>, "header">[] = [
   { key: "bant", type: "number" },
   { key: "price", type: "number", format: (_, p) => rupiah(p.price, p.pricePeriod) },
   { key: "approvalDate", accessor: (p) => p.approvalDate ?? "" },
+  // One line, like every row (QA 2026-10-08): how many PO documents (the link counts as one); the panel lists them.
   {
     key: "poDocs",
-    render: (_, p) => (p.poDocs.length || p.poDocUrl
-      ? <span className="block space-y-1">{p.poDocUrl && <a href={p.poDocUrl} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="block truncate text-[0.75rem] text-brand-700 hover:underline">Link PO</a>}<FileLinks files={p.poDocs} /></span>
-      : <span className="text-slate-300">-</span>),
+    render: (_, p) => {
+      const n = p.poDocs.length + (p.poDocUrl ? 1 : 0);
+      return n ? <span className="inline-flex items-center gap-1 text-slate-700"><Paperclip size={12} aria-hidden />{n}</span> : <span className="text-slate-300">-</span>;
+    },
   },
   { key: "salesPic" },
   { key: "leadSource", accessor: (p) => text(p, "leadSource") },
@@ -277,7 +260,7 @@ function cellText(p: Pq, key: string): string {
     case "price": return rupiah(p.price, p.pricePeriod);
     case "pqNo": return p.pqNo ?? (needsPqNo(p) ? "Perlu Generate PQ" : "Menunggu Talent Onboard");
     case "durationMonths": return p.durationMonths ? `${p.durationMonths} bulan` : "";
-    case "pqDocs": return p.pqDocs[0]?.name ?? "-";
+    case "pqDocs": return p.pqDocs.map((f) => f.name).join(", ");
     case "poDocs": return p.poDocs[0]?.name ?? (p.poDocUrl ? "Link PO" : "-");
     default: return text(p, key);
   }
@@ -301,8 +284,10 @@ const CONFIG: WorkspaceConfig<Pq> = {
   cellText,
   valueOrder: { stage: PQ_STAGES.map((s) => s.title), optyStatus: OPTY_STATUS.map(([, l]) => l) },
   defaultShown: PQ_DEFAULT_SHOWN,
-  // V1 freezes Aksi / Status, Opty No, PQ No and Dokumen PQ (app/sales/opportunities-table.tsx).
-  frozen: ["actions", "optyNo", "pqNo", "pqDocs"],
+  // V1 freezes Aksi / Status, Opty No, PQ No and Dokumen PQ (app/sales/opportunities-table.tsx); Aksi became in-cell
+  // edits, the row's right-click menu and the panel (QA 2026-10-08).
+  frozen: ["optyNo", "pqNo", "pqDocs"],
+  rowMenu,
   grid: (p) => ({
     label: `${p.client} ${p.pqNo ?? p.optyNo}`,
     author: <span className="inline-flex items-center gap-1.5 text-[0.6875rem] text-slate-500"><span aria-hidden className="inline-block h-2 w-2 rounded-full" style={{ background: PQ_STAGES.find((s) => s.id === p.stage)?.accent ?? "#8a8f98" }} /><span className="font-mono">{p.pqNo ?? p.optyNo}</span> · {PQ_STAGE_LABEL[p.stage] ?? p.stage}</span>,
