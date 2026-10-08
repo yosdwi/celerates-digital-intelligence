@@ -6,14 +6,14 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Building2, Calendar, FileText, Mail, Phone, Plus, UserPlus, X } from "lucide-react";
-import { Badge, Button, Checkbox, Dialog, DialogBody, DialogFooter, Input, RecordPanel, Select, Textarea } from "@crisp-ui-kit/crisp";
+import { ActivityFeedRow, Badge, Button, Checkbox, Dialog, DialogBody, DialogFooter, Input, RecordPanel, Select, Textarea } from "@crisp-ui-kit/crisp";
 import { useToast } from "@/components/toast-provider";
 import { createActivity, createClient, createContact, deleteActivity, deleteClient, deleteContact, updateClient } from "@/app/sales/accounts/actions";
 import { F, DraftFooter, opts, readDraft, useCloseFromXOnly, useSubmit, type Draft } from "./forms";
 import { rupiah } from "./model";
 import { PQ_STAGE_LABEL } from "./pq-model";
 import { ACCOUNT_STATUSES, ACTIVITY_LABEL, ACTIVITY_TYPES, accountFormData, lastActivityOf, picOf, type Account } from "./account-model";
-import { HistoryRows, useHistory } from "./history";
+import { RecordTimeline, type TimelineItem } from "./history";
 import { PanelTitle, useRecordPanelRail, useRowActions, type Access, type PanelRequest } from "./record-workspace";
 import { InlineSelect, MoreMenu } from "./cells";
 
@@ -45,8 +45,7 @@ export function AccountPreview({
   const router = useRouter();
   const { showToast } = useToast();
   const [dialog, setDialog] = useState<Dialogs>(null);
-  const { edit } = useRowActions();
-  const changes = useHistory(record?.id ?? "", undefined, record);
+  const { edit, showHistory } = useRowActions();
   useEffect(() => {
     if (!record || !request || record.id !== request.id) return;
     const a = request.action;
@@ -82,29 +81,38 @@ export function AccountPreview({
     <li key={key} className="flex items-center justify-between gap-2 text-[0.8125rem]"><span className="min-w-0 truncate text-slate-700">{left}</span>{right}</li>
   );
 
+  // Aktivitas (Attio's record timeline): logged calls, emails, meetings and notes with every saved change, by time.
+  const logged: TimelineItem[] = record.activities.map((a) => {
+    const Icon = TYPE_ICON[a.type] ?? FileText;
+    return {
+      key: a.id,
+      at: a.date,
+      row: (
+        <ActivityFeedRow
+          actor={<span className="font-medium text-slate-900">{a.by ?? "-"}</span>}
+          action={
+            <span className="flex min-w-0 items-center gap-1.5">
+              <Icon size={13} className="shrink-0 text-slate-500" aria-label={ACTIVITY_LABEL[a.type] ?? a.type} />
+              <span className="truncate font-medium text-slate-900">{a.title}</span>
+              {removeButton("delActivity", a.id, a.title)}
+            </span>
+          }
+          when={a.date}
+        >
+          {(a.description || a.contact) && (
+            <div className="text-[0.75rem] leading-5 text-slate-600">
+              {a.description && <p className="whitespace-pre-wrap">{a.description}</p>}
+              {a.contact && <p className="text-slate-400">dengan {a.contact}</p>}
+            </div>
+          )}
+        </ActivityFeedRow>
+      ),
+    };
+  });
   const activity = (
     <div className="space-y-2">
       {access.canEdit && <Button size="sm" intent="neutral" onClick={() => setDialog("activity")}><Plus size={13} /> Catat aktivitas</Button>}
-      {record.activities.length === 0 ? <p className="text-[0.8125rem] text-slate-400">Belum ada aktivitas.</p> : (
-        <ol className="space-y-2.5">
-          {record.activities.map((a) => {
-            const Icon = TYPE_ICON[a.type] ?? FileText;
-            return (
-              <li key={a.id} className="flex gap-2">
-                <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-600" title={ACTIVITY_LABEL[a.type] ?? a.type}><Icon size={13} /></span>
-                <div className="min-w-0 flex-1">
-                  <p className="flex items-baseline justify-between gap-2">
-                    <span className="truncate text-[0.8125rem] font-medium text-slate-900">{a.title}</span>
-                    <span className="flex shrink-0 items-center gap-1.5 text-[0.75rem] text-slate-500">{a.date}{removeButton("delActivity", a.id, a.title)}</span>
-                  </p>
-                  {a.description && <p className="whitespace-pre-wrap text-[0.75rem] leading-5 text-slate-600">{a.description}</p>}
-                  {(a.contact || a.by) && <p className="text-[0.6875rem] text-slate-400">{[a.contact && `dengan ${a.contact}`, a.by && `oleh ${a.by}`].filter(Boolean).join(" · ")}</p>}
-                </div>
-              </li>
-            );
-          })}
-        </ol>
-      )}
+      <RecordTimeline recordId={record.id} version={record} extra={logged} />
     </div>
   );
 
@@ -151,7 +159,6 @@ export function AccountPreview({
       content: h.invoices.length ? <ul className="space-y-1">{h.invoices.map((i) => row(`${i.group_name ?? "-"}${i.price_per_month ? ` · ${rupiah(i.price_per_month)}` : ""}`,
         <Badge tone={INVOICE_TONE[i.status_code ?? ""] ?? "neutral"} size="small">{i.status_code ?? "-"}</Badge>, i.id))}</ul> : undefined,
     },
-    { key: "history", label: "Riwayat perubahan", count: changes.rows?.length ?? 0, content: <HistoryRows state={changes} showField /> },
   ];
 
   // Buttons only (QA 2026-10-08): the status is edited in the Ringkasan above.
@@ -190,6 +197,8 @@ export function AccountPreview({
         highlights={highlights}
         activityLabel="Aktivitas"
         activity={activity}
+        viewAllActivityLabel="Riwayat lengkap"
+        onViewAllActivity={() => showHistory(record.id)}
         sections={sections}
         footer={footer}
         resizable

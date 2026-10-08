@@ -5,7 +5,7 @@
 // docs/design/SALES-V2-CRISP-UX-CONTRACT.md is the contract this file implements.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Columns3, LayoutGrid, Search, Sparkles, Table2 } from "lucide-react";
+import { Columns3, History, LayoutGrid, Search, Sparkles, Table2 } from "lucide-react";
 import {
   DataTable, EntityCard, Input, SavedViews, SavedViewsSaveBar, StatCard, TableToolbar, ViewToggle, useSnackbar,
   applyFilters, applySorts, Button, Dialog, DialogBody, DialogFooter, FormField,
@@ -17,7 +17,7 @@ import { openAgent } from "@/components/mobile/events";
 import { setRightRail, useRightRail } from "@/lib/right-rail";
 import { HeaderFilter, type HeaderSpec } from "./header-filter";
 import { KanbanBoard } from "./board-menu";
-import { HistoryList } from "./history";
+import { HistoryList, ModuleHistoryDrawer } from "./history";
 import type { HistoryRecordType } from "@/lib/field-history";
 import { parseState, serializeState, type SavedState, type StoredView, type View, type WorkspaceState } from "./model";
 
@@ -54,6 +54,8 @@ export type RowActions = {
   edit: (id: string, key: string, value: string) => Promise<void>;
   /** Edit history: the record type, and a stored field's label and value as the page shows them. */
   history: { recordType: HistoryRecordType; label: (field: string) => string; format: (field: string, value: string | null) => string };
+  /** Open the page's Riwayat drawer, on one record's changes when given. */
+  showHistory: (recordId?: string) => void;
 };
 const RowActionsContext = createContext<RowActions | null>(null);
 export function useRowActions(): RowActions {
@@ -323,10 +325,12 @@ export function RecordWorkspace<T extends { id: string }>({
     };
   }, [c]);
   const [historyOf, setHistoryOf] = useState<null | { id: string; key: string }>(null);
+  const [feedOf, setFeedOf] = useState<null | { recordId: string | null }>(null);
   const rowActions = useMemo<RowActions>(() => ({
     edit,
     history,
     access,
+    showHistory: (recordId) => setFeedOf({ recordId: recordId ?? null }),
     open: (id, action) => { commit({ record: id }); setRequest(action ? { id, action } : null); },
     run: (record, p, action) => {
       const before = Object.fromEntries(Object.keys(p).map((k) => [k, (record as Record<string, unknown>)[k]]));
@@ -496,7 +500,10 @@ export function RecordWorkspace<T extends { id: string }>({
           filterLabel="Filter"
           viewSettingsLabel="Kolom"
         />
-        <div className="ml-auto flex items-center gap-1.5">{toolbarEnd}</div>
+        <div className="ml-auto flex items-center gap-1.5">
+          <Button size="sm" intent="ghost" onClick={() => setFeedOf({ recordId: null })} data-sales-v2-history-open><History size={14} /> Riwayat</Button>
+          {toolbarEnd}
+        </div>
       </div>
 
       {dirty && (
@@ -601,6 +608,15 @@ export function RecordWorkspace<T extends { id: string }>({
           </DialogBody>
         )}
       </Dialog>
+
+      <ModuleHistoryDrawer
+        open={!!feedOf}
+        recordId={feedOf?.recordId}
+        onClose={() => setFeedOf(null)}
+        onClearRecord={() => setFeedOf({ recordId: null })}
+        labelOf={(id) => { const o = all.find((r) => r.id === id); return o ? c.board.cardLabel(o) : null; }}
+        onOpenRecord={(id) => { setFeedOf(null); select(id); }}
+      />
 
       <Dialog open={!!naming} onOpenChange={(o) => !o && setNaming(null)} title={naming?.mode === "rename" ? "Ganti nama tampilan" : "Simpan tampilan"} width={400}>
         {naming && (

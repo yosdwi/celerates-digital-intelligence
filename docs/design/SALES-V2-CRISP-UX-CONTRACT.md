@@ -242,6 +242,12 @@ Decided with the Product Owner before any change (feedback doc "Feedback UI UX")
   keys). Every Sales update action writes through `updateWithHistory` (lib/field-history.ts), PMO document fields
   included, whichever screen made the edit; recorded from 2026-10-08 on. Read through `getFieldHistory` (Sales
   viewer; Account also Marketing viewer).
+  Three ways in (Crisp ActivityFeed): a cell's "View edit history" (that field); the panel's Aktivitas, the record
+  timeline as in Attio (OT Progress Notes / PQ Notes pinned on top, then each save grouped as one entry; Account mixes
+  in its logged calls, emails, meetings and notes by date; the latest ten, then "Tampilkan … lainnya"); and the
+  toolbar's Riwayat drawer, every change in the module filtered by person, field and time (7 days by default), one
+  record when opened from the panel's "Riwayat lengkap", a record name opening that record (`getModuleHistory`, same
+  guard). No changed-cell marker in the table: noise in a dense grid.
 - Form dialogs: the <form> is the dialog card's flex column, so Crisp's body scrolls and Batal / Simpan stay in view;
   before, a long form clipped them on short laptop screens (Crisp caps a dialog at 74vh).
 - Kanban: no per-column "+" (New is in the toolbar). A column header opens sort, a filter (the table's controls) for

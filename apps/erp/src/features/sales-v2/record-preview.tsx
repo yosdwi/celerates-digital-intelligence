@@ -17,7 +17,7 @@ import {
 import { EditOpportunityDialog, type FormOptions } from "./forms";
 import { PanelTitle, useRecordPanelRail, useRowActions, type Access, type PanelRequest } from "./record-workspace";
 import { InlineCheck, InlineSelect, InlineText, MoreMenu } from "./cells";
-import { HistoryRows, useHistory } from "./history";
+import { RecordTimeline } from "./history";
 
 const STAGE_OPTIONS = STAGES.map((s) => ({ value: s.id, label: s.title, swatch: s.swatch }));
 
@@ -55,8 +55,7 @@ export function RecordPreview({
   const router = useRouter();
   const { showToast } = useToast();
   const [dialog, setDialog] = useState<null | "convert" | "delete" | "edit">(null);
-  const { edit } = useRowActions();
-  const changes = useHistory(record?.id ?? "", undefined, record);
+  const { edit, showHistory } = useRowActions();
   useEffect(() => {
     if (!record || !request || record.id !== request.id) return;
     const { action } = request;
@@ -112,7 +111,6 @@ export function RecordPreview({
       ) : undefined,
     },
     { key: "dropped", label: "Dropped Reason", count: record.droppedReason ? 1 : 0, content: text(record.droppedReason) ?? undefined },
-    { key: "history", label: "Riwayat perubahan", count: changes.rows?.length ?? 0, content: <HistoryRows state={changes} showField /> },
   ];
 
   // Buttons only (QA 2026-10-08): stage and Sales Qualified are edited in the Ringkasan above.
@@ -149,8 +147,14 @@ export function RecordPreview({
           closeLabel="Tutup"
           highlightsLabel="Ringkasan"
           highlights={highlights}
-          activityLabel="Progress Notes"
-          activity={text(record.progressNotes) ?? <p className="text-[0.8125rem] text-slate-400">Belum ada progress notes.</p>}
+          // Aktivitas (Attio's record timeline): the latest Progress Notes pinned, then every saved change.
+          activityLabel="Aktivitas"
+          activity={<>
+            {record.progressNotes && <div className="mb-2 rounded-md bg-slate-50 px-2.5 py-2"><p className="text-[0.6875rem] font-semibold uppercase tracking-wider text-slate-500">Progress Notes</p><p className="whitespace-pre-wrap text-[0.8125rem] leading-5 text-slate-700">{record.progressNotes}</p></div>}
+            <RecordTimeline recordId={record.id} version={record} />
+          </>}
+          viewAllActivityLabel="Riwayat lengkap"
+          onViewAllActivity={() => showHistory(record.id)}
           sections={sections}
           footer={footer}
           resizable

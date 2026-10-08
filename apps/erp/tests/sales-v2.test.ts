@@ -458,3 +458,18 @@ test("edit history: every Sales update path records its changes; the read is gua
   for (const f of ["workspace.tsx", "pq-workspace.tsx", "account-workspace.tsx"]) assert.match(read(`features/sales-v2/${f}`), /recordType: "/, f);
   assert.match(read("features/sales-v2/record-workspace.tsx"), /onViewEditHistory=\{\(id, key\) => setHistoryOf/);
 });
+
+test("edit history: the panel's Aktivitas is the record timeline; the page's Riwayat drawer reads the whole module, guarded", () => {
+  const action = read("app/sales/history-actions.ts");
+  for (const fn of ["getFieldHistory", "getModuleHistory"])
+    assert.match(action, new RegExp(`export async function ${fn}\\([^)]*\\) \\{\\n  await requireActor\\(\\);[\\s\\S]*?await canRead\\(recordType\\);`), fn);
+  for (const f of ["record-preview.tsx", "pq-preview.tsx", "account-preview.tsx"]) {
+    const src = read(`features/sales-v2/${f}`);
+    assert.match(src, /activityLabel="Aktivitas"/, f);
+    assert.match(src, /<RecordTimeline recordId=\{record\.id\} version=\{record\}/, f);
+    assert.match(src, /onViewAllActivity=\{\(\) => showHistory\(record\.id\)\}/, f);
+  }
+  const ws = read("features/sales-v2/record-workspace.tsx");
+  assert.match(ws, /<ModuleHistoryDrawer/);
+  assert.match(ws, /showHistory: \(recordId\) => setFeedOf/);
+});
