@@ -612,6 +612,7 @@ export function RecordWorkspace<T extends { id: string }>({
             valuesOf={valuesOf}
             onCardsChange={access.canEdit ? onCardsChange : undefined}
             onOpen={select}
+            onClose={closePreview}
           />
         )}
 

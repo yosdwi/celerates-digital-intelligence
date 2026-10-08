@@ -49,11 +49,14 @@
    n × 268px it scrolls sideways. */
 [data-sales-v2-board] .crisp-board-row {
   display: grid; grid-auto-flow: column; grid-auto-columns: minmax(268px, 1fr); align-items: stretch;
-  overflow: auto; overscroll-behavior: contain; padding-bottom: 64px;
+  overflow: auto; overscroll-behavior: contain; padding-top: 0; padding-bottom: 64px; margin-top: var(--crisp-space-3);
 }
 [data-sales-v2-board] .crisp-board-col { width: auto; max-height: none; }
-[data-sales-v2-board] .crisp-board-col-body { overflow: visible; }
-[data-sales-v2-board] .crisp-board-col-header { position: sticky; top: 0; z-index: 2; background: #fff; }
+[data-sales-v2-board] .crisp-board-col-body { overflow: visible; padding-top: 8px; }
+/* A sticky header pins to the scroll box's content edge, below its padding: Crisp's 12px row padding left a strip
+   above the pinned headers where cards showed through (QA page 11). The row has no top padding; the space sits
+   outside it (margin), and the gap under the header is the body's padding, so scrolled cards pass under the header. */
+[data-sales-v2-board] .crisp-board-col-header { position: sticky; top: 0; z-index: 2; background: #fff; margin-bottom: 0; }
 /* A card scrolled into view (a record in the URL) lands below the pinned header, not under it. */
 [data-sales-v2-board] .crisp-board-card { scroll-margin-top: 48px; }
 
@@ -67,7 +70,7 @@
 [data-sales-v2-board] .crisp-board-col:nth-child(6) { --stage: var(--stage-6); }
 [data-sales-v2-board] .crisp-board-col:nth-child(7) { --stage: var(--stage-7); }
 [data-sales-v2-board] .crisp-board-col:nth-child(8) { --stage: var(--stage-8); }
-[data-sales-v2-board] .crisp-board-col-header { padding: 0 6px; border-bottom: 2px solid var(--stage, #cbd5e1); margin-bottom: 6px; }
+[data-sales-v2-board] .crisp-board-col-header { padding: 0 6px; border-bottom: 2px solid var(--stage, #cbd5e1); }
 [data-sales-v2-board] .crisp-board-col-body { background: color-mix(in srgb, var(--stage, #94a3b8) 7%, #f8fafc); }
 [data-sales-v2-board] .crisp-board-card {
   border-radius: 8px;

@@ -13,7 +13,7 @@ type Column = { sort?: ToolbarSort; filters: ToolbarFilter[]; field?: string };
 type Card<T> = T & { columnId: string };
 
 export function KanbanBoard<T extends { id: string }>({
-  config: c, records, toolbarColumns, valuesOf, onCardsChange, onOpen,
+  config: c, records, toolbarColumns, valuesOf, onCardsChange, onOpen, onClose,
 }: {
   config: WorkspaceConfig<T>;
   records: T[];
@@ -22,6 +22,8 @@ export function KanbanBoard<T extends { id: string }>({
   valuesOf: (rows: T[]) => Record<string, [string, number][]>;
   onCardsChange?: (next: Card<T>[]) => void;
   onOpen: (id: string) => void;
+  /** Double-click on a card closes the record panel (QA page 11): the first click opened it, the double-click puts it away. */
+  onClose: () => void;
 }) {
   const { board } = c;
   const [cols, setCols] = useState<Record<string, Column>>({});
@@ -89,6 +91,7 @@ export function KanbanBoard<T extends { id: string }>({
         style={stageVars}
         data-sales-v2-board
         onClickCapture={(e) => openFrom(e.target)}
+        onDoubleClick={(e) => { if ((e.target as Element).closest(".crisp-board-card")) { window.getSelection()?.removeAllRanges(); onClose(); } }}
         onKeyDownCapture={(e) => { if ((e.key === "Enter" || e.key === " ") && (e.target as Element).matches(".crisp-board-col-header")) { e.preventDefault(); openFrom(e.target); } }}
       >
         <Board<Card<T>>

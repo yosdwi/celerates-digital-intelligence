@@ -500,10 +500,18 @@ test("Crisp's own text reads in Indonesian on Sales V2 (CrispMessagesProvider at
 test("QA pages 7–10: Kanban scrolls as one board, whole cards drag, Client fills the frozen block", () => {
   const css = read("app/sales/v2/sales-v2.css");
   assert.match(css, /\[data-sales-v2-board\] \.crisp-board-row \{[^}]*overflow: auto/);
-  assert.match(css, /\[data-sales-v2-board\] \.crisp-board-col-body \{ overflow: visible; \}/);
+  assert.match(css, /\[data-sales-v2-board\] \.crisp-board-col-body \{ overflow: visible;/);
   assert.match(css, /\[data-sales-v2-board\] \.crisp-board-col-header \{ position: sticky; top: 0;/);
   // onPreviewCard makes Crisp stop pointerdown over the card's content: only its edges dragged.
   assert.doesNotMatch(read("features/sales-v2/board-menu.tsx"), /onPreviewCard=/);
+  // QA page 11: a sticky header pins below its scroll box's padding, so the row has none on top (cards showed above
+  // the pinned headers) and nothing transparent sits between header and cards.
+  assert.match(css, /\.crisp-board-row \{[^}]*padding-top: 0;/);
+  assert.match(css, /\.crisp-board-col-header \{ position: sticky; top: 0;[^}]*margin-bottom: 0; \}/);
+  assert.doesNotMatch(css, /margin-bottom: 6px/);
+  // Double-click on a card closes the record panel, on every board (OT, PQ, Account share KanbanBoard).
+  assert.match(read("features/sales-v2/board-menu.tsx"), /onDoubleClick=\{[^\n]*\.crisp-board-card[^\n]*onClose\(\)/);
+  assert.match(read("features/sales-v2/record-workspace.tsx"), /onClose=\{closePreview\}/);
   const ws = read("features/sales-v2/record-workspace.tsx");
   assert.match(ws, /i === parts\.length - 1 \? "flex-1" : "shrink-0"/);
   assert.match(ws, /i === parts\.length - 1 \? "min-w-0 flex-1" : "shrink-0"/);
