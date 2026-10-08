@@ -1,7 +1,7 @@
 "use client";
 // PQ record panel (contract §8): read first (highlights, documents, signature, PMO documents, source Opportunity), then
 // explicit actions. Every mutation is a V1 PQ Tracker server action (app/sales/actions.ts).
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Link as LinkIcon, Paperclip, Send } from "lucide-react";
@@ -18,7 +18,7 @@ import {
 } from "./pq-model";
 import { EditPqDialog } from "./pq-forms";
 import type { PqOptions } from "./pq-data";
-import { PanelTitle, useRecordPanelRail, type Access } from "./record-workspace";
+import { PanelTitle, useRecordPanelRail, type Access, type PanelRequest } from "./record-workspace";
 
 const SIGNATURE_TONE = { not_sent: "neutral", pending: "warning", signed: "success", rejected: "danger" } as const;
 const DOC_STATUS_LABEL: Record<string, string> = Object.fromEntries(DOC_STATUS_OPTIONS);
@@ -53,7 +53,7 @@ export function FileLinks({ files }: { files: PqFile[] }) {
 }
 
 export function PqPreview({
-  record, records, access, returnTo, onSelect, onClose, onPatch, options,
+  record, records, access, returnTo, onSelect, onClose, onPatch, options, request, onRequestHandled,
 }: {
   record: Pq | null;
   records: Pq[];
@@ -63,11 +63,19 @@ export function PqPreview({
   onClose: () => void;
   onPatch: (id: string, patch: Partial<Pq>) => void;
   options: PqOptions;
+  /** A dialog the Aksi column asked for (edit, delete): opened once this record is shown. */
+  request?: PanelRequest | null;
+  onRequestHandled?: () => void;
 }) {
   const router = useRouter();
   const { showToast } = useToast();
   const [pending, start] = useTransition();
   const [dialog, setDialog] = useState<null | "edit" | "delete" | "sign">(null);
+  useEffect(() => {
+    if (!record || !request || record.id !== request.id) return;
+    if (request.action === "edit" ? access.canEdit : request.action === "delete" && access.canDelete) setDialog(request.action as "edit" | "delete");
+    onRequestHandled?.();
+  }, [record, request, onRequestHandled, access]);
   const wrapRef = useRecordPanelRail(record ? { type: "commercial_pq", id: record.id, label: `${record.pqNo ?? record.optyNo} · ${record.client}` } : null, onClose, !!dialog);
 
   if (!record) return <div ref={wrapRef} hidden />;

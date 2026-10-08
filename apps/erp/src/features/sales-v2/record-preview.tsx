@@ -15,7 +15,7 @@ import {
   CLIENT_TYPE_LABEL, LEVEL_LABEL, PRIORITIES, SERVICE_LABEL, STAGES, STAGE_LABEL, canConvert, rupiah, type Opportunity,
 } from "./model";
 import { EditOpportunityDialog, type FormOptions } from "./forms";
-import { PanelTitle, useRecordPanelRail, type Access } from "./record-workspace";
+import { PanelTitle, useRecordPanelRail, type Access, type PanelRequest } from "./record-workspace";
 
 const SIGNATURE: Record<string, { label: string; tone: "neutral" | "warning" | "success" | "danger" }> = {
   not_sent: { label: "Belum dikirim", tone: "neutral" },
@@ -30,7 +30,7 @@ const isRedirect = (err: unknown) => typeof (err as { digest?: unknown })?.diges
 export type { Access };
 
 export function RecordPreview({
-  record, records, access, returnTo, onSelect, onClose, onPatch, options, convertRequest, onConvertHandled,
+  record, records, access, returnTo, onSelect, onClose, onPatch, options, request, onRequestHandled,
 }: {
   record: Opportunity | null;
   /** The current filtered, sorted list: Previous / Next walk it. */
@@ -43,19 +43,21 @@ export function RecordPreview({
   /** Optimistic local change while the server action runs. */
   onPatch: (id: string, patch: Partial<Opportunity>) => void;
   options: FormOptions;
-  /** Set after a Kanban move to Win chose "Pindahkan & Convert": open Convert for this record once. */
-  convertRequest?: string | null;
-  onConvertHandled?: () => void;
+  /** A dialog to open once for this record: the Aksi column (edit, delete, convert) or a Kanban move to Win that chose
+   *  "Pindahkan & Convert". */
+  request?: PanelRequest | null;
+  onRequestHandled?: () => void;
 }) {
   const router = useRouter();
   const { showToast } = useToast();
   const [pending, start] = useTransition();
   const [dialog, setDialog] = useState<null | "convert" | "delete" | "edit">(null);
   useEffect(() => {
-    if (!record || record.id !== convertRequest) return;
-    if (canConvert(record)) setDialog("convert");
-    onConvertHandled?.();
-  }, [record, convertRequest, onConvertHandled]);
+    if (!record || !request || record.id !== request.id) return;
+    const { action } = request;
+    if (action === "convert" ? canConvert(record) : action === "edit" ? access.canEdit : action === "delete" && access.canDelete) setDialog(action as "convert" | "edit" | "delete");
+    onRequestHandled?.();
+  }, [record, request, onRequestHandled, access]);
   // The Agent is a docked drawer that narrows the page (contract §9), so the preview stays open beside it.
   const visible = !!record;
   const wrapRef = useRecordPanelRail(record ? { type: "opportunity_tracker", id: record.id, label: `${record.optyNo} · ${record.client}` } : null, onClose, !!dialog);

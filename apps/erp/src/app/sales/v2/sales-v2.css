@@ -83,3 +83,9 @@
     --crisp-space-3: 10.5px; --crisp-space-3-5: 12px; --crisp-space-4: 14px; --crisp-space-5: 17.5px; --crisp-space-6: 21px; --crisp-space-8: 28px;
   }
 }
+
+/* V1's frozen block (record-workspace.tsx `frozen`): one pinned column holding Aksi / Status and the next V1 columns.
+   Its header label spans the whole cell so each part's menu sits over its own part; its cells may grow like V1's. */
+[data-sales-v2] .crisp-datatable-th-label:has([data-sales-v2-frozen-head]) { display: block; width: 100%; overflow: visible; }
+[data-sales-v2] td:has([data-sales-v2-frozen]) { padding-block: 6px; border-inline-end: 1px solid #ddd6fe; }
+[data-sales-v2] th:has([data-sales-v2-frozen-head]) { border-inline-end: 1px solid #ddd6fe; }

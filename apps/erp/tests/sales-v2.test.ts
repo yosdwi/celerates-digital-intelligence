@@ -335,3 +335,17 @@ test("QA 2026-10-08: slim sidebar scroll, Agent width follows the screen and can
   for (const f of ["workspace.tsx", "pq-workspace.tsx", "account-workspace.tsx"]) assert.doesNotMatch(read(`features/sales-v2/${f}`), /soft: "#/, f);
   assert.match(read("app/sales/v2/sales-v2.css"), /background: #f5f3ff; color: #6d28d9/);
 });
+
+test("QA 2026-10-08: V1's frozen columns and stacked Aksi / Status cell in OT and PQ", () => {
+  const ot = read("features/sales-v2/workspace.tsx");
+  const pq = read("features/sales-v2/pq-workspace.tsx");
+  // V1 sticks these four (md:sticky in the V1 tables), in this order.
+  assert.match(ot, /frozen: \["actions", "optyNo", "leadNo", "client"\]/);
+  assert.match(pq, /frozen: \["actions", "optyNo", "pqNo", "pqDocs"\]/);
+  for (const a of ["updateOptyStatus", "updateSalesQualified"]) assert.match(ot.slice(ot.indexOf("function ActionsCell")), new RegExp(a));
+  assert.match(pq.slice(pq.indexOf("function ActionsCell")), /savePqStage[\s\S]*updateOptyStatus/);
+  const kit = read("features/sales-v2/record-workspace.tsx");
+  // Rows taller than Crisp's 36px virtualization row: bounded scroll box, no `height` (which turns virtualization on).
+  assert.match(kit, /scrollProps=\{\{ style: \{ overflowY: "auto", height: workspaceHeight/);
+  assert.doesNotMatch(kit, /\n\s+height=\{workspaceHeight\}/);
+});

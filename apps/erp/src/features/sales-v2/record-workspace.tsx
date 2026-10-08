@@ -3,7 +3,7 @@
 // (in the URL), three views (Tabel · Grid · Kanban), clickable summary cards, saved views, Excel-style headers and a
 // slot for the page's own record panel. A page supplies a WorkspaceConfig plus its panel, dialogs and toolbar actions.
 // docs/design/SALES-V2-CRISP-UX-CONTRACT.md is the contract this file implements.
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Columns3, LayoutGrid, Search, Sparkles, Table2 } from "lucide-react";
 import {
@@ -23,6 +23,9 @@ export type Access = { canEdit: boolean; canDelete: boolean };
 export type Kpi<T> = { id: string; label: string; color: StatColor; match: (o: T) => boolean };
 export type PendingMove<T> = { record: T; to: string };
 
+/** A row's Aksi cell asking the panel to open one of its dialogs ("edit", "delete", "convert", …) for a record. */
+export type PanelRequest = { id: string; action: string };
+
 /** What the page's record panel gets: the selection, the visible list (Previous / Next) and the optimistic patch. */
 export type PanelContext<T> = {
   record: T | null;
@@ -31,7 +34,26 @@ export type PanelContext<T> = {
   select: (id: string) => void;
   close: () => void;
   patch: (id: string, p: Partial<T>) => void;
+  /** A dialog the Aksi column asked for; the panel opens it once its record is selected, then calls `clearRequest`. */
+  request: PanelRequest | null;
+  clearRequest: () => void;
 };
+
+/**
+ * What a table cell (the V1 Aksi / Status column) may do: open the record with one of the panel's dialogs, or save a
+ * quick change optimistically (`run`: patch, call the V1 action, refresh; put it back and say so if it fails).
+ */
+export type RowActions = {
+  access: Access;
+  open: (id: string, action?: string) => void;
+  run: (record: { id: string }, patch: Record<string, unknown>, action: () => Promise<unknown>) => void;
+};
+const RowActionsContext = createContext<RowActions | null>(null);
+export function useRowActions(): RowActions {
+  const ctx = useContext(RowActionsContext);
+  if (!ctx) throw new Error("useRowActions outside RecordWorkspace");
+  return ctx;
+}
 /** A Kanban move into a confirm stage, waiting for the page's dialog. `onMoved` after the server saved it. */
 export type MoveContext<T> = { move: PendingMove<T> | null; returnTo: string; onCancel: () => void; onMoved: () => void; select: (id: string) => void };
 
@@ -60,6 +82,12 @@ export type WorkspaceConfig<T extends { id: string }> = {
   /** Checklist order for coded columns (a pipeline in its own order, zero counts kept). */
   valueOrder?: Record<string, readonly string[]>;
   defaultShown: string[];
+  /**
+   * V1's frozen columns, in order (QA 2026-10-08): shown together as the table's first column, which Crisp pins while
+   * the rest scrolls (it pins one column; its column virtualization would drop a separately pinned second one). Always
+   * shown and first; each keeps its own header menu.
+   */
+  frozen?: string[];
   grid: (o: T) => { label: string; author: React.ReactNode; title: string; excerpt: string; footer: React.ReactNode; date?: string };
   board: {
     stages: readonly { id: string; title: string; accent: string }[];
@@ -246,35 +274,75 @@ export function RecordWorkspace<T extends { id: string }>({
   }, []);
 
   const select = useCallback((id: string) => commit({ record: id }), [commit]);
+  const [request, setRequest] = useState<PanelRequest | null>(null);
+  const [, startRow] = useTransition();
+  const rowActions = useMemo<RowActions>(() => ({
+    access,
+    open: (id, action) => { commit({ record: id }); setRequest(action ? { id, action } : null); },
+    run: (record, p, action) => {
+      const before = Object.fromEntries(Object.keys(p).map((k) => [k, (record as Record<string, unknown>)[k]]));
+      patch(record.id, p as Partial<T>);
+      startRow(async () => {
+        try { await action(); router.refresh(); }
+        catch (err) { patch(record.id, before as Partial<T>); showToast((err as Error)?.message || "Gagal menyimpan", "error"); }
+      });
+    },
+  }), [access, commit, patch, router, showToast]);
   const closePreview = useCallback(() => commit({ record: null }), [commit]);
   const selected = state.record ? all.find((r) => r.id === state.record) ?? null : null;
 
   // Table: Excel-style headers (header-filter.tsx) over every field; widths follow the longest value.
-  const allKeys = useMemo(() => c.columns.map((x) => x.key), [c]);
+  const frozenKeys = useMemo(() => c.frozen ?? [], [c]);
+  const allKeys = useMemo(() => c.columns.map((x) => x.key).filter((k) => !frozenKeys.includes(k)), [c, frozenKeys]);
   const widths = useMemo(() => columnWidths(c, serverRecords), [c, serverRecords]);
   const valueIndex = useMemo(() => distinctValues(c, all), [c, all]);
   const hideColumn = useCallback((key: string) => setShownKeys(shownKeys.filter((k) => k !== key)), [setShownKeys, shownKeys]);
-  const columns = useMemo(() => c.columns.map((col): DataTableColumn<T> => {
-    const spec = c.specs[col.key];
-    return {
+  const columns = useMemo(() => {
+    const header = (key: string, onHide?: () => void) => (
+      <HeaderFilter
+        spec={c.specs[key]}
+        values={valueIndex[key] ?? []}
+        filters={state.filters}
+        sorts={state.sorts}
+        onFilters={(filters) => commit({ filters })}
+        onSorts={(sorts) => commit({ sorts })}
+        onHide={onHide}
+      />
+    );
+    const regular = c.columns.filter((col) => !frozenKeys.includes(col.key)).map((col): DataTableColumn<T> => ({
       ...col,
-      header: (
-        <HeaderFilter
-          spec={spec}
-          values={valueIndex[col.key] ?? []}
-          filters={state.filters}
-          sorts={state.sorts}
-          onFilters={(filters) => commit({ filters })}
-          onSorts={(sorts) => commit({ sorts })}
-          onHide={() => hideColumn(col.key)}
-        />
-      ),
-      align: spec.align,
-      width: widths[col.key],
+      header: header(col.key, () => hideColumn(col.key)),
+      align: c.specs[col.key].align,
+      width: col.width ?? widths[col.key],
       hidden: !shownKeys.includes(col.key),
+    }));
+    if (!frozenKeys.length) return regular;
+    // V1's frozen block as one pinned column: each part keeps its width and header menu, cells stack like V1's.
+    const parts = frozenKeys.map((key) => {
+      const col = c.columns.find((x) => x.key === key)!;
+      return { col, width: (col.width as number | undefined) ?? widths[key] };
+    });
+    const frozen: DataTableColumn<T> = {
+      key: FROZEN,
+      width: parts.reduce((n, p) => n + p.width, 0),
+      header: (
+        <span className="flex w-full items-stretch" data-sales-v2-frozen-head>
+          {parts.map(({ col, width }) => <span key={col.key} className="flex shrink-0 items-center pr-3" style={{ width }}>{header(col.key)}</span>)}
+        </span>
+      ),
+      render: (_, row) => (
+        <span className="flex w-full items-start" data-sales-v2-frozen>
+          {parts.map(({ col, width }) => (
+            <span key={col.key} className="min-w-0 shrink-0 whitespace-normal break-words pr-3" style={{ width }}>
+              {col.render ? col.render(undefined as never, row) : c.cellText(row, col.key)}
+            </span>
+          ))}
+        </span>
+      ),
     };
-  }), [c, valueIndex, state.filters, state.sorts, commit, hideColumn, widths, shownKeys]);
-  const columnsForSettings: TableToolbarColumn[] = useMemo(() => c.columns.map((x) => ({ key: x.key, label: c.specs[x.key].label })), [c]);
+    return [frozen, ...regular];
+  }, [c, frozenKeys, valueIndex, state.filters, state.sorts, commit, hideColumn, widths, shownKeys]);
+  const columnsForSettings: TableToolbarColumn[] = useMemo(() => c.columns.filter((x) => !frozenKeys.includes(x.key)).map((x) => ({ key: x.key, label: c.specs[x.key].label })), [c, frozenKeys]);
   const [workspaceRef, workspaceHeight] = useHeight<HTMLDivElement>();
   const counts = useMemo(() => Object.fromEntries(c.kpis.map((k) => [k.id, all.filter(k.match).length])), [c, all]);
   // Each Kanban column's colour, read by sales-v2.css (Crisp's columns carry no id of their own).
@@ -284,6 +352,7 @@ export function RecordWorkspace<T extends { id: string }>({
   return (
     // Full viewport height: -mb-24 cancels the shell's bottom padding, so the workspace reaches the bottom edge and the
     // Agent launcher floats over it (the scroll areas leave room for it, sales-v2.css).
+    <RowActionsContext.Provider value={rowActions}>
     <div className="flex flex-col bg-white text-[0.8125rem] text-slate-800 md:-mb-24 md:h-dvh" data-sales-v2>
       {/* md:pr-56 keeps the header clear of the app's fixed top-right controls (language, bell, account). */}
       {/* Density (contract §5, §15): fixed compact sizes like Attio, never zoom; a 1280 × 650 laptop viewport (1366 or
@@ -402,15 +471,17 @@ export function RecordWorkspace<T extends { id: string }>({
             surface="bleed"
             data={records}
             columns={columns}
-            columnOrder={[...shownKeys, ...allKeys.filter((k) => !shownKeys.includes(k))]}
-            onColumnOrderChange={(order) => setShownKeys(order.filter((k) => shownKeys.includes(k)))}
-            onColumnsChange={(next) => setShownKeys(next.filter((x) => !x.hidden).map((x) => x.key))}
+            columnOrder={[...(frozenKeys.length ? [FROZEN] : []), ...shownKeys.filter((k) => allKeys.includes(k)), ...allKeys.filter((k) => !shownKeys.includes(k))]}
+            onColumnOrderChange={(order) => setShownKeys(order.filter((k) => k !== FROZEN && shownKeys.includes(k)))}
+            onColumnsChange={(next) => setShownKeys(next.filter((x) => !x.hidden && x.key !== FROZEN).map((x) => x.key))}
             showViewSettings={false}
             showCount={false}
             stickyFirst
             interactive
             onRowClick={(row) => select(row.id)}
-            height={workspaceHeight}
+            // A bounded scroll box without Crisp's row virtualization: that assumes 36px rows, and V1's Aksi column
+            // stacks taller ones (the frozen block, QA 2026-10-08); a few hundred rows render fine.
+            scrollProps={{ style: { overflowY: "auto", height: workspaceHeight, maxHeight: workspaceHeight } }}
             locale="id-ID"
             empty={empty}
           />
@@ -457,7 +528,7 @@ export function RecordWorkspace<T extends { id: string }>({
           </div>
         )}
 
-        {renderPanel({ record: selected, records, returnTo, select, close: closePreview, patch })}
+        {renderPanel({ record: selected, records, returnTo, select, close: closePreview, patch, request, clearRequest: () => setRequest(null) })}
       </div>
 
       {renderMoveDialog({
@@ -492,9 +563,11 @@ export function RecordWorkspace<T extends { id: string }>({
         )}
       </Dialog>
     </div>
+    </RowActionsContext.Provider>
   );
 }
 
+const FROZEN = "__frozen";
 const stageTitle = (stages: readonly { id: string; title: string }[], id: string) => stages.find((s) => s.id === id)?.title ?? id;
 
 /** What makes a saved view "changed": the record set and its order. Switching Tabel/Grid/Kanban is only a lens. */

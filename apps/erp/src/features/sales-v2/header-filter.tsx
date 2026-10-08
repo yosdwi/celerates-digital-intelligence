@@ -30,7 +30,8 @@ export function HeaderFilter({
   sorts: ToolbarSort[];
   onFilters: (next: ToolbarFilter[]) => void;
   onSorts: (next: ToolbarSort[]) => void;
-  onHide: () => void;
+  /** Absent for a frozen column, which is always shown. */
+  onHide?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const active = filters.some((f) => isHeaderFilter(f, spec.key)) || (spec.kind === "bool" && filters.some((f) => f.key === spec.key));
@@ -76,9 +77,11 @@ export function HeaderFilter({
           <Button size="sm" intent="neutral" disabled={!active} onClick={() => onFilters(filters.filter((f) => !isHeaderFilter(f, spec.key) && !(spec.kind === "bool" && f.key === spec.key)))}>
             Hapus filter
           </Button>
-          <Button size="sm" intent="neutral" onClick={() => { setOpen(false); onHide(); }}>
-            <EyeOff size={13} /> Sembunyikan
-          </Button>
+          {onHide && (
+            <Button size="sm" intent="neutral" onClick={() => { setOpen(false); onHide(); }}>
+              <EyeOff size={13} /> Sembunyikan
+            </Button>
+          )}
         </div>
       </div>
     </Popover>
