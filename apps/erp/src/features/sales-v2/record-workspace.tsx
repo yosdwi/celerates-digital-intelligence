@@ -63,6 +63,33 @@ export function useRowActions(): RowActions {
   if (!ctx) throw new Error("useRowActions outside RecordWorkspace");
   return ctx;
 }
+
+/** Labels and option labels for stored fields, so the edit history reads as the table does. */
+export function historyLabels<T extends { id: string }>(c: WorkspaceConfig<T>): RowActions["history"] {
+  const meta = new Map<string, { label: string; options?: Map<string, string> }>();
+  for (const [key, e] of Object.entries(c.edits ?? {})) {
+    const col = c.columns.find((x) => x.key === key);
+    meta.set(e.field, { label: c.specs[key]?.label ?? key, options: col?.options ? new Map(col.options.map((o) => [o.value, String(o.label)])) : undefined });
+  }
+  return {
+    recordType: c.recordType,
+    label: (f) => meta.get(f)?.label ?? humanize(f),
+    format: (f, v) => (v == null ? "" : meta.get(f)?.options?.get(v) ?? (v === "true" ? "Ya" : v === "false" ? "Tidak" : /^\d{4,}$/.test(v) ? Number(v).toLocaleString("id-ID") : v)),
+  };
+}
+
+/** Read-only row actions for a page outside the workspace (the full record page): history works, edits go elsewhere. */
+export function HistoryProvider<T extends { id: string }>({ config, access, children }: { config: WorkspaceConfig<T>; access: Access; children: React.ReactNode }) {
+  const value = useMemo<RowActions>(() => ({
+    access,
+    history: historyLabels(config),
+    open: () => {},
+    run: () => {},
+    edit: () => Promise.reject(new Error("Ubah dari Opportunity Tracker")),
+    showHistory: () => {},
+  }), [config, access]);
+  return <RowActionsContext.Provider value={value}>{children}</RowActionsContext.Provider>;
+}
 /** A Kanban move into a confirm stage, waiting for the page's dialog. `onMoved` after the server saved it. */
 export type MoveContext<T> = { move: PendingMove<T> | null; returnTo: string; onCancel: () => void; onMoved: () => void; select: (id: string) => void };
 
@@ -338,19 +365,7 @@ export function RecordWorkspace<T extends { id: string }>({
       throw err instanceof Error ? err : new Error("Gagal menyimpan");
     }
   }, [c, patch, router]);
-  // Labels and option labels for stored fields, so the edit history reads as the table does.
-  const history = useMemo<RowActions["history"]>(() => {
-    const meta = new Map<string, { label: string; options?: Map<string, string> }>();
-    for (const [key, e] of Object.entries(c.edits ?? {})) {
-      const col = c.columns.find((x) => x.key === key);
-      meta.set(e.field, { label: c.specs[key]?.label ?? key, options: col?.options ? new Map(col.options.map((o) => [o.value, String(o.label)])) : undefined });
-    }
-    return {
-      recordType: c.recordType,
-      label: (f) => meta.get(f)?.label ?? humanize(f),
-      format: (f, v) => (v == null ? "" : meta.get(f)?.options?.get(v) ?? (v === "true" ? "Ya" : v === "false" ? "Tidak" : /^\d{4,}$/.test(v) ? Number(v).toLocaleString("id-ID") : v)),
-    };
-  }, [c]);
+  const history = useMemo(() => historyLabels(c), [c]);
   const [historyOf, setHistoryOf] = useState<null | { id: string; key: string }>(null);
   const [feedOf, setFeedOf] = useState<null | { recordId: string | null }>(null);
   const rowActions = useMemo<RowActions>(() => ({

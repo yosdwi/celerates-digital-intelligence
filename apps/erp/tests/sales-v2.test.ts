@@ -14,6 +14,7 @@ import { ACCOUNT_BUILT_IN_VIEWS, accountFieldValue, accountFormData, accountMatc
 import { safeSalesReturnPath } from "../src/lib/safe-return";
 import { submoduleFor } from "../src/lib/module-access";
 import { navModuleFor } from "../src/lib/nav-module";
+import { buildJourney, type JourneyInput } from "../src/features/sales-v2/journey-model";
 
 const read = (p: string) => readFileSync(new URL(`../src/${p}`, import.meta.url), "utf8");
 const q = (s: string) => new URLSearchParams(s);
@@ -535,4 +536,58 @@ test("QA page 10: a page shared with your module keeps you in it; a direct visit
   assert.equal(navModuleFor("/ta/pipeline", "sales")?.key, "ta");
   assert.equal(navModuleFor("/sales/v2/opportunity-tracker", "ta")?.key, "sales");
   for (const f of ["components/sidebar.tsx", "components/mobile/tab-bar.tsx"]) assert.match(read(f), /useNavModule\(pathname\)/);
+});
+
+test("Deal 360: steps follow the deal downstream and name the stuck hand-offs with their owner", () => {
+  const now = Date.parse("2026-10-08T00:00:00Z");
+  const base: JourneyInput = {
+    now,
+    tracker: { status: "win", createdAt: null, closingPrice: 50_000_000 },
+    requisition: null, pq: null, applications: [], talents: [], claims: [],
+  };
+  // A won deal not yet converted: REQ is the current step, Sales owns the action.
+  const j0 = buildJourney(base);
+  assert.deepEqual(j0.steps.map((s) => s.state), ["done", "current", "todo", "todo", "todo", "todo"]);
+  assert.equal(j0.steps[0].detail, "Win");
+  assert.deepEqual(j0.actions.map((a) => a.owner), ["Sales"]);
+  assert.equal(j0.summary, "Opty · 1 perlu tindakan");
+
+  const full: JourneyInput = {
+    ...base,
+    requisition: { id: "r", no: "REQ-1", createdAt: null },
+    pq: { id: "p", no: "PQ-1" },
+    applications: [
+      { candidate: "Ayu", candidateId: "c1", hiring: "onboarding", submission: "client_accepted" },
+      { candidate: "Bima", candidateId: "c2", hiring: "offering", submission: "client_accepted" },
+      { candidate: "Citra", candidateId: "c3", hiring: "cv_sent", submission: null },
+    ],
+    talents: [
+      { onboardingId: "o1", candidateId: "c1", name: "Ayu", position: "QA", employeeId: "e1", assignment: { status: "on_project", price: 20_000_000, marginPercent: 12 } },
+      { onboardingId: "o4", candidateId: "c4", name: "Dewi", position: "QA", employeeId: null, assignment: null },
+      { onboardingId: "o5", candidateId: "c5", name: "Eka", position: "QA", employeeId: "e5", assignment: null },
+    ],
+    claims: [
+      { id: "k1", no: "OT-1", title: "", status: "forwarded_to_sales", createdAt: "2026-10-06T00:00:00Z", toClient: 1_000_000, invoiced: false },
+      { id: "k2", no: "OT-2", title: "", status: "draft", createdAt: "2026-09-20T00:00:00Z", toClient: 500_000, invoiced: false },
+      { id: "k3", no: "OT-3", title: "", status: "invoiced", createdAt: "2026-09-01T00:00:00Z", toClient: 2_000_000, invoiced: true },
+    ],
+  };
+  const j = buildJourney(full);
+  assert.ok(j.steps.every((s) => s.state === "done"));
+  assert.equal(j.steps[2].detail, "3 kandidat · 2 diterima");
+  assert.equal(j.steps[5].detail, "rata-rata 12,0%");
+  // Bima accepted without onboarding (TA), Dewi not promoted (TA), Eka without assignment (TM), OT-1 waits on Sales,
+  // OT-2 Draft 18 days (PMO). The invoiced claim needs nothing.
+  assert.deepEqual(j.actions.map((a) => `${a.owner}:${a.key}`), ["TA:ob:c2", "TA:promote:o4", "TM:setup:e5", "Sales:claim:k1", "PMO:claim:k2"]);
+  assert.deepEqual(j.money, { deal: 50_000_000, claimed: 3_500_000, invoiced: 1, claims: 3 });
+
+  // Placed but never synced: margin is the current step and Sales is asked to sync.
+  const unsynced = buildJourney({ ...full, talents: [{ ...full.talents[0], assignment: { status: "on_project", price: 1, marginPercent: null } }] });
+  assert.equal(unsynced.steps[5].state, "current");
+  assert.ok(unsynced.actions.some((a) => a.key === "sync" && a.href === "/sales/profitability-tracker"));
+
+  // The panel's ↗ opens this page; Edit stays in the footer.
+  const preview = read("features/sales-v2/record-preview.tsx");
+  assert.match(preview, /onOpenRecord=\{\(\) => router\.push\(`\/sales\/v2\/opportunity-tracker\/\$\{record\.id\}/);
+  assert.match(preview, /<PanelJourney record=\{record\}/);
 });

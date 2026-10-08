@@ -76,6 +76,7 @@ export function RecordPreview({
   // here as in the table (the workspace's `edit`), the rest of the record lives in the table and the Edit form.
   const save = (key: string) => (v: string) => { edit(record.id, key, v).catch((err) => showToast((err as Error)?.message || "Gagal menyimpan", "error")); };
   const highlights = [
+    { key: "journey", label: "Perjalanan", value: <PanelJourney record={record} returnTo={returnTo} /> },
     { key: "opty", label: "Opty No", value: <span className="font-mono text-[0.75rem]">{record.optyNo}</span> },
     { key: "stage", label: "Stage", value: <InlineSelect value={record.status} options={STAGE_OPTIONS} label="Stage" canEdit={access.canEdit} onChange={save("status")} /> },
     { key: "qualified", label: "Sales Qualified", value: <InlineCheck checked={record.salesQualified} label="Qualified" canEdit={access.canEdit} onChange={(v) => save("salesQualified")(String(v))} /> },
@@ -142,8 +143,9 @@ export function RecordPreview({
           onNext={index >= 0 && index < records.length - 1 ? () => onSelect(records[index + 1].id) : undefined}
           previousRecordLabel="Sebelumnya"
           nextRecordLabel="Berikutnya"
-          onOpenRecord={access.canEdit ? () => setDialog("edit") : undefined}
-          openRecordLabel="Edit"
+          // ↗ opens the full record page (Deal 360), Attio's "open record"; Edit stays a button in the footer.
+          onOpenRecord={() => router.push(`/sales/v2/opportunity-tracker/${record.id}?return_to=${encodeURIComponent(returnTo)}`)}
+          openRecordLabel="Buka halaman penuh"
           closeLabel="Tutup"
           highlightsLabel="Ringkasan"
           highlights={highlights}
@@ -169,6 +171,27 @@ export function RecordPreview({
       <DeleteDialog record={record} open={dialog === "delete"} onClose={() => setDialog(null)} onDeleted={onClose} />
       {access.canEdit && <EditOpportunityDialog record={record} open={dialog === "edit"} onClose={() => setDialog(null)} returnTo={returnTo} options={options} />}
     </>
+  );
+}
+
+/** One line of Deal 360 from what the panel already has (Opty → REQ → Kandidat → Onboarding → PQ signed); the full
+ *  journey, down to claims and margin, is on the record page. */
+function PanelJourney({ record, returnTo }: { record: Opportunity; returnTo: string }) {
+  const r = record.requisition;
+  const steps = [true, !!r, !!r?.applications, !!r?.onboarding, record.pq?.signature === "signed"];
+  const reached = ["Opty", "REQ", "Kandidat", "Onboarding", "PQ signed"][steps.lastIndexOf(true)];
+  return (
+    <Link href={`/sales/v2/opportunity-tracker/${record.id}?return_to=${encodeURIComponent(returnTo)}`} className="inline-flex items-center gap-2 hover:underline" data-panel-journey>
+      <span className="inline-flex items-center" aria-hidden>
+        {steps.map((on, i) => (
+          <span key={i} className="inline-flex items-center">
+            {i > 0 && <span className={`h-0.5 w-2.5 ${on ? "bg-emerald-500" : "bg-slate-200"}`} />}
+            <span className={`h-2 w-2 rounded-full ${on ? "bg-emerald-500" : "border border-slate-300 bg-white"}`} />
+          </span>
+        ))}
+      </span>
+      <span className="text-[0.75rem] text-slate-600">{reached} · lihat →</span>
+    </Link>
   );
 }
 

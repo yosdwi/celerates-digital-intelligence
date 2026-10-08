@@ -77,7 +77,7 @@ function Workspace({ records, access, options, sheetSync }: WorkspaceProps) {
   const [convertRequest, setConvertRequest] = useState<string | null>(null);
   return (
     <RecordWorkspace
-      config={CONFIG}
+      config={OPPORTUNITY_CONFIG}
       records={records}
       access={access}
       headerEnd={<Link href="/sales/opportunity-tracker" className="text-[0.75rem] text-slate-400 hover:text-slate-700 hover:underline" title="Tampilan lama (V1)">Versi lama</Link>}
@@ -252,7 +252,7 @@ function cellText(o: Opportunity, key: string): string {
 }
 
 
-const CONFIG: WorkspaceConfig<Opportunity> = {
+export const OPPORTUNITY_CONFIG: WorkspaceConfig<Opportunity> = {
   title: "Opportunity Tracker",
   subtitle: "Evaluasi requirement klien sebelum lanjut ke proses hiring.",
   noun: "opportunity",

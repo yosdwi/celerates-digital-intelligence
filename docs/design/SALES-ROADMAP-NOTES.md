@@ -5,8 +5,8 @@ committed work. Each one is defined before it is built (problem, cause, options,
 
 | # | Idea | Decision 2026-10-08 |
 |---|---|---|
-| 1 | Deal 360: one panel follows a deal from Opportunity to margin | Mockup shown; define next |
-| 2 + 6 | Email in the ERP (log, read, send, templates), like Attio or Frappe | Use the existing mailbox celeratesapps@celerates.co.id during the pilot; switch to the Sales team's mailboxes later. Define next |
+| 1 | Deal 360: one page follows a deal from Opportunity to margin | Built: the panel's ↗ opens the full record page (`/sales/v2/opportunity-tracker/<id>`, Crisp RecordPage) with tabs Perjalanan and Aktivitas; the panel shows a one-line journey |
+| 2 + 6 | Email in the ERP (log, read, send, templates), like Attio or Frappe | Stage A (IMAP log, BCC to log) and B (send + templates) together, one mailbox celeratesapps@celerates.co.id for the pilot (IMAP login with the existing App Password verified 2026-10-08); no visibility rules yet; personal mailboxes after the pilot. Next |
 | 3 | AI fills forms from a pasted email or RFQ | Agreed; define next |
 | 4 | Margin check before Proposal Sent | Later; notes below |
 | 5 | Pipeline insight | Later; notes below |
