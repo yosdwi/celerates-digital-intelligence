@@ -16,6 +16,7 @@ import { submoduleFor } from "../src/lib/module-access";
 import { navModuleFor } from "../src/lib/nav-module";
 import { buildJourney, type JourneyInput } from "../src/features/sales-v2/journey-model";
 import { fillTemplate, matchAccount, parseAddressList, snippet, threadKey } from "../src/lib/mail/model";
+import { normalizeAiFill } from "../src/features/sales-v2/ai-fill";
 
 const read = (p: string) => readFileSync(new URL(`../src/${p}`, import.meta.url), "utf8");
 const q = (s: string) => new URLSearchParams(s);
@@ -620,4 +621,23 @@ test("Sales email: mail matches its Account by contact, then company domain; thr
   assert.match(read("features/sales-v2/account-preview.tsx"), /key: "email", label: "Email", count: record\.emails/);
   assert.match(read("features/sales-v2/deal-page.tsx"), /id: "email", label: "Email"/);
   assert.match(read("instrumentation.ts"), /startMailSync\(\)/);
+});
+
+test("AI form fill: only known fields, V1 codes and sane numbers reach the form", () => {
+  assert.deepEqual(normalizeAiFill({
+    client_name: "  PT Maju Jaya ", service_type_code: "Managed Service", level_code: "senior", headcount_target: "3 orang",
+    estimated_duration_months: 6, price_amount: "Rp 15.000.000", price_period_code: "monthly", client_type_code: "partner",
+    sales_pic_name: "Injected", headcount_target_extra: 9, requirement_summary: "Butuh 3 backend engineer",
+  }), {
+    client_name: "PT Maju Jaya", service_type_code: "managed_service", level_code: "senior", headcount_target: "3",
+    estimated_duration_months: "6", price_amount: "15000000", price_period_code: "monthly", requirement_summary: "Butuh 3 backend engineer",
+  });
+  // Out of range or not a code: dropped, never guessed.
+  assert.deepEqual(normalizeAiFill({ headcount_target: 0, estimated_duration_months: 999, level_code: "principal" }), {});
+  assert.deepEqual(normalizeAiFill("not an object"), {});
+  assert.deepEqual(normalizeAiFill(null), {});
+  const forms = read("features/sales-v2/forms.tsx");
+  assert.match(forms, /fetch\("\/api\/agent\/extract"/);
+  assert.match(forms, /aiKeys=\{aiKeys\} onAiFill=\{aiFill\}/);
+  assert.match(read("app/api/agent/extract/route.ts"), /normalizeAiFill\(out\?\.fields\)/);
 });

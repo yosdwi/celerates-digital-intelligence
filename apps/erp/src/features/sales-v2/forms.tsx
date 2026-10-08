@@ -6,7 +6,7 @@
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { BriefcaseBusiness, ChevronDown, Plus, Repeat, SquarePen } from "lucide-react";
+import { BriefcaseBusiness, ChevronDown, Plus, Repeat, Sparkles, SquarePen } from "lucide-react";
 import { Button, Checkbox, Dialog, DialogBody, DialogFooter, FormField, Input, InputShell, Menu, MenuItem, Select, Textarea } from "@crisp-ui-kit/crisp";
 import { MoneyInput } from "@/components/form-fields";
 import { useToast } from "@/components/toast-provider";
@@ -114,8 +114,39 @@ export function DraftFooter({ pending, onCancel, onReset, t, resetLabel = "Koson
   );
 }
 
-function OpportunityForm({ options, draft: d, formRef, onDone, onCancel, onReset, status }: FormProps & { status?: string }) {
+/** Pasted client email or RFQ → AI proposes the fields (roadmap #3, api/agent/extract). Nothing is saved: the values
+ *  land in the form, marked, for the person to check. The pasted text is not kept. */
+function AiFill({ onFill }: { onFill: (fields: Draft) => void }) {
+  const [text, setText] = useState("");
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const run = () => start(async () => {
+    setError(null);
+    const res = await fetch("/api/agent/extract", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) }).catch(() => null);
+    const body = await res?.json().catch(() => ({}));
+    if (!res?.ok) { setError(body?.error ?? "AI belum tersedia."); return; }
+    const fields = (body?.fields ?? {}) as Draft;
+    if (!Object.keys(fields).length) { setError("AI tidak menemukan data yang bisa diisi dari teks ini."); return; }
+    onFill(fields);
+  });
+  return (
+    <details className="mb-3 rounded-lg border border-violet-200 bg-violet-50/50 px-3 py-2" data-ai-fill>
+      <summary className="flex cursor-pointer items-center gap-1.5 text-[0.8125rem] font-medium text-violet-900"><Sparkles size={14} /> Isi dari email / RFQ klien (AI)</summary>
+      <div className="mt-2 space-y-2">
+        <Textarea value={text} onChange={(e) => setText(e.target.value)} rows={5} placeholder="Tempel isi email atau RFQ di sini…" aria-label="Teks email atau RFQ" />
+        <div className="flex items-center gap-2">
+          <Button type="button" size="sm" intent="primary" loading={pending} disabled={text.trim().length < 10} onClick={run}><Sparkles size={13} /> Isi dengan AI</Button>
+          <span className="text-[0.75rem] text-slate-500">Hasil AI ditandai ✦ di form; periksa sebelum menyimpan.</span>
+        </div>
+        {error && <p className="text-[0.75rem] text-red-600">{error}</p>}
+      </div>
+    </details>
+  );
+}
+
+function OpportunityForm({ options, draft: d, formRef, onDone, onCancel, onReset, status, aiKeys = [], onAiFill }: FormProps & { status?: string; aiKeys?: string[]; onAiFill?: (fields: Draft) => void }) {
   const { pending, onSubmit, t } = useSubmit(createOpportunityTracker, onDone);
+  const ai = (key: string, hint?: string) => (aiKeys.includes(key) ? "✦ Diisi AI, periksa" : hint);
   const [leadId, setLeadId] = useState(d.lead_id ?? "");
   const lead = options.leadOptions.find((l) => l.id === leadId);
   const clientDefault = leadId === (d.lead_id ?? "") && d.client_name != null ? d.client_name : lead?.client_name ?? "";
@@ -124,6 +155,7 @@ function OpportunityForm({ options, draft: d, formRef, onDone, onCancel, onReset
       {status && <input type="hidden" name="opty_status_code" value={status} />}
       <DialogBody>
         {status && <p className="mb-3 text-[0.75rem] text-slate-600">Stage awal: <b className="text-slate-900">{STAGE_LABEL[status] ?? status}</b></p>}
+        {onAiFill && <AiFill onFill={onAiFill} />}
         <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-3">
           <F label="Dari Marketing Lead" hint={lead ? `Leads No: ${lead.lead_no}` : "Kosongkan kalau bukan dari Marketing."}>
             <Select
@@ -135,21 +167,21 @@ function OpportunityForm({ options, draft: d, formRef, onDone, onCancel, onReset
               options={[{ value: "", label: "- Tidak dari Lead / Manual -" }, ...options.leadOptions.map((l) => ({ value: l.id, label: `${l.lead_no} - ${l.client_name}` }))]}
             />
           </F>
-          <F label="Nama Klien" required hint={lead ? "Otomatis dari Lead, bisa diedit" : undefined}>
+          <F label="Nama Klien" required hint={ai("client_name", lead ? "Otomatis dari Lead, bisa diedit" : undefined)}>
             <Input key={`client-${leadId}`} name="client_name" required defaultValue={clientDefault} autoFocus />
           </F>
-          <F label="Client Type"><Select name="client_type_code" defaultValue={d.client_type_code} options={opts(CLIENT_TYPES)} placeholder="-" /></F>
+          <F label="Client Type" hint={ai("client_type_code")}><Select name="client_type_code" defaultValue={d.client_type_code} options={opts(CLIENT_TYPES)} placeholder="-" /></F>
 
-          <F label="Service Type"><Select name="service_type_code" defaultValue={d.service_type_code} options={opts(SERVICE_TYPES)} placeholder="-" /></F>
+          <F label="Service Type" hint={ai("service_type_code")}><Select name="service_type_code" defaultValue={d.service_type_code} options={opts(SERVICE_TYPES)} placeholder="-" /></F>
           <F label="Sales PIC" required><Input name="sales_pic_name" required defaultValue={d.sales_pic_name} /></F>
-          <F label="Positions"><PositionInput suggestions={options.positionSuggestions} defaultValue={d.position_name} /></F>
+          <F label="Positions" hint={ai("position_name")}><PositionInput suggestions={options.positionSuggestions} defaultValue={d.position_name} /></F>
 
-          <F label="Level"><Select name="level_code" defaultValue={d.level_code} options={opts(LEVELS)} placeholder="-" /></F>
-          <F label="Headcount"><Input name="headcount_target" type="number" defaultValue={d.headcount_target} /></F>
-          <F label="Estimasi Durasi (bulan)"><Input name="estimated_duration_months" type="number" defaultValue={d.estimated_duration_months} /></F>
+          <F label="Level" hint={ai("level_code")}><Select name="level_code" defaultValue={d.level_code} options={opts(LEVELS)} placeholder="-" /></F>
+          <F label="Headcount" hint={ai("headcount_target")}><Input name="headcount_target" type="number" defaultValue={d.headcount_target} /></F>
+          <F label="Estimasi Durasi (bulan)" hint={ai("estimated_duration_months")}><Input name="estimated_duration_months" type="number" defaultValue={d.estimated_duration_months} /></F>
 
-          <F label="Price"><Money name="price_amount" defaultValue={d.price_amount} /></F>
-          <F label="Price Period"><Select name="price_period_code" defaultValue={d.price_period_code ?? "monthly"} options={opts(PRICE_PERIODS)} /></F>
+          <F label="Price" hint={ai("price_amount")}><Money name="price_amount" defaultValue={d.price_amount} /></F>
+          <F label="Price Period" hint={ai("price_period_code")}><Select name="price_period_code" defaultValue={d.price_period_code ?? "monthly"} options={opts(PRICE_PERIODS)} /></F>
           <F label="Closing Price Deal"><Money name="estimated_deal_amount" defaultValue={d.estimated_deal_amount} /></F>
 
           <F label="BANTE Score"><Select name="bante_score" defaultValue={d.bante_score} options={opts(BANTE_SCORES)} placeholder="-" /></F>
@@ -158,8 +190,8 @@ function OpportunityForm({ options, draft: d, formRef, onDone, onCancel, onReset
             <Checkbox name="sales_qualified" value="true" defaultChecked={d.sales_qualified === "true"} /> Sales Qualified
           </label>
 
-          <F label="Requirement Summary" span><Textarea name="requirement_summary" rows={2} defaultValue={d.requirement_summary} /></F>
-          <F label="Detail Requirement" span><Textarea name="detail_requirement" rows={3} defaultValue={d.detail_requirement} /></F>
+          <F label="Requirement Summary" span hint={ai("requirement_summary")}><Textarea name="requirement_summary" rows={2} defaultValue={d.requirement_summary} /></F>
+          <F label="Detail Requirement" span hint={ai("detail_requirement")}><Textarea name="detail_requirement" rows={3} defaultValue={d.detail_requirement} /></F>
         </div>
       </DialogBody>
       <DraftFooter pending={pending} onCancel={onCancel} onReset={onReset} t={t} />
@@ -215,11 +247,18 @@ export function CreateMenu({ options, create, onCreate }: { options: FormOptions
   const drafts = useRef<Record<string, Draft>>({});
   const formRef = useRef<HTMLFormElement>(null);
   const [resetTick, setResetTick] = useState(0);
+  const [aiKeys, setAiKeys] = useState<string[]>([]);
   const kind = create?.kind;
   const close = () => { if (kind) drafts.current[kind] = readDraft(formRef.current, ["opty_status_code"]); onCreate(null); };
   const onOpenChange = useCloseFromXOnly(!!create, close);
-  const done = () => { if (kind) drafts.current[kind] = {}; onCreate(null); };
-  const reset = () => { if (kind) drafts.current[kind] = {}; setResetTick((n) => n + 1); };
+  const done = () => { if (kind) drafts.current[kind] = {}; setAiKeys([]); onCreate(null); };
+  const reset = () => { if (kind) drafts.current[kind] = {}; setAiKeys([]); setResetTick((n) => n + 1); };
+  // AI fill keeps what was typed and overwrites only the fields the AI found, then remounts the form with them.
+  const aiFill = (fields: Draft) => {
+    drafts.current.opportunity = { ...readDraft(formRef.current, ["opty_status_code"]), ...fields };
+    setAiKeys(Object.keys(fields));
+    setResetTick((n) => n + 1);
+  };
   const props = { options, formRef, draft: (kind && drafts.current[kind]) || {}, onDone: done, onCancel: close, onReset: reset };
 
   return (
@@ -245,7 +284,7 @@ export function CreateMenu({ options, create, onCreate }: { options: FormOptions
         width={760}
         data-sales-v2-dialog={kind}
       >
-        {kind === "opportunity" && <OpportunityForm key={`o${resetTick}`} {...props} status={create?.status} />}
+        {kind === "opportunity" && <OpportunityForm key={`o${resetTick}`} {...props} status={create?.status} aiKeys={aiKeys} onAiFill={aiFill} />}
         {kind === "extension" && <ExtensionForm key={`e${resetTick}`} {...props} />}
       </Dialog>
     </>
