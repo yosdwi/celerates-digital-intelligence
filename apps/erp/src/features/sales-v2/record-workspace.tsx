@@ -7,7 +7,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Columns3, History, LayoutGrid, Search, Sparkles, Table2 } from "lucide-react";
 import {
-  DataTable, EntityCard, Input, SavedViews, SavedViewsSaveBar, StatCard, TableToolbar, ViewToggle, useSnackbar,
+  DataTable, EntityCard, Input, SavedViews, SavedViewsSaveBar, StatCard, TableToolbar, Tooltip, ViewToggle, useSnackbar,
   applyFilters, applySorts, Button, Dialog, DialogBody, DialogFooter, FormField,
   type ContextMenuOption, type DataTableColumn, type TableToolbarColumn,
 } from "@crisp-ui-kit/crisp";
@@ -404,9 +404,10 @@ export function RecordWorkspace<T extends { id: string }>({
 
   return (
     // Full viewport height: -mb-24 cancels the shell's bottom padding, so the workspace reaches the bottom edge and the
-    // Agent launcher floats over it (the scroll areas leave room for it, sales-v2.css).
+    // Agent launcher floats over it (the scroll areas leave room for it, sales-v2.css). The page itself never scrolls
+    // (QA 2026-10-08): only the table, grid or board does, so an open menu or popover stays on its trigger.
     <RowActionsContext.Provider value={rowActions}>
-    <div className="flex flex-col bg-white text-[0.8125rem] text-slate-800 md:-mb-24 md:h-dvh" data-sales-v2>
+    <div className="flex flex-col bg-white text-[0.8125rem] text-slate-800 md:-mb-24 md:h-dvh md:overflow-hidden" data-sales-v2>
       {/* md:pr-56 keeps the header clear of the app's fixed top-right controls (language, bell, account). */}
       {/* Density (contract §5, §15): fixed compact sizes like Attio, never zoom; a 1280 × 650 laptop viewport (1366 or
           1920 screens at 125–150 % OS scaling) must show the table without the chrome eating the height. */}
@@ -501,7 +502,8 @@ export function RecordWorkspace<T extends { id: string }>({
           viewSettingsLabel="Kolom"
         />
         <div className="ml-auto flex items-center gap-1.5">
-          <Button size="sm" intent="ghost" onClick={() => setFeedOf({ recordId: null })} data-sales-v2-history-open><History size={14} /> Riwayat</Button>
+          {/* Icons with their name on hover keep the toolbar on one line on a laptop (QA 2026-10-08). */}
+          <Tooltip content="Riwayat perubahan"><Button size="sm" intent="ghost" aria-label="Riwayat perubahan" onClick={() => setFeedOf({ recordId: null })} data-sales-v2-history-open><History size={14} /></Button></Tooltip>
           {toolbarEnd}
         </div>
       </div>

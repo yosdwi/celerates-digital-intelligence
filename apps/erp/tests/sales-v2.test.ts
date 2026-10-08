@@ -473,3 +473,13 @@ test("edit history: the panel's Aktivitas is the record timeline; the page's Riw
   assert.match(ws, /<ModuleHistoryDrawer/);
   assert.match(ws, /showHistory: \(recordId\) => setFeedOf/);
 });
+
+test("QA page 6: popovers scroll inside and the page never scrolls under them; toolbar tools are icons", () => {
+  const css = read("app/sales/v2/sales-v2.css");
+  assert.match(css, /\.crisp-popover-content \{ max-height: min\(60dvh, 480px\); overflow-y: auto; overscroll-behavior: contain; \}/);
+  assert.match(css, /\.crisp-menu-content \{ overscroll-behavior: contain; \}/);
+  const ws = read("features/sales-v2/record-workspace.tsx");
+  assert.match(ws, /md:h-dvh md:overflow-hidden" data-sales-v2>/);
+  assert.match(ws, /<Tooltip content="Riwayat perubahan"><Button size="sm" intent="ghost" aria-label="Riwayat perubahan"/);
+  assert.match(read("features/sales-v2/sheet-sync-dialog.tsx"), /<Tooltip content="Google Sheet Sync">/);
+});

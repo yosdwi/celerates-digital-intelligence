@@ -61,6 +61,11 @@
   box-shadow: inset 3px 0 0 var(--stage, #94a3b8), inset 0 0 0 1px #94a3b8, 0 3px 8px rgb(15 23 42 / 0.08);
 }
 
+/* Menus and popovers (QA 2026-10-08): Crisp's popover has no height limit, so a long one (Kolom: every column) ran off
+   a laptop screen; it scrolls inside now, and reaching either end of a list never scrolls the page under it. */
+.crisp-popover-content { max-height: min(60dvh, 480px); overflow-y: auto; overscroll-behavior: contain; }
+.crisp-menu-content { overscroll-behavior: contain; }
+
 /* Dialogs: the form is the focus. Dim and blur what is behind it; brand header. */
 .crisp-dialog-backdrop { background: rgb(9 34 54 / 0.42); backdrop-filter: blur(3px); }
 [data-sales-v2-dialog] { background: #fff; box-shadow: 0 24px 64px rgb(9 34 54 / 0.32), 0 0 0 1px rgb(9 34 54 / 0.08); }

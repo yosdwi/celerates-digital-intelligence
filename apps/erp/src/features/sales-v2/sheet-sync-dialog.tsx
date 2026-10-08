@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { RefreshCw } from "lucide-react";
-import { Button, Callout, Dialog, DialogBody, FormField, Input } from "@crisp-ui-kit/crisp";
+import { Button, Callout, Dialog, DialogBody, FormField, Input, Tooltip } from "@crisp-ui-kit/crisp";
 import * as ot from "@/app/sales/opportunity-tracker/sheet-sync/actions";
 import { MappingSection as OtMapping } from "@/app/sales/opportunity-tracker/sheet-sync/mapping-section";
 import { SyncButtons as OtSync } from "@/app/sales/opportunity-tracker/sheet-sync/sync-buttons";
@@ -33,10 +33,12 @@ export function SheetSyncButton({ data, parts }: { data: SheetSyncData; parts: P
   const [open, setOpen] = useState(false);
   return (
     <>
-      {/* Label from xl up; below that the icon (with its name as tooltip) keeps the toolbar on one line. */}
-      <Button size="sm" intent="ghost" onClick={() => setOpen(true)} aria-label="Sheet Sync" title="Google Sheet Sync" data-testid="sales-v2-sheet-sync">
-        <RefreshCw size={13} /> <span className="hidden xl:inline">Sheet Sync</span>
-      </Button>
+      {/* An icon with its name on hover keeps the toolbar on one line on a laptop (QA 2026-10-08). */}
+      <Tooltip content="Google Sheet Sync">
+        <Button size="sm" intent="ghost" onClick={() => setOpen(true)} aria-label="Google Sheet Sync" data-testid="sales-v2-sheet-sync">
+          <RefreshCw size={14} />
+        </Button>
+      </Tooltip>
       <Dialog open={open} onOpenChange={setOpen} title="Google Sheet Sync" icon={<RefreshCw size={16} />} closeLabel="Tutup" width={640} data-sales-v2-dialog="sheet-sync">
         {open && <SheetSyncBody data={data} parts={parts} />}
       </Dialog>
