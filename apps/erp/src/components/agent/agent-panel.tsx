@@ -45,7 +45,11 @@ type AgentContext = {
 // First visit: a short invitation above the launcher (pilot: ask, or tell us how the ERP works for you). Once per browser.
 const INTRO_KEY = "celerates.agent.intro.v1";
 // Docked width of the drawer on large screens; the page narrows by this much instead of being covered (Railway-style).
-const RAIL_WIDTH = "400px";
+// It follows the screen (about 330px on a 1280 laptop viewport, 420px on a monitor) until the user drags its edge;
+// a dragged width is kept per browser, always within 300–560px and at most 45 % of the window.
+const WIDTH_KEY = "celerates.agent.width";
+const fitWidth = (w: number) => Math.round(Math.max(300, Math.min(w, 560, window.innerWidth * 0.45)));
+const screenWidth = () => Math.min(420, Math.max(320, Math.round(window.innerWidth * 0.26)));
 
 function uuid() {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -87,14 +91,36 @@ export function AgentPanel() {
   // preview instead of on top of it (docs/design/SALES-V2-CRISP-UX-CONTRACT.md §9).
   const rail = useRightRail();
   useEffect(() => setRightRail({ agentOpen: open }), [open]);
+  const [width, setWidth] = useState(400);
+  const userWidth = useRef<number | null>(null);
+  useEffect(() => {
+    try { userWidth.current = Number(localStorage.getItem(WIDTH_KEY)) || null; } catch { /* storage blocked: screen width */ }
+    const apply = () => setWidth(fitWidth(userWidth.current ?? screenWidth()));
+    apply();
+    window.addEventListener("resize", apply);
+    return () => window.removeEventListener("resize", apply);
+  }, []);
+  const resizeTo = (w: number) => {
+    userWidth.current = fitWidth(w);
+    setWidth(userWidth.current);
+    try { localStorage.setItem(WIDTH_KEY, String(userWidth.current)); } catch { /* not kept */ }
+  };
+  const startResize = (e: React.PointerEvent) => {
+    e.preventDefault();
+    const move = (ev: PointerEvent) => resizeTo(window.innerWidth - ev.clientX);
+    const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); document.body.style.cursor = ""; };
+    document.body.style.cursor = "col-resize";
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
   // Docked on lg+: the app shell and the fixed top-right controls read --agent-rail and move left by the drawer width.
   useEffect(() => {
     const mql = window.matchMedia("(min-width: 1024px)");
-    const apply = () => document.documentElement.style.setProperty("--agent-rail", open && mql.matches ? RAIL_WIDTH : "0px");
+    const apply = () => document.documentElement.style.setProperty("--agent-rail", open && mql.matches ? `${width}px` : "0px");
     apply();
     mql.addEventListener("change", apply);
     return () => mql.removeEventListener("change", apply);
-  }, [open]);
+  }, [open, width]);
   const [intro, setIntro] = useState(false);
   useEffect(() => {
     if (status !== "authenticated") return;
@@ -422,8 +448,21 @@ export function AgentPanel() {
           id="celerates-agent"
           role="dialog"
           aria-labelledby="celerates-agent-title"
-          className="fixed inset-0 z-50 flex h-[100dvh] w-full flex-col overflow-hidden bg-white sm:inset-y-0 sm:left-auto sm:right-0 sm:z-40 sm:w-[400px] sm:border-l sm:border-slate-200 sm:shadow-[-8px_0_24px_rgba(9,34,54,0.06)] lg:shadow-none"
+          style={{ "--agent-w": `${width}px` } as React.CSSProperties}
+          className="fixed inset-0 z-50 flex h-[100dvh] w-full flex-col overflow-hidden bg-white sm:inset-y-0 sm:left-auto sm:right-0 sm:z-40 sm:w-[var(--agent-w)] sm:border-l sm:border-slate-200 sm:shadow-[-8px_0_24px_rgba(9,34,54,0.06)] lg:shadow-none"
         >
+          {/* Drag the left edge to resize (arrow keys too); the page beside it narrows with it. */}
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Ubah lebar Agent"
+            aria-valuenow={width}
+            tabIndex={0}
+            onPointerDown={startResize}
+            onKeyDown={(e) => { if (e.key === "ArrowLeft") resizeTo(width + 16); if (e.key === "ArrowRight") resizeTo(width - 16); }}
+            className="absolute inset-y-0 left-0 z-10 hidden w-1.5 cursor-col-resize transition-colors hover:bg-brand-300/60 focus-visible:bg-brand-400/60 focus-visible:outline-none sm:block"
+            data-agent-resize
+          />
           <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-slate-200 px-4">
             <div className="flex min-w-0 items-center gap-2">
               <Sparkles className="h-4 w-4 shrink-0 text-brand-600" />

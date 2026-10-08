@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -55,6 +56,20 @@ export function Sidebar() {
   // The page the current URL belongs to (longest match; a V1 Sales page counts as its V2 entry).
   const currentHref = submoduleFor(pathname)?.href;
 
+  // The menu keeps its own scroll; a soft fade at an edge says more items sit past it (sidebar-scroll in globals.css).
+  const navRef = useRef<HTMLElement>(null);
+  const [fade, setFade] = useState({ top: false, bottom: false });
+  useEffect(() => {
+    const el = navRef.current;
+    if (!el) return;
+    const update = () => setFade({ top: el.scrollTop > 1, bottom: el.scrollTop + el.clientHeight < el.scrollHeight - 1 });
+    update();
+    el.addEventListener("scroll", update, { passive: true });
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => { el.removeEventListener("scroll", update); ro.disconnect(); };
+  }, [pathname, collapsed, status]);
+
   if (status !== "authenticated") return null;
 
   const firstName = ((session?.user as any)?.fullName ?? session?.user?.name ?? "Sobat Celerates").split(" ")[0];
@@ -73,7 +88,12 @@ export function Sidebar() {
         </Link>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-2 py-1 space-y-0.5">
+      <nav
+        ref={navRef}
+        className="sidebar-scroll flex-1 overflow-y-auto px-2 py-1 space-y-0.5"
+        data-fade-top={fade.top || undefined}
+        data-fade-bottom={fade.bottom || undefined}
+      >
         {!isTalent && (
           <Link
             href="/"

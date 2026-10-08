@@ -121,12 +121,12 @@ function Workspace({ records, access, options, sheetSync }: WorkspaceProps) {
 
 // ── Summary cards: built-in views, in the ERP palette ───────────────────────────────────────────────────────
 const OPEN = new Set(["cv_submission", "solutioning", "proposal_sent", "need_action"]);
-const KPIS: { id: string; label: string; tone: string; soft: string; bar: string; match: (o: Opportunity) => boolean }[] = [
-  { id: "all", label: "Total Opportunity", tone: "#194667", soft: "#eef3f7", bar: "#194667", match: () => true },
-  { id: "active", label: "Pipeline aktif", tone: "#1a43b8", soft: "#e8eefd", bar: "#2356e8", match: (o) => OPEN.has(o.status) },
-  { id: "ready", label: "Siap Convert", tone: "#b2410f", soft: "#fdeee7", bar: "#f15525", match: (o) => o.salesQualified && !o.pq },
-  { id: "win", label: "Win", tone: "#0e6b52", soft: "#e1f4ee", bar: "#10b981", match: (o) => o.status === "win" },
-  { id: "dropped", label: "Dropped", tone: "#b42318", soft: "#fdecea", bar: "#ef4444", match: (o) => o.status === "dropped" },
+const KPIS: WorkspaceConfig<Opportunity>["kpis"] = [
+  { id: "all", label: "Total Opportunity", color: "navy", match: () => true },
+  { id: "active", label: "Pipeline aktif", color: "blue", match: (o) => OPEN.has(o.status) },
+  { id: "ready", label: "Siap Convert", color: "amber", match: (o) => o.salesQualified && !o.pq },
+  { id: "win", label: "Win", color: "green", match: (o) => o.status === "win" },
+  { id: "dropped", label: "Dropped", color: "red", match: (o) => o.status === "dropped" },
 ];
 
 const STAGE_ACCENT: Record<string, string> = Object.fromEntries(STAGES.map((s) => [s.id, s.accent]));

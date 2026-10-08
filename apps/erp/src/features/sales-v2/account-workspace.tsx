@@ -86,12 +86,12 @@ function Workspace({ records, access }: Props) {
 
 // ── Summary cards: V1's (Total, Perlu Follow-up) plus the other statuses and what needs a look ─────────────────
 const KPIS: WorkspaceConfig<Account>["kpis"] = [
-  { id: "all", label: "Total Account", tone: "#194667", soft: "#eef3f7", bar: "#194667", match: () => true },
-  { id: "prospect", label: "Perlu Follow-up", tone: "#b2410f", soft: "#fdeee7", bar: "#f15525", match: (a) => a.status === "prospect" },
-  { id: "active", label: "Active", tone: "#0e6b52", soft: "#e1f4ee", bar: "#10b981", match: (a) => a.status === "active" },
-  { id: "dormant", label: "Dormant", tone: "#475467", soft: "#f2f4f7", bar: "#8a8f98", match: (a) => a.status === "dormant" },
-  { id: "active_opty", label: "Ada Opportunity Aktif", tone: "#1a43b8", soft: "#e8eefd", bar: "#2356e8", match: (a) => a.activeOpportunities > 0 },
-  { id: "overdue", label: "Invoice Overdue", tone: "#b42318", soft: "#fdecea", bar: "#ef4444", match: (a) => a.overdueInvoices > 0 },
+  { id: "all", label: "Total Account", color: "navy", match: () => true },
+  { id: "prospect", label: "Perlu Follow-up", color: "red", match: (a) => a.status === "prospect" },
+  { id: "active", label: "Active", color: "green", match: (a) => a.status === "active" },
+  { id: "dormant", label: "Dormant", color: "purple", match: (a) => a.status === "dormant" },
+  { id: "active_opty", label: "Ada Opportunity Aktif", color: "blue", match: (a) => a.activeOpportunities > 0 },
+  { id: "overdue", label: "Invoice Overdue", color: "orange", match: (a) => a.overdueInvoices > 0 },
 ];
 
 const money = (a: Account) => (a.monthlyValue > 0 ? `${rupiah(a.monthlyValue)}/bln` : "");

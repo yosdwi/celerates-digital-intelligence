@@ -15,11 +15,23 @@
   --crisp-stroke-focus-ring: #2356e8;
 }
 
-/* Table header: ERP brand tint, semibold, the whole cell is the Excel-style menu button. */
-[data-sales-v2] .crisp-table thead th { background: #eef3f7; color: #123650; font-size: 0.75rem; font-weight: 600; border-bottom: 1px solid #dce8ef; }
-[data-sales-v2] .crisp-table thead th:hover { background: #e3ecf3; }
+/* Table header: V1's violet header row (bg-violet-50, violet-700, uppercase, semibold; QA 2026-10-08); the whole cell
+   is the Excel-style menu button. */
+[data-sales-v2] .crisp-table thead th {
+  background: #f5f3ff; color: #6d28d9; font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.025em;
+  border-bottom: 1px solid #ddd6fe;
+}
+[data-sales-v2] .crisp-table thead th:hover { background: #ede9fe; }
 [data-sales-v2] [data-header-filter] { cursor: pointer; }
-[data-sales-v2] [data-header-filter][data-active] { color: #1a43b8; }
+[data-sales-v2] [data-header-filter][data-active] { color: #4c1d95; }
+
+/* Summary cards: V1 gradients behind Crisp's StatCard (record-workspace.tsx), so its own surface and colours step aside. */
+[data-sales-v2-kpi] .crisp-statcard { background: transparent; border: 0; box-shadow: none; }
+
+/* Tabel · Grid · Kanban: V1's violet gradient on the active tile (components/view-toggle.tsx). */
+[data-sales-v2] .crisp-viewtoggle-tile[data-active] {
+  background-image: linear-gradient(to bottom right, #7c3aed, #a78bfa); color: #fff; box-shadow: 0 4px 10px -3px rgb(124 58 237 / 0.5);
+}
 
 /* The workspace reaches the bottom edge and the Agent launcher floats over its corner: the scroll areas end with room
    for it, so the last row or card can always be scrolled clear. */

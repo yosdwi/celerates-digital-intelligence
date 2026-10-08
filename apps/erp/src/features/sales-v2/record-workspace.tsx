@@ -12,13 +12,15 @@ import {
   type DataTableColumn, type TableToolbarColumn,
 } from "@crisp-ui-kit/crisp";
 import { useToast } from "@/components/toast-provider";
+import { GRADIENTS, type StatColor } from "@/components/stat-card";
 import { openAgent } from "@/components/mobile/events";
 import { setRightRail, useRightRail } from "@/lib/right-rail";
 import { HeaderFilter, type HeaderSpec } from "./header-filter";
 import { parseState, serializeState, type SavedState, type StoredView, type View, type WorkspaceState } from "./model";
 
 export type Access = { canEdit: boolean; canDelete: boolean };
-export type Kpi<T> = { id: string; label: string; tone: string; soft: string; bar: string; match: (o: T) => boolean };
+/** A summary card: V1's gradient colours (components/stat-card.tsx). */
+export type Kpi<T> = { id: string; label: string; color: StatColor; match: (o: T) => boolean };
 export type PendingMove<T> = { record: T; to: string };
 
 /** What the page's record panel gets: the selection, the visible list (Previous / Next) and the optimistic patch. */
@@ -297,10 +299,11 @@ export function RecordWorkspace<T extends { id: string }>({
         </div>
       </header>
 
-      {/* The one coloured element on the page (contract §12): each card is a built-in view; click to apply, again to clear. */}
+      {/* Summary cards in V1's gradients (QA 2026-10-08); each card is a built-in view: click to apply, again to clear. */}
       <section aria-label="Ringkasan" className={`mx-5 mb-2 grid grid-cols-2 gap-2 sm:grid-cols-3 ${c.kpis.length > 5 ? "lg:grid-cols-6" : "lg:grid-cols-5"}`} data-sales-v2-kpi>
         {c.kpis.map((k) => {
           const on = active.id === k.id;
+          const g = GRADIENTS[k.color];
           return (
             <button
               key={k.id}
@@ -308,13 +311,14 @@ export function RecordWorkspace<T extends { id: string }>({
               aria-pressed={on}
               onClick={() => applyView(on ? null : k.id)}
               data-kpi={k.id}
-              className="rounded-lg border text-left transition-shadow hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2"
-              style={{ background: k.soft, borderColor: on ? k.tone : "transparent", boxShadow: `inset 3px 0 0 ${k.bar}`, outlineColor: k.tone }}
+              className="relative overflow-hidden rounded-xl text-left text-white transition-all duration-200 hover:-translate-y-px focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+              style={{ backgroundImage: g.bg, boxShadow: on ? `0 0 0 2px #fff, 0 0 0 4px ${g.glow.replace(/[\d.]+\)$/, "0.9)")}` : `0 1px 2px rgba(15,23,42,0.08), 0 10px 20px -12px ${g.glow}` }}
             >
+              <span aria-hidden className="pointer-events-none absolute -right-6 -top-6 h-16 w-16 rounded-full bg-white/15" />
               <StatCard
-                className="px-3 py-1.5"
-                label={<span className="text-[0.75rem] font-medium text-slate-600">{k.label}</span>}
-                value={<span className="text-[1.125rem] font-bold leading-6 tabular-nums" style={{ color: k.tone }}>{counts[k.id]}</span>}
+                className="relative px-3 py-1.5"
+                label={<span className="text-[0.75rem] font-medium text-white/85">{k.label}</span>}
+                value={<span className="text-[1.125rem] font-extrabold leading-6 tabular-nums text-white">{counts[k.id]}</span>}
               />
             </button>
           );

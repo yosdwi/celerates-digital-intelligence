@@ -128,11 +128,11 @@ function MoveDialog({ move, onCancel, onMoved }: MoveContext<Pq>) {
 
 // ── Summary cards: built-in views, in the ERP palette ───────────────────────────────────────────────────────
 const KPIS: WorkspaceConfig<Pq>["kpis"] = [
-  { id: "all", label: "Total PQ", tone: "#194667", soft: "#eef3f7", bar: "#194667", match: () => true },
-  { id: "on_going", label: "On Going", tone: "#1a43b8", soft: "#e8eefd", bar: "#2356e8", match: (p) => p.stage === "on_going" },
-  { id: "need_pq", label: "Perlu Generate PQ", tone: "#b2410f", soft: "#fdeee7", bar: "#f15525", match: needsPqNo },
-  { id: "win", label: "Win", tone: "#0e6b52", soft: "#e1f4ee", bar: "#10b981", match: (p) => p.stage === "win" },
-  { id: "drop", label: "Drop", tone: "#b42318", soft: "#fdecea", bar: "#ef4444", match: (p) => p.stage === "drop" },
+  { id: "all", label: "Total PQ", color: "navy", match: () => true },
+  { id: "on_going", label: "On Going", color: "blue", match: (p) => p.stage === "on_going" },
+  { id: "need_pq", label: "Perlu Generate PQ", color: "amber", match: needsPqNo },
+  { id: "win", label: "Win", color: "green", match: (p) => p.stage === "win" },
+  { id: "drop", label: "Drop", color: "red", match: (p) => p.stage === "drop" },
 ];
 
 const initials = (name: string) => name.split(/\s+/).filter((w) => /^[A-Za-z]/.test(w)).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("") || "?";

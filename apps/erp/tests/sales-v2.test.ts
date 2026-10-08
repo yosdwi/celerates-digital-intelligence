@@ -323,3 +323,15 @@ test("Account V2 reuses V1 CRM actions, keeps Marketing's access and is the side
   const del = actions.slice(actions.indexOf("export async function deleteContact"));
   assert.ok(del.indexOf("contact_id: null") < del.indexOf("db.delete(crmClientContacts)"));
 });
+
+test("QA 2026-10-08: slim sidebar scroll, Agent width follows the screen and can be dragged, V1 colours in V2", () => {
+  const sidebar = read("components/sidebar.tsx");
+  assert.match(sidebar, /sidebar-scroll/);
+  assert.match(read("app/globals.css"), /\.sidebar-scroll::-webkit-scrollbar \{ width: 6px; \}/);
+  const agent = read("components/agent/agent-panel.tsx");
+  assert.doesNotMatch(agent, /w-\[400px\]|RAIL_WIDTH = "400px"/);
+  assert.match(agent, /role="separator"/);
+  assert.match(read("features/sales-v2/record-workspace.tsx"), /GRADIENTS\[k\.color\]/);
+  for (const f of ["workspace.tsx", "pq-workspace.tsx", "account-workspace.tsx"]) assert.doesNotMatch(read(`features/sales-v2/${f}`), /soft: "#/, f);
+  assert.match(read("app/sales/v2/sales-v2.css"), /background: #f5f3ff; color: #6d28d9/);
+});

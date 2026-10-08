@@ -1,4 +1,6 @@
-const GRADIENTS: Record<string, { bg: string; glow: string }> = {
+export type StatColor = "indigo" | "green" | "amber" | "red" | "blue" | "purple" | "pink" | "orange" | "navy";
+/** V1 summary-card gradients; Sales V2 cards use the same ones (contract §17). */
+export const GRADIENTS: Record<StatColor, { bg: string; glow: string }> = {
   indigo: { bg: "linear-gradient(135deg, #7c3aed, #a78bfa)", glow: "rgba(124,58,237,0.35)" },
   green: { bg: "linear-gradient(135deg, #059669, #34d399)", glow: "rgba(5,150,105,0.32)" },
   amber: { bg: "linear-gradient(135deg, #b45309, #fbbf24)", glow: "rgba(180,83,9,0.32)" },
