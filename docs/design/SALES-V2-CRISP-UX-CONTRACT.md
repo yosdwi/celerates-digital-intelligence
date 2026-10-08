@@ -215,3 +215,25 @@ they follow. 1600px and wider (the 1920 monitor reference) and phones are unchan
 - New V2 controls for V1 actions V1 never showed: Edit account (`updateClient`) and Hapus (`deleteClient`).
 - Fix in V1's `deleteContact`: activities logged with the contact keep their history without it (the foreign key
   refused the delete before).
+
+## 17. QA round 2026-10-08 (laptop, V1 parity)
+
+Decided with the Product Owner before any change (feedback doc "Feedback UI UX"):
+
+- Sidebar keeps its scroll; the scrollbar is a 6px rounded thumb, no track, shown on hover, with a 16px fade at an edge
+  that has items past it (`.sidebar-scroll`, globals.css).
+- Agent drawer: about 26 % of the window (320–420px) instead of a fixed 400px; the left edge drags (and arrow keys)
+  to 300–560px, at most 45 % of the window, kept per browser. The page beside it narrows with it.
+- Colours as V1: summary cards in V1's gradients (components/stat-card.tsx `GRADIENTS`), table header V1's violet
+  row, the active Tabel · Grid · Kanban tile V1's violet gradient. Primary actions stay ERP navy (V1 does too).
+- Frozen columns as V1: Opportunity Tracker Aksi / Status, Opty No, Leads No, Klien; PQ Tracker Aksi / Status, Opty No,
+  PQ No, Dokumen PQ. Crisp pins one column and windows the others, so they render as one pinned block (each part with
+  its own header menu, always shown, first). The Aksi / Status cell stacks V1's controls on V1's actions; Edit, Hapus
+  and Convert open the record panel with that dialog. Rows grow with it, so Crisp's row virtualization (36px rows) is
+  off and the table scrolls in a bounded box.
+- Kanban: no per-column "+" (New is in the toolbar). A column header opens sort, a filter (the table's controls) for
+  that column's cards, and Hide; this lasts for the visit.
+- Google Sheet Sync (OT and PQ) is on, both ways like V1, through a Google service account
+  (`GOOGLE_SERVICE_ACCOUNT_JSON`, JSON or base64, server env): share the sheet with its email as Editor. Every sync
+  action needs Sales Editor (`requireSalesSheetSync`); before, they only checked for a session. Other modules' sheet
+  sync stays off (`integrationDisabled`).

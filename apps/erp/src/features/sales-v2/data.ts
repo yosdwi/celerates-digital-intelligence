@@ -1,6 +1,6 @@
 import { count, desc, eq, inArray, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
-import { INTEGRATIONS_ENABLED } from "@/lib/integration-policy";
+import { serviceAccountEmail } from "@/lib/google-sheets";
 import {
   applications, attachments, candidates, employees, leads, onboardingRequests, opportunities, requisitions, salesOpportunityTrackers, sheetConnections, signatureRequests,
 } from "@/db/schema";
@@ -119,7 +119,9 @@ export async function loadSheetSync(divisionKey = "sales_opportunity_tracker") {
     .from(sheetConnections)
     .where(eq(sheetConnections.division_key, divisionKey));
   return {
-    enabled: INTEGRATIONS_ENABLED,
+    // On once the server has a Google service account (lib/google-sheets.ts); the sheet is shared with its email.
+    enabled: !!serviceAccountEmail(),
+    shareWith: serviceAccountEmail(),
     connection: c ? { url: c.url, sheetName: c.sheetName, mapping: c.mapping ? (JSON.parse(c.mapping) as Record<string, string>) : null } : null,
   };
 }

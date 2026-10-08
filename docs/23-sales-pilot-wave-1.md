@@ -148,7 +148,7 @@ PASSKEY_RP_NAME=Celerates ERP
 - [ ] Verify downstream TA can continue from the generated Requisition/PQ state with an actual TA account.
 - [x] Add database-level one-to-one guards for Opportunity → Requisition/PQ Tracker and cover conversion retry in HTTP smoke.
 - [ ] Verify duplicate conversion and orphan-state protections with real pilot scenarios.
-- [ ] Confirm what Google Sheet sync remains transitional during Wave 1 and who is the write-owner during the pilot. Fact found 2026-10-07: every Sales Sheet sync action (connect, headers, mapping, pull, push, debug) is hard-disabled in this build by `integrationDisabled()` ("Fitur ini belum diaktifkan pada pilot.") and `sheet_connections` has 0 rows, so ERP is the only write-owner today. Whether the Sheet is re-enabled one-way, imported once, or retired is a Product Owner decision.
+- [x] (2026-10-08, Product Owner: Sales OT and PQ sync both ways through a Google service account; other modules stay off. Needs GOOGLE_SERVICE_ACCOUNT_JSON on the server.) Confirm what Google Sheet sync remains transitional during Wave 1 and who is the write-owner during the pilot. Fact found 2026-10-07: every Sales Sheet sync action (connect, headers, mapping, pull, push, debug) is hard-disabled in this build by `integrationDisabled()` ("Fitur ini belum diaktifkan pada pilot.") and `sheet_connections` has 0 rows, so ERP is the only write-owner today. Whether the Sheet is re-enabled one-way, imported once, or retired is a Product Owner decision.
 
 ### Pilot release
 

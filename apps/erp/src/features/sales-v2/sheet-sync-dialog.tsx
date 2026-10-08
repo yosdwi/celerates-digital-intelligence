@@ -54,9 +54,14 @@ function SheetSyncBody({ data, parts: { connectSheet, MappingSection, SyncButton
   return (
     <DialogBody className="max-h-[calc(85dvh-8.5rem)] space-y-4 overflow-y-auto">
       {!data.enabled && (
-        <Callout tone="warning" title="Belum aktif di pilot">
-          Sinkronisasi Google Sheet dimatikan selama pilot. Data di bawah hanya untuk dilihat.
+        <Callout tone="warning" title="Belum dikonfigurasi">
+          Service account Google belum dipasang di server, jadi sinkronisasi belum bisa jalan. Data di bawah hanya untuk dilihat.
         </Callout>
+      )}
+      {data.shareWith && (
+        <p className="rounded-md bg-slate-50 px-3 py-2 text-[0.75rem] text-slate-700">
+          Bagikan Google Sheet ke <b className="select-all font-mono text-slate-900">{data.shareWith}</b> sebagai <b>Editor</b>, lalu tempel link-nya di bawah.
+        </p>
       )}
       {c ? (
         <div className="rounded-md bg-emerald-50 px-3 py-2 text-[0.8125rem] text-emerald-900">

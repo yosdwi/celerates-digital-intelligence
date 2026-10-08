@@ -358,3 +358,37 @@ test("QA 2026-10-08: Kanban has no per-column +; a column header opens sort, fil
   assert.match(menu, /crisp-board-col-header/);
   for (const part of ["Urutkan kartu", "Filter kartu di kolom ini", "Sembunyikan", "applyFilters", "applySorts"]) assert.match(menu, new RegExp(part), part);
 });
+
+test("QA 2026-10-08: Sales Sheet Sync runs on the service account, Sales editors only", async () => {
+  for (const f of ["app/sales/sheet-sync/actions.ts", "app/sales/opportunity-tracker/sheet-sync/actions.ts"]) {
+    const src = read(f);
+    const actions = src.split(/export async function /).slice(1);
+    assert.equal(actions.length, 6, f);
+    for (const a of actions) assert.match(a, /^\w+\([^)]*\)[^{]*\{\n  await requireActor\(\);\n  await requireSalesSheetSync\(\);/, `${f} ${a.slice(0, 20)}`);
+    assert.doesNotMatch(src, /getValidAccessToken|integrationDisabled/, f);
+  }
+  assert.match(read("lib/integration-policy.ts"), /requireDivisionAccess\("sales"\)/);
+
+  // The JWT bearer grant: RS256 over the service account's claims, verifiable with its public key.
+  const { generateKeyPairSync, createVerify } = await import("node:crypto");
+  const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+  const key = { client_email: "sync@celerates-test.iam.gserviceaccount.com", private_key: privateKey.export({ type: "pkcs8", format: "pem" }) };
+  process.env.GOOGLE_SERVICE_ACCOUNT_JSON = Buffer.from(JSON.stringify(key)).toString("base64");
+  const realFetch = globalThis.fetch;
+  let body: URLSearchParams | null = null;
+  globalThis.fetch = (async (_url: string, init: RequestInit) => { body = init.body as URLSearchParams; return new Response(JSON.stringify({ access_token: "t1", expires_in: 3600 })); }) as typeof fetch;
+  try {
+    const { getServiceAccountToken, serviceAccountEmail } = await import("../src/lib/google-sheets");
+    assert.equal(serviceAccountEmail(), key.client_email);
+    assert.equal(await getServiceAccountToken(), "t1");
+    assert.equal(body!.get("grant_type"), "urn:ietf:params:oauth:grant-type:jwt-bearer");
+    const [h, p, sig] = body!.get("assertion")!.split(".");
+    assert.ok(createVerify("RSA-SHA256").update(`${h}.${p}`).verify(publicKey, sig, "base64url"));
+    const claims = JSON.parse(Buffer.from(p, "base64url").toString());
+    assert.equal(claims.iss, key.client_email);
+    assert.equal(claims.scope, "https://www.googleapis.com/auth/spreadsheets");
+  } finally {
+    globalThis.fetch = realFetch;
+    delete process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+  }
+});

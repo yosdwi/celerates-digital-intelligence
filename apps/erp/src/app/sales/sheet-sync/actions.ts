@@ -1,10 +1,11 @@
 "use server";
-import { integrationDisabled } from "@/lib/integration-policy";
+import { requireSalesSheetSync } from "@/lib/integration-policy";
+import { requireActor } from "@/lib/actor";
 import { db } from "@/db";
 import { opportunities, sheetConnections } from "@/db/schema";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getValidAccessToken, extractSpreadsheetId, readSheetValues, writeSheetValues, clearSheetRange, quoteSheetName } from "@/lib/google-sheets";
+import { getServiceAccountToken, extractSpreadsheetId, readSheetValues, writeSheetValues, clearSheetRange, quoteSheetName } from "@/lib/google-sheets";
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { generateOptyNoWithPosition, generatePqNo } from "@/lib/id-generators";
@@ -24,7 +25,8 @@ function normalizeValue(value: string): string | null {
 }
 
 export async function connectSheet(formData: FormData) {
-  await integrationDisabled();
+  await requireActor();
+  await requireSalesSheetSync();
 
   const url = formData.get("spreadsheet_url") as string;
   const sheetName = (formData.get("sheet_name") as string) || "Sheet1";
@@ -48,7 +50,8 @@ export async function connectSheet(formData: FormData) {
 export type HeadersResult = { ok: true; headers: string[] } | { ok: false; error: string };
 
 export async function fetchSheetHeaders(): Promise<HeadersResult> {
-  await integrationDisabled();
+  await requireActor();
+  await requireSalesSheetSync();
 
   const session = await getServerSession(authOptions);
   const userId = (session?.user as any)?.id;
@@ -58,7 +61,7 @@ export async function fetchSheetHeaders(): Promise<HeadersResult> {
   if (!connection) return { ok: false, error: "Belum ada Google Sheet yang terhubung" };
 
   try {
-    const accessToken = await getValidAccessToken(userId);
+    const accessToken = await getServiceAccountToken();
     const rows = await readSheetValues(accessToken, connection.spreadsheet_id, `${quoteSheetName(connection.sheet_name)}!A1:Z1`);
     const headers = (rows[0] ?? []).filter((h) => h.trim() !== "");
     if (headers.length === 0) return { ok: false, error: "Baris header (baris 1) di sheet kosong." };
@@ -69,7 +72,8 @@ export async function fetchSheetHeaders(): Promise<HeadersResult> {
 }
 
 export async function saveColumnMapping(mapping: Record<string, string>): Promise<void> {
-  await integrationDisabled();
+  await requireActor();
+  await requireSalesSheetSync();
 
   await db.update(sheetConnections).set({
     column_mapping: JSON.stringify(mapping),
@@ -80,7 +84,8 @@ export async function saveColumnMapping(mapping: Record<string, string>): Promis
 export type SyncResult = { ok: true; imported: number; skipped: number } | { ok: false; error: string };
 
 export async function syncPull(): Promise<SyncResult> {
-  await integrationDisabled();
+  await requireActor();
+  await requireSalesSheetSync();
 
   const session = await getServerSession(authOptions);
   const userId = (session?.user as any)?.id;
@@ -97,7 +102,7 @@ export async function syncPull(): Promise<SyncResult> {
   }
 
   try {
-    const accessToken = await getValidAccessToken(userId);
+    const accessToken = await getServiceAccountToken();
     const headerRows = await readSheetValues(accessToken, connection.spreadsheet_id, `${quoteSheetName(connection.sheet_name)}!A1:Z1`);
     const headerRow = headerRows[0] ?? [];
 
@@ -188,7 +193,8 @@ export async function syncPull(): Promise<SyncResult> {
 }
 
 export async function syncPush(): Promise<SyncResult> {
-  await integrationDisabled();
+  await requireActor();
+  await requireSalesSheetSync();
 
   const session = await getServerSession(authOptions);
   const userId = (session?.user as any)?.id;
@@ -198,7 +204,7 @@ export async function syncPush(): Promise<SyncResult> {
   if (!connection) return { ok: false, error: "Belum ada Google Sheet yang terhubung" };
 
   try {
-    const accessToken = await getValidAccessToken(userId);
+    const accessToken = await getServiceAccountToken();
     const allOpportunities = await db.select().from(opportunities);
 
     const rows: string[][] = [HEADERS];
@@ -246,7 +252,8 @@ export type DebugResult = {
 } | { ok: false; error: string };
 
 export async function debugSync(): Promise<DebugResult> {
-  await integrationDisabled();
+  await requireActor();
+  await requireSalesSheetSync();
 
   const session = await getServerSession(authOptions);
   const userId = (session?.user as any)?.id;
@@ -263,7 +270,7 @@ export async function debugSync(): Promise<DebugResult> {
   }
 
   try {
-    const accessToken = await getValidAccessToken(userId);
+    const accessToken = await getServiceAccountToken();
     const headerRows = await readSheetValues(accessToken, connection.spreadsheet_id, `${quoteSheetName(connection.sheet_name)}!A1:Z1`);
     const headerRow = headerRows[0] ?? [];
 
