@@ -9,17 +9,17 @@ import {
 } from "lucide-react";
 import { SnackbarProvider, type ContextMenuOption, type DataTableColumn, type TableToolbarColumn } from "@crisp-ui-kit/crisp";
 import { useToast } from "@/components/toast-provider";
-import { updateOptyStatus, updateSalesQualified } from "@/app/sales/opportunity-tracker/actions";
+import { saveOpportunityTracker, updateOptyStatus, updateSalesQualified } from "@/app/sales/opportunity-tracker/actions";
 import { CreateMenu, type CreateRequest, type FormOptions } from "./forms";
 import type { HeaderSpec } from "./header-filter";
 import { CONFIRM_STAGES, StageMoveDialog } from "./stage-move";
 import { SheetSyncButton, OT_SHEET_SYNC } from "./sheet-sync-dialog";
 import type { SheetSyncData } from "./data";
 import { RecordPreview } from "./record-preview";
-import { RecordWorkspace, useRowActions, type Access, type RowActions, type WorkspaceConfig } from "./record-workspace";
-import { InlineCheck, InlineSelect } from "./cells";
+import { RecordWorkspace, type Access, type RowActions, type WorkspaceConfig } from "./record-workspace";
+import { RecordLink } from "./cells";
 import {
-  BUILT_IN_VIEWS, CLIENT_TYPES, DEFAULT_SHOWN, FIELD_KEYS, LEVELS, SERVICE_TYPES, STAGES, STAGE_LABEL, SERVICE_LABEL, LEVEL_LABEL, CLIENT_TYPE_LABEL,
+  BANTE_SCORES, BUILT_IN_VIEWS, CLIENT_TYPES, OT_FIELD_EDITS, editValues, fieldFormData, DEFAULT_SHOWN, FIELD_KEYS, LEVELS, SERVICE_TYPES, STAGES, STAGE_LABEL, SERVICE_LABEL, LEVEL_LABEL, CLIENT_TYPE_LABEL,
   canConvert, daysSince, fieldValue, matchesSearch, rupiah, type Opportunity,
 } from "./model";
 
@@ -162,31 +162,30 @@ function KanbanCard({ o, onOpen }: { o: Opportunity; onOpen: () => void }) {
   );
 }
 
-/** Stage and Sales Qualified edited in their cells (QA 2026-10-08), with the same V1 actions as the panel. */
-function StageCell({ o }: { o: Opportunity }) {
-  const { access, run } = useRowActions();
-  return <InlineSelect value={o.status} options={STAGE_OPTIONS} label="Stage" canEdit={access.canEdit} onChange={(v) => run(o, { status: v }, () => updateOptyStatus(o.id, v))} />;
-}
-function QualifiedCell({ o }: { o: Opportunity }) {
-  const { access, run } = useRowActions();
-  return <InlineCheck checked={o.salesQualified} label="Qualified" canEdit={access.canEdit} onChange={(v) => run(o, { salesQualified: v }, () => updateSalesQualified(o.id, v))} />;
-}
-const STAGE_OPTIONS = STAGES.map((s) => ({ value: s.id, label: s.title, swatch: s.swatch }));
-
 /** Right-click on a row: V1's quick actions (Aksi / Status), each only when this user and this record allow it. */
-function rowMenu(o: Opportunity, { access, open, run }: RowActions): ContextMenuOption[] {
+function rowMenu(o: Opportunity, { access, open }: RowActions): ContextMenuOption[] {
   const items: ContextMenuOption[] = [{ label: "Buka", onSelect: () => open(o.id) }];
   if (!access.canEdit) return items;
-  items.push(
-    { label: "Edit", onSelect: () => open(o.id, "edit") },
-    { label: o.salesQualified ? "Batalkan Sales Qualified" : "Tandai Sales Qualified", onSelect: () => run(o, { salesQualified: !o.salesQualified }, () => updateSalesQualified(o.id, !o.salesQualified)) },
-  );
+  items.push({ label: "Edit (form lengkap)", onSelect: () => open(o.id, "edit") });
   if (canConvert(o)) items.push({ label: "Convert to Requisition", onSelect: () => open(o.id, "convert") });
-  items.push({ separator: true });
-  for (const s of STAGES) items.push({ label: `Stage: ${s.title}`, disabled: s.id === o.status, onSelect: () => run(o, { status: s.id }, () => updateOptyStatus(o.id, s.id)) });
   if (access.canDelete && !o.pq && !o.requisition) items.push({ separator: true }, { label: "Hapus", danger: true, onSelect: () => open(o.id, "delete") });
   return items;
 }
+
+/** In-cell edits (QA 2026-10-08): the V1 edit form for one field (saveOpportunityTracker, no redirect), and V1's own
+ *  actions for Stage and Sales Qualified. */
+const EDITS: WorkspaceConfig<Opportunity>["edits"] = {
+  ...Object.fromEntries(Object.entries(OT_FIELD_EDITS).map(([key, f]) => [key, {
+    required: f.required,
+    patch: (_: Opportunity, v: string) => f.patch(v),
+    save: (o: Opportunity, v: string) => saveOpportunityTracker(o.id, fieldFormData(editValues(o), f.form, v)),
+  }])),
+  status: { required: true, patch: (_, v) => ({ status: v }), save: (o, v) => updateOptyStatus(o.id, v) },
+  salesQualified: { patch: (_, v) => ({ salesQualified: v === "true" }), save: (o, v) => updateSalesQualified(o.id, v === "true") },
+};
+const opt = (pairs: readonly (readonly [string, string])[]) => pairs.map(([value, label]) => ({ value, label }));
+const label = (labels: Record<string, string>, v: string | null) => (v ? labels[v] ?? v : "");
+
 
 // ── Table columns: every Celerates field, the useful ones shown by default (contract §7) ──────────────────────
 // Header alignment follows the values under it: centre for short codes, dates and counts, right for money.
@@ -214,26 +213,28 @@ const SPECS: Record<string, HeaderSpec> = Object.fromEntries(([
   ["droppedReason", "Dropped Reason", CircleX, "text", "left"],
 ] as const).map(([key, label, icon, kind, align]) => [key, { key, label, icon, kind, align, sortable: FIELD_KEYS.has(key) }]));
 
+// Stage chips in Crisp's tag palette, keyed by stage code (the select editor reads the same code).
+const STAGE_SWATCH = Object.fromEntries(STAGES.map((s) => [s.id, s.swatch])) as Record<string, 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12>;
 const ALL_COLUMNS: Omit<DataTableColumn<Opportunity>, "header">[] = [
-  { key: "client", width: 150, render: (_, o) => <span className="font-medium text-slate-900">{o.client}</span> },
+  { key: "client", width: 150, render: (_, o) => <RecordLink id={o.id}>{o.client}</RecordLink> },
   { key: "optyNo", width: 112, render: (_, o) => <span className="font-mono text-[0.75rem] text-slate-600">{o.optyNo}</span> },
-  { key: "status", render: (_, o) => <StageCell o={o} /> },
+  { key: "status", type: "status", accessor: (o) => o.status, format: (_, o) => STAGE_LABEL[o.status] ?? o.status, swatches: STAGE_SWATCH, editor: "select", options: STAGES.map((s) => ({ value: s.id, label: s.title })) },
   { key: "position" },
   { key: "headcount", type: "number" },
   { key: "price", type: "number", format: (_, o) => rupiah(o.price, o.pricePeriod) },
   { key: "salesPic" },
-  { key: "salesQualified", render: (_, o) => <QualifiedCell o={o} /> },
-  { key: "lastCommunication", accessor: (o) => o.lastCommunication ?? "" },
+  { key: "salesQualified", accessor: (o) => String(o.salesQualified), editor: "checkbox" },
+  { key: "lastCommunication", type: "date", accessor: (o) => o.lastCommunication ?? "", format: (_, o) => o.lastCommunication ?? "" },
   { key: "downstream", render: (_, o) => o.requisition ? <span className="font-mono text-[0.75rem]">{o.requisition.no}</span> : o.pq ? <span className="text-[0.75rem]">PQ · Extension</span> : <span className="text-slate-400">-</span> },
   { key: "leadNo", width: 104, render: (_, o) => <span className="font-mono text-[0.75rem] text-slate-600">{o.leadNo ?? "-"}</span> },
-  { key: "clientType", accessor: (o) => (o.clientType ? CLIENT_TYPE_LABEL[o.clientType] ?? o.clientType : "") },
-  { key: "serviceType", accessor: (o) => (o.serviceType ? SERVICE_LABEL[o.serviceType] ?? o.serviceType : "") },
-  { key: "level", accessor: (o) => (o.level ? LEVEL_LABEL[o.level] ?? o.level : "") },
+  { key: "clientType", accessor: (o) => o.clientType ?? "", format: (_, o) => label(CLIENT_TYPE_LABEL, o.clientType), editor: "select", options: opt(CLIENT_TYPES) },
+  { key: "serviceType", accessor: (o) => o.serviceType ?? "", format: (_, o) => label(SERVICE_LABEL, o.serviceType), editor: "select", options: opt(SERVICE_TYPES) },
+  { key: "level", accessor: (o) => o.level ?? "", format: (_, o) => label(LEVEL_LABEL, o.level), editor: "select", options: opt(LEVELS) },
   { key: "durationMonths", type: "number", format: (_, o) => (o.durationMonths ? `${o.durationMonths} bulan` : "") },
   { key: "requirement" },
   { key: "detailRequirement" },
   { key: "closingPrice", type: "number", format: (_, o) => rupiah(o.closingPrice) },
-  { key: "bante", type: "number" },
+  { key: "bante", accessor: (o) => (o.bante == null ? "" : String(o.bante)), editor: "select", options: opt(BANTE_SCORES) },
   { key: "progressNotes" },
   { key: "droppedReason" },
 ];
@@ -274,6 +275,7 @@ const CONFIG: WorkspaceConfig<Opportunity> = {
   // the row's right-click menu and the panel (QA 2026-10-08).
   frozen: ["optyNo", "leadNo", "client"],
   rowMenu,
+  edits: EDITS,
   grid: (o) => ({
     label: `${o.client} ${o.optyNo}`,
     author: <span className="inline-flex items-center gap-1.5 text-[0.6875rem] text-slate-500"><StageDot status={o.status} /><span className="font-mono">{o.optyNo}</span> · {STAGE_LABEL[o.status] ?? o.status}</span>,

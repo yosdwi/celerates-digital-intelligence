@@ -48,6 +48,8 @@ export type RowActions = {
   access: Access;
   open: (id: string, action?: string) => void;
   run: (record: { id: string }, patch: Record<string, unknown>, action: () => Promise<unknown>) => void;
+  /** Save one field the way its table cell does (`WorkspaceConfig.edits`); rejects with the reason it failed. */
+  edit: (id: string, key: string, value: string) => Promise<void>;
 };
 const RowActionsContext = createContext<RowActions | null>(null);
 export function useRowActions(): RowActions {
@@ -90,6 +92,12 @@ export type WorkspaceConfig<T extends { id: string }> = {
    * and shows whole on hover and in the panel.
    */
   frozen?: string[];
+  /**
+   * Fields edited where they are shown (QA 2026-10-08, Attio-style): in their table cell (double-click or Enter; Crisp's
+   * cell menu Paste / Clear value too) and in the panel. `patch` is the optimistic change, `save` posts it with the V1
+   * action; a `required` field refuses an empty value.
+   */
+  edits?: Record<string, { required?: boolean; patch: (o: T, value: string) => Partial<T>; save: (o: T, value: string) => Promise<unknown> }>;
   /** Right-click menu on a table row (QA 2026-10-08): the record's quick actions, only those its user may take. */
   rowMenu?: (o: T, row: RowActions) => ContextMenuOption[];
   grid: (o: T) => { label: string; author: React.ReactNode; title: string; excerpt: string; footer: React.ReactNode; date?: string };
@@ -277,7 +285,26 @@ export function RecordWorkspace<T extends { id: string }>({
   const select = useCallback((id: string) => commit({ record: id }), [commit]);
   const [request, setRequest] = useState<PanelRequest | null>(null);
   const [, startRow] = useTransition();
+  const allRef = useRef(all);
+  allRef.current = all;
+  const edit = useCallback(async (id: string, key: string, value: string) => {
+    const o = allRef.current.find((r) => r.id === id);
+    const e = c.edits?.[key];
+    if (!o || !e) return;
+    if (e.required && !value.trim()) throw new Error(`${c.specs[key]?.label ?? key} wajib diisi`);
+    const p = e.patch(o, value);
+    const before = Object.fromEntries(Object.keys(p).map((k) => [k, (o as Record<string, unknown>)[k]])) as Partial<T>;
+    patch(id, p);
+    try {
+      await e.save(o, value);
+      router.refresh();
+    } catch (err) {
+      patch(id, before);
+      throw err instanceof Error ? err : new Error("Gagal menyimpan");
+    }
+  }, [c, patch, router]);
   const rowActions = useMemo<RowActions>(() => ({
+    edit,
     access,
     open: (id, action) => { commit({ record: id }); setRequest(action ? { id, action } : null); },
     run: (record, p, action) => {
@@ -288,7 +315,7 @@ export function RecordWorkspace<T extends { id: string }>({
         catch (err) { patch(record.id, before as Partial<T>); showToast((err as Error)?.message || "Gagal menyimpan", "error"); }
       });
     },
-  }), [access, commit, patch, router, showToast]);
+  }), [access, commit, patch, router, showToast, edit]);
   const closePreview = useCallback(() => commit({ record: null }), [commit]);
   const selected = state.record ? all.find((r) => r.id === state.record) ?? null : null;
 
@@ -314,6 +341,7 @@ export function RecordWorkspace<T extends { id: string }>({
       ...col,
       header: header(col.key, () => hideColumn(col.key)),
       align: c.specs[col.key].align,
+      editable: access.canEdit && !!c.edits?.[col.key],
       width: col.width ?? widths[col.key],
       hidden: !shownKeys.includes(col.key),
     }));
@@ -342,7 +370,7 @@ export function RecordWorkspace<T extends { id: string }>({
       ),
     };
     return [frozen, ...regular];
-  }, [c, frozenKeys, valueIndex, state.filters, state.sorts, commit, hideColumn, widths, shownKeys]);
+  }, [c, frozenKeys, valueIndex, state.filters, state.sorts, commit, hideColumn, widths, shownKeys, access.canEdit]);
   const columnsForSettings: TableToolbarColumn[] = useMemo(() => c.columns.filter((x) => !frozenKeys.includes(x.key)).map((x) => ({ key: x.key, label: c.specs[x.key].label })), [c, frozenKeys]);
   const [workspaceRef, workspaceHeight] = useHeight<HTMLDivElement>();
   const counts = useMemo(() => Object.fromEntries(c.kpis.map((k) => [k.id, all.filter(k.match).length])), [c, all]);
@@ -477,8 +505,10 @@ export function RecordWorkspace<T extends { id: string }>({
             showViewSettings={false}
             showCount={false}
             stickyFirst
+            // A click selects a cell (double-click edits it, Attio-style); the record opens from its name link, the
+            // row menu's Buka, or a card (QA 2026-10-08).
             interactive
-            onRowClick={(row) => select(row.id)}
+            onEdit={edit}
             rowContextMenu={c.rowMenu ? (row) => c.rowMenu!(row, rowActions) : undefined}
             // A bounded scroll box without Crisp's row virtualization: that assumes 36px rows, and V1's Aksi column
             // stacks taller ones (the frozen block, QA 2026-10-08); a few hundred rows render fine.

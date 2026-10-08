@@ -256,3 +256,39 @@ export const DEFAULT_SHOWN = [
   "client", "optyNo", "status", "position", "headcount", "price", "salesPic", "salesQualified", "lastCommunication", "downstream",
   "leadNo", "clientType", "serviceType", "level", "durationMonths", "requirement", "detailRequirement", "closingPrice", "bante", "progressNotes", "droppedReason",
 ];
+
+// ── Inline edits (QA 2026-10-08) ─────────────────────────────────────────────────────────────────────────────
+type FieldEdit<T> = { form: string; required?: boolean; patch: (value: string) => Partial<T> };
+/** Digits only (a pasted "Rp 7.000.000" is 7000000); blank stays blank. */
+export const digits = (v: string) => v.replace(/[^\d]/g, "");
+const num = (v: string) => (digits(v) ? Number(digits(v)) : null);
+const text = (v: string) => (v.trim() ? v.trim() : null);
+const NUMERIC_FORM_FIELDS = new Set(["headcount_target", "estimated_duration_months", "price_amount", "estimated_deal_amount", "bant_score", "bante_score"]);
+
+/** Table column → the V1 edit form field it writes, and the record change it makes. Stage and Sales Qualified have
+ *  their own V1 actions and are not here. Required as in the V1 form. */
+export const OT_FIELD_EDITS: Record<string, FieldEdit<Opportunity>> = {
+  client: { form: "client_name", required: true, patch: (v) => ({ client: v.trim() }) },
+  salesPic: { form: "sales_pic_name", required: true, patch: (v) => ({ salesPic: v.trim() }) },
+  clientType: { form: "client_type_code", patch: (v) => ({ clientType: text(v) }) },
+  serviceType: { form: "service_type_code", patch: (v) => ({ serviceType: text(v) }) },
+  position: { form: "position_name", patch: (v) => ({ position: text(v) }) },
+  level: { form: "level_code", patch: (v) => ({ level: text(v) }) },
+  headcount: { form: "headcount_target", patch: (v) => ({ headcount: num(v) }) },
+  durationMonths: { form: "estimated_duration_months", patch: (v) => ({ durationMonths: num(v) }) },
+  price: { form: "price_amount", patch: (v) => ({ price: num(v) }) },
+  closingPrice: { form: "estimated_deal_amount", patch: (v) => ({ closingPrice: num(v) }) },
+  bante: { form: "bante_score", patch: (v) => ({ bante: num(v) }) },
+  lastCommunication: { form: "last_communication_date", patch: (v) => ({ lastCommunication: text(v) }) },
+  requirement: { form: "requirement_summary", patch: (v) => ({ requirement: text(v) }) },
+  detailRequirement: { form: "detail_requirement", patch: (v) => ({ detailRequirement: text(v) }) },
+  progressNotes: { form: "progress_notes", patch: (v) => ({ progressNotes: text(v) }) },
+  droppedReason: { form: "dropped_reason", patch: (v) => ({ droppedReason: text(v) }) },
+};
+
+/** The full V1 form for one changed field: every other field posted as it is, so the V1 action keeps them. */
+export function fieldFormData(values: Record<string, string>, form: string, value: string): FormData {
+  const fd = new FormData();
+  for (const [k, v] of Object.entries({ ...values, [form]: NUMERIC_FORM_FIELDS.has(form) ? digits(value) : value.trim() })) fd.set(k, v);
+  return fd;
+}

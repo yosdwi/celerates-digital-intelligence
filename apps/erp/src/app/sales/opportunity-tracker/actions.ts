@@ -65,6 +65,15 @@ export async function createOpportunityTracker(formData: FormData) {
 
 export async function updateOpportunityTracker(id: string, formData: FormData) {
   await requireActor();
+  await saveOpportunityTracker(id, formData);
+  // The "Berhasil disimpan" toast belongs to the redirect (a table edit shows its own state instead).
+  await markSaved();
+  redirect(safeSalesReturnPath(formData.get("return_to")));
+}
+
+/** The edit without the redirect: Sales V2 saves a single field from its table (the form still posts every field). */
+export async function saveOpportunityTracker(id: string, formData: FormData) {
+  await requireActor();
 
   await requireDivisionAccess("sales");
   const client_name = formData.get("client_name") as string;
@@ -111,8 +120,6 @@ export async function updateOpportunityTracker(id: string, formData: FormData) {
 
   await logActivity("sales", "update", `Opportunity Tracker: ${client_name}`, "Opportunity Tracker");
   revalidatePath("/sales/opportunity-tracker");
-  await markSaved();
-  redirect(safeSalesReturnPath(formData.get("return_to")));
 }
 
 export async function updateSalesQualified(id: string, sales_qualified: boolean) {

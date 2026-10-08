@@ -217,6 +217,16 @@ export async function createExtensionRequestFromSales(formData: FormData): Promi
 
 export async function updateOpportunity(id: string, formData: FormData) {
   await requireActor();
+  await saveOpportunity(id, formData);
+  // The "Berhasil disimpan" toast belongs to the redirect (a table edit shows its own state instead).
+  await markSaved();
+  // Optional return_to (Sales paths only): Sales V2 edits in a dialog and comes back to its own URL.
+  redirect(safeSalesReturnPath(formData.get("return_to"), "/sales"));
+}
+
+/** The edit without the redirect: Sales V2 saves a single field from its table (the form still posts every field). */
+export async function saveOpportunity(id: string, formData: FormData) {
+  await requireActor();
 
   await requireDivisionAccess("sales");
   const client_name = formData.get("client_name") as string;
@@ -346,9 +356,6 @@ export async function updateOpportunity(id: string, formData: FormData) {
 
   await logActivity("sales", "update", `PQ Tracker: ${client_name} — ${project_name}`, "PQ Tracker");
   revalidatePath("/sales");
-  await markSaved();
-  // Optional return_to (Sales paths only): Sales V2 edits in a dialog and comes back to its own URL.
-  redirect(safeSalesReturnPath(formData.get("return_to"), "/sales"));
 }
 
 export type UpdateStageResult = { ok: true } | { ok: false; error: string };

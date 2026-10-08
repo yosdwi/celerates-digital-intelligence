@@ -13,16 +13,16 @@ import { useToast } from "@/components/toast-provider";
 import type { HeaderSpec } from "./header-filter";
 import { SheetSyncButton, PQ_SHEET_SYNC } from "./sheet-sync-dialog";
 import type { SheetSyncData } from "./data";
-import { RecordWorkspace, useRowActions, type Access, type MoveContext, type RowActions, type WorkspaceConfig } from "./record-workspace";
-import { InlineSelect } from "./cells";
-import { BUSINESS_UNITS, CLIENT_TYPES, LEVELS, PRIORITIES, SERVICE_TYPES, rupiah } from "./model";
+import { RecordWorkspace, type Access, type MoveContext, type RowActions, type WorkspaceConfig } from "./record-workspace";
+import { RecordLink } from "./cells";
+import { BANTE_SCORES, BUSINESS_UNITS, CLIENT_TYPES, LEVELS, PRIORITIES, SERVICE_TYPES, fieldFormData, rupiah } from "./model";
 import {
   LEAD_SOURCE_LABEL, OPTY_STATUS_LABEL, PQ_BUILT_IN_VIEWS, PQ_DEFAULT_SHOWN, PQ_FIELD_KEYS, PQ_STAGES, PQ_STAGE_LABEL, SIGNATURE_LABEL,
-  needsPqNo, pqFieldValue, pqMatchesSearch, withPqStage, type Pq,
+  PQ_FIELD_EDITS, needsPqNo, pqEditValues, pqFieldValue, pqMatchesSearch, withPqStage, type Pq,
 } from "./pq-model";
 import { CreatePq, type PqCreateRequest } from "./pq-forms";
 import { PqPreview, ok, savePqStage } from "./pq-preview";
-import { updateOptyStatus, updatePipelineStage } from "@/app/sales/actions";
+import { saveOpportunity, updateOptyStatus, updatePipelineStage } from "@/app/sales/actions";
 import type { PqOptions } from "./pq-data";
 
 const STAGE_ORDER: Record<string, number> = Object.fromEntries(PQ_STAGES.map((s, i) => [s.id, i]));
@@ -159,29 +159,32 @@ function KanbanCard({ p, onOpen }: { p: Pq; onOpen: () => void }) {
   );
 }
 
-/** Pipeline Stage (with V1's Opty Status rule) and Opty Status edited in their cells (QA 2026-10-08). */
-function StageCell({ p }: { p: Pq }) {
-  const { access, run } = useRowActions();
-  return <InlineSelect value={p.stage} options={STAGE_OPTIONS} label="Pipeline Stage" canEdit={access.canEdit} onChange={(v) => run(p, withPqStage(p, v), () => savePqStage(p.id, v))} />;
-}
-function OptyStatusCell({ p }: { p: Pq }) {
-  const { access, run } = useRowActions();
-  return <InlineSelect value={p.optyStatus ?? ""} options={OPTY_OPTIONS} label="Opty Status" canEdit={access.canEdit} onChange={(v) => run(p, { optyStatus: v }, () => ok(updateOptyStatus(p.id, v)))} />;
-}
-const STAGE_OPTIONS = PQ_STAGES.map((s) => ({ value: s.id, label: s.title, swatch: s.swatch }));
-const OPTY_OPTIONS = OPTY_STATUS.map(([value, label]) => ({ value, label }));
-
 /** Right-click on a row: V1's quick actions (Aksi / Status), each only when this user and this record allow it. */
-function rowMenu(p: Pq, { access, open, run }: RowActions): ContextMenuOption[] {
+function rowMenu(p: Pq, { access, open }: RowActions): ContextMenuOption[] {
   const items: ContextMenuOption[] = [{ label: "Buka", onSelect: () => open(p.id) }];
   if (!access.canEdit) return items;
-  items.push({ label: "Edit", onSelect: () => open(p.id, "edit") });
+  items.push({ label: "Edit (form lengkap)", onSelect: () => open(p.id, "edit") });
   if (p.signature.status === "not_sent" && p.pqNo) items.push({ label: "Kirim untuk TTD", onSelect: () => open(p.id, "sign") });
-  items.push({ separator: true });
-  for (const s of PQ_STAGES) items.push({ label: `Pipeline: ${s.title}`, disabled: s.id === p.stage, onSelect: () => run(p, withPqStage(p, s.id), () => savePqStage(p.id, s.id)) });
   if (access.canDelete) items.push({ separator: true }, { label: "Hapus", danger: true, onSelect: () => open(p.id, "delete") });
   return items;
 }
+
+/** In-cell edits (QA 2026-10-08): the V1 PQ edit form for one field (saveOpportunity, no redirect; every other field
+ *  and the PMO documents posted as they are), and V1's StageSelector actions for Pipeline Stage and Opty Status. */
+const EDITS: WorkspaceConfig<Pq>["edits"] = {
+  ...Object.fromEntries(Object.entries(PQ_FIELD_EDITS).map(([key, f]) => [key, {
+    required: f.required,
+    patch: (_: Pq, v: string) => f.patch(v),
+    save: (p: Pq, v: string) => saveOpportunity(p.id, fieldFormData(pqEditValues(p), f.form, v)),
+  }])),
+  stage: { required: true, patch: (p, v) => withPqStage(p, v), save: (p, v) => savePqStage(p.id, v) },
+  optyStatus: { patch: (_, v) => ({ optyStatus: v || null }), save: (p, v) => ok(updateOptyStatus(p.id, v)) },
+};
+const opt = (pairs: readonly (readonly [string, string])[]) => pairs.map(([value, label]) => ({ value, label }));
+const coded = (labels: Record<string, string>, v: string | null) => (v ? labels[v] ?? v : "");
+// Pipeline chips in Crisp's tag palette, keyed by stage code (the select editor reads the same code).
+const STAGE_SWATCH = Object.fromEntries(PQ_STAGES.map((s) => [s.id, s.swatch])) as Record<string, 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12>;
+
 
 // ── Table columns: every V1 column, Client first and pinned ─────────────────────────────────────────────────
 const SPECS: Record<string, HeaderSpec> = Object.fromEntries(([
@@ -215,12 +218,12 @@ const SPECS: Record<string, HeaderSpec> = Object.fromEntries(([
 
 const text = (p: Pq, key: string) => String(pqFieldValue(p, key) ?? "");
 const COLUMNS: Omit<DataTableColumn<Pq>, "header">[] = [
-  { key: "client", render: (_, p) => <span className="font-medium text-slate-900">{p.client}</span> },
+  { key: "client", render: (_, p) => <RecordLink id={p.id}>{p.client}</RecordLink> },
   { key: "optyNo", width: 112, render: (_, p) => <span className="font-mono text-[0.75rem] text-slate-600">{p.optyNo}</span> },
   // As V1: the number or "-"; Perlu Generate PQ / Menunggu Talent Onboard sit in the Aksi cell.
   { key: "pqNo", width: 120, render: (_, p) => <span className="font-mono text-[0.75rem] text-slate-600">{p.pqNo ?? "-"}</span> },
-  { key: "stage", render: (_, p) => <StageCell p={p} /> },
-  { key: "optyStatus", render: (_, p) => <OptyStatusCell p={p} /> },
+  { key: "stage", type: "status", accessor: (p) => p.stage, format: (_, p) => PQ_STAGE_LABEL[p.stage] ?? p.stage, swatches: STAGE_SWATCH, editor: "select", options: PQ_STAGES.map((s) => ({ value: s.id, label: s.title })) },
+  { key: "optyStatus", accessor: (p) => p.optyStatus ?? "", format: (_, p) => coded(OPTY_STATUS_LABEL, p.optyStatus), editor: "select", options: opt(OPTY_STATUS) },
   {
     key: "signature",
     render: (_, p) => <span className={p.signature.status === "not_sent" ? "text-slate-400" : `rounded px-1.5 py-0.5 font-medium ${SIGN_CHIP[p.signature.status]}`}>{SIGNATURE_LABEL[p.signature.status]}</span>,
@@ -229,16 +232,16 @@ const COLUMNS: Omit<DataTableColumn<Pq>, "header">[] = [
   { key: "pqDocs", width: 64, render: (_, p) => (p.pqDocs.length ? <span className="inline-flex items-center gap-1 text-slate-700"><Paperclip size={12} aria-hidden />{p.pqDocs.length}</span> : <span className="text-slate-300">-</span>) },
   { key: "project" },
   { key: "position" },
-  { key: "clientType", accessor: (p) => text(p, "clientType") },
-  { key: "serviceType", accessor: (p) => text(p, "serviceType") },
-  { key: "businessUnit", accessor: (p) => text(p, "businessUnit") },
-  { key: "level", accessor: (p) => text(p, "level") },
+  { key: "clientType", accessor: (p) => p.clientType ?? "", format: (_, p) => text(p, "clientType"), editor: "select", options: opt(CLIENT_TYPES) },
+  { key: "serviceType", accessor: (p) => p.serviceType ?? "", format: (_, p) => text(p, "serviceType"), editor: "select", options: opt(SERVICE_TYPES) },
+  { key: "businessUnit", accessor: (p) => p.businessUnit ?? "", format: (_, p) => text(p, "businessUnit"), editor: "select", options: opt(BUSINESS_UNITS) },
+  { key: "level", accessor: (p) => p.level ?? "", format: (_, p) => text(p, "level"), editor: "select", options: opt(LEVELS) },
   { key: "headcount", type: "number" },
   { key: "durationMonths", type: "number", format: (_, p) => (p.durationMonths ? `${p.durationMonths} bulan` : "") },
-  { key: "priority", accessor: (p) => text(p, "priority") },
-  { key: "bant", type: "number" },
+  { key: "priority", accessor: (p) => p.priority ?? "", format: (_, p) => text(p, "priority"), editor: "select", options: opt(PRIORITIES) },
+  { key: "bant", accessor: (p) => (p.bant == null ? "" : String(p.bant)), editor: "select", options: opt(BANTE_SCORES) },
   { key: "price", type: "number", format: (_, p) => rupiah(p.price, p.pricePeriod) },
-  { key: "approvalDate", accessor: (p) => p.approvalDate ?? "" },
+  { key: "approvalDate", type: "date", accessor: (p) => p.approvalDate ?? "", format: (_, p) => p.approvalDate ?? "" },
   // One line, like every row (QA 2026-10-08): how many PO documents (the link counts as one); the panel lists them.
   {
     key: "poDocs",
@@ -249,9 +252,9 @@ const COLUMNS: Omit<DataTableColumn<Pq>, "header">[] = [
   },
   { key: "salesPic" },
   { key: "leadSource", accessor: (p) => text(p, "leadSource") },
-  { key: "requestDate", accessor: (p) => p.requestDate ?? "" },
-  { key: "startDate", accessor: (p) => p.startDate ?? "" },
-  { key: "endDate", accessor: (p) => p.endDate ?? "" },
+  { key: "requestDate", type: "date", accessor: (p) => p.requestDate ?? "", format: (_, p) => p.requestDate ?? "" },
+  { key: "startDate", type: "date", accessor: (p) => p.startDate ?? "", format: (_, p) => p.startDate ?? "" },
+  { key: "endDate", type: "date", accessor: (p) => p.endDate ?? "", format: (_, p) => p.endDate ?? "" },
   { key: "notes" },
 ];
 
@@ -288,6 +291,7 @@ const CONFIG: WorkspaceConfig<Pq> = {
   // edits, the row's right-click menu and the panel (QA 2026-10-08).
   frozen: ["optyNo", "pqNo", "pqDocs"],
   rowMenu,
+  edits: EDITS,
   grid: (p) => ({
     label: `${p.client} ${p.pqNo ?? p.optyNo}`,
     author: <span className="inline-flex items-center gap-1.5 text-[0.6875rem] text-slate-500"><span aria-hidden className="inline-block h-2 w-2 rounded-full" style={{ background: PQ_STAGES.find((s) => s.id === p.stage)?.accent ?? "#8a8f98" }} /><span className="font-mono">{p.pqNo ?? p.optyNo}</span> · {PQ_STAGE_LABEL[p.stage] ?? p.stage}</span>,

@@ -5,17 +5,20 @@ import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Badge, Button, Checkbox, Dialog, DialogBody, DialogFooter, FormField, Input, InputShell, RecordPanel, Select } from "@crisp-ui-kit/crisp";
+import { Badge, Button, Dialog, DialogBody, DialogFooter, FormField, Input, InputShell, RecordPanel, Select } from "@crisp-ui-kit/crisp";
 import { MoneyInput } from "@/components/form-fields";
 import { useToast } from "@/components/toast-provider";
 import {
-  convertToRequisition, deleteOpportunityTracker, updateOptyStatus, updateSalesQualified,
+  convertToRequisition, deleteOpportunityTracker,
 } from "@/app/sales/opportunity-tracker/actions";
 import {
-  CLIENT_TYPE_LABEL, LEVEL_LABEL, PRIORITIES, SERVICE_LABEL, STAGES, STAGE_LABEL, canConvert, rupiah, type Opportunity,
+  PRIORITIES, STAGES, canConvert, rupiah, type Opportunity,
 } from "./model";
 import { EditOpportunityDialog, type FormOptions } from "./forms";
-import { PanelTitle, useRecordPanelRail, type Access, type PanelRequest } from "./record-workspace";
+import { PanelTitle, useRecordPanelRail, useRowActions, type Access, type PanelRequest } from "./record-workspace";
+import { InlineCheck, InlineSelect, InlineText, MoreMenu } from "./cells";
+
+const STAGE_OPTIONS = STAGES.map((s) => ({ value: s.id, label: s.title, swatch: s.swatch }));
 
 const SIGNATURE: Record<string, { label: string; tone: "neutral" | "warning" | "success" | "danger" }> = {
   not_sent: { label: "Belum dikirim", tone: "neutral" },
@@ -50,8 +53,8 @@ export function RecordPreview({
 }) {
   const router = useRouter();
   const { showToast } = useToast();
-  const [pending, start] = useTransition();
   const [dialog, setDialog] = useState<null | "convert" | "delete" | "edit">(null);
+  const { edit } = useRowActions();
   useEffect(() => {
     if (!record || !request || record.id !== request.id) return;
     const { action } = request;
@@ -67,35 +70,18 @@ export function RecordPreview({
   // The full V1 edit page stays reachable; day-to-day editing is the dialog (contract §12).
   const editHref = `/sales/opportunity-tracker/${record.id}/edit?return_to=${encodeURIComponent(returnTo)}`;
 
-  function run(patch: Partial<Opportunity>, action: () => Promise<unknown>) {
-    const before = Object.fromEntries(Object.keys(patch).map((k) => [k, record![k as keyof Opportunity]]));
-    onPatch(record!.id, patch);
-    start(async () => {
-      try {
-        await action();
-        router.refresh();
-      } catch (err) {
-        onPatch(record!.id, before as Partial<Opportunity>);
-        showToast((err as Error)?.message || "Gagal menyimpan", "error");
-      }
-    });
-  }
 
+  // Ringkasan (QA 2026-10-08): what a Kanban or Grid user needs without the table; the four that change most are edited
+  // here as in the table (the workspace's `edit`), the rest of the record lives in the table and the Edit form.
+  const save = (key: string) => (v: string) => { edit(record.id, key, v).catch((err) => showToast((err as Error)?.message || "Gagal menyimpan", "error")); };
   const highlights = [
     { key: "opty", label: "Opty No", value: <span className="font-mono text-[0.75rem]">{record.optyNo}</span> },
-    { key: "stage", label: "Stage", value: STAGE_LABEL[record.status] ?? record.status },
+    { key: "stage", label: "Stage", value: <InlineSelect value={record.status} options={STAGE_OPTIONS} label="Stage" canEdit={access.canEdit} onChange={save("status")} /> },
+    { key: "qualified", label: "Sales Qualified", value: <InlineCheck checked={record.salesQualified} label="Qualified" canEdit={access.canEdit} onChange={(v) => save("salesQualified")(String(v))} /> },
+    { key: "pic", label: "Sales PIC", value: <InlineText value={record.salesPic} label="Sales PIC" canEdit={access.canEdit} onCommit={save("salesPic")} /> },
+    { key: "price", label: "Price", value: <InlineText value={record.price == null ? "" : String(record.price)} display={rupiah(record.price, record.pricePeriod) || "-"} numeric label="Price" canEdit={access.canEdit} onCommit={save("price")} /> },
     { key: "pos", label: "Positions", value: record.position ? `${record.position}${record.headcount ? ` × ${record.headcount}` : ""}` : "-" },
-    { key: "level", label: "Level", value: record.level ? LEVEL_LABEL[record.level] ?? record.level : "-" },
-    { key: "price", label: "Price", value: rupiah(record.price, record.pricePeriod) || "-" },
-    { key: "closing", label: "Closing Price Deal", value: rupiah(record.closingPrice) || "-" },
-    { key: "pic", label: "Sales PIC", value: record.salesPic || "-" },
     { key: "comm", label: "Last Communication", value: record.lastCommunication ?? "-" },
-    { key: "service", label: "Service Type", value: record.serviceType ? SERVICE_LABEL[record.serviceType] ?? record.serviceType : "-" },
-    { key: "client", label: "Client Type", value: record.clientType ? CLIENT_TYPE_LABEL[record.clientType] ?? record.clientType : "-" },
-    { key: "bante", label: "BANTE", value: record.bante ?? "-" },
-    { key: "lead", label: "Leads No", value: record.leadNo ? <span className="font-mono text-[0.75rem]">{record.leadNo}</span> : "-" },
-    { key: "duration", label: "Durasi", value: record.durationMonths ? `${record.durationMonths} bulan` : "-" },
-    { key: "qualified", label: "Sales Qualified", value: record.salesQualified ? "Ya" : "Belum" },
   ];
 
   const text = (v: string | null) => v ? <p className="whitespace-pre-wrap text-[0.8125rem] leading-5 text-slate-700">{v}</p> : null;
@@ -126,36 +112,18 @@ export function RecordPreview({
     { key: "dropped", label: "Dropped Reason", count: record.droppedReason ? 1 : 0, content: text(record.droppedReason) ?? undefined },
   ];
 
+  // Buttons only (QA 2026-10-08): stage and Sales Qualified are edited in the Ringkasan above.
   const footer = access.canEdit ? (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-2">
-        <span className="w-16 shrink-0 text-[0.75rem] text-slate-500">Stage</span>
-        <Select
-          aria-label="Change stage"
-          size="small"
-          value={record.status}
-          disabled={pending}
-          onValueChange={(v) => v !== record.status && run({ status: v }, () => updateOptyStatus(record.id, v))}
-          options={STAGES.map((s) => ({ value: s.id, label: s.title }))}
-        />
-        <label className="flex shrink-0 items-center gap-1.5 text-[0.75rem] text-slate-700">
-          <Checkbox
-            checked={record.salesQualified}
-            disabled={pending}
-            onChange={(e) => { const v = e.currentTarget.checked; run({ salesQualified: v }, () => updateSalesQualified(record.id, v)); }}
-          />
-          Sales Qualified
-        </label>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        {canConvert(record) && <Button size="sm" intent="primary" onClick={() => setDialog("convert")}>Convert to Requisition</Button>}
-        {record.pq && <span className="text-[0.75rem] text-slate-500">Sudah dikonversi</span>}
-        <Button size="sm" intent="neutral" onClick={() => setDialog("edit")}>Edit</Button>
-        <Link href={editHref} className="text-[0.75rem] text-slate-500 hover:text-slate-800 hover:underline">Halaman penuh</Link>
-        {access.canDelete && !record.pq && !record.requisition && (
-          <Button size="sm" intent="ghost" className="ml-auto text-red-600" onClick={() => setDialog("delete")}>Hapus</Button>
-        )}
-      </div>
+    <div className="flex flex-wrap items-center gap-2">
+      {canConvert(record) && <Button size="sm" intent="primary" onClick={() => setDialog("convert")}>Convert to Requisition</Button>}
+      {record.pq && <span className="text-[0.75rem] text-slate-500">Sudah dikonversi</span>}
+      <Button size="sm" intent="neutral" onClick={() => setDialog("edit")}>Edit</Button>
+      <span className="ml-auto">
+        <MoreMenu items={[
+          { label: "Halaman penuh (V1)", onSelect: () => router.push(editHref) },
+          ...(access.canDelete && !record.pq && !record.requisition ? [{ label: "Hapus", danger: true, onSelect: () => setDialog("delete") }] : []),
+        ]} />
+      </span>
     </div>
   ) : (
     <p className="text-[0.75rem] text-slate-500">Mode lihat saja: perubahan butuh akses Editor Sales.</p>

@@ -336,24 +336,50 @@ test("QA 2026-10-08: slim sidebar scroll, Agent width follows the screen and can
   assert.match(read("app/sales/v2/sales-v2.css"), /background: #f5f3ff; color: #6d28d9/);
 });
 
-test("QA 2026-10-08: V1's frozen columns, slim; quick actions in cells and the row menu, not a tall Aksi column", () => {
+test("QA 2026-10-08: Attio-style table: V1's frozen columns slim, fields edited in their cell, the name opens the panel", () => {
   const ot = read("features/sales-v2/workspace.tsx");
   const pq = read("features/sales-v2/pq-workspace.tsx");
-  // V1 sticks Aksi / Status plus these (md:sticky in the V1 tables); Aksi became in-cell edits and the row menu.
+  const acc = read("features/sales-v2/account-workspace.tsx");
   assert.match(ot, /frozen: \["optyNo", "leadNo", "client"\]/);
   assert.match(pq, /frozen: \["optyNo", "pqNo", "pqDocs"\]/);
-  for (const src of [ot, pq]) {
+  for (const src of [ot, pq, acc]) {
     assert.doesNotMatch(src, /ActionsCell|key: "actions"/);
-    assert.match(src, /\n  rowMenu,/);
-    assert.match(src, /<InlineSelect /);
+    assert.match(src, /\n  rowMenu,\n  edits: EDITS,/);
+    assert.match(src, /<RecordLink id=/);
+    assert.match(src, /editor: "select"/);
   }
-  assert.match(ot, /updateOptyStatus\(o\.id, v\)/);
-  assert.match(ot, /updateSalesQualified\(o\.id, v\)/);
-  assert.match(pq, /savePqStage\(p\.id, v\)/);
+  // One field saved through the V1 edit action without its redirect; stage-like fields through their own V1 actions.
+  assert.match(ot, /saveOpportunityTracker\(o\.id, fieldFormData\(editValues\(o\)/);
+  assert.match(pq, /saveOpportunity\(p\.id, fieldFormData\(pqEditValues\(p\)/);
+  assert.match(pq, /save: \(p, v\) => savePqStage\(p\.id, v\)/);
   const kit = read("features/sales-v2/record-workspace.tsx");
+  assert.match(kit, /onEdit=\{edit\}/);
   assert.match(kit, /rowContextMenu=\{c\.rowMenu/);
-  // Frozen parts stay one line (a long value ends in "…" with the whole value on hover).
+  assert.doesNotMatch(kit, /onRowClick=/);
   assert.match(kit, /className="min-w-0 shrink-0 truncate pr-3" style=\{\{ width \}\} title=/);
+  // The V1 update actions are split, not duplicated: update = save + redirect.
+  assert.match(read("app/sales/opportunity-tracker/actions.ts"), /await saveOpportunityTracker\(id, formData\);\n[^]*?await markSaved\(\);\n  redirect\(/);
+  assert.match(read("app/sales/actions.ts"), /await saveOpportunity\(id, formData\);\n[^]*?await markSaved\(\);\n[^]*?redirect\(/);
+});
+
+test("in-cell edits write V1 form fields and keep every other field as it is", async () => {
+  const { OT_FIELD_EDITS, fieldFormData } = await import("../src/features/sales-v2/model");
+  const { PQ_FIELD_EDITS } = await import("../src/features/sales-v2/pq-model");
+  const o = { client: "PT A", salesPic: "Rina", status: "solutioning", salesQualified: true, price: 5000000, clientType: "new" } as unknown as Opportunity;
+  const values = editValues(o);
+  for (const f of Object.values(OT_FIELD_EDITS)) assert.ok(f.form in values, f.form);
+  const p = { client: "PT B", project: "X", serviceType: "rpo", salesPic: "Rina", stage: "on_going", signature: { status: "not_sent" } } as unknown as Pq;
+  const pqValues = pqEditValues(p);
+  for (const f of Object.values(PQ_FIELD_EDITS)) assert.ok(f.form in pqValues, f.form);
+  const fd = fieldFormData(values, "price_amount", "Rp 7.000.000");
+  assert.equal(fd.get("price_amount"), "7000000");
+  assert.equal(fd.get("client_name"), "PT A");
+  assert.equal(fd.get("sales_qualified"), "true");
+  assert.deepEqual(new Set(fd.keys()), new Set(Object.keys(values)));
+  assert.deepEqual(OT_FIELD_EDITS.price.patch("Rp 7.000.000"), { price: 7000000 });
+  assert.deepEqual(OT_FIELD_EDITS.clientType.patch(""), { clientType: null });
+  assert.equal(OT_FIELD_EDITS.client.required, true);
+  assert.equal(PQ_FIELD_EDITS.project.required, true);
 });
 
 test("QA 2026-10-08: form dialogs keep Batal / Simpan in view (no clipped footer on short laptop screens)", () => {

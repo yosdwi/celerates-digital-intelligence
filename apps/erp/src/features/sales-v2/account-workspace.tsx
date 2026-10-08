@@ -7,18 +7,20 @@ import {
   Activity, AlarmClock, Banknote, Briefcase, Building2, CalendarClock, CircleDot, Contact, Factory, FileSignature, NotebookPen,
   Receipt, Target, TrendingUp, UserRound, Users,
 } from "lucide-react";
-import { SnackbarProvider, type DataTableColumn, type TableToolbarColumn } from "@crisp-ui-kit/crisp";
+import { SnackbarProvider, type ContextMenuOption, type DataTableColumn, type TableToolbarColumn } from "@crisp-ui-kit/crisp";
+import { updateClient } from "@/app/sales/accounts/actions";
+import { RecordLink } from "./cells";
 import type { HeaderSpec } from "./header-filter";
-import { RecordWorkspace, type Access, type WorkspaceConfig } from "./record-workspace";
+import { RecordWorkspace, type Access, type RowActions, type WorkspaceConfig } from "./record-workspace";
 import { rupiah } from "./model";
 import {
   ACCOUNT_BUILT_IN_VIEWS, ACCOUNT_DEFAULT_SHOWN, ACCOUNT_FIELD_KEYS, ACCOUNT_STATUSES, ACCOUNT_STATUS_LABEL,
-  accountFieldValue, accountMatchesSearch, lastActivityOf, picOf, type Account,
+  accountFieldValue, accountFormData, accountMatchesSearch, lastActivityOf, picOf, type Account,
 } from "./account-model";
 import { AccountPreview, CreateAccount, saveAccountStatus } from "./account-preview";
 
 const STATUS_ORDER: Record<string, number> = Object.fromEntries(ACCOUNT_STATUSES.map((s, i) => [s.id, i]));
-const STATUS_SWATCH = Object.fromEntries(ACCOUNT_STATUSES.map((s, i) => [String(i), s.swatch])) as Record<string, 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12>;
+const STATUS_SWATCH = Object.fromEntries(ACCOUNT_STATUSES.map((s) => [s.id, s.swatch])) as Record<string, 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12>;
 
 function sortValue(a: Account, key: string): unknown {
   if (key === "status") return STATUS_ORDER[a.status] ?? 99;
@@ -77,7 +79,7 @@ function Workspace({ records, access }: Props) {
         </>
       }
       toolbarEnd={access.canEdit && <CreateAccount names={names} open={!!create} status={create?.status} onOpen={() => setCreate({})} onClose={() => setCreate(null)} />}
-      renderPanel={(p) => <AccountPreview record={p.record} records={p.records} access={access} onSelect={p.select} onClose={p.close} onPatch={p.patch} />}
+      renderPanel={(p) => <AccountPreview record={p.record} records={p.records} access={access} onSelect={p.select} onClose={p.close} onPatch={p.patch} request={p.request} onRequestHandled={p.clearRequest} />}
       renderMoveDialog={() => null}
     />
   );
@@ -136,8 +138,8 @@ const SPECS: Record<string, HeaderSpec> = Object.fromEntries(([
 
 const text = (a: Account, key: string) => String(accountFieldValue(a, key) ?? "");
 const COLUMNS: Omit<DataTableColumn<Account>, "header">[] = [
-  { key: "name", type: "entity", accessor: (a) => a.name },
-  { key: "status", type: "status", accessor: (a) => String(STATUS_ORDER[a.status] ?? 9), format: (_, a) => ACCOUNT_STATUS_LABEL[a.status] ?? a.status, swatches: STATUS_SWATCH },
+  { key: "name", render: (_, a) => <RecordLink id={a.id}>{a.name}</RecordLink> },
+  { key: "status", type: "status", accessor: (a) => a.status, format: (_, a) => ACCOUNT_STATUS_LABEL[a.status] ?? a.status, swatches: STATUS_SWATCH, editor: "select", options: ACCOUNT_STATUSES.map((s) => ({ value: s.id, label: s.title })) },
   { key: "industry", accessor: (a) => a.industry ?? "" },
   { key: "activeOpportunities", type: "number" },
   { key: "opportunities", type: "number" },
@@ -161,6 +163,30 @@ function cellText(a: Account, key: string): string {
   return text(a, key);
 }
 
+/** Right-click on a row: the panel's actions, each only when allowed. */
+function rowMenu(a: Account, { access, open }: RowActions): ContextMenuOption[] {
+  const items: ContextMenuOption[] = [{ label: "Buka", onSelect: () => open(a.id) }];
+  if (!access.canEdit) return items;
+  items.push(
+    { label: "Catat aktivitas", onSelect: () => open(a.id, "activity") },
+    { label: "Tambah kontak", onSelect: () => open(a.id, "contact") },
+    { label: "Edit (form lengkap)", onSelect: () => open(a.id, "edit") },
+  );
+  if (access.canDelete) items.push({ separator: true }, { label: "Hapus", danger: true, onSelect: () => open(a.id, "delete") });
+  return items;
+}
+
+/** In-cell edits (QA 2026-10-08): V1's updateClient, which writes name, industry, status and notes together. */
+const field = (key: "industry" | "status" | "notes", form: string) => ({
+  patch: (_: Account, v: string) => ({ [key]: key === "status" ? v : v.trim() || null }) as Partial<Account>,
+  save: (a: Account, v: string) => { const fd = accountFormData(a); fd.set(form, v.trim()); return updateClient(a.id, fd); },
+});
+const EDITS: WorkspaceConfig<Account>["edits"] = {
+  industry: field("industry", "industry"),
+  status: { required: true, ...field("status", "status_code") },
+  notes: field("notes", "notes"),
+};
+
 const CONFIG: WorkspaceConfig<Account> = {
   title: "Account (CRM)",
   subtitle: "Semua klien dari Marketing & Sales: kontak, aktivitas, dan riwayat lead, PQ, kontrak dan invoice.",
@@ -179,6 +205,8 @@ const CONFIG: WorkspaceConfig<Account> = {
   cellText,
   valueOrder: { status: ACCOUNT_STATUSES.map((s) => s.title) },
   defaultShown: ACCOUNT_DEFAULT_SHOWN,
+  rowMenu,
+  edits: EDITS,
   grid: (a) => ({
     label: a.name,
     author: <span className="inline-flex items-center gap-1.5 text-[0.6875rem] text-slate-500"><span aria-hidden className="inline-block h-2 w-2 rounded-full" style={{ background: ACCOUNT_STATUSES.find((s) => s.id === a.status)?.accent ?? "#8a8f98" }} />{ACCOUNT_STATUS_LABEL[a.status] ?? a.status}{a.industry ? ` · ${a.industry}` : ""}</span>,

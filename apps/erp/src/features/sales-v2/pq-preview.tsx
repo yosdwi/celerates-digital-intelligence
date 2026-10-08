@@ -11,14 +11,18 @@ import { MultiFileUpload } from "@/components/multi-file-upload";
 import { SmartFileLink } from "@/components/smart-file-link";
 import { deleteOpportunity, sendPqForSignature, updateOptyStatus, updatePipelineStage } from "@/app/sales/actions";
 import { DOC_STATUS_OPTIONS, OPTY_STATUS, SALES_TYPES, STAGE_TO_OPTY_STATUS } from "@/app/sales/pq-constants";
-import { CLIENT_TYPE_LABEL, LEVEL_LABEL, SERVICE_LABEL, rupiah } from "./model";
+import { rupiah } from "./model";
 import {
-  BU_LABEL, LEAD_SOURCE_LABEL, OPTY_STATUS_LABEL, PQ_STAGES, PQ_STAGE_LABEL, PRIORITY_LABEL, SIGNATURE_LABEL, needsPqNo, withPqStage,
+  PQ_STAGES, SIGNATURE_LABEL, needsPqNo,
   type Pq, type PqFile,
 } from "./pq-model";
 import { EditPqDialog } from "./pq-forms";
 import type { PqOptions } from "./pq-data";
-import { PanelTitle, useRecordPanelRail, type Access, type PanelRequest } from "./record-workspace";
+import { PanelTitle, useRecordPanelRail, useRowActions, type Access, type PanelRequest } from "./record-workspace";
+import { InlineSelect, InlineText, MoreMenu } from "./cells";
+
+const STAGE_OPTIONS = PQ_STAGES.map((s) => ({ value: s.id, label: s.title, swatch: s.swatch }));
+const OPTY_OPTIONS = OPTY_STATUS.map(([value, label]) => ({ value, label }));
 
 const SIGNATURE_TONE = { not_sent: "neutral", pending: "warning", signed: "success", rejected: "danger" } as const;
 const DOC_STATUS_LABEL: Record<string, string> = Object.fromEntries(DOC_STATUS_OPTIONS);
@@ -69,8 +73,8 @@ export function PqPreview({
 }) {
   const router = useRouter();
   const { showToast } = useToast();
-  const [pending, start] = useTransition();
   const [dialog, setDialog] = useState<null | "edit" | "delete" | "sign">(null);
+  const { edit } = useRowActions();
   useEffect(() => {
     if (!record || !request || record.id !== request.id) return;
     const can = request.action === "edit" ? access.canEdit
@@ -84,41 +88,19 @@ export function PqPreview({
   if (!record) return <div ref={wrapRef} hidden />;
   const index = records.findIndex((r) => r.id === record.id);
 
-  function run(patch: Partial<Pq>, action: () => Promise<unknown>) {
-    const before = Object.fromEntries(Object.keys(patch).map((k) => [k, record![k as keyof Pq]]));
-    onPatch(record!.id, patch);
-    start(async () => {
-      try {
-        await action();
-        router.refresh();
-      } catch (err) {
-        onPatch(record!.id, before as Partial<Pq>);
-        showToast((err as Error)?.message || "Gagal menyimpan", "error");
-      }
-    });
-  }
 
-  const label = (labels: Record<string, string>, v: string | null) => (v ? labels[v] ?? v : "-");
+  // Ringkasan (QA 2026-10-08): what a Kanban or Grid user needs without the table; Pipeline Stage, Opty Status and Price
+  // are edited here as in the table (the workspace's `edit`), the rest of the record lives in the table and the Edit form.
+  const save = (key: string) => (v: string) => { edit(record.id, key, v).catch((err) => showToast((err as Error)?.message || "Gagal menyimpan", "error")); };
   const highlights = [
     { key: "opty", label: "Opty No", value: <span className="font-mono text-[0.75rem]">{record.optyNo}</span> },
     { key: "pq", label: "PQ No", value: record.pqNo ? <span className="font-mono text-[0.75rem]">{record.pqNo}</span> : needsPqNo(record) ? <Badge tone="warning" size="small">Perlu Generate PQ</Badge> : <span className="text-slate-400">Menunggu Talent Onboard</span> },
-    { key: "stage", label: "Pipeline Stage", value: PQ_STAGE_LABEL[record.stage] ?? record.stage },
-    { key: "status", label: "Opty Status", value: label(OPTY_STATUS_LABEL, record.optyStatus) },
+    { key: "stage", label: "Pipeline Stage", value: <InlineSelect value={record.stage} options={STAGE_OPTIONS} label="Pipeline Stage" canEdit={access.canEdit} onChange={save("stage")} /> },
+    { key: "status", label: "Opty Status", value: <InlineSelect value={record.optyStatus ?? ""} options={OPTY_OPTIONS} label="Opty Status" canEdit={access.canEdit} onChange={save("optyStatus")} /> },
     { key: "project", label: "Project", value: record.project || "-" },
     { key: "pos", label: "Positions", value: record.position ? `${record.position}${record.headcount ? ` × ${record.headcount}` : ""}` : "-" },
-    { key: "level", label: "Level", value: label(LEVEL_LABEL, record.level) },
-    { key: "price", label: "Price", value: rupiah(record.price, record.pricePeriod) || "-" },
+    { key: "price", label: "Price", value: <InlineText value={record.price == null ? "" : String(record.price)} display={rupiah(record.price, record.pricePeriod) || "-"} numeric label="Price" canEdit={access.canEdit} onCommit={save("price")} /> },
     { key: "pic", label: "Sales PIC", value: record.salesPic || "-" },
-    { key: "service", label: "Service Type", value: label(SERVICE_LABEL, record.serviceType) },
-    { key: "bu", label: "Business Unit", value: label(BU_LABEL, record.businessUnit) },
-    { key: "priority", label: "Priority", value: label(PRIORITY_LABEL, record.priority) },
-    { key: "bant", label: "BANTE", value: record.bant ?? "-" },
-    { key: "client", label: "Client Type", value: label(CLIENT_TYPE_LABEL, record.clientType) },
-    { key: "duration", label: "Durasi", value: record.durationMonths ? `${record.durationMonths} bulan` : "-" },
-    { key: "request", label: "Opty Request Date", value: record.requestDate ?? "-" },
-    { key: "approval", label: "Approval Date", value: record.approvalDate ?? "-" },
-    { key: "period", label: "Start – End", value: record.startDate || record.endDate ? `${record.startDate ?? "?"} – ${record.endDate ?? "?"}` : "-" },
-    { key: "source", label: "Lead Source", value: label(LEAD_SOURCE_LABEL, record.leadSource) },
   ];
 
   const sig = record.signature;
@@ -167,36 +149,18 @@ export function PqPreview({
   ];
 
   const canSign = sig.status === "not_sent" && !!record.pqNo;
+  // Buttons only (QA 2026-10-08): Pipeline Stage and Opty Status are edited in the Ringkasan above.
   const footer = access.canEdit ? (
-    <div className="flex flex-col gap-2">
-      <div className="grid grid-cols-[4.5rem_1fr] items-center gap-x-2 gap-y-1.5">
-        <span className="text-[0.75rem] text-slate-500">Pipeline</span>
-        <Select
-          aria-label="Pipeline Stage"
-          size="small"
-          value={record.stage}
-          disabled={pending}
-          onValueChange={(v) => v !== record.stage && run(withPqStage(record, v), () => savePqStage(record.id, v))}
-          options={PQ_STAGES.map((s) => ({ value: s.id, label: s.title }))}
-        />
-        <span className="text-[0.75rem] text-slate-500">Opty Status</span>
-        <Select
-          aria-label="Opty Status"
-          size="small"
-          value={record.optyStatus ?? ""}
-          disabled={pending}
-          placeholder="- Opty Status -"
-          onValueChange={(v) => v !== record.optyStatus && run({ optyStatus: v }, () => ok(updateOptyStatus(record.id, v)))}
-          options={OPTY_STATUS.map(([value, l]) => ({ value, label: l }))}
-        />
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        {canSign && <Button size="sm" intent="primary" onClick={() => setDialog("sign")}><Send size={13} /> Kirim untuk TTD</Button>}
-        {sig.status === "not_sent" && !record.pqNo && <span className="text-[0.75rem] text-slate-500">Isi PQ Number dulu sebelum TTD</span>}
-        <Button size="sm" intent="neutral" onClick={() => setDialog("edit")}>Edit</Button>
-        <Link href={`/sales/${record.id}/edit`} className="text-[0.75rem] text-slate-500 hover:text-slate-800 hover:underline">Halaman penuh</Link>
-        {access.canDelete && <Button size="sm" intent="ghost" className="ml-auto text-red-600" onClick={() => setDialog("delete")}>Hapus</Button>}
-      </div>
+    <div className="flex flex-wrap items-center gap-2">
+      {canSign && <Button size="sm" intent="primary" onClick={() => setDialog("sign")}><Send size={13} /> Kirim untuk TTD</Button>}
+      {sig.status === "not_sent" && !record.pqNo && <span className="text-[0.75rem] text-slate-500">Isi PQ Number dulu sebelum TTD</span>}
+      <Button size="sm" intent="neutral" onClick={() => setDialog("edit")}>Edit</Button>
+      <span className="ml-auto">
+        <MoreMenu items={[
+          { label: "Halaman penuh (V1)", onSelect: () => router.push(`/sales/${record.id}/edit`) },
+          ...(access.canDelete ? [{ label: "Hapus", danger: true, onSelect: () => setDialog("delete") }] : []),
+        ]} />
+      </span>
     </div>
   ) : (
     <p className="text-[0.75rem] text-slate-500">Mode lihat saja: perubahan butuh akses Editor Sales.</p>

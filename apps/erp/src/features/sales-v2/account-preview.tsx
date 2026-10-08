@@ -2,7 +2,7 @@
 // Account record panel (contract §8, §16): V1's Account 360 in the panel (stats, activity timeline, contacts, related
 // leads / PQ / contracts / invoices), then explicit actions. Every mutation is a V1 CRM server action
 // (app/sales/accounts/actions.ts); the forms keep V1's fields, names and required flags.
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Building2, Calendar, FileText, Mail, Phone, Plus, UserPlus, X } from "lucide-react";
@@ -12,14 +12,15 @@ import { createActivity, createClient, createContact, deleteActivity, deleteClie
 import { F, DraftFooter, opts, readDraft, useCloseFromXOnly, useSubmit, type Draft } from "./forms";
 import { rupiah } from "./model";
 import { PQ_STAGE_LABEL } from "./pq-model";
-import { ACCOUNT_STATUSES, ACCOUNT_STATUS_LABEL, ACTIVITY_LABEL, ACTIVITY_TYPES, accountFormData, lastActivityOf, picOf, type Account } from "./account-model";
-import { PanelTitle, useRecordPanelRail, type Access } from "./record-workspace";
+import { ACCOUNT_STATUSES, ACTIVITY_LABEL, ACTIVITY_TYPES, accountFormData, lastActivityOf, picOf, type Account } from "./account-model";
+import { PanelTitle, useRecordPanelRail, useRowActions, type Access, type PanelRequest } from "./record-workspace";
+import { InlineSelect, MoreMenu } from "./cells";
 
-const STATUS_TONE: Record<string, "warning" | "success" | "neutral"> = { prospect: "warning", active: "success", dormant: "neutral" };
 const TYPE_ICON: Record<string, typeof Phone> = { call: Phone, email: Mail, meeting: Calendar, note: FileText };
 const STAGE_TONE: Record<string, "success" | "danger"> = { win: "success", drop: "danger" };
 const INVOICE_TONE: Record<string, "danger" | "success" | "neutral"> = { overdue: "danger", submitted: "success", planned: "neutral" };
 const statusOptions = ACCOUNT_STATUSES.map((s) => ({ value: s.id, label: s.title }));
+const STATUS_CHIPS = ACCOUNT_STATUSES.map((s) => ({ value: s.id, label: s.title, swatch: s.swatch }));
 const today = () => new Date().toLocaleDateString("en-CA");
 
 /** Board move and the panel's status select: V1's updateClient with the other fields unchanged. */
@@ -28,7 +29,7 @@ export const saveAccountStatus = (a: Account, status: string) => updateClient(a.
 type Dialogs = null | "edit" | "delete" | "contact" | "activity" | { kind: "delContact" | "delActivity"; id: string; name: string };
 
 export function AccountPreview({
-  record, records, access, onSelect, onClose, onPatch,
+  record, records, access, onSelect, onClose, onPatch, request, onRequestHandled,
 }: {
   record: Account | null;
   records: Account[];
@@ -36,11 +37,20 @@ export function AccountPreview({
   onSelect: (id: string) => void;
   onClose: () => void;
   onPatch: (id: string, patch: Partial<Account>) => void;
+  /** A dialog the row's menu asked for (edit, delete, contact, activity): opened once this record is shown. */
+  request?: PanelRequest | null;
+  onRequestHandled?: () => void;
 }) {
   const router = useRouter();
   const { showToast } = useToast();
-  const [pending, start] = useTransition();
   const [dialog, setDialog] = useState<Dialogs>(null);
+  const { edit } = useRowActions();
+  useEffect(() => {
+    if (!record || !request || record.id !== request.id) return;
+    const a = request.action;
+    if (a === "delete" ? access.canDelete : access.canEdit && (a === "edit" || a === "contact" || a === "activity")) setDialog(a as "edit" | "delete" | "contact" | "activity");
+    onRequestHandled?.();
+  }, [record, request, onRequestHandled, access]);
   const wrapRef = useRecordPanelRail(record ? { type: "crm_client", id: record.id, label: record.name } : null, onClose, !!dialog);
 
   if (!record) return <div ref={wrapRef} hidden />;
@@ -48,17 +58,9 @@ export function AccountPreview({
   const pic = picOf(record);
   const h = record.history;
 
-  function setStatus(status: string) {
-    const before = record!.status;
-    onPatch(record!.id, { status });
-    start(async () => {
-      try { await saveAccountStatus(record!, status); router.refresh(); }
-      catch (err) { onPatch(record!.id, { status: before }); showToast((err as Error)?.message || "Gagal menyimpan", "error"); }
-    });
-  }
 
   const highlights = [
-    { key: "status", label: "Status", value: <Badge tone={STATUS_TONE[record.status] ?? "neutral"} size="small">{ACCOUNT_STATUS_LABEL[record.status] ?? record.status}</Badge> },
+    { key: "status", label: "Status", value: <InlineSelect value={record.status} options={STATUS_CHIPS} label="Status" canEdit={access.canEdit} onChange={(v) => edit(record.id, "status", v).catch((err) => showToast((err as Error)?.message || "Gagal menyimpan", "error"))} /> },
     { key: "industry", label: "Industri", value: record.industry || "-" },
     { key: "activeOpty", label: "Opportunity Aktif", value: record.activeOpportunities },
     { key: "opty", label: "Total Opportunity", value: record.opportunities },
@@ -149,18 +151,17 @@ export function AccountPreview({
     },
   ];
 
+  // Buttons only (QA 2026-10-08): the status is edited in the Ringkasan above.
   const footer = access.canEdit ? (
-    <div className="flex flex-col gap-2">
-      <div className="grid grid-cols-[4.5rem_1fr] items-center gap-x-2">
-        <span className="text-[0.75rem] text-slate-500">Status</span>
-        <Select aria-label="Status" size="small" value={record.status} disabled={pending} onValueChange={(v) => v !== record.status && setStatus(v)} options={statusOptions} />
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <Button size="sm" intent="primary" onClick={() => setDialog("activity")}><Plus size={13} /> Catat aktivitas</Button>
-        <Button size="sm" intent="neutral" onClick={() => setDialog("edit")}>Edit</Button>
-        <Link href={`/sales/accounts/${record.id}`} className="text-[0.75rem] text-slate-500 hover:text-slate-800 hover:underline">Halaman penuh</Link>
-        {access.canDelete && <Button size="sm" intent="ghost" className="ml-auto text-red-600" onClick={() => setDialog("delete")}>Hapus</Button>}
-      </div>
+    <div className="flex flex-wrap items-center gap-2">
+      <Button size="sm" intent="primary" onClick={() => setDialog("activity")}><Plus size={13} /> Catat aktivitas</Button>
+      <Button size="sm" intent="neutral" onClick={() => setDialog("edit")}>Edit</Button>
+      <span className="ml-auto">
+        <MoreMenu items={[
+          { label: "Halaman penuh (V1)", onSelect: () => router.push(`/sales/accounts/${record.id}`) },
+          ...(access.canDelete ? [{ label: "Hapus", danger: true, onSelect: () => setDialog("delete") }] : []),
+        ]} />
+      </span>
     </div>
   ) : (
     <p className="text-[0.75rem] text-slate-500">Mode lihat saja: perubahan butuh akses Editor Sales.</p>

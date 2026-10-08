@@ -140,3 +140,29 @@ export function pqEditValues(p: Pq): Record<string, string> {
     other_doc_no: s(d?.otherDocNo), other_doc_status_code: s(d?.otherDocStatus),
   };
 }
+
+// ── Inline edits (QA 2026-10-08) ─────────────────────────────────────────────────────────────────────────────
+const blank = (v: string) => (v.trim() ? v.trim() : null);
+const count = (v: string) => (v.replace(/[^\d]/g, "") ? Number(v.replace(/[^\d]/g, "")) : null);
+/** Table column → the V1 PQ edit form field it writes (pqEditValues), and the record change. Pipeline Stage and Opty
+ *  Status have their own V1 actions; Sales PIC (V1's PIC picker), PQ Number (Generate), files and PMO documents stay
+ *  in the Edit dialog. Required as in the V1 form. */
+export const PQ_FIELD_EDITS: Record<string, { form: string; required?: boolean; patch: (value: string) => Partial<Pq> }> = {
+  client: { form: "client_name", required: true, patch: (v) => ({ client: v.trim() }) },
+  project: { form: "project_name", required: true, patch: (v) => ({ project: v.trim() }) },
+  serviceType: { form: "service_type_code", required: true, patch: (v) => ({ serviceType: v.trim() }) },
+  clientType: { form: "client_type_code", patch: (v) => ({ clientType: blank(v) }) },
+  position: { form: "position_name", patch: (v) => ({ position: blank(v) }) },
+  businessUnit: { form: "business_unit_code", patch: (v) => ({ businessUnit: blank(v) }) },
+  level: { form: "level_code", patch: (v) => ({ level: blank(v) }) },
+  headcount: { form: "headcount_target", patch: (v) => ({ headcount: count(v) }) },
+  durationMonths: { form: "estimated_duration_months", patch: (v) => ({ durationMonths: count(v) }) },
+  priority: { form: "priority_code", patch: (v) => ({ priority: blank(v) }) },
+  bant: { form: "bant_score", patch: (v) => ({ bant: count(v) }) },
+  price: { form: "price_amount", patch: (v) => ({ price: count(v) }) },
+  requestDate: { form: "opty_request_date", patch: (v) => ({ requestDate: blank(v) }) },
+  approvalDate: { form: "approval_date", patch: (v) => ({ approvalDate: blank(v) }) },
+  startDate: { form: "start_date", patch: (v) => ({ startDate: blank(v) }) },
+  endDate: { form: "end_date", patch: (v) => ({ endDate: blank(v) }) },
+  notes: { form: "notes", patch: (v) => ({ notes: blank(v) }) },
+};
