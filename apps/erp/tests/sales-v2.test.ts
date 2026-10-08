@@ -430,3 +430,31 @@ test("QA 2026-10-08: Sales Sheet Sync runs on the service account, Sales editors
     delete process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
   }
 });
+
+test("edit history: changed fields only; blank equals null; unwritten (undefined) fields are not changes", async () => {
+  const { fieldDiffs } = await import("../src/lib/field-history");
+  const before = { client_name: "PT A", price_amount: 5000000, notes: null, level_code: "", price_period_code: "monthly", approval_date: "2026-10-01" };
+  assert.deepEqual(fieldDiffs(before, { client_name: "PT A", price_amount: 7000000, notes: "", level_code: null, price_period_code: undefined, approval_date: "2026-10-02" }), [
+    { field: "price_amount", old: "5000000", new: "7000000" },
+    { field: "approval_date", old: "2026-10-01", new: "2026-10-02" },
+  ]);
+  assert.deepEqual(fieldDiffs({}, { pks_no: "PKS/1", po_no: null }), [{ field: "pks_no", old: null, new: "PKS/1" }]);
+});
+
+test("edit history: every Sales update path records its changes; the read is guarded per record type", () => {
+  const ot = read("app/sales/opportunity-tracker/actions.ts");
+  const pq = read("app/sales/actions.ts");
+  const acc = read("app/sales/accounts/actions.ts");
+  assert.equal((ot.match(/updateWithHistory\("opportunity_tracker", salesOpportunityTrackers, id,/g) ?? []).length, 3);
+  assert.equal((pq.match(/updateWithHistory\("commercial_pq", opportunities, id,/g) ?? []).length, 4);
+  assert.match(pq, /recordChanges\("commercial_pq", id, fieldDiffs\(existingDoc \?\? \{\}, docFields\)\)/);
+  assert.equal((acc.match(/updateWithHistory\("crm_client", crmClients, id,/g) ?? []).length, 1);
+  for (const [src, table] of [[ot, "salesOpportunityTrackers"], [pq, "opportunities"], [acc, "crmClients"]] as const)
+    assert.doesNotMatch(src, new RegExp(`db\\.update\\(${table}\\)`), table);
+  assert.match(readFileSync(new URL("../drizzle/0014_record_field_changes.sql", import.meta.url), "utf8"), /CREATE TABLE IF NOT EXISTS "record_field_changes"/);
+  const action = read("app/sales/history-actions.ts");
+  assert.match(action, /requireDivisionAccess\("sales", "viewer"\)/);
+  assert.match(action, /if \(recordType !== "crm_client"\) throw err;\n    await requireDivisionAccess\("marketing", "viewer"\)/);
+  for (const f of ["workspace.tsx", "pq-workspace.tsx", "account-workspace.tsx"]) assert.match(read(`features/sales-v2/${f}`), /recordType: "/, f);
+  assert.match(read("features/sales-v2/record-workspace.tsx"), /onViewEditHistory=\{\(id, key\) => setHistoryOf/);
+});

@@ -230,10 +230,18 @@ Decided with the Product Owner before any change (feedback doc "Feedback UI UX")
   Tracker Opty No, Leads No, Klien (~370px); PQ Tracker Opty No, PQ No, Dok. PQ as a file count (~300px). Crisp pins
   one column and windows the others, so they render as one pinned block, each part one line with its own header menu
   (a longer value ends in "…", whole on hover and in the panel). Rows stay 32px.
-- V1's Aksi / Status became quick actions that cost no space: Stage / Sales Qualified (OT) and Pipeline Stage / Opty
-  Status (PQ) are edited in their cells (`cells.tsx`), and a right-click on a row offers Buka, Edit, Sales Qualified,
-  Convert, Kirim untuk TTD, stage moves and Hapus, each only when allowed. A row click opens the panel, home of every
-  action and of the Agent. Crisp's row virtualization stays off (it assumes 36px rows; the laptop tier has 32px).
+- Interaction model (decided 2026-10-08, option B "Attio + summary panel"): the table is where work happens. A click
+  selects a cell; double-click or Enter edits it with Crisp's editors (select, date, number, text, checkbox), and
+  Crisp's cell menu works (Copy, Paste, Clear value, View edit history) plus the record's actions (Buka, Edit form,
+  Convert / Kirim untuk TTD / Catat aktivitas, Hapus). A cell saves one field through the V1 edit action without its
+  redirect (`saveOpportunityTracker`, `saveOpportunity`; `update…` = save + redirect) or the field's own V1 action
+  (stage, Sales Qualified, Opty Status, `updateClient`). Required fields refuse an empty value. The record's name,
+  Buka and a Kanban / Grid card open the panel, now a summary: key fields edited in place, long text, downstream
+  records, edit history, Tanya Agent; its footer has buttons only and a ⋯ menu (Halaman penuh, Hapus).
+- Edit history: table `record_field_changes` (migration 0014; record type, id, field, old, new, who, when; no foreign
+  keys). Every Sales update action writes through `updateWithHistory` (lib/field-history.ts), PMO document fields
+  included, whichever screen made the edit; recorded from 2026-10-08 on. Read through `getFieldHistory` (Sales
+  viewer; Account also Marketing viewer).
 - Form dialogs: the <form> is the dialog card's flex column, so Crisp's body scrolls and Batal / Simpan stay in view;
   before, a long form clipped them on short laptop screens (Crisp caps a dialog at 74vh).
 - Kanban: no per-column "+" (New is in the toolbar). A column header opens sort, a filter (the table's controls) for

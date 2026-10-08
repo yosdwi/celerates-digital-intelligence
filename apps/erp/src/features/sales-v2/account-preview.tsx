@@ -13,6 +13,7 @@ import { F, DraftFooter, opts, readDraft, useCloseFromXOnly, useSubmit, type Dra
 import { rupiah } from "./model";
 import { PQ_STAGE_LABEL } from "./pq-model";
 import { ACCOUNT_STATUSES, ACTIVITY_LABEL, ACTIVITY_TYPES, accountFormData, lastActivityOf, picOf, type Account } from "./account-model";
+import { HistoryRows, useHistory } from "./history";
 import { PanelTitle, useRecordPanelRail, useRowActions, type Access, type PanelRequest } from "./record-workspace";
 import { InlineSelect, MoreMenu } from "./cells";
 
@@ -45,6 +46,7 @@ export function AccountPreview({
   const { showToast } = useToast();
   const [dialog, setDialog] = useState<Dialogs>(null);
   const { edit } = useRowActions();
+  const changes = useHistory(record?.id ?? "", undefined, record);
   useEffect(() => {
     if (!record || !request || record.id !== request.id) return;
     const a = request.action;
@@ -149,6 +151,7 @@ export function AccountPreview({
       content: h.invoices.length ? <ul className="space-y-1">{h.invoices.map((i) => row(`${i.group_name ?? "-"}${i.price_per_month ? ` · ${rupiah(i.price_per_month)}` : ""}`,
         <Badge tone={INVOICE_TONE[i.status_code ?? ""] ?? "neutral"} size="small">{i.status_code ?? "-"}</Badge>, i.id))}</ul> : undefined,
     },
+    { key: "history", label: "Riwayat perubahan", count: changes.rows?.length ?? 0, content: <HistoryRows state={changes} showField /> },
   ];
 
   // Buttons only (QA 2026-10-08): the status is edited in the Ringkasan above.

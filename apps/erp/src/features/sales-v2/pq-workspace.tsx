@@ -173,12 +173,13 @@ function rowMenu(p: Pq, { access, open }: RowActions): ContextMenuOption[] {
  *  and the PMO documents posted as they are), and V1's StageSelector actions for Pipeline Stage and Opty Status. */
 const EDITS: WorkspaceConfig<Pq>["edits"] = {
   ...Object.fromEntries(Object.entries(PQ_FIELD_EDITS).map(([key, f]) => [key, {
+    field: f.form,
     required: f.required,
     patch: (_: Pq, v: string) => f.patch(v),
     save: (p: Pq, v: string) => saveOpportunity(p.id, fieldFormData(pqEditValues(p), f.form, v)),
   }])),
-  stage: { required: true, patch: (p, v) => withPqStage(p, v), save: (p, v) => savePqStage(p.id, v) },
-  optyStatus: { patch: (_, v) => ({ optyStatus: v || null }), save: (p, v) => ok(updateOptyStatus(p.id, v)) },
+  stage: { field: "pipeline_stage_code", required: true, patch: (p, v) => withPqStage(p, v), save: (p, v) => savePqStage(p.id, v) },
+  optyStatus: { field: "opty_status_code", patch: (_, v) => ({ optyStatus: v || null }), save: (p, v) => ok(updateOptyStatus(p.id, v)) },
 };
 const opt = (pairs: readonly (readonly [string, string])[]) => pairs.map(([value, label]) => ({ value, label }));
 const coded = (labels: Record<string, string>, v: string | null) => (v ? labels[v] ?? v : "");
@@ -274,6 +275,7 @@ const CONFIG: WorkspaceConfig<Pq> = {
   subtitle: "Price quotation per opportunity: dokumen, tanda tangan dan status pipeline.",
   noun: "PQ",
   searchPlaceholder: "Cari client, PQ No, project…",
+  recordType: "commercial_pq",
   storage: { columns: "celerates.salesV2.pq.columns", views: "celerates.salesV2.pq.savedViews" },
   fieldKeys: PQ_FIELD_KEYS,
   fieldValue: pqFieldValue,

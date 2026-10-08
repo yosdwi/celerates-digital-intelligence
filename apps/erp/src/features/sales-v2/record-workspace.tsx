@@ -17,6 +17,8 @@ import { openAgent } from "@/components/mobile/events";
 import { setRightRail, useRightRail } from "@/lib/right-rail";
 import { HeaderFilter, type HeaderSpec } from "./header-filter";
 import { KanbanBoard } from "./board-menu";
+import { HistoryList } from "./history";
+import type { HistoryRecordType } from "@/lib/field-history";
 import { parseState, serializeState, type SavedState, type StoredView, type View, type WorkspaceState } from "./model";
 
 export type Access = { canEdit: boolean; canDelete: boolean };
@@ -50,6 +52,8 @@ export type RowActions = {
   run: (record: { id: string }, patch: Record<string, unknown>, action: () => Promise<unknown>) => void;
   /** Save one field the way its table cell does (`WorkspaceConfig.edits`); rejects with the reason it failed. */
   edit: (id: string, key: string, value: string) => Promise<void>;
+  /** Edit history: the record type, and a stored field's label and value as the page shows them. */
+  history: { recordType: HistoryRecordType; label: (field: string) => string; format: (field: string, value: string | null) => string };
 };
 const RowActionsContext = createContext<RowActions | null>(null);
 export function useRowActions(): RowActions {
@@ -95,9 +99,11 @@ export type WorkspaceConfig<T extends { id: string }> = {
   /**
    * Fields edited where they are shown (QA 2026-10-08, Attio-style): in their table cell (double-click or Enter; Crisp's
    * cell menu Paste / Clear value too) and in the panel. `patch` is the optimistic change, `save` posts it with the V1
-   * action; a `required` field refuses an empty value.
+   * action; a `required` field refuses an empty value. `field` is the stored column, for its edit history.
    */
-  edits?: Record<string, { required?: boolean; patch: (o: T, value: string) => Partial<T>; save: (o: T, value: string) => Promise<unknown> }>;
+  edits?: Record<string, { field: string; required?: boolean; patch: (o: T, value: string) => Partial<T>; save: (o: T, value: string) => Promise<unknown> }>;
+  /** The record type its edit history is stored under (lib/field-history.ts). */
+  recordType: HistoryRecordType;
   /** Right-click menu on a table row (QA 2026-10-08): the record's quick actions, only those its user may take. */
   rowMenu?: (o: T, row: RowActions) => ContextMenuOption[];
   grid: (o: T) => { label: string; author: React.ReactNode; title: string; excerpt: string; footer: React.ReactNode; date?: string };
@@ -303,8 +309,23 @@ export function RecordWorkspace<T extends { id: string }>({
       throw err instanceof Error ? err : new Error("Gagal menyimpan");
     }
   }, [c, patch, router]);
+  // Labels and option labels for stored fields, so the edit history reads as the table does.
+  const history = useMemo<RowActions["history"]>(() => {
+    const meta = new Map<string, { label: string; options?: Map<string, string> }>();
+    for (const [key, e] of Object.entries(c.edits ?? {})) {
+      const col = c.columns.find((x) => x.key === key);
+      meta.set(e.field, { label: c.specs[key]?.label ?? key, options: col?.options ? new Map(col.options.map((o) => [o.value, String(o.label)])) : undefined });
+    }
+    return {
+      recordType: c.recordType,
+      label: (f) => meta.get(f)?.label ?? humanize(f),
+      format: (f, v) => (v == null ? "" : meta.get(f)?.options?.get(v) ?? (v === "true" ? "Ya" : v === "false" ? "Tidak" : /^\d{4,}$/.test(v) ? Number(v).toLocaleString("id-ID") : v)),
+    };
+  }, [c]);
+  const [historyOf, setHistoryOf] = useState<null | { id: string; key: string }>(null);
   const rowActions = useMemo<RowActions>(() => ({
     edit,
+    history,
     access,
     open: (id, action) => { commit({ record: id }); setRequest(action ? { id, action } : null); },
     run: (record, p, action) => {
@@ -315,7 +336,7 @@ export function RecordWorkspace<T extends { id: string }>({
         catch (err) { patch(record.id, before as Partial<T>); showToast((err as Error)?.message || "Gagal menyimpan", "error"); }
       });
     },
-  }), [access, commit, patch, router, showToast, edit]);
+  }), [access, commit, patch, router, showToast, edit, history]);
   const closePreview = useCallback(() => commit({ record: null }), [commit]);
   const selected = state.record ? all.find((r) => r.id === state.record) ?? null : null;
 
@@ -509,6 +530,7 @@ export function RecordWorkspace<T extends { id: string }>({
             // row menu's Buka, or a card (QA 2026-10-08).
             interactive
             onEdit={edit}
+            onViewEditHistory={(id, key) => setHistoryOf({ id, key })}
             rowContextMenu={c.rowMenu ? (row) => c.rowMenu!(row, rowActions) : undefined}
             // A bounded scroll box without Crisp's row virtualization: that assumes 36px rows, and V1's Aksi column
             // stacks taller ones (the frozen block, QA 2026-10-08); a few hundred rows render fine.
@@ -571,6 +593,15 @@ export function RecordWorkspace<T extends { id: string }>({
         },
       })}
 
+      {/* "View edit history" from a cell's menu: that field's history (the whole record's for a computed column). */}
+      <Dialog open={!!historyOf} onOpenChange={(o) => !o && setHistoryOf(null)} title={historyOf ? `Riwayat ${c.specs[historyOf.key]?.label ?? ""}` : ""} closeLabel="Tutup" width={480} data-sales-v2-dialog="history">
+        {historyOf && (
+          <DialogBody>
+            <HistoryList recordId={historyOf.id} field={c.edits?.[historyOf.key]?.field} />
+          </DialogBody>
+        )}
+      </Dialog>
+
       <Dialog open={!!naming} onOpenChange={(o) => !o && setNaming(null)} title={naming?.mode === "rename" ? "Ganti nama tampilan" : "Simpan tampilan"} width={400}>
         {naming && (
           <form onSubmit={(e) => { e.preventDefault(); saveNamed(); }}>
@@ -593,6 +624,8 @@ export function RecordWorkspace<T extends { id: string }>({
 }
 
 const FROZEN = "__frozen";
+/** A stored column name as words, for fields no table column shows ("pks_status_code" → "Pks status"). */
+const humanize = (f: string) => { const w = f.replace(/_(code|name)$/, "").replace(/_/g, " "); return w.charAt(0).toUpperCase() + w.slice(1); };
 const stageTitle = (stages: readonly { id: string; title: string }[], id: string) => stages.find((s) => s.id === id)?.title ?? id;
 
 /** What makes a saved view "changed": the record set and its order. Switching Tabel/Grid/Kanban is only a lens. */

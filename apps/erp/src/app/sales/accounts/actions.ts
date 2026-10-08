@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { crmClients, crmClientContacts, crmClientActivities } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { updateWithHistory } from "@/lib/field-history";
 import { logActivity } from "@/lib/activity-log";
 import { requireDivisionAccess } from "@/lib/require-division-access";
 
@@ -30,7 +31,7 @@ export async function updateClient(id: string, formData: FormData) {
   const status_code = (formData.get("status_code") as string) || "prospect";
   const notes = (formData.get("notes") as string) || null;
 
-  await db.update(crmClients).set({ name, industry, status_code, notes }).where(eq(crmClients.id, id));
+  await updateWithHistory("crm_client", crmClients, id, { name, industry, status_code, notes });
   await logActivity("sales", "update", `Account: ${name}`, "CRM Account");
   revalidatePath("/sales/accounts");
   revalidatePath(`/sales/accounts/${id}`);

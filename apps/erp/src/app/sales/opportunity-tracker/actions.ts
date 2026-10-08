@@ -3,6 +3,7 @@ import { requireActor } from "@/lib/actor";
 import { db } from "@/db";
 import { salesOpportunityTrackers, requisitions, opportunities } from "@/db/schema";
 import { revalidatePath } from "next/cache";
+import { updateWithHistory } from "@/lib/field-history";
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { logActivity } from "@/lib/activity-log";
@@ -96,7 +97,7 @@ export async function saveOpportunityTracker(id: string, formData: FormData) {
   const price_period_code = formData.get("price_period_code") as string;
   const estimated_duration_months = formData.get("estimated_duration_months") as string;
 
-  await db.update(salesOpportunityTrackers).set({
+  await updateWithHistory("opportunity_tracker", salesOpportunityTrackers, id, {
     client_name,
     service_type_code: service_type_code || null,
     requirement_summary: requirement_summary || null,
@@ -116,7 +117,7 @@ export async function saveOpportunityTracker(id: string, formData: FormData) {
     price_amount: price_amount ? Number(price_amount) : null,
     price_period_code: price_period_code || "monthly",
     estimated_duration_months: estimated_duration_months ? Number(estimated_duration_months) : null,
-  }).where(eq(salesOpportunityTrackers.id, id));
+  });
 
   await logActivity("sales", "update", `Opportunity Tracker: ${client_name}`, "Opportunity Tracker");
   revalidatePath("/sales/opportunity-tracker");
@@ -126,7 +127,7 @@ export async function updateSalesQualified(id: string, sales_qualified: boolean)
   await requireActor();
 
   await requireDivisionAccess("sales");
-  await db.update(salesOpportunityTrackers).set({ sales_qualified }).where(eq(salesOpportunityTrackers.id, id));
+  await updateWithHistory("opportunity_tracker", salesOpportunityTrackers, id, { sales_qualified });
   await logActivity("sales", "update", `Sales Qualified diubah jadi ${sales_qualified}`, "Opportunity Tracker");
   revalidatePath("/sales/opportunity-tracker");
 }
@@ -135,7 +136,7 @@ export async function updateOptyStatus(id: string, opty_status_code: string) {
   await requireActor();
 
   await requireDivisionAccess("sales");
-  await db.update(salesOpportunityTrackers).set({ opty_status_code }).where(eq(salesOpportunityTrackers.id, id));
+  await updateWithHistory("opportunity_tracker", salesOpportunityTrackers, id, { opty_status_code });
   await logActivity("sales", "update", `Opty Status diubah jadi ${opty_status_code}`, "Opportunity Tracker");
   revalidatePath("/sales/opportunity-tracker");
 }

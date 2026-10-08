@@ -178,6 +178,7 @@ function rowMenu(a: Account, { access, open }: RowActions): ContextMenuOption[] 
 
 /** In-cell edits (QA 2026-10-08): V1's updateClient, which writes name, industry, status and notes together. */
 const field = (key: "industry" | "status" | "notes", form: string) => ({
+  field: form,
   patch: (_: Account, v: string) => ({ [key]: key === "status" ? v : v.trim() || null }) as Partial<Account>,
   save: (a: Account, v: string) => { const fd = accountFormData(a); fd.set(form, v.trim()); return updateClient(a.id, fd); },
 });
@@ -192,6 +193,7 @@ const CONFIG: WorkspaceConfig<Account> = {
   subtitle: "Semua klien dari Marketing & Sales: kontak, aktivitas, dan riwayat lead, PQ, kontrak dan invoice.",
   noun: "account",
   searchPlaceholder: "Cari account, industri, kontak…",
+  recordType: "crm_client",
   storage: { columns: "celerates.salesV2.accounts.columns", views: "celerates.salesV2.accounts.savedViews" },
   fieldKeys: ACCOUNT_FIELD_KEYS,
   fieldValue: accountFieldValue,

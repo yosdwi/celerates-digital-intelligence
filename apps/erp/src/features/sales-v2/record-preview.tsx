@@ -17,6 +17,7 @@ import {
 import { EditOpportunityDialog, type FormOptions } from "./forms";
 import { PanelTitle, useRecordPanelRail, useRowActions, type Access, type PanelRequest } from "./record-workspace";
 import { InlineCheck, InlineSelect, InlineText, MoreMenu } from "./cells";
+import { HistoryRows, useHistory } from "./history";
 
 const STAGE_OPTIONS = STAGES.map((s) => ({ value: s.id, label: s.title, swatch: s.swatch }));
 
@@ -55,6 +56,7 @@ export function RecordPreview({
   const { showToast } = useToast();
   const [dialog, setDialog] = useState<null | "convert" | "delete" | "edit">(null);
   const { edit } = useRowActions();
+  const changes = useHistory(record?.id ?? "", undefined, record);
   useEffect(() => {
     if (!record || !request || record.id !== request.id) return;
     const { action } = request;
@@ -110,6 +112,7 @@ export function RecordPreview({
       ) : undefined,
     },
     { key: "dropped", label: "Dropped Reason", count: record.droppedReason ? 1 : 0, content: text(record.droppedReason) ?? undefined },
+    { key: "history", label: "Riwayat perubahan", count: changes.rows?.length ?? 0, content: <HistoryRows state={changes} showField /> },
   ];
 
   // Buttons only (QA 2026-10-08): stage and Sales Qualified are edited in the Ringkasan above.

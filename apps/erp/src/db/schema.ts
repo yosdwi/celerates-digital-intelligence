@@ -1219,6 +1219,25 @@ export const automationGeneratedDocuments = pgTable("automation_generated_docume
  * (exact match, bukan FK) ke client_name di leads/opportunities/sales_opportunity_trackers
  * supaya nggak perlu ubah tabel-tabel yang sudah ada sama sekali.
  */
+/**
+ * Field-level edit history (Sales V2 "View edit history", QA 2026-10-08): one row per changed field, written by the
+ * update actions through lib/field-history.ts. `record_type` is the Agent catalog type (opportunity_tracker,
+ * commercial_pq, crm_client); `field` the column name. No foreign keys: history outlives the record and the user.
+ */
+export const recordFieldChanges = pgTable("record_field_changes", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  record_type: text("record_type").notNull(),
+  record_id: uuid("record_id").notNull(),
+  field: text("field").notNull(),
+  old_value: text("old_value"),
+  new_value: text("new_value"),
+  actor_user_id: uuid("actor_user_id"),
+  actor_name: text("actor_name").notNull(),
+  created_at: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  idxRecord: index("idx_record_field_changes_record").on(t.record_type, t.record_id, t.created_at),
+}));
+
 export const crmClients = pgTable("crm_clients", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull(),

@@ -4,6 +4,7 @@ import { requireActor } from "@/lib/actor";
 import { db } from "@/db";
 import { opportunities, requisitions, signatureRequests, projectDocuments, employees, extensionIncrementRequests, salesOpportunityTrackers } from "@/db/schema";
 import { revalidatePath } from "next/cache";
+import { fieldDiffs, pmoDocumentOf, recordChanges, updateWithHistory } from "@/lib/field-history";
 import { eq, and } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { markSaved } from "@/lib/saved-flag";
@@ -277,7 +278,7 @@ export async function saveOpportunity(id: string, formData: FormData) {
 
   const [beforePipeline] = await db.select({ pipeline_stage_code: opportunities.pipeline_stage_code }).from(opportunities).where(eq(opportunities.id, id));
 
-  await db.update(opportunities).set({
+  await updateWithHistory("commercial_pq", opportunities, id, {
     client_name,
     client_type_code: client_type_code || null,
     project_name,
@@ -306,7 +307,7 @@ export async function saveOpportunity(id: string, formData: FormData) {
     // kayak pipeline_stage_code di atas.
     ...(opty_status_code ? { opty_status_code } : {}),
     pq_no: pq_no || null,
-  }).where(eq(opportunities.id, id));
+  });
 
   // Sama seperti updatePipelineStage -- begitu opportunity ditandai Won lewat
   // form edit ini (bukan cuma quick-select di tabel), PMO & TM tetap harus
@@ -321,7 +322,7 @@ export async function saveOpportunity(id: string, formData: FormData) {
     revalidatePath("/pmo/contracts");
   }
 
-  const [existingDoc] = await db.select({ id: projectDocuments.id }).from(projectDocuments).where(eq(projectDocuments.opportunity_id, id)).limit(1);
+  const existingDoc = await pmoDocumentOf(id);
   const docFields = {
     pks_no: pks_no || null,
     pks_status_code: pks_status_code || null,
@@ -334,8 +335,10 @@ export async function saveOpportunity(id: string, formData: FormData) {
     project_details: project_details || null,
     sales_type_code: sales_type_code || null,
   };
+  // The PMO document fields are part of the PQ's history too (same record, edited from the same form).
+  await recordChanges("commercial_pq", id, fieldDiffs(existingDoc ?? {}, docFields));
   if (existingDoc) {
-    await db.update(projectDocuments).set(docFields).where(eq(projectDocuments.id, existingDoc.id));
+    await db.update(projectDocuments).set(docFields).where(eq(projectDocuments.id, existingDoc.id as string));
   } else if (Object.values(docFields).some((v) => v !== null)) {
     // Baru insert row project_documents kalau ada isinya -- kalau semua kosong,
     // nggak perlu bikin row PMO yang bakal muncul kosong di Document Tracker.
@@ -371,7 +374,7 @@ export async function updatePipelineStage(id: string, pipeline_stage_code: strin
 
   const [before] = await db.select({ client_name: opportunities.client_name, opty_no: opportunities.opty_no, pipeline_stage_code: opportunities.pipeline_stage_code }).from(opportunities).where(eq(opportunities.id, id));
 
-  await db.update(opportunities).set({ pipeline_stage_code }).where(eq(opportunities.id, id));
+  await updateWithHistory("commercial_pq", opportunities, id, { pipeline_stage_code });
   await logActivity("sales", "update", `Pipeline Stage diubah jadi ${pipeline_stage_code}`, "PQ Tracker");
 
   // Begitu opportunity ditandai Won, PMO langsung bisa proses A.Contract
@@ -400,7 +403,7 @@ export async function updateOptyStatus(id: string, opty_status_code: string): Pr
   } catch (e: any) {
     return { ok: false, error: e.message };
   }
-  await db.update(opportunities).set({ opty_status_code }).where(eq(opportunities.id, id));
+  await updateWithHistory("commercial_pq", opportunities, id, { opty_status_code });
   await logActivity("sales", "update", `Opty Status diubah jadi ${opty_status_code}`, "PQ Tracker");
   revalidatePath("/sales");
   return { ok: true };
@@ -511,7 +514,7 @@ export async function generatePqNumber(id: string, formData: FormData) {
   const price_period_code = formData.get("price_period_code") as string;
   const notes = formData.get("notes") as string;
 
-  await db.update(opportunities).set({
+  await updateWithHistory("commercial_pq", opportunities, id, {
     pq_no,
     client_name,
     project_name,
@@ -519,7 +522,7 @@ export async function generatePqNumber(id: string, formData: FormData) {
     price_amount: price_amount ? Number(price_amount) : null,
     price_period_code: price_period_code || undefined,
     notes: notes || null,
-  }).where(eq(opportunities.id, id));
+  });
 
   revalidatePath("/sales");
 }

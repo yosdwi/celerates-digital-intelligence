@@ -176,12 +176,13 @@ function rowMenu(o: Opportunity, { access, open }: RowActions): ContextMenuOptio
  *  actions for Stage and Sales Qualified. */
 const EDITS: WorkspaceConfig<Opportunity>["edits"] = {
   ...Object.fromEntries(Object.entries(OT_FIELD_EDITS).map(([key, f]) => [key, {
+    field: f.form,
     required: f.required,
     patch: (_: Opportunity, v: string) => f.patch(v),
     save: (o: Opportunity, v: string) => saveOpportunityTracker(o.id, fieldFormData(editValues(o), f.form, v)),
   }])),
-  status: { required: true, patch: (_, v) => ({ status: v }), save: (o, v) => updateOptyStatus(o.id, v) },
-  salesQualified: { patch: (_, v) => ({ salesQualified: v === "true" }), save: (o, v) => updateSalesQualified(o.id, v === "true") },
+  status: { field: "opty_status_code", required: true, patch: (_, v) => ({ status: v }), save: (o, v) => updateOptyStatus(o.id, v) },
+  salesQualified: { field: "sales_qualified", patch: (_, v) => ({ salesQualified: v === "true" }), save: (o, v) => updateSalesQualified(o.id, v === "true") },
 };
 const opt = (pairs: readonly (readonly [string, string])[]) => pairs.map(([value, label]) => ({ value, label }));
 const label = (labels: Record<string, string>, v: string | null) => (v ? labels[v] ?? v : "");
@@ -257,6 +258,7 @@ const CONFIG: WorkspaceConfig<Opportunity> = {
   noun: "opportunity",
   searchPlaceholder: "Cari client, Opty No, PIC…",
   // columns v2: every column is shown by default (as V1 and Attio); the bump reset earlier per-browser choices once.
+  recordType: "opportunity_tracker",
   storage: { columns: "celerates.salesV2.columns.v2", views: "celerates.salesV2.savedViews" },
   fieldKeys: FIELD_KEYS,
   fieldValue,
