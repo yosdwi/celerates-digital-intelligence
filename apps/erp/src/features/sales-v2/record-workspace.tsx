@@ -7,7 +7,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Columns3, LayoutGrid, Search, Sparkles, Table2 } from "lucide-react";
 import {
-  Board, DataTable, EntityCard, Input, SavedViews, SavedViewsSaveBar, StatCard, TableToolbar, ViewToggle, useSnackbar,
+  DataTable, EntityCard, Input, SavedViews, SavedViewsSaveBar, StatCard, TableToolbar, ViewToggle, useSnackbar,
   applyFilters, applySorts, Button, Dialog, DialogBody, DialogFooter, FormField,
   type DataTableColumn, type TableToolbarColumn,
 } from "@crisp-ui-kit/crisp";
@@ -16,6 +16,7 @@ import { GRADIENTS, type StatColor } from "@/components/stat-card";
 import { openAgent } from "@/components/mobile/events";
 import { setRightRail, useRightRail } from "@/lib/right-rail";
 import { HeaderFilter, type HeaderSpec } from "./header-filter";
+import { KanbanBoard } from "./board-menu";
 import { parseState, serializeState, type SavedState, type StoredView, type View, type WorkspaceState } from "./model";
 
 export type Access = { canEdit: boolean; canDelete: boolean };
@@ -104,7 +105,6 @@ export type WorkspaceConfig<T extends { id: string }> = {
     recordLabel: (o: T) => string;
     cardLabel: (o: T) => string;
     renderCard: (o: T, open: () => void) => React.ReactNode;
-    newCardLabel: string;
   };
 };
 
@@ -139,7 +139,7 @@ function useHeight<T extends HTMLElement>() {
 
 /** Crisp's Snackbar (Undo after a Kanban move) needs a SnackbarProvider above this component. */
 export function RecordWorkspace<T extends { id: string }>({
-  config: c, records: serverRecords, access, headerEnd, toolbarEnd, onNewCard, renderPanel, renderMoveDialog,
+  config: c, records: serverRecords, access, headerEnd, toolbarEnd, renderPanel, renderMoveDialog,
 }: {
   config: WorkspaceConfig<T>;
   records: T[];
@@ -148,8 +148,6 @@ export function RecordWorkspace<T extends { id: string }>({
   headerEnd?: React.ReactNode;
   /** Dataset actions at the end of the toolbar, primary last (Attio: Import / Export · + New). */
   toolbarEnd?: React.ReactNode;
-  /** A Kanban column's "+": open the page's create dialog with that stage. */
-  onNewCard?: (stage: string) => void;
   renderPanel: (ctx: PanelContext<T>) => React.ReactNode;
   renderMoveDialog: (ctx: MoveContext<T>) => React.ReactNode;
 }) {
@@ -345,8 +343,7 @@ export function RecordWorkspace<T extends { id: string }>({
   const columnsForSettings: TableToolbarColumn[] = useMemo(() => c.columns.filter((x) => !frozenKeys.includes(x.key)).map((x) => ({ key: x.key, label: c.specs[x.key].label })), [c, frozenKeys]);
   const [workspaceRef, workspaceHeight] = useHeight<HTMLDivElement>();
   const counts = useMemo(() => Object.fromEntries(c.kpis.map((k) => [k.id, all.filter(k.match).length])), [c, all]);
-  // Each Kanban column's colour, read by sales-v2.css (Crisp's columns carry no id of their own).
-  const stageVars = Object.fromEntries(board.stages.map((s, i) => [`--stage-${i + 1}`, s.accent])) as React.CSSProperties;
+  const valuesOf = useCallback((rows: T[]) => distinctValues(c, rows), [c]);
   const empty = <p className="p-6 text-center text-slate-500">Tidak ada {c.noun} yang cocok.</p>;
 
   return (
@@ -512,20 +509,14 @@ export function RecordWorkspace<T extends { id: string }>({
         )}
 
         {state.view === "kanban" && (
-          <div className="h-full px-3 pt-2" style={stageVars} data-sales-v2-board>
-            <Board<T & { columnId: string }>
-              columns={board.stages.map((s) => ({ id: s.id, title: s.title, accent: s.accent }))}
-              cards={records.map((o) => ({ ...o, columnId: board.stageOf(o) }))}
-              onCardsChange={access.canEdit ? onCardsChange : undefined}
-              getCardLabel={board.cardLabel}
-              announceMove={(col, card) => `${card ?? "Kartu"} dipindah ke ${col}`}
-              onPreviewCard={(x) => select(x.id)}
-              previewCardLabel="Lihat ringkasan"
-              onNewCard={access.canEdit && onNewCard ? onNewCard : undefined}
-              newCardLabel={board.newCardLabel}
-              renderCard={(x) => board.renderCard(x, () => select(x.id))}
-            />
-          </div>
+          <KanbanBoard<T>
+            config={c}
+            records={records}
+            toolbarColumns={toolbarColumns}
+            valuesOf={valuesOf}
+            onCardsChange={access.canEdit ? onCardsChange : undefined}
+            onOpen={select}
+          />
         )}
 
         {renderPanel({ record: selected, records, returnTo, select, close: closePreview, patch, request, clearRequest: () => setRequest(null) })}

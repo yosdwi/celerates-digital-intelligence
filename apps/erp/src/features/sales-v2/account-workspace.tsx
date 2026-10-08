@@ -70,7 +70,6 @@ function Workspace({ records, access }: Props) {
       config={CONFIG}
       records={records}
       access={access}
-      onNewCard={(status) => setCreate({ status })}
       headerEnd={
         <>
           <span className="text-[0.75rem] text-slate-500" data-sales-v2-total>Nilai kontrak <b className="tabular-nums text-slate-800">{rupiah(total)}/bln</b></span>
@@ -198,6 +197,5 @@ const CONFIG: WorkspaceConfig<Account> = {
     recordLabel: (a) => a.name,
     cardLabel: (a) => a.name,
     renderCard: (a, open) => <KanbanCard a={a} onOpen={open} />,
-    newCardLabel: "Account baru",
   },
 };

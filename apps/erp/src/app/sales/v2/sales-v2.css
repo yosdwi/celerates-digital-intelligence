@@ -89,3 +89,8 @@
 [data-sales-v2] .crisp-datatable-th-label:has([data-sales-v2-frozen-head]) { display: block; width: 100%; overflow: visible; }
 [data-sales-v2] td:has([data-sales-v2-frozen]) { padding-block: 6px; border-inline-end: 1px solid #ddd6fe; }
 [data-sales-v2] th:has([data-sales-v2-frozen-head]) { border-inline-end: 1px solid #ddd6fe; }
+
+/* Kanban column headers open the column menu (board-menu.tsx). */
+[data-sales-v2-board] .crisp-board-col-header { cursor: pointer; border-radius: 6px 6px 0 0; }
+[data-sales-v2-board] .crisp-board-col-header:hover { background: color-mix(in srgb, var(--stage, #94a3b8) 10%, #fff); }
+[data-sales-v2-board] .crisp-board-col-header:focus-visible { outline: 2px solid #2356e8; outline-offset: -2px; }

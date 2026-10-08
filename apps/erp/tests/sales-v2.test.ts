@@ -61,8 +61,8 @@ test("built-in views and default columns use Celerates fields", () => {
 });
 
 test("V2 renders with Crisp components, not look-alikes", () => {
-  const ws = read("features/sales-v2/record-workspace.tsx");
-  for (const c of ["DataTable", "TableToolbar", "ViewToggle", "SavedViews", "Board", "StatCard", "EntityCard"]) assert.match(ws, new RegExp(`<${c}\\b`), c);
+  const ws = read("features/sales-v2/record-workspace.tsx") + read("features/sales-v2/board-menu.tsx");
+  for (const c of ["DataTable", "TableToolbar", "ViewToggle", "SavedViews", "Board", "StatCard", "EntityCard", "Popover"]) assert.match(ws, new RegExp(`<${c}\\b`), c);
   assert.match(read("features/sales-v2/record-preview.tsx"), /<RecordPanel\b/);
   const forms = read("features/sales-v2/forms.tsx");
   for (const c of ["Dialog", "DialogBody", "DialogFooter", "Select", "Input", "Textarea", "Menu"]) assert.match(forms, new RegExp(`<${c}\\b`), c);
@@ -348,4 +348,13 @@ test("QA 2026-10-08: V1's frozen columns and stacked Aksi / Status cell in OT an
   // Rows taller than Crisp's 36px virtualization row: bounded scroll box, no `height` (which turns virtualization on).
   assert.match(kit, /scrollProps=\{\{ style: \{ overflowY: "auto", height: workspaceHeight/);
   assert.doesNotMatch(kit, /\n\s+height=\{workspaceHeight\}/);
+});
+
+test("QA 2026-10-08: Kanban has no per-column +; a column header opens sort, filter and hide for that column", () => {
+  const kit = read("features/sales-v2/record-workspace.tsx");
+  assert.doesNotMatch(kit, /onNewCard|newCardLabel/);
+  for (const f of ["workspace.tsx", "pq-workspace.tsx", "account-workspace.tsx"]) assert.doesNotMatch(read(`features/sales-v2/${f}`), /onNewCard|newCardLabel/, f);
+  const menu = read("features/sales-v2/board-menu.tsx");
+  assert.match(menu, /crisp-board-col-header/);
+  for (const part of ["Urutkan kartu", "Filter kartu di kolom ini", "Sembunyikan", "applyFilters", "applySorts"]) assert.match(menu, new RegExp(part), part);
 });

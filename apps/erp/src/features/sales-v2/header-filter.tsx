@@ -88,7 +88,7 @@ export function HeaderFilter({
   );
 }
 
-function MenuButton({ children, onClick, pressed }: { children: React.ReactNode; onClick: () => void; pressed?: boolean }) {
+export function MenuButton({ children, onClick, pressed }: { children: React.ReactNode; onClick: () => void; pressed?: boolean }) {
   return (
     <button type="button" onClick={onClick} aria-pressed={pressed} className={`flex h-8 items-center gap-2 rounded-md px-2 text-left hover:bg-slate-100 ${pressed ? "font-semibold text-[#194667]" : "text-slate-700"}`}>
       {children}
@@ -97,7 +97,7 @@ function MenuButton({ children, onClick, pressed }: { children: React.ReactNode;
 }
 
 /** Excel's AutoFilter list: search, Pilih semua, one checkbox per distinct value with its count. Applies at once. */
-function ValueList({ spec, values, filters, onFilters }: { spec: HeaderSpec; values: [string, number][]; filters: ToolbarFilter[]; onFilters: (f: ToolbarFilter[]) => void }) {
+export function ValueList({ spec, values, filters, onFilters }: { spec: HeaderSpec; values: [string, number][]; filters: ToolbarFilter[]; onFilters: (f: ToolbarFilter[]) => void }) {
   const [q, setQ] = useState("");
   const all = useMemo(() => values.map(([v]) => v), [values]);
   const checked = checkedValues(filters, spec.key, all);
@@ -143,7 +143,7 @@ function ValueList({ spec, values, filters, onFilters }: { spec: HeaderSpec; val
   );
 }
 
-function BoolChoice({ spec, filters, onFilters }: { spec: HeaderSpec; filters: ToolbarFilter[]; onFilters: (f: ToolbarFilter[]) => void }) {
+export function BoolChoice({ spec, filters, onFilters }: { spec: HeaderSpec; filters: ToolbarFilter[]; onFilters: (f: ToolbarFilter[]) => void }) {
   const current = filters.find((f) => f.key === spec.key && (f.op === "istrue" || f.op === "isfalse"))?.op ?? "all";
   const set = (op: "all" | "istrue" | "isfalse") => {
     const rest = filters.filter((f) => f.key !== spec.key);
@@ -160,7 +160,7 @@ function BoolChoice({ spec, filters, onFilters }: { spec: HeaderSpec; filters: T
   );
 }
 
-function RangeFields({ spec, filters, onFilters }: { spec: HeaderSpec; filters: ToolbarFilter[]; onFilters: (f: ToolbarFilter[]) => void }) {
+export function RangeFields({ spec, filters, onFilters }: { spec: HeaderSpec; filters: ToolbarFilter[]; onFilters: (f: ToolbarFilter[]) => void }) {
   const own = filters.filter((f) => isHeaderFilter(f, spec.key));
   const [min, setMin] = useState(own.find((f) => f.op === "greaterthan" || f.op === "after")?.value ?? "");
   const [max, setMax] = useState(own.find((f) => f.op === "lessthan" || f.op === "before")?.value ?? "");
@@ -178,7 +178,7 @@ function RangeFields({ spec, filters, onFilters }: { spec: HeaderSpec; filters: 
   );
 }
 
-function ContainsField({ spec, filters, onFilters }: { spec: HeaderSpec; filters: ToolbarFilter[]; onFilters: (f: ToolbarFilter[]) => void }) {
+export function ContainsField({ spec, filters, onFilters }: { spec: HeaderSpec; filters: ToolbarFilter[]; onFilters: (f: ToolbarFilter[]) => void }) {
   const [text, setText] = useState(filters.find((f) => isHeaderFilter(f, spec.key))?.value ?? "");
   return (
     <form className="flex gap-2 px-1 pb-1" onSubmit={(e) => { e.preventDefault(); onFilters(setContains(filters, spec.key, text)); }}>

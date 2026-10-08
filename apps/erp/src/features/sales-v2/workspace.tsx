@@ -81,7 +81,6 @@ function Workspace({ records, access, options, sheetSync }: WorkspaceProps) {
       config={CONFIG}
       records={records}
       access={access}
-      onNewCard={(status) => setCreate({ kind: "opportunity", status })}
       headerEnd={<Link href="/sales/opportunity-tracker" className="text-[0.75rem] text-slate-400 hover:text-slate-700 hover:underline" title="Tampilan lama (V1)">Versi lama</Link>}
       toolbarEnd={
         <>
@@ -309,6 +308,5 @@ const CONFIG: WorkspaceConfig<Opportunity> = {
     recordLabel: (o) => o.optyNo,
     cardLabel: (o) => `${o.client} ${o.optyNo}`,
     renderCard: (o, open) => <KanbanCard o={o} onOpen={open} />,
-    newCardLabel: "Opportunity baru",
   },
 };

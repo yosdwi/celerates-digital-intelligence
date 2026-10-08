@@ -83,7 +83,6 @@ function Workspace({ records, access, options, sheetSync }: Props) {
       config={CONFIG}
       records={records}
       access={access}
-      onNewCard={(stage) => setCreate({ stage })}
       headerEnd={<Link href="/sales" className="text-[0.75rem] text-slate-400 hover:text-slate-700 hover:underline" title="Tampilan lama (V1)">Versi lama</Link>}
       toolbarEnd={
         <>
@@ -327,6 +326,5 @@ const CONFIG: WorkspaceConfig<Pq> = {
     recordLabel: (p) => p.pqNo ?? p.optyNo,
     cardLabel: (p) => `${p.client} ${p.pqNo ?? p.optyNo}`,
     renderCard: (p, open) => <KanbanCard p={p} onOpen={open} />,
-    newCardLabel: "PQ baru",
   },
 };
