@@ -1571,3 +1571,69 @@ def test_extract_opportunity_proposes_form_fields_and_writes_nothing(monkeypatch
         }
         assert asked == [("openai/agent-test", "system", text, {"type": "json_object"})]
         assert one_count("agent_runs") == before, "extracting starts no run"
+
+
+def test_extract_form_reads_a_po_file_per_form_and_stores_nothing(monkeypatch):
+    import sys
+    import types
+
+    token = mint()
+    asked = []
+
+    def completion(model, messages, **kwargs):
+        asked.append((messages[0]["content"], messages[1]["content"]))
+        content = '{"po_no": "PO/2026/0042", "client_name": "PT Maju Jaya", "headcount_target": 2}'
+        return types.SimpleNamespace(
+            choices=[types.SimpleNamespace(message=types.SimpleNamespace(content=content), finish_reason="stop")],
+            usage=types.SimpleNamespace(total_tokens=42),
+        )
+
+    monkeypatch.setitem(sys.modules, "litellm", types.SimpleNamespace(completion=completion))
+    monkeypatch.setattr(settings(), "generation_mode", "litellm")
+    monkeypatch.setattr(settings(), "agent_model", "openai/agent-test")
+    po = pdf_bytes(["PURCHASE ORDER PO/2026/0042", "PT Maju Jaya", "2 QA Engineer, 6 bulan"])
+    auth = {"X-ERP-Delegation": token}
+    with TestClient(app) as c:
+        r = c.post(
+            "/api/agent/extract-file",
+            files={"file": ("po.pdf", po, "application/pdf")},
+            data={"form": "pq"},
+            headers=auth,
+        )
+        assert r.status_code == 200
+        assert r.json()["fields"]["po_no"] == "PO/2026/0042"
+        prompt, text = asked[-1]
+        assert "purchase order" in prompt and "PO/2026/0042" in text, "the model reads the document's text"
+        assert (
+            c.post(
+                "/api/agent/extract-file",
+                files={"file": ("po.pdf", b"not a pdf", "application/pdf")},
+                data={"form": "pq"},
+                headers=auth,
+            ).status_code
+            == 422
+        )
+        assert (
+            c.post(
+                "/api/agent/extract-file", files={"file": ("po.pdf", po, "application/pdf")}, data={"form": "pq"}
+            ).status_code
+            == 401
+        )
+        assert (
+            c.post(
+                "/api/agent/extract-file",
+                files={"file": ("po.pdf", po, "application/pdf")},
+                data={"form": "nope"},
+                headers=auth,
+            ).status_code
+            == 422
+        )
+        r = c.post(
+            "/api/agent/extract",
+            json={"form": "contact", "text": "Budi Santoso\nHR Manager\nbudi@majujaya.co.id"},
+            headers=auth,
+        )
+        assert r.status_code == 200 and "signature" in asked[-1][0]
+        assert (
+            c.post("/api/agent/extract", json={"form": "nope", "text": "0123456789"}, headers=auth).status_code == 422
+        )
