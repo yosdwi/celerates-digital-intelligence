@@ -8,8 +8,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY services/intelligence-api/pyproject.toml services/intelligence-api/uv.lock services/intelligence-api/
 COPY services/intelligence-api/cdi services/intelligence-api/cdi
 RUN uv sync --project services/intelligence-api --frozen --no-dev
-# Docling is installed for the standard Compose path. CPU wheels avoid CUDA libraries.
-RUN uv pip install --python services/intelligence-api/.venv/bin/python --torch-backend=cpu 'docling==2.129.0'
+# Docling is installed for the standard Compose path. CPU wheels avoid CUDA libraries. rapidocr is pinned to the version
+# the pilot image runs: 3.10.0 dropped PP_OCRV6_LANGS, which docling 2.129 imports, and the model download fails.
+RUN uv pip install --python services/intelligence-api/.venv/bin/python --torch-backend=cpu 'docling==2.129.0' 'rapidocr==3.9.2'
 # Company Files (ADR-018): layout, TableFormer and RapidOCR (torch backend, Latin script) are fetched at build time so
 # the worker never downloads models at run time. Verify in the deployed image with `python -m cdi.files_smoke`.
 ENV DOCLING_ARTIFACTS_PATH=/opt/docling-models
