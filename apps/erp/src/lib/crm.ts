@@ -85,9 +85,18 @@ export type RelatedHistory = {
 
 /** Riwayat lengkap (bukan cuma hitungan) buat halaman Account 360 satu klien. */
 export async function getAccountHistory(clientName: string): Promise<RelatedHistory> {
+  return (await getAccountHistoryMap([clientName])).get(clientName)!;
+}
+
+/** Riwayat per nama klien untuk banyak akun sekaligus (Sales V2 Account), dicocokkan by client_name seperti di atas. */
+export async function getAccountHistoryMap(clientNames: string[]): Promise<Map<string, RelatedHistory>> {
+  const map = new Map<string, RelatedHistory>();
+  if (clientNames.length === 0) return map;
+  for (const name of clientNames) map.set(name, { leads: [], opportunities: [], contracts: [], invoices: [] });
+
   const [leadRows, optyRows] = await Promise.all([
-    db.select({ id: leads.id, lead_no: leads.lead_no, project_name: leads.project_name, is_qualified: leads.is_qualified }).from(leads).where(inArray(leads.client_name, [clientName])),
-    db.select().from(opportunities).where(inArray(opportunities.client_name, [clientName])),
+    db.select({ id: leads.id, lead_no: leads.lead_no, project_name: leads.project_name, is_qualified: leads.is_qualified, client_name: leads.client_name }).from(leads).where(inArray(leads.client_name, clientNames)),
+    db.select().from(opportunities).where(inArray(opportunities.client_name, clientNames)),
   ]);
 
   const optyIds = optyRows.map((o) => o.id);
@@ -98,10 +107,14 @@ export async function getAccountHistory(clientName: string): Promise<RelatedHist
       ])
     : [[], []];
 
-  return {
-    leads: leadRows,
-    opportunities: optyRows.map((o) => ({ id: o.id, opty_no: o.opty_no, price_amount: o.price_amount, price_period_code: o.price_period_code, pipeline_stage_code: o.pipeline_stage_code })),
-    contracts: contractRows.map((c) => ({ id: c.id, contract_duration_months: c.contract_duration_months, start_date: c.start_date, end_date: c.end_date })),
-    invoices: invoiceRows.map((i) => ({ id: i.id, group_name: i.group_name, price_per_month: i.price_per_month, status_code: i.status_code })),
-  };
+  for (const l of leadRows) map.get(l.client_name)?.leads.push({ id: l.id, lead_no: l.lead_no, project_name: l.project_name, is_qualified: l.is_qualified });
+  const optyClient = new Map<string, string>();
+  for (const o of optyRows) {
+    optyClient.set(o.id, o.client_name);
+    map.get(o.client_name)?.opportunities.push({ id: o.id, opty_no: o.opty_no, price_amount: o.price_amount, price_period_code: o.price_period_code, pipeline_stage_code: o.pipeline_stage_code });
+  }
+  const of = (optyId: string) => map.get(optyClient.get(optyId) ?? "");
+  for (const c of contractRows) of(c.opportunity_id)?.contracts.push({ id: c.id, contract_duration_months: c.contract_duration_months, start_date: c.start_date, end_date: c.end_date });
+  for (const i of invoiceRows) of(i.opportunity_id)?.invoices.push({ id: i.id, group_name: i.group_name, price_per_month: i.price_per_month, status_code: i.status_code });
+  return map;
 }

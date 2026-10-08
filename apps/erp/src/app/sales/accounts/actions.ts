@@ -77,6 +77,8 @@ export async function deleteContact(id: string, clientId: string) {
   await requireActor();
 
   await requireDivisionAccess("sales");
+  // Activities logged with this contact keep their history, without the contact (the FK would otherwise refuse the delete).
+  await db.update(crmClientActivities).set({ contact_id: null }).where(eq(crmClientActivities.contact_id, id));
   await db.delete(crmClientContacts).where(eq(crmClientContacts.id, id));
   revalidatePath(`/sales/accounts/${clientId}`);
 }

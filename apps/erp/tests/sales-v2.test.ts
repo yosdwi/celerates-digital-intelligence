@@ -10,6 +10,7 @@ import {
   type Opportunity,
 } from "../src/features/sales-v2/model";
 import { PQ_DEFAULT_SHOWN, needsPqNo, pqEditValues, pqFieldValue, withPqStage, type Pq } from "../src/features/sales-v2/pq-model";
+import { ACCOUNT_BUILT_IN_VIEWS, accountFieldValue, accountFormData, accountMatchesSearch, type Account } from "../src/features/sales-v2/account-model";
 import { safeSalesReturnPath } from "../src/lib/safe-return";
 import { submoduleFor } from "../src/lib/module-access";
 
@@ -273,4 +274,52 @@ test("density on laptops: compact sidebar and V2 chrome, no zoom (contract §15)
   assert.doesNotMatch(globals + v2css, /\bzoom:|html \{[^}]*transform/);
   // Font sizes are rem so they follow that step (px would stay large on laptops).
   for (const f of readdirSync(new URL("../src/features/sales-v2/", import.meta.url))) assert.doesNotMatch(read(`features/sales-v2/${f}`), /text-\[\d+px\]/, f);
+});
+
+const account = (p: Partial<Account> = {}): Account => ({
+  id: "a1", name: "PT Maju", industry: "Banking", status: "prospect", notes: null, createdBy: null, createdAt: null,
+  leads: 0, opportunities: 2, activeOpportunities: 1, contracts: 0, monthlyValue: 0, invoices: 3, overdueInvoices: 0,
+  contacts: [{ id: "c1", name: "Rina", role: "HR", email: "rina@maju.co", phone: null, primary: true }], activities: [],
+  history: { leads: [], opportunities: [], contracts: [], invoices: [] }, ...p,
+});
+
+test("Account: filters read labels and flags; search covers contacts; built-in views filter what their card counts", () => {
+  const a = account();
+  assert.equal(accountFieldValue(a, "status"), "Prospect");
+  assert.equal(accountFieldValue(a, "pic"), "Rina");
+  assert.equal(accountFieldValue(a, "hasActiveOpty"), true);
+  assert.equal(accountFieldValue(a, "hasOverdue"), false);
+  assert.ok(accountMatchesSearch(a, "rina@"));
+  assert.ok(!accountMatchesSearch(a, "telkom"));
+  const rows = [a, account({ id: "a2", status: "active", activeOpportunities: 0, overdueInvoices: 2 })];
+  const count = (id: string) => applyFilters(rows, ACCOUNT_BUILT_IN_VIEWS.find((v) => v.id === id)!.state.filters, accountFieldValue).length;
+  assert.deepEqual(["all", "prospect", "active", "dormant", "active_opty", "overdue"].map(count), [2, 1, 1, 0, 1, 1]);
+});
+
+test("Account: a status change posts every field V1's updateClient writes, the others unchanged", () => {
+  const actions = read("app/sales/accounts/actions.ts");
+  const update = actions.slice(actions.indexOf("export async function updateClient"), actions.indexOf("export type DeleteResult"));
+  const fields = new Set([...update.matchAll(/formData\.get\("([a-z_]+)"\)/g)].map((m) => m[1]));
+  const fd = accountFormData(account({ notes: "VIP" }), "active");
+  assert.deepEqual(new Set(fd.keys()), fields);
+  assert.equal(fd.get("status_code"), "active");
+  assert.equal(fd.get("notes"), "VIP");
+  assert.equal(fd.get("industry"), "Banking");
+});
+
+test("Account V2 reuses V1 CRM actions, keeps Marketing's access and is the sidebar entry for both divisions", async () => {
+  const all = ["account-workspace.tsx", "account-preview.tsx"].map((f) => read(`features/sales-v2/${f}`)).join("\n");
+  for (const a of ["createClient", "updateClient", "deleteClient", "createContact", "deleteContact", "createActivity", "deleteActivity"])
+    assert.match(all, new RegExp(`\\b${a}\\b`), a);
+  assert.doesNotMatch(all, /"use server"|from "@\/db"/);
+  const { canOpenRoute } = await import("../src/lib/route-access");
+  assert.equal(canOpenRoute({ access: [{ divisionKey: "marketing", level: "viewer" }] }, "/sales/v2/accounts"), true);
+  assert.equal(canOpenRoute({ access: [{ divisionKey: "marketing", level: "viewer" }] }, "/sales/v2/pq-tracker"), false);
+  assert.equal(canOpenRoute({ access: [{ divisionKey: "ta", level: "full" }] }, "/sales/v2/accounts"), false);
+  assert.equal(submoduleFor("/sales/v2/accounts")?.label, "Account (CRM)");
+  assert.equal(submoduleFor("/sales/accounts/x")?.href, "/sales/v2/accounts");
+  // A contact with logged activities can be deleted: the activities keep their history without it.
+  const actions = read("app/sales/accounts/actions.ts");
+  const del = actions.slice(actions.indexOf("export async function deleteContact"));
+  assert.ok(del.indexOf("contact_id: null") < del.indexOf("db.delete(crmClientContacts)"));
 });

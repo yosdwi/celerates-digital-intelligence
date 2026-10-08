@@ -107,7 +107,7 @@ type FormProps = { options: FormOptions; draft: Draft; formRef: React.RefObject<
 export function DraftFooter({ pending, onCancel, onReset, t, resetLabel = "Kosongkan form" }: { pending: boolean; onCancel: () => void; onReset: () => void; t: (k: string) => string; resetLabel?: string }) {
   return (
     <DialogFooter>
-      <button type="button" onClick={onReset} disabled={pending} className="mr-auto text-[0.75rem] text-slate-500 hover:text-slate-800 hover:underline">{resetLabel}</button>
+      {resetLabel && <button type="button" onClick={onReset} disabled={pending} className="mr-auto text-[0.75rem] text-slate-500 hover:text-slate-800 hover:underline">{resetLabel}</button>}
       <Button type="button" intent="neutral" size="sm" onClick={onCancel} disabled={pending}>{t("cancel")}</Button>
       <Button type="submit" intent="primary" size="sm" loading={pending}>{pending ? t("saving") : t("save")}</Button>
     </DialogFooter>

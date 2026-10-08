@@ -227,7 +227,7 @@ const ENTITIES: CatalogEntity[] = [
     ],
     search: ["name", "industry"],
     routes: ["/sales/accounts/{id}"],
-    listHref: "/sales/accounts",
+    listHref: "/sales/v2/accounts",
     edges: [
       byName("lead", "leads", "client_name", "Lead", "leads"),
       byName("sales_opportunity", "sales_opportunity_trackers", "client_name", "Opportunity Tracker", "trackers"),

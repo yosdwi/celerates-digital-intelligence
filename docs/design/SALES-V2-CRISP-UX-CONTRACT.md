@@ -198,3 +198,20 @@ Laptop tier (all modules): between 768 and 1599 CSS px wide the root font size i
 rem-based size steps down 12.5 %, and Crisp's px tokens step down with it (`sales-v2.css`: text 10.5–15px, table
 rows 32px, header 36px, spacing × 0.875). Font sizes are written in rem (`text-[0.8125rem]`, not `text-[13px]`) so
 they follow. 1600px and wider (the 1920 monitor reference) and phones are unchanged. Still no zoom or transform.
+
+## 16. Account (CRM) V2 (2026-10-08)
+
+- Route `/sales/v2/accounts`; Sales › Account (CRM) and Marketing › Account (CRM) open it, V1 stays at
+  `/sales/accounts` and `/sales/accounts/[id]` ("Versi lama", "Halaman penuh"). Same route gate as V1: Sales or
+  Marketing may open it; V1's CRM actions need Sales Editor (delete: Sales Full), so only those see the controls.
+- Data is V1's: `crm_clients` with contacts and activities, V1's stats (`getAccountStatsMap`) and Account 360 history
+  (`getAccountHistoryMap`, the many-accounts form of `getAccountHistory`, same matching by client name).
+- Summary cards: Total Account, Perlu Follow-up (Prospect, V1's card), Active, Dormant, Ada Opportunity Aktif,
+  Invoice Overdue. V1's Total Nilai Kontrak is a sum, shown beside the title. Kanban by status (Prospect, Active,
+  Dormant): moves save at once with Undo (`updateClient`, the other fields posted unchanged).
+- Panel: V1 Account 360 (stats as highlights, activity timeline, contacts, Notes, Leads, Opportunity (PQ) linked to
+  PQ Tracker V2, Kontrak, Invoice); footer: Status select, Catat aktivitas, Edit, Halaman penuh, Hapus. Contacts and
+  activities are added and deleted from the panel with V1's fields (`createContact`, `createActivity`, …).
+- New V2 controls for V1 actions V1 never showed: Edit account (`updateClient`) and Hapus (`deleteClient`).
+- Fix in V1's `deleteContact`: activities logged with the contact keep their history without it (the foreign key
+  refused the delete before).

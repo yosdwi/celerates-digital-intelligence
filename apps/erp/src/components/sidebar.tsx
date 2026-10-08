@@ -17,7 +17,7 @@ import { useSidebarCollapse } from "./sidebar-context";
 
 // One small icon per page (Attio-style list rows). Pages without an entry get a neutral dot.
 const PAGE_ICON: Record<string, LucideIcon> = {
-  "/marketing/dashboard": LayoutDashboard, "/marketing": Target, "/sales/accounts": Building2,
+  "/marketing/dashboard": LayoutDashboard, "/marketing": Target, "/sales/v2/accounts": Building2,
   "/sales/dashboard": LayoutDashboard, "/sales/v2/opportunity-tracker": Handshake, "/sales/v2/pq-tracker": FileText,
   "/ta/client-active": Building, "/pmo/overtime-business-trip": Plane, "/sales/profitability-tracker": PiggyBank,
   "/ta/dashboard": LayoutDashboard, "/ta": ClipboardList, "/ta/candidates": UserSearch, "/ta/pipeline": Workflow, "/ta/onboarding": DoorOpen,

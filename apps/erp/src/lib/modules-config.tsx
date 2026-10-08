@@ -20,7 +20,7 @@ export const MODULES: ModuleConfig[] = [
     basePath: "/marketing", subPages: [
       { href: "/marketing/dashboard", label: "Dashboard" },
       { href: "/marketing", label: "Leads" },
-      { href: "/sales/accounts", label: "Account (CRM)", collab: true },
+      { href: "/sales/v2/accounts", label: "Account (CRM)", collab: true, v1: "/sales/accounts" },
     ],
   },
   {
@@ -30,7 +30,7 @@ export const MODULES: ModuleConfig[] = [
       // Sales V2 (docs/design/SALES-V2-CRISP-UX-CONTRACT.md); the V1 pages stay at `v1`, linked from V2.
       { href: "/sales/v2/opportunity-tracker", label: "Opportunity Tracker", group: "Pipeline", v1: "/sales/opportunity-tracker" },
       { href: "/sales/v2/pq-tracker", label: "PQ Tracker", group: "Pipeline", v1: "/sales" },
-      { href: "/sales/accounts", label: "Account (CRM)" },
+      { href: "/sales/v2/accounts", label: "Account (CRM)", v1: "/sales/accounts" },
       { href: "/ta/client-active", label: "Client Active", collab: true },
       { href: "/pmo/overtime-business-trip", label: "Overtime & Business Trip", collab: true, collabColor: "orange" },
       { href: "/sales/profitability-tracker", label: "Profitability Tracker", collab: true },
