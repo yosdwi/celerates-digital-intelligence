@@ -470,7 +470,7 @@ export function RecordWorkspace<T extends { id: string }>({
       </header>}
 
       {/* Summary cards in V1's gradients (QA 2026-10-08); each card is a built-in view: click to apply, again to clear. */}
-      <section aria-label="Ringkasan" className={`mx-5 mb-2 grid grid-cols-2 gap-2 sm:grid-cols-3 ${c.kpis.length > 5 ? "lg:grid-cols-6" : "lg:grid-cols-5"}`} data-sales-v2-kpi>
+      <section aria-label="Ringkasan" className={`mx-5 mb-2 ${shell === "crisp" ? "mt-3" : ""} grid grid-cols-2 gap-2 sm:grid-cols-3 ${c.kpis.length > 5 ? "lg:grid-cols-6" : "lg:grid-cols-5"}`} data-sales-v2-kpi>
         {c.kpis.map((k) => {
           const on = active.id === k.id;
           const g = GRADIENTS[k.color];
