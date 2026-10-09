@@ -10,7 +10,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { useTranslations } from "next-intl";
 import { AppShell, Button, HeaderBar, MenuItem, Sidebar, type CommandItem, type SidebarNavGroup } from "@crisp-ui-kit/crisp";
-import { Dot, Home, LayoutTemplate, LogOut, Moon, Share2, Sparkles, Sun, Undo2, UserRound } from "lucide-react";
+import { Dot, Home, LayoutTemplate, LogOut, Moon, Sparkles, Sun, Undo2, UserRound } from "lucide-react";
 import { claimsOf, navModules, submoduleFor } from "@/lib/module-access";
 import { NAV_LABEL_KEYS } from "@/lib/nav-i18n";
 import { useNavModule } from "@/lib/nav-module";
@@ -55,7 +55,6 @@ export function ErpShell({ prefs, children }: { prefs: UiPrefs; children: React.
       href: sub.href,
       onSelect: (e: React.MouseEvent<HTMLAnchorElement>) => { if (e.metaKey || e.ctrlKey) return; e.preventDefault(); go(sub.href)(); },
       active: current?.href === sub.href,
-      meta: sub.collab ? <Share2 size={12} aria-label={t("sharedPages")} /> : undefined,
     })),
   }));
   const commandItems: CommandItem[] = [

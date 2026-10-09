@@ -60,3 +60,5 @@ html[data-sidebar-tone="dark"] .crisp-sidebar {
   html[data-shell="crisp"] [data-erp-shell-main]:has([data-sales-v2]) { padding-bottom: 0; overflow: hidden; }
   html[data-shell="crisp"] [data-erp-shell-main] [data-sales-v2][class*="h-dvh"] { height: 100%; margin-bottom: 0; }
 }
+/* Lucide icons default to 24 px and Crisp's sidebar rows don't size them: rows take Attio's 16 px. */
+.crisp-sidebar .crisp-sidebar-row svg, .crisp-sidebar .crisp-sidebar-main svg { width: 16px; height: 16px; flex: none; }
