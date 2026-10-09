@@ -8,6 +8,9 @@ import { useRouter } from "next/navigation";
 import { Bell, CheckCheck, ExternalLink, Inbox as InboxIcon, Mail } from "lucide-react";
 import { Button, Segmented } from "@crisp-ui-kit/crisp";
 import { markAllNotificationsRead, markNotificationRead } from "@/app/notifications/actions";
+import { NOTIFICATIONS_CHANGED } from "@/components/erp-shell";
+
+const changed = () => window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED));
 
 export type InboxItem = { id: string; title: string; body: string | null; link: string | null; isRead: boolean; createdAt: string };
 
@@ -47,12 +50,12 @@ export function Inbox({ items: initial }: { items: InboxItem[] }) {
     setSelected(it.id);
     if (!it.isRead) {
       setItems((all) => all.map((x) => (x.id === it.id ? { ...x, isRead: true } : x)));
-      start(() => markNotificationRead(it.id));
+      start(async () => { await markNotificationRead(it.id); changed(); });
     }
   };
   const readAll = () => {
     setItems((all) => all.map((x) => ({ ...x, isRead: true })));
-    start(async () => { await markAllNotificationsRead(); router.refresh(); });
+    start(async () => { await markAllNotificationsRead(); changed(); router.refresh(); });
   };
 
   return (

@@ -241,11 +241,12 @@ const SPECIAL_PAGES: Record<string, { icon: React.ComponentType<{ className?: st
   "/access-management": { icon: KeyRound, text: "Manajemen akses" },
 };
 const isMac = () => typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
-const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("") || "?";
+const initials = (name: string) => name.split(/\s+/).map((w) => w.replace(/[^\p{L}\p{N}]/gu, "")).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("") || "?";
 /** A steady colour per person, so the same face reads the same everywhere. */
 const hue = (id: string) => `hsl(${[...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7)} 45% 45%)`;
 
 export const RECENT_KEY = "celerates.recent";
+export const NOTIFICATIONS_CHANGED = "celerates:notifications-changed";
 function rememberPage(href: string, label: string) {
   try {
     const list = (JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]") as { href: string; label: string; at: number }[]).filter((p) => p.href !== href);
@@ -301,7 +302,8 @@ function useUnreadCount() {
     const load = () => getMyNotifications().then((rows) => { if (alive) setN((rows as { is_read: boolean }[]).filter((r) => !r.is_read).length); }).catch(() => {});
     load();
     const id = setInterval(load, 60_000);
-    return () => { alive = false; clearInterval(id); };
+    window.addEventListener(NOTIFICATIONS_CHANGED, load); // the Inbox marked something read
+    return () => { alive = false; clearInterval(id); window.removeEventListener(NOTIFICATIONS_CHANGED, load); };
   }, []);
   return n;
 }
