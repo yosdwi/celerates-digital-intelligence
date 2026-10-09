@@ -780,3 +780,18 @@ test("QA page 12: sign-in page is bare, says 'expired' only for a refused cookie
   assert.equal(isStaleBuild(new Error("relation does not exist")), false);
   assert.ok(readFileSync("src/app/global-error.tsx", "utf8").includes("reloadOnce()"));
 });
+
+test("QA 2026-10-09: invitation email carries no secret, escapes names, and every invite path sends it", async () => {
+  process.env.NEXTAUTH_URL = process.env.NEXTAUTH_URL ?? "https://ierp.example";
+  const { inviteMessage, activationLink } = await import("../src/lib/invite-mail");
+  const m = inviteMessage({ to: "tyas@celerates.co.id", name: "Tyas <b>", inviter: "Owner", access: "Sales · Editor" });
+  assert.ok(m.text.includes(activationLink("tyas@celerates.co.id")));
+  assert.match(activationLink("tyas@celerates.co.id"), /\/login\?aktivasi=tyas%40celerates\.co\.id$/);
+  assert.ok(m.html.includes("Tyas &#60;b&#62;") && !m.html.includes("Tyas <b>"));
+  assert.doesNotMatch(m.text + m.html, /token|password=|code=/i);
+  const actions = readFileSync("src/app/access-management/actions.ts", "utf8");
+  for (const fn of ["inviteUser", "inviteUsersBulk", "resendInvite"]) assert.match(actions, new RegExp(`export async function ${fn}\\([^)]*\\)[^{]*\\{\\n  await requireActor\\(\\);\\n  const owner = await requireOwner\\(\\);`), fn);
+  assert.match(actions, /lines\.length > 50/);
+  assert.match(actions, /u\.password_hash/);
+  assert.match(readFileSync("src/app/login/login-form.tsx", "utf8"), /searchParams\.get\("aktivasi"\)/);
+});

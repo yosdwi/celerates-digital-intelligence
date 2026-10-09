@@ -186,7 +186,7 @@ test("edit values carry every V1 edit field and post blanks for unset values", (
   // The edit dialog renders the same fields.
   const forms = read("features/sales-v2/forms.tsx");
   const edit = forms.slice(forms.indexOf("function EditForm"));
-  for (const f of v1Fields) assert.match(edit, f === "position_name" ? /<PositionInput\b/ : new RegExp(`name="${f}"`), f);
+  for (const f of v1Fields) assert.match(edit, f === "position_name" ? /<PositionInput\b/ : f === "sales_pic_name" ? /<SalesPicSelect\b/ : new RegExp(`name="${f}"`), f);
 });
 
 test("Kanban: Win and Dropped ask first; other moves save with Undo", () => {
@@ -423,19 +423,43 @@ test("QA 2026-10-08: Sales Sheet Sync runs on the service account, Sales editors
   let body: URLSearchParams | null = null;
   globalThis.fetch = (async (_url: string, init: RequestInit) => { body = init.body as URLSearchParams; return new Response(JSON.stringify({ access_token: "t1", expires_in: 3600 })); }) as typeof fetch;
   try {
-    const { getServiceAccountToken, serviceAccountEmail } = await import("../src/lib/google-sheets");
-    assert.equal(serviceAccountEmail(), key.client_email);
-    assert.equal(await getServiceAccountToken(), "t1");
+    const { getSheetsToken, sheetsAccountEmail, forgetSheetsToken } = await import("../src/lib/google-sheets");
+    forgetSheetsToken();
+    assert.equal(await sheetsAccountEmail(), key.client_email);
+    assert.equal(await getSheetsToken(), "t1");
     assert.equal(body!.get("grant_type"), "urn:ietf:params:oauth:grant-type:jwt-bearer");
     const [h, p, sig] = body!.get("assertion")!.split(".");
     assert.ok(createVerify("RSA-SHA256").update(`${h}.${p}`).verify(publicKey, sig, "base64url"));
     const claims = JSON.parse(Buffer.from(p, "base64url").toString());
     assert.equal(claims.iss, key.client_email);
-    assert.equal(claims.scope, "https://www.googleapis.com/auth/spreadsheets");
+    assert.equal(claims.scope, "https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.metadata.readonly");
+    forgetSheetsToken();
   } finally {
     globalThis.fetch = realFetch;
     delete process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
   }
+});
+
+test("QA 2026-10-09: the company Google account is connected by an Owner only, checked, and stored encrypted", async () => {
+  const connect = read("app/api/google/sheets/connect/route.ts");
+  const callback = read("app/api/google/sheets/callback/route.ts");
+  for (const src of [connect, callback]) assert.match(src, /await requireOwner\(\)/);
+  assert.match(connect, /access_type: "offline"/);
+  assert.match(connect, /httpOnly: true, secure: true, sameSite: "lax"/);
+  assert.match(callback, /q\.get\("state"\) !== saved\.state/);
+  assert.match(callback, /email !== oauth\.account/);
+  assert.match(callback, /sealToken\(data\.refresh_token, SHEETS_PURPOSE\)/);
+  assert.doesNotMatch(callback, /refresh_token: data|console\.(log|info)\(.*token/);
+  assert.match(read("lib/google-sheets.ts"), /openToken\(row\.refresh_token_enc, SHEETS_PURPOSE\)/);
+  process.env.NEXTAUTH_SECRET ??= "test-secret";
+  const { sealToken, openToken } = await import("../src/lib/google-sheets");
+  const sealed = sealToken("1//refresh", "sales_sheets");
+  assert.ok(!sealed.includes("refresh"));
+  assert.equal(openToken(sealed, "sales_sheets"), "1//refresh");
+  assert.equal(openToken(sealed, "other_purpose"), null);
+  const actions = read("features/sales-v2/sheet-actions.ts");
+  assert.match(actions, /disconnectGoogleAccount\(\): Promise<void> \{\n  await requireActor\(\);\n  const owner = await requireOwner\(\);/);
+  for (const fn of ["availableSheets", "sheetTabs"]) assert.match(actions, new RegExp(`function ${fn}\\([^)]*\\): Promise<.*> \\{\\n  await requireActor\\(\\);\\n  await requireSalesSheetSync\\(\\);`));
 });
 
 test("edit history: changed fields only; blank equals null; unwritten (undefined) fields are not changes", async () => {
@@ -703,4 +727,19 @@ test("New PQ keeps PO / PKS numbers in Notes; Edit Opportunity proposals list on
   assert.match(read("features/sales-v2/pq-forms.tsx"), /<AiFill form="pq" file/);
   assert.match(read("features/sales-v2/account-preview.tsx"), /createAccountContacts\(name, keep\)/);
   assert.match(read("features/sales-v2/email-panel.tsx"), /Jadikan kontak/);
+});
+
+test("QA 2026-10-09: Sales PIC is picked from Sales accounts in every Sales form, with a 'Deal saya' view", async () => {
+  const forms = read("features/sales-v2/forms.tsx");
+  const pq = read("features/sales-v2/pq-forms.tsx");
+  assert.equal((forms.match(/<SalesPicSelect options=\{options\.salesPics\}/g) ?? []).length, 3);
+  assert.equal((pq.match(/<SalesPicSelect options=\{options\.picNames\}/g) ?? []).length, 2);
+  assert.doesNotMatch(forms + pq, /<Input name="sales_pic_name"|PicSelect name="sales_pic_name"/);
+  assert.match(read("features/sales-v2/data.ts"), /d\.key = 'sales' AND ua\.level IN \('editor', 'full'\)/);
+  assert.match(read("features/sales-v2/pq-data.ts"), /loadSalesPics\(\)/);
+  const { withMyDeals, BUILT_IN_VIEWS } = await import("../src/features/sales-v2/model");
+  assert.equal(withMyDeals(BUILT_IN_VIEWS, null), BUILT_IN_VIEWS);
+  const views = withMyDeals(BUILT_IN_VIEWS, "Tyas");
+  assert.deepEqual(views.map((v) => v.id).slice(0, 3), ["all", "mine", "active"]);
+  assert.deepEqual(views[1].state.filters[0], { id: "bm", key: "salesPic", op: "is", value: "Tyas" });
 });

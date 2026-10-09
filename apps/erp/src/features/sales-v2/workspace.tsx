@@ -1,7 +1,7 @@
 "use client";
 // Sales V2 Opportunity Tracker: the shared record workspace (record-workspace.tsx) configured with Celerates
 // Opportunity fields, stages and actions. docs/design/SALES-V2-CRISP-UX-CONTRACT.md is the contract.
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   BadgeCheck, Banknote, Briefcase, Building2, CalendarClock, CircleDot, CircleX, FileText, Gauge, GitBranch, HandCoins, Hash,
@@ -10,7 +10,7 @@ import {
 import { SnackbarProvider, type ContextMenuOption, type DataTableColumn, type TableToolbarColumn } from "@crisp-ui-kit/crisp";
 import { useToast } from "@/components/toast-provider";
 import { saveOpportunityTracker, updateOptyStatus, updateSalesQualified } from "@/app/sales/opportunity-tracker/actions";
-import { CreateMenu, type CreateRequest, type FormOptions } from "./forms";
+import { CreateMenu, useMyName, type CreateRequest, type FormOptions } from "./forms";
 import type { HeaderSpec } from "./header-filter";
 import { CONFIRM_STAGES, StageMoveDialog } from "./stage-move";
 import { SheetSyncButton, OT_SHEET_SYNC } from "./sheet-sync-dialog";
@@ -20,7 +20,7 @@ import { RecordWorkspace, type Access, type RowActions, type WorkspaceConfig } f
 import { RecordLink } from "./cells";
 import {
   BANTE_SCORES, BUILT_IN_VIEWS, CLIENT_TYPES, OT_FIELD_EDITS, editValues, fieldFormData, DEFAULT_SHOWN, FIELD_KEYS, LEVELS, SERVICE_TYPES, STAGES, STAGE_LABEL, SERVICE_LABEL, LEVEL_LABEL, CLIENT_TYPE_LABEL,
-  canConvert, daysSince, fieldValue, matchesSearch, rupiah, type Opportunity,
+  canConvert, daysSince, fieldValue, matchesSearch, rupiah, withMyDeals, type Opportunity,
 } from "./model";
 
 const STAGE_ORDER: Record<string, number> = Object.fromEntries(STAGES.map((s, i) => [s.id, i]));
@@ -75,9 +75,12 @@ function Workspace({ records, access, options, sheetSync }: WorkspaceProps) {
   const { showToast } = useToast();
   const [create, setCreate] = useState<CreateRequest>(null);
   const [convertRequest, setConvertRequest] = useState<string | null>(null);
+  const me = useMyName();
+  const mine = me && options.salesPics.includes(me) ? me : null;
+  const config = useMemo(() => ({ ...OPPORTUNITY_CONFIG, builtInViews: withMyDeals(OPPORTUNITY_CONFIG.builtInViews, mine) }), [mine]);
   return (
     <RecordWorkspace
-      config={OPPORTUNITY_CONFIG}
+      config={config}
       records={records}
       access={access}
       headerEnd={<Link href="/sales/opportunity-tracker" className="text-[0.75rem] text-slate-400 hover:text-slate-700 hover:underline" title="Tampilan lama (V1)">Versi lama</Link>}

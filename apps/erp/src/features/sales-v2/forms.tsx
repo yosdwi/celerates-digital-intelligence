@@ -5,6 +5,7 @@
 // kept as a draft until it is saved or reset.
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { useTranslations } from "next-intl";
 import { BriefcaseBusiness, ChevronDown, Plus, Repeat, Sparkles, SquarePen } from "lucide-react";
 import { Button, Checkbox, Dialog, DialogBody, DialogFooter, FormField, Input, InputShell, Menu, MenuItem, Select, Textarea } from "@crisp-ui-kit/crisp";
@@ -47,7 +48,31 @@ export type FormOptions = {
   leadOptions: { id: string; lead_no: string; client_name: string }[];
   positionSuggestions: string[];
   employeeOptions: { value: string; label: string }[];
+  /** Sales PIC choices: the Sales accounts (loadSalesPics). */
+  salesPics: string[];
 };
+
+/** The signed-in person's name, as Sales PIC lists show it. */
+export function useMyName(): string | null {
+  return ((useSession().data?.user as { fullName?: string } | undefined)?.fullName ?? null);
+}
+
+/**
+ * Sales PIC picked from the Sales accounts (QA 2026-10-09), stored as the name. A stored name that differs only in case
+ * or spaces opens as the account's name, so saving tidies it; any other old name stays selectable, marked "nama lama".
+ * A new record starts with the signed-in person when they are on the list.
+ */
+export function SalesPicSelect({ options, defaultValue }: { options: string[]; defaultValue?: string }) {
+  const me = useMyName();
+  const stored = defaultValue?.trim() ?? "";
+  const canonical = stored ? options.find((o) => o.toLowerCase() === stored.replace(/\s+/g, " ").toLowerCase()) ?? stored : "";
+  const [value, setValue] = useState(canonical || (me && options.includes(me) ? me : ""));
+  const list = value && !options.includes(value) ? [...options, value] : options;
+  return (
+    <Select name="sales_pic_name" required searchable value={value} onValueChange={setValue} placeholder="Pilih Sales PIC"
+      options={list.map((n) => ({ value: n, label: options.includes(n) ? n : `${n} (nama lama)` }))} />
+  );
+}
 
 /** A label above a Crisp control; `span` widens it to the full row. */
 export function F({ label, required, span, hint, children }: { label: string; required?: boolean; span?: boolean; hint?: string; children: React.ReactNode }) {
@@ -202,7 +227,7 @@ function OpportunityForm({ options, draft: d, formRef, onDone, onCancel, onReset
           <F label="Client Type" hint={ai("client_type_code")}><Select name="client_type_code" defaultValue={d.client_type_code} options={opts(CLIENT_TYPES)} placeholder="-" /></F>
 
           <F label="Service Type" hint={ai("service_type_code")}><Select name="service_type_code" defaultValue={d.service_type_code} options={opts(SERVICE_TYPES)} placeholder="-" /></F>
-          <F label="Sales PIC" required><Input name="sales_pic_name" required defaultValue={d.sales_pic_name} /></F>
+          <F label="Sales PIC" required><SalesPicSelect options={options.salesPics} defaultValue={d.sales_pic_name} /></F>
           <F label="Positions" hint={ai("position_name")}><PositionInput suggestions={options.positionSuggestions} defaultValue={d.position_name} /></F>
 
           <F label="Level" hint={ai("level_code")}><Select name="level_code" defaultValue={d.level_code} options={opts(LEVELS)} placeholder="-" /></F>
@@ -256,7 +281,7 @@ function ExtensionForm({ options, draft: d, formRef, onDone, onCancel, onReset, 
           <F label="Price" hint={ai("price_amount")}><Money name="price_amount" defaultValue={d.price_amount} /></F>
           <F label="Price Period" hint={ai("price_period_code")}><Select name="price_period_code" defaultValue={d.price_period_code ?? "monthly"} options={opts(PRICE_PERIODS)} /></F>
 
-          <F label="Sales PIC" required hint={ai("sales_pic_name")}><Input name="sales_pic_name" required defaultValue={d.sales_pic_name} /></F>
+          <F label="Sales PIC" required hint={ai("sales_pic_name")}><SalesPicSelect options={options.salesPics} defaultValue={d.sales_pic_name} /></F>
           <F label="Start Date" hint={ai("start_date")}><Input name="start_date" type="date" defaultValue={d.start_date} /></F>
           <F label="End Date" hint={ai("end_date")}><Input name="end_date" type="date" defaultValue={d.end_date} /></F>
 
@@ -439,7 +464,7 @@ function EditForm({ record, draft: d, formRef, returnTo, options, onDone, onCanc
           <F label="Stage" hint={ai("opty_status_code")}><Select name="opty_status_code" defaultValue={d.opty_status_code} options={STAGES.map((s) => ({ value: s.id, label: s.title }))} /></F>
 
           <F label="Service Type"><Select name="service_type_code" defaultValue={d.service_type_code || undefined} options={opts(SERVICE_TYPES)} placeholder="-" /></F>
-          <F label="Sales PIC" required><Input name="sales_pic_name" required defaultValue={d.sales_pic_name} /></F>
+          <F label="Sales PIC" required><SalesPicSelect options={options.salesPics} defaultValue={d.sales_pic_name} /></F>
           <F label="Positions" hint={ai("position_name")}><PositionInput suggestions={options.positionSuggestions} defaultValue={d.position_name} /></F>
 
           <F label="Level" hint={ai("level_code")}><Select name="level_code" defaultValue={d.level_code || undefined} options={opts(LEVELS)} placeholder="-" /></F>

@@ -42,12 +42,14 @@ async function api(body: Record<string, unknown>) {
 export function LoginForm() {
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
-  const [step, setStep] = useState<Step>("password");
+  // The invitation email links here with ?aktivasi=<email>: straight to the activation step, email filled in.
+  const invited = searchParams.get("aktivasi")?.trim().toLowerCase() || null;
+  const [step, setStep] = useState<Step>(invited ? "reset-email" : "password");
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(invited ? "Selamat datang! Klik Kirim kode untuk mengaktifkan akun Anda." : null);
   const [showPassword, setShowPassword] = useState(false);
   const [passkeySupported, setPasskeySupported] = useState(false);
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(invited ?? "");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
 

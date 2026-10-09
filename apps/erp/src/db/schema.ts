@@ -1041,6 +1041,16 @@ export const googleTokens = pgTable("google_tokens", {
   uqUser: uniqueIndex("uq_google_tokens_user").on(t.user_id),
 }));
 
+/** A company Google account connected by an Owner for one purpose ("sales_sheets"); refresh token encrypted. */
+export const googleAccounts = pgTable("google_accounts", {
+  purpose: text("purpose").primaryKey(),
+  email: text("email").notNull(),
+  refresh_token_enc: text("refresh_token_enc").notNull(),
+  scopes: text("scopes").notNull(),
+  connected_by_user_id: uuid("connected_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  connected_at: timestamp("connected_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const sheetConnections = pgTable("sheet_connections", {
   id: uuid("id").defaultRandom().primaryKey(),
   division_key: text("division_key").notNull(),

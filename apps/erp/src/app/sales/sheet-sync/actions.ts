@@ -5,7 +5,7 @@ import { db } from "@/db";
 import { opportunities, sheetConnections } from "@/db/schema";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getServiceAccountToken, extractSpreadsheetId, readSheetValues, writeSheetValues, clearSheetRange, quoteSheetName } from "@/lib/google-sheets";
+import { getSheetsToken, extractSpreadsheetId, readSheetValues, writeSheetValues, clearSheetRange, quoteSheetName } from "@/lib/google-sheets";
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { generateOptyNoWithPosition, generatePqNo } from "@/lib/id-generators";
@@ -61,7 +61,7 @@ export async function fetchSheetHeaders(): Promise<HeadersResult> {
   if (!connection) return { ok: false, error: "Belum ada Google Sheet yang terhubung" };
 
   try {
-    const accessToken = await getServiceAccountToken();
+    const accessToken = await getSheetsToken();
     const rows = await readSheetValues(accessToken, connection.spreadsheet_id, `${quoteSheetName(connection.sheet_name)}!A1:Z1`);
     const headers = (rows[0] ?? []).filter((h) => h.trim() !== "");
     if (headers.length === 0) return { ok: false, error: "Baris header (baris 1) di sheet kosong." };
@@ -102,7 +102,7 @@ export async function syncPull(): Promise<SyncResult> {
   }
 
   try {
-    const accessToken = await getServiceAccountToken();
+    const accessToken = await getSheetsToken();
     const headerRows = await readSheetValues(accessToken, connection.spreadsheet_id, `${quoteSheetName(connection.sheet_name)}!A1:Z1`);
     const headerRow = headerRows[0] ?? [];
 
@@ -204,7 +204,7 @@ export async function syncPush(): Promise<SyncResult> {
   if (!connection) return { ok: false, error: "Belum ada Google Sheet yang terhubung" };
 
   try {
-    const accessToken = await getServiceAccountToken();
+    const accessToken = await getSheetsToken();
     const allOpportunities = await db.select().from(opportunities);
 
     const rows: string[][] = [HEADERS];
@@ -270,7 +270,7 @@ export async function debugSync(): Promise<DebugResult> {
   }
 
   try {
-    const accessToken = await getServiceAccountToken();
+    const accessToken = await getSheetsToken();
     const headerRows = await readSheetValues(accessToken, connection.spreadsheet_id, `${quoteSheetName(connection.sheet_name)}!A1:Z1`);
     const headerRow = headerRows[0] ?? [];
 

@@ -1,7 +1,7 @@
 import { desc, eq, getTableColumns, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
 import { clients, leads, opportunities, projectDocuments, signatureRequests } from "@/db/schema";
-import { getPicNames } from "@/lib/reference-data";
+import { loadSalesPics } from "./data";
 import { getActiveUserOptions } from "@/lib/approval-journey";
 import { getAttachmentsWithUrlsForMany, type AttachmentWithUrl } from "@/lib/attachments";
 import { OPPORTUNITY_PO_DOC_SOURCE } from "@/app/sales/constants";
@@ -22,7 +22,7 @@ export async function loadPqWorkspace() {
     db.select().from(projectDocuments).where(isNotNull(projectDocuments.opportunity_id)),
     db.select().from(signatureRequests).where(eq(signatureRequests.source_type, PQ_SIGNATURE_SOURCE)),
     getActiveUserOptions(),
-    getPicNames(),
+    loadSalesPics(),
     db.select({ position_name: opportunities.position_name }).from(opportunities).where(isNotNull(opportunities.position_name)),
     db.select({ name: clients.name, code: clients.code }).from(clients),
   ]);

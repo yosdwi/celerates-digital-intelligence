@@ -10,6 +10,7 @@ import { OwnerToggle } from "./owner-toggle";
 import { createDivision } from "./actions";
 import { ExpandableSection } from "@/components/expandable-section";
 import { InviteUserForm } from "./invite-user-form";
+import { ResendInviteButton } from "./resend-invite-button";
 import { EditUserButton } from "./edit-user-button";
 import { DeleteUserButton } from "./delete-user-button";
 import { SecurityControls, type GrantRow } from "./security-controls";
@@ -124,6 +125,7 @@ export default async function AccessManagementPage() {
                   <p className="text-xs text-slate-500">{u.email} &middot; {u.role_title ?? "-"}</p>
                 </div>
                 <div className="flex items-center gap-3">
+                  {u.status === "active" && !u.password_hash && u.account_type !== "talent" && <ResendInviteButton userId={u.id} />}
                   <span className={`inline-flex items-center rounded-full whitespace-nowrap px-2.5 py-0.5 text-xs font-medium ${STATUS_BADGE[u.status] ?? "bg-slate-100 text-slate-600"}`}>
                     {statusLabels[u.status] ?? u.status}
                   </span>

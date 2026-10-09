@@ -5,12 +5,11 @@
 import { useRef, useState } from "react";
 import { FilePlus2, Plus, SquarePen } from "lucide-react";
 import { Button, Dialog, DialogBody, Input, Select, Textarea } from "@crisp-ui-kit/crisp";
-import { PicSelect } from "@/components/pic-select";
 import { MultiFileUpload } from "@/components/multi-file-upload";
 import { createOpportunity, deleteOpportunityAttachment, updateOpportunity } from "@/app/sales/actions";
 import { GeneratePqButton } from "@/app/sales/generate-pq-button";
 import { DOC_STATUS_OPTIONS, OPTY_STATUS, PIPELINE_STAGES, SALES_TYPES } from "@/app/sales/pq-constants";
-import { AiFill, DraftFooter, F, Money, PositionInput, fillHint, opts, readDraft, useCloseFromXOnly, useSubmit, type AiFillResult, type Draft } from "./forms";
+import { AiFill, DraftFooter, F, Money, PositionInput, SalesPicSelect, fillHint, opts, readDraft, useCloseFromXOnly, useSubmit, type AiFillResult, type Draft } from "./forms";
 import { mergeFill, pqCreateFields } from "./ai-fill";
 import { BANTE_SCORES, BUSINESS_UNITS, CLIENT_TYPES, LEVELS, PRICE_PERIODS, PRIORITIES, SERVICE_TYPES } from "./model";
 import { PQ_STAGE_LABEL, pqEditValues, type Pq, type PqFile } from "./pq-model";
@@ -98,7 +97,7 @@ function CreateForm({ options, draft: d, formRef, returnPath, onDone, onCancel, 
           <F label="Price" hint={ai("price_amount")}><Money name="price_amount" defaultValue={d.price_amount} /></F>
 
           <F label="Price Period" hint={ai("price_period_code")}><Select name="price_period_code" defaultValue={d.price_period_code ?? "monthly"} options={opts(PRICE_PERIODS)} /></F>
-          <PicSelect name="sales_pic_name" label="Sales PIC" options={options.picNames} defaultValue={d.sales_pic_name} required currentPath={returnPath} />
+          <F label="Sales PIC" required><SalesPicSelect options={options.picNames} defaultValue={d.sales_pic_name} /></F>
           <F label="Pipeline Stage"><Select name="pipeline_stage_code" defaultValue={d.pipeline_stage_code ?? "on_going"} options={opts(PIPELINE_STAGES)} /></F>
 
           <F label="Opty Status"><Select name="opty_status_code" defaultValue={d.opty_status_code} options={opts(OPTY_STATUS)} placeholder="-" /></F>
@@ -179,7 +178,7 @@ function EditForm({ record, draft: d, formRef, returnTo, options, onDone, onCanc
           <F label="Price" hint={ai("price_amount")}><Money name="price_amount" defaultValue={d.price_amount} /></F>
 
           <F label="Price Period" hint={ai("price_period_code")}><Select name="price_period_code" defaultValue={d.price_period_code || "monthly"} options={opts(PRICE_PERIODS)} /></F>
-          <PicSelect name="sales_pic_name" label="Sales PIC" options={options.picNames} defaultValue={d.sales_pic_name} required currentPath={returnTo.split("?")[0]} />
+          <F label="Sales PIC" required><SalesPicSelect options={options.picNames} defaultValue={d.sales_pic_name} /></F>
           <div>
             <F label="PQ Number"><Input name="pq_no" defaultValue={d.pq_no} /></F>
             {/* V1's generator: fills PQ Number from Client, Business Unit, Service Type and Approval Date in this form. */}

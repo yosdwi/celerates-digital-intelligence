@@ -1,7 +1,7 @@
 "use client";
 // Sales V2 PQ Tracker: the shared record workspace (record-workspace.tsx) configured with V1 PQ Tracker fields, its
 // Pipeline Stage board and its actions. docs/design/SALES-V2-CRISP-UX-CONTRACT.md §14.
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import {
   Banknote, Briefcase, Building2, CalendarCheck, CalendarClock, CalendarRange, CircleDot, FileSignature, FileText, FolderKanban, Gauge,
@@ -15,12 +15,13 @@ import { SheetSyncButton, PQ_SHEET_SYNC } from "./sheet-sync-dialog";
 import type { SheetSyncData } from "./data";
 import { RecordWorkspace, type Access, type MoveContext, type RowActions, type WorkspaceConfig } from "./record-workspace";
 import { RecordLink } from "./cells";
-import { BANTE_SCORES, BUSINESS_UNITS, CLIENT_TYPES, LEVELS, PRIORITIES, SERVICE_TYPES, fieldFormData, rupiah } from "./model";
+import { BANTE_SCORES, BUSINESS_UNITS, CLIENT_TYPES, LEVELS, PRIORITIES, SERVICE_TYPES, fieldFormData, rupiah, withMyDeals } from "./model";
 import {
   LEAD_SOURCE_LABEL, OPTY_STATUS_LABEL, PQ_BUILT_IN_VIEWS, PQ_DEFAULT_SHOWN, PQ_FIELD_KEYS, PQ_STAGES, PQ_STAGE_LABEL, SIGNATURE_LABEL,
   PQ_FIELD_EDITS, needsPqNo, pqEditValues, pqFieldValue, pqMatchesSearch, withPqStage, type Pq,
 } from "./pq-model";
 import { CreatePq, type PqCreateRequest } from "./pq-forms";
+import { useMyName } from "./forms";
 import { PqPreview, ok, savePqStage } from "./pq-preview";
 import { saveOpportunity, updateOptyStatus, updatePipelineStage } from "@/app/sales/actions";
 import type { PqOptions } from "./pq-data";
@@ -78,9 +79,12 @@ export function PqWorkspace(props: Props) {
 
 function Workspace({ records, access, options, sheetSync }: Props) {
   const [create, setCreate] = useState<PqCreateRequest>(null);
+  const me = useMyName();
+  const mine = me && options.picNames.includes(me) ? me : null;
+  const config = useMemo(() => ({ ...CONFIG, builtInViews: withMyDeals(CONFIG.builtInViews, mine) }), [mine]);
   return (
     <RecordWorkspace
-      config={CONFIG}
+      config={config}
       records={records}
       access={access}
       headerEnd={<Link href="/sales" className="text-[0.75rem] text-slate-400 hover:text-slate-700 hover:underline" title="Tampilan lama (V1)">Versi lama</Link>}

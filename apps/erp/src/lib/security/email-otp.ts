@@ -91,10 +91,11 @@ const SUBJECT: Record<OtpPurpose, string> = {
   reset: "Kode atur password Celerates ERP",
 };
 
-async function smtpSend(to: string, code: string, purpose: OtpPurpose): Promise<void> {
+/** The SMTP transport for system mail (codes, invitations). */
+export function systemTransport() {
   if (!mailConfigured()) throw new Error("mail_not_configured");
   const pass = process.env.SMTP_PASSWORD || readFileSync(process.env.SMTP_PASSWORD_FILE!, "utf8").trim();
-  const transport = nodemailer.createTransport({
+  return nodemailer.createTransport({
     host: process.env.SMTP_HOST,
     port: Number(process.env.SMTP_PORT || 587),
     secure: Number(process.env.SMTP_PORT || 587) === 465,
@@ -104,7 +105,10 @@ async function smtpSend(to: string, code: string, purpose: OtpPurpose): Promise<
     logger: false,
     connectionTimeout: 10_000,
   });
-  await transport.sendMail({
+}
+
+async function smtpSend(to: string, code: string, purpose: OtpPurpose): Promise<void> {
+  await systemTransport().sendMail({
     from: process.env.SMTP_FROM,
     to,
     subject: SUBJECT[purpose],

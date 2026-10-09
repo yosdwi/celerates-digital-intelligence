@@ -1,6 +1,6 @@
 import { count, desc, eq, inArray, isNotNull } from "drizzle-orm";
-import { db } from "@/db";
-import { serviceAccountEmail } from "@/lib/google-sheets";
+import { db, sql } from "@/db";
+import { sheetsAccountEmail, sheetsOAuth } from "@/lib/google-sheets";
 import {
   applications, attachments, candidates, employees, leads, onboardingRequests, opportunities, requisitions, salesOpportunityTrackers, sheetConnections, signatureRequests,
 } from "@/db/schema";
@@ -9,8 +9,22 @@ import { OPPORTUNITY_PO_DOC_SOURCE } from "@/app/sales/constants";
 import type { Opportunity, SignatureStatus } from "./model";
 
 /** Everything the Opportunity workspace shows, read from the same tables V1 reads. No new source of truth. */
+/**
+ * Who can be a Sales PIC (QA 2026-10-09): active accounts with Sales editor or full access, and Owners. The tracker
+ * still stores the name (V1 and the Google Sheet read it as text), but it is picked from this list.
+ */
+export async function loadSalesPics(): Promise<string[]> {
+  const rows = await sql<{ full_name: string }[]>`
+    SELECT DISTINCT u.full_name FROM users u
+    WHERE u.status = 'active' AND u.account_type <> 'talent' AND (u.is_owner OR EXISTS (
+      SELECT 1 FROM user_access ua JOIN divisions d ON d.id = ua.division_id
+      WHERE ua.user_id = u.id AND d.key = 'sales' AND ua.level IN ('editor', 'full')))
+    ORDER BY u.full_name`;
+  return rows.map((r) => r.full_name).filter((n) => !!n?.trim());
+}
+
 export async function loadOpportunityWorkspace() {
-  const [rows, reqs, pqs, sigs, docs, apps, onboard, leadOptions, positionRows, employeeRows] = await Promise.all([
+  const [rows, reqs, pqs, sigs, docs, apps, onboard, leadOptions, positionRows, employeeRows, salesPics] = await Promise.all([
     db
       .select({
         id: salesOpportunityTrackers.id,
@@ -63,6 +77,7 @@ export async function loadOpportunityWorkspace() {
       .from(employees)
       .leftJoin(onboardingRequests, eq(employees.onboarding_request_id, onboardingRequests.id))
       .leftJoin(candidates, eq(onboardingRequests.candidate_id, candidates.id)),
+    loadSalesPics(),
   ]);
 
   const appsByReq = new Map(apps.map((a) => [a.requisitionId!, a.n]));
@@ -105,6 +120,7 @@ export async function loadOpportunityWorkspace() {
     records,
     leadOptions: leadOptions.map((l) => ({ id: l.id, lead_no: l.lead_no, client_name: l.client_name })),
     positionSuggestions: Array.from(new Set(positionRows.map((r) => r.position_name).filter((p): p is string => !!p?.trim()))).sort(),
+    salesPics,
     employeeOptions: employeeRows.map((e) => ({ value: e.id, label: `${e.employee_no} - ${e.candidate_name ?? "-"}${e.position_name ? ` (${e.position_name})` : ""}` })),
   };
 }
@@ -113,15 +129,18 @@ export type WorkspaceData = Awaited<ReturnType<typeof loadOpportunityWorkspace>>
 
 /** Google Sheet connection for the Sheet Sync dialog (editors only; the page decides). No tokens, just what V1 shows. */
 /** `divisionKey`: V1's key per page ("sales_opportunity_tracker"; "sales" is PQ Tracker). */
-export async function loadSheetSync(divisionKey = "sales_opportunity_tracker") {
+export async function loadSheetSync(divisionKey = "sales_opportunity_tracker", isOwner = false) {
+  const account = await sheetsAccountEmail();
   const [c] = await db
     .select({ url: sheetConnections.spreadsheet_url, sheetName: sheetConnections.sheet_name, mapping: sheetConnections.column_mapping })
     .from(sheetConnections)
     .where(eq(sheetConnections.division_key, divisionKey));
   return {
-    // On once the server has a Google service account (lib/google-sheets.ts); the sheet is shared with its email.
-    enabled: !!serviceAccountEmail(),
-    shareWith: serviceAccountEmail(),
+    // On once an Owner connected the company Google account (lib/google-sheets.ts); the sheet is shared with it.
+    enabled: !!account,
+    shareWith: account,
+    // An Owner may connect (or reconnect) the account once its OAuth client is on the server.
+    connectAs: isOwner ? (sheetsOAuth()?.account ?? null) : null,
     connection: c ? { url: c.url, sheetName: c.sheetName, mapping: c.mapping ? (JSON.parse(c.mapping) as Record<string, string>) : null } : null,
   };
 }

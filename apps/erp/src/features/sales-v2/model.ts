@@ -229,6 +229,13 @@ export const BUILT_IN_VIEWS: StoredView[] = [
   { id: "dropped", name: "Dropped", builtIn: true, state: { view: "table", q: "", filters: [{ id: "b5", key: "status", op: "is", value: "Dropped" }], sorts: [] } },
 ];
 
+/** "Deal saya" (QA 2026-10-09): the built-in views plus one filtered to the signed-in Sales PIC, after "all". */
+export function withMyDeals(views: StoredView[], me: string | null): StoredView[] {
+  if (!me) return views;
+  const mine: StoredView = { id: "mine", name: "Deal saya", builtIn: true, state: { view: "table", q: "", filters: [{ id: "bm", key: "salesPic", op: "is", value: me }], sorts: [] } };
+  return [views[0], mine, ...views.slice(1)];
+}
+
 /**
  * The V1 edit form's fields (app/sales/opportunity-tracker/[id]/edit) for a record, as form strings. The edit dialog
  * starts from these, and a Kanban move that also records a Dropped Reason sends them back unchanged through the same

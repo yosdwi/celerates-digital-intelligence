@@ -2,6 +2,7 @@
 import { currentClaims, requestMeta, requireActor, requireRecentAuth, StepUpRequiredError } from "@/lib/actor";
 import { db, sql } from "@/db";
 import { mailboxAllowed } from "@/lib/security/email-otp";
+import { inviteMail } from "@/lib/invite-mail";
 import { audit } from "@/lib/security/audit";
 import { CAPABILITIES, type Capability, type CapabilityScope } from "@/lib/security/policy";
 import { revokeUserSessions } from "@/lib/security/session";
@@ -147,51 +148,81 @@ export async function createDivision(formData: FormData) {
 
 export type InviteResult = { ok: true } | { ok: false; error: string };
 
-export async function inviteUser(formData: FormData): Promise<InviteResult> {
-  await requireActor();
+const LEVEL_LABEL: Record<string, string> = { viewer: "Viewer", editor: "Editor", full: "Full" };
+export type InviteOutcome = { ok: true; email: string; mailed: boolean } | { ok: false; email?: string; error: string };
 
-  const owner = await requireOwner();
+/** One invitation: the account (active, no password yet), its division access, the audit row, then the email. */
+async function inviteOne(owner: { id: string; fullName?: string; name?: string | null; email?: string | null },
+  input: { email: string; full_name: string; division_id: string; level: string; make_owner: boolean }): Promise<InviteOutcome> {
+  const email = input.email.trim().toLowerCase();
+  const full_name = input.full_name.trim();
+  if (!email || !full_name) return { ok: false, email, error: "Email dan nama wajib diisi" };
+  if (!mailboxAllowed(email).ok) return { ok: false, email, error: "Gunakan email perusahaan @celerates.com atau @celerates.co.id" };
+  if (!input.make_owner && (!input.division_id || !LEVEL_LABEL[input.level])) return { ok: false, email, error: "Pilih divisi dan level akses (atau centang jadikan Owner)" };
 
-  const email = (formData.get("email") as string).trim().toLowerCase();
-  const full_name = formData.get("full_name") as string;
-  const division_id = formData.get("division_id") as string;
-  const level = formData.get("level") as string;
-  const make_owner = formData.get("make_owner") === "on";
+  const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
+  if (existing) return { ok: false, email, error: "Email ini sudah terdaftar" };
+  const [division] = input.make_owner ? [] : await db.select({ name: divisions.name }).from(divisions).where(eq(divisions.id, input.division_id));
+  if (!input.make_owner && !division) return { ok: false, email, error: "Divisi tidak ditemukan" };
 
-  if (!email || !full_name) {
-    return { ok: false, error: "Email dan nama wajib diisi" };
+  const [newUser] = await db.insert(users).values({ email, full_name, status: "active", is_owner: input.make_owner }).returning();
+  if (!input.make_owner) {
+    await db.insert(userAccess).values({ user_id: newUser.id, division_id: input.division_id, level: input.level, granted_by_user_id: owner.id });
   }
-  if (!mailboxAllowed(email).ok) {
-    return { ok: false, error: "Gunakan email perusahaan @celerates.com atau @celerates.co.id" };
-  }
-  if (!make_owner && (!division_id || !level)) {
-    return { ok: false, error: "Pilih divisi dan level akses (atau centang jadikan Owner)" };
-  }
+  await auditAccess("user_invite", newUser.id, input.make_owner ? "owner" : input.level);
 
-  const [existing] = await db.select().from(users).where(eq(users.email, email));
-  if (existing) {
-    return { ok: false, error: "Email ini sudah terdaftar" };
-  }
-
-  const [newUser] = await db.insert(users).values({
-    email,
-    full_name,
-    status: "active",
-    is_owner: make_owner,
-  }).returning();
-
-  if (!make_owner && division_id && level) {
-    await db.insert(userAccess).values({
-      user_id: newUser.id,
-      division_id,
-      level,
-      granted_by_user_id: owner.id,
-    });
-  }
   // The invited person sets a password with an email code ("Aktivasi akun / lupa password" on /login).
-  await auditAccess("user_invite", newUser.id, make_owner ? "owner" : level);
+  const access = input.make_owner ? "Owner" : `${division!.name} · ${LEVEL_LABEL[input.level]}`;
+  const mailed = await inviteMail.send({ to: email, name: full_name, inviter: owner.fullName ?? owner.name ?? owner.email ?? "Admin Celerates", access })
+    .then(() => true, () => false);
+  return { ok: true, email, mailed };
+}
 
+export async function inviteUser(formData: FormData): Promise<InviteOutcome> {
+  await requireActor();
+  const owner = await requireOwner();
+  const out = await inviteOne(owner, {
+    email: String(formData.get("email") ?? ""), full_name: String(formData.get("full_name") ?? ""),
+    division_id: String(formData.get("division_id") ?? ""), level: String(formData.get("level") ?? ""), make_owner: formData.get("make_owner") === "on",
+  });
   revalidatePath("/access-management");
+  return out;
+}
+
+/**
+ * Many invitations at once: one line per person, "email, nama" or "email, nama, level" (comma, semicolon or tab).
+ * Every line goes to the chosen division; a line's own level overrides the default. At most 50 lines.
+ */
+export async function inviteUsersBulk(formData: FormData): Promise<InviteOutcome[]> {
+  await requireActor();
+  const owner = await requireOwner();
+  const division_id = String(formData.get("division_id") ?? "");
+  const defaultLevel = String(formData.get("level") ?? "");
+  const lines = String(formData.get("lines") ?? "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  if (lines.length > 50) return [{ ok: false, error: "Maksimal 50 baris sekali kirim." }];
+  const out: InviteOutcome[] = [];
+  for (const line of lines) {
+    const [email = "", full_name = "", level = ""] = line.split(/[,;\t]/).map((p) => p.trim());
+    out.push(await inviteOne(owner, { email, full_name, division_id, level: (level || defaultLevel).toLowerCase(), make_owner: false }));
+  }
+  revalidatePath("/access-management");
+  return out;
+}
+
+/** Send the invitation again to an account that has not set a password yet. */
+export async function resendInvite(userId: string): Promise<InviteResult> {
+  await requireActor();
+  const owner = await requireOwner();
+  const [u] = await db.select().from(users).where(eq(users.id, userId));
+  if (!u || u.status !== "active" || u.password_hash || u.account_type === "talent") return { ok: false, error: "Akun ini sudah aktif atau tidak bisa diundang." };
+  const rows = await db.select({ name: divisions.name, level: userAccess.level }).from(userAccess).innerJoin(divisions, eq(divisions.id, userAccess.division_id)).where(eq(userAccess.user_id, userId));
+  const access = u.is_owner ? "Owner" : rows.map((r) => `${r.name} · ${LEVEL_LABEL[r.level] ?? r.level}`).join(", ") || "Celerates ERP";
+  try {
+    await inviteMail.send({ to: u.email, name: u.full_name, inviter: (owner as { fullName?: string }).fullName ?? "Admin Celerates", access });
+  } catch {
+    return { ok: false, error: "Email undangan gagal terkirim. Coba lagi nanti." };
+  }
+  await auditAccess("user_invite_resend", userId);
   return { ok: true };
 }
 
