@@ -2,8 +2,9 @@ import { headers } from "next/headers";
 import { requireActor } from "@/lib/actor";
 import { requireTalentSession } from "@/lib/talent/actor";
 import "@fontsource-variable/inter";
-import "@crisp-ui-kit/crisp/styles.layered.css";
 import "./globals.css";
+// After globals.css: Crisp's cascade layers must be declared after Tailwind's, or Tailwind's base reset wins over them.
+import "@crisp-ui-kit/crisp/styles.layered.css";
 import "./crisp-theme.css";
 import { getLocale, getMessages, getTimeZone } from "next-intl/server";
 import { Sidebar } from "@/components/sidebar";
