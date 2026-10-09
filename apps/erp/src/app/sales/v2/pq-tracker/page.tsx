@@ -14,7 +14,7 @@ export default async function SalesV2PqTrackerPage() {
   const session = await getServerSession(authOptions);
   const level = divisionLevel(claimsOf(session?.user), "sales");
   const access = { canEdit: level === "editor" || level === "full", canDelete: level === "full" };
-  const [{ records, options }, sheetSync] = await Promise.all([loadPqWorkspace(), access.canEdit ? loadSheetSync("sales", claimsOf(session?.user).isOwner) : null]);
+  const [{ records, options }, sheetSync] = await Promise.all([loadPqWorkspace(), access.canEdit ? loadSheetSync("sales", claimsOf(session?.user).isOwner, access.canDelete) : null]);
   return (
     <Suspense>
       <PqWorkspace records={records} access={access} options={options} sheetSync={sheetSync} />

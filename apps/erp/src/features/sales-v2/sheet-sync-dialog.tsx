@@ -1,7 +1,7 @@
 "use client";
-// Google Sheet Sync as a dialog (contract §12), in place of leaving for the V1 sheet-sync page. Same V1 actions and
-// components (connect, column mapping, pull/push) per page: Opportunity Tracker and PQ Tracker each keep their own. Sync runs
-// on the company Google account an Owner connected (QA 2026-10-09); until then the dialog says who must do what.
+// Google Sheet Sync as a dialog (contract §12). Connecting a sheet uses V1's action per page; importing is the Sales V2
+// flow (QA 2026-10-09): columns matched automatically, value mapping, a preview with a status per row, then one import;
+// pushing changes only mapped cells. Sync runs on the company Google account an Owner connected.
 import { useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -9,26 +9,16 @@ import { useTranslations } from "next-intl";
 import { RefreshCw } from "lucide-react";
 import { Button, Callout, Dialog, DialogBody, FormField, Input, Select, Tooltip } from "@crisp-ui-kit/crisp";
 import * as ot from "@/app/sales/opportunity-tracker/sheet-sync/actions";
-import { MappingSection as OtMapping } from "@/app/sales/opportunity-tracker/sheet-sync/mapping-section";
-import { SyncButtons as OtSync } from "@/app/sales/opportunity-tracker/sheet-sync/sync-buttons";
-import { TARGET_FIELDS as OT_FIELDS } from "@/app/sales/opportunity-tracker/sheet-sync/target-fields";
 import * as pq from "@/app/sales/sheet-sync/actions";
-import { MappingSection as PqMapping } from "@/app/sales/sheet-sync/mapping-section";
-import { SyncButtons as PqSync } from "@/app/sales/sheet-sync/sync-buttons";
-import { TARGET_FIELDS as PQ_FIELDS } from "@/app/sales/sheet-sync/target-fields";
-import type { TargetField } from "@/components/column-mapping-form";
+import { SheetImport, SheetPush } from "./sheet-import-panel";
+import type { SheetKind } from "./sheet-import";
 import type { SheetSyncData } from "./data";
 import { availableSheets, disconnectGoogleAccount, sheetTabs } from "./sheet-actions";
 
-/** One page's V1 sheet-sync pieces. */
-type Parts = {
-  connectSheet: (fd: FormData) => Promise<unknown>;
-  MappingSection: (p: { targetFields: TargetField[]; savedMapping: Record<string, string> }) => React.ReactNode;
-  SyncButtons: () => React.ReactNode;
-  targetFields: TargetField[];
-};
-export const OT_SHEET_SYNC: Parts = { connectSheet: ot.connectSheet, MappingSection: OtMapping, SyncButtons: OtSync, targetFields: OT_FIELDS };
-export const PQ_SHEET_SYNC: Parts = { connectSheet: pq.connectSheet, MappingSection: PqMapping, SyncButtons: PqSync, targetFields: PQ_FIELDS };
+/** One page's sheet: which tracker, and V1's action that saves the connection. */
+type Parts = { kind: SheetKind; connectSheet: (fd: FormData) => Promise<unknown> };
+export const OT_SHEET_SYNC: Parts = { kind: "ot", connectSheet: ot.connectSheet };
+export const PQ_SHEET_SYNC: Parts = { kind: "pq", connectSheet: pq.connectSheet };
 
 /** Where Google's consent page sent the Owner back to (`?sheet=`), as a message. */
 const OUTCOME: Record<string, { tone: "success" | "warning"; text: string }> = {
@@ -51,14 +41,14 @@ export function SheetSyncButton({ data, parts }: { data: SheetSyncData; parts: P
           <RefreshCw size={14} />
         </Button>
       </Tooltip>
-      <Dialog open={open} onOpenChange={setOpen} title="Google Sheet Sync" icon={<RefreshCw size={16} />} closeLabel="Tutup" width={640} data-sales-v2-dialog="sheet-sync">
+      <Dialog open={open} onOpenChange={setOpen} title="Google Sheet Sync" icon={<RefreshCw size={16} />} closeLabel="Tutup" width={920} data-sales-v2-dialog="sheet-sync">
         {open && <SheetSyncBody data={data} parts={parts} outcome={outcome ? OUTCOME[outcome] : undefined} />}
       </Dialog>
     </>
   );
 }
 
-function SheetSyncBody({ data, parts: { connectSheet, MappingSection, SyncButtons, targetFields }, outcome }: { data: SheetSyncData; parts: Parts; outcome?: { tone: "success" | "warning"; text: string } }) {
+function SheetSyncBody({ data, parts: { kind, connectSheet }, outcome }: { data: SheetSyncData; parts: Parts; outcome?: { tone: "success" | "warning"; text: string } }) {
   const t = useTranslations("sales.sheetSync");
   const router = useRouter();
   const path = usePathname();
@@ -159,19 +149,8 @@ function SheetSyncBody({ data, parts: { connectSheet, MappingSection, SyncButton
             {error && <p className="text-[0.8125rem] text-red-600">{error}</p>}
             <div><Button type="submit" size="sm" intent="primary" loading={pending}>{c ? t("updateConnection") : t("connectButton")}</Button></div>
           </form>
-          {c && (
-            <section>
-              <h3 className="mb-1 text-[0.8125rem] font-semibold text-slate-800">{t("mapColumns")}</h3>
-              <p className="mb-3 text-[0.75rem] text-slate-500">{t("mapColumnsDesc")}</p>
-              <MappingSection targetFields={targetFields} savedMapping={c.mapping ?? {}} />
-            </section>
-          )}
-          {c?.mapping && (
-            <section>
-              <h3 className="mb-2 text-[0.8125rem] font-semibold text-slate-800">{t("synchronization")}</h3>
-              <SyncButtons />
-            </section>
-          )}
+          {c && <SheetImport key={`${c.url}|${c.sheetName}`} kind={kind} />}
+          {c && data.canPush && <SheetPush key={`push|${c.url}|${c.sheetName}`} kind={kind} />}
         </>
       )}
     </DialogBody>

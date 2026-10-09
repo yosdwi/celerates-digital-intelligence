@@ -66,13 +66,18 @@ account the ERP syncs as).
 | P15 | **Push** | Clears columns **A:R** of the connected tab and rewrites it with **all** ERP records (300+ seed rows), as codes, under fixed headers. Extra team columns (S onwards) stay, but their rows no longer line up. | **Destroys a team sheet.** Any Sales editor can trigger it. |
 | P16 | PQ sheet | Same pattern. PQ codes are slugified with no map at all ("Manage Service" → `manage_service`, "P1" → `p1`). A blank ID Opty or PQ No generates new numbers, so every Pull duplicates the row. | As P5 and P10. |
 
-## 4. Observed results (Product Owner fills in)
+## 4. Observed results (run 2026-10-09 by the Product Owner; rows checked in the pilot DB)
 
-| # | Observed | Matches prediction? | Note |
-|---|---|---|---|
-| P1 | | | |
-| P2 | | | |
-| … | | | |
+| Tab | What happened | Confirms |
+|---|---|---|
+| OT **Rapi** | Pull imported all 3 rows with correct codes, numbers and dates. | Baseline OK |
+| OT **Pipeline** | Pull stopped at row 5 (UJI PT Nusantara Logistik) with a raw "Failed query: insert into sales_opportunity_trackers …" message; the date "1 Okt 2026" was refused. Rows 2–4 were already saved and rows 6–18 never ran. | P4 |
+| OT **Pipeline** row 2 | Price "Rp15.000.000" (currency cell) stored **empty**. Date "01/10/2026" stored as **2026-01-10**. Deal from the formula (no format) stored correctly. | P2, P3 |
+| OT **Pipeline** row 4 | Service "Managed Services" stored as the invalid code `managed_services`; client type "Lama" as `lama`; deal "Rp 540.000.000", price "Rp 18.000.000" and headcount "3 orang" stored **empty**; date stored as 2026-01-10. | P2, P3, P5, P7 |
+| OT **Pipeline** row 5 (not saved) | The failing insert shows `won`, `headhunt`, `baru` and `c_level` as codes. | P5 |
+| OT **Lebar** | The mapping form still showed the **Pipeline** headers after the tab changed, because its header list is kept from the previous tab. The saved mapping used "Nama Klien " (with a space), which this tab doesn't have, and Rate/Status sit at AA/AB, past Z. Pull: 0 imported, 1 skipped. | P1, P13, new bug: stale headers |
+| Mapping form (doc page 13) | Even the **Rapi** tab, whose headers equal the ERP labels, opened with every column on "Jangan diimport". | P1 |
+| Not yet run | Second Pull (P10), duplicate and existing keys (P11, P12), PQ sheet (P16), Push (P15). | — |
 
 ## 5. Target design (Attio / Frappe style)
 

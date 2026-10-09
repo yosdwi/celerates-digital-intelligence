@@ -13,7 +13,7 @@ export default async function SalesV2OpportunityTrackerPage() {
   const session = await getServerSession(authOptions);
   const level = divisionLevel(claimsOf(session?.user), "sales");
   const access = { canEdit: level === "editor" || level === "full", canDelete: level === "full" };
-  const [{ records, ...options }, sheetSync] = await Promise.all([loadOpportunityWorkspace(), access.canEdit ? loadSheetSync(undefined, claimsOf(session?.user).isOwner) : null]);
+  const [{ records, ...options }, sheetSync] = await Promise.all([loadOpportunityWorkspace(), access.canEdit ? loadSheetSync(undefined, claimsOf(session?.user).isOwner, access.canDelete) : null]);
   return (
     <Suspense>
       <OpportunityWorkspace records={records} access={access} options={options} sheetSync={sheetSync} />

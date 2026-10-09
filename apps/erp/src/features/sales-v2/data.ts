@@ -129,7 +129,7 @@ export type WorkspaceData = Awaited<ReturnType<typeof loadOpportunityWorkspace>>
 
 /** Google Sheet connection for the Sheet Sync dialog (editors only; the page decides). No tokens, just what V1 shows. */
 /** `divisionKey`: V1's key per page ("sales_opportunity_tracker"; "sales" is PQ Tracker). */
-export async function loadSheetSync(divisionKey = "sales_opportunity_tracker", isOwner = false) {
+export async function loadSheetSync(divisionKey = "sales_opportunity_tracker", isOwner = false, canPush = false) {
   const account = await sheetsAccountEmail();
   const [c] = await db
     .select({ url: sheetConnections.spreadsheet_url, sheetName: sheetConnections.sheet_name, mapping: sheetConnections.column_mapping })
@@ -141,6 +141,8 @@ export async function loadSheetSync(divisionKey = "sales_opportunity_tracker", i
     shareWith: account,
     // An Owner may connect (or reconnect) the account once its OAuth client is on the server.
     connectAs: isOwner ? (sheetsOAuth()?.account ?? null) : null,
+    // Writing to the team's sheet: Sales Full or Owner (sheet-import-actions checks again).
+    canPush,
     connection: c ? { url: c.url, sheetName: c.sheetName, mapping: c.mapping ? (JSON.parse(c.mapping) as Record<string, string>) : null } : null,
   };
 }

@@ -213,3 +213,32 @@ export async function clearSheetRange(accessToken: string, spreadsheetId: string
     throw new Error(`Gagal bersihkan Google Sheet: ${err}`);
   }
 }
+/** A whole tab, every column. UNFORMATTED gives numbers as numbers and dates as serial numbers (import); FORMATTED gives what the sheet shows. */
+export async function readSheetGrid(accessToken: string, spreadsheetId: string, tab: string, render: "FORMATTED_VALUE" | "UNFORMATTED_VALUE"): Promise<unknown[][]> {
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(quoteSheetName(tab))}?valueRenderOption=${render}&dateTimeRenderOption=SERIAL_NUMBER`;
+  const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` }, cache: "no-store" });
+  if (!response.ok) throw new Error(response.status === 400 ? `Tab "${tab}" tidak ditemukan di Google Sheet.` : `Gagal baca Google Sheet (${response.status}).`);
+  return ((await response.json()) as { values?: unknown[][] }).values ?? [];
+}
+
+/** Writes single cells; values are entered as if typed (a date stays a date), text that would be a formula arrives quoted. */
+export async function writeSheetCells(accessToken: string, spreadsheetId: string, data: { range: string; value: string | number }[]): Promise<void> {
+  if (!data.length) return;
+  const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchUpdate`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ valueInputOption: "USER_ENTERED", data: data.map((d) => ({ range: d.range, values: [[d.value]] })) }),
+  });
+  if (!response.ok) throw new Error(`Gagal menulis ke Google Sheet (${response.status}).`);
+}
+
+export async function appendSheetRows(accessToken: string, spreadsheetId: string, tab: string, rows: (string | number)[][]): Promise<void> {
+  if (!rows.length) return;
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(quoteSheetName(tab))}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ values: rows }),
+  });
+  if (!response.ok) throw new Error(`Gagal menambah baris ke Google Sheet (${response.status}).`);
+}

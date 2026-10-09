@@ -743,3 +743,91 @@ test("QA 2026-10-09: Sales PIC is picked from Sales accounts in every Sales form
   assert.deepEqual(views.map((v) => v.id).slice(0, 3), ["all", "mine", "active"]);
   assert.deepEqual(views[1].state.filters[0], { id: "bm", key: "salesPic", op: "is", value: "Tyas" });
 });
+
+test("QA 2026-10-09 sheet import: columns match themselves, values parse the Indonesian way, rows get a status", async () => {
+  const m = await import("../src/features/sales-v2/sheet-import");
+  const headers = ["No. Opty", "Qualified?", "Nama Klien ", "Jenis Layanan", "Status", "Est. Nilai Deal", "Tipe Klien", "PIC Sales", "Tgl Komunikasi Terakhir", "BANT", "Posisi", "Level", "Jumlah Orang", "Rate / bulan", "Region"];
+  const match = m.matchColumns(headers, m.SHEET_FIELDS.ot);
+  assert.equal(match["Nama Klien "]?.field, "client_name");
+  assert.equal(match["Rate / bulan"]?.field, "price_amount");
+  assert.equal(match["Region"], null);
+  assert.equal(Object.values(match).filter(Boolean).length, 14);
+  assert.equal(m.matchColumns(["Client Name"], m.SHEET_FIELDS.ot, { "Client Name": "" })["Client Name"], null, "a saved 'ignore' wins");
+  assert.deepEqual(m.uniqueHeaders(["Status", "Status", ""]), ["Status", "Status (B)", "Kolom C"]);
+
+  for (const [v, want] of [["Rp 15.000.000", 15000000], ["15jt", 15000000], ["15,5 juta", 15500000], ["4.500.000", 4500000], [12500000.5, 12500001], ["", null]] as const)
+    assert.deepEqual(m.parseMoney(v), { ok: true, value: want }, String(v));
+  assert.equal(m.parseMoney("USD 2,000").ok, false);
+  assert.equal(m.parseMoney("TBD").ok, false);
+  assert.deepEqual(m.parseDate("01/10/2026"), { ok: true, value: "2026-10-01" });
+  assert.deepEqual(m.parseDate("01/10/2026", "mdy"), { ok: true, value: "2026-01-10" });
+  assert.deepEqual(m.parseDate("1 Okt 2026"), { ok: true, value: "2026-10-01" });
+  assert.deepEqual(m.parseDate("Oct 1, 2026"), { ok: true, value: "2026-10-01" });
+  assert.deepEqual(m.parseDate(46296), { ok: true, value: "2026-10-01" });
+  assert.equal(m.parseDate("kemarin").ok, false);
+  assert.equal(m.parseDate("31/02/2026").ok, false);
+  assert.deepEqual(m.parseCount("3 orang"), { ok: true, value: 3 });
+  assert.equal(m.parseCount("2-3").ok, false);
+  assert.deepEqual(m.parseScore("4/5"), { ok: true, value: 4 });
+
+  const cols = Object.fromEntries(headers.map((h) => [h, match[h]?.field ?? ""]));
+  const rows: unknown[][] = [
+    ["", "Ya", "UJI A", "Managed Services", "Won", "Rp 540.000.000", "Lama", "Tyas", "1 Okt 2026", "4", "Dev", "Sr.", "3 orang", "15jt"],
+    ["", "x", "UJI B", "RPO", "Closed Lost", "", "Baru", "Budi S.", "kemarin", "High", "SPG", "C-Level", "2-3", "USD 2,000"],
+    ["Q4 2026 ▼"],
+    ["OPTY-1", "Yes", "UJI C", "Outsourcing", "Win", "", "Existing", "Tyas", "", "", "", "", "", "20000000"],
+    ["OPTY-2", "", "UJI D", "", "", "", "", "Tyas", "", "", "", "", "", ""],
+    ["OPTY-2", "", "UJI E", "", "", "", "", "Tyas", "", "", "", "", "", ""],
+    ["", "Ya", "UJI F", "Outsourcing", "Win", "", "", "Tyas", "", "", "Dev", "", "", ""],
+  ];
+  const plan = m.planImport({ kind: "ot", headers, rows, columns: cols, values: {}, dateOrder: "dmy", pics: ["Tyas"], existing: [
+    { id: "1", key: "OPTY-1", values: { client_name: "UJI C", price_amount: 15000000, opty_status_code: "win", sales_pic_name: "Tyas", service_type_code: "outsourcing", client_type_code: "existing", sales_qualified: true } },
+    { id: "9", key: "OPTY-9", values: { client_name: "UJI F", position_name: "Dev", sales_pic_name: "Tyas" } },
+  ] });
+  const st = (n: number) => plan.rows.find((r) => r.row === n)!;
+  assert.equal(st(2).status, "create");
+  assert.deepEqual(st(2).values, { sales_qualified: true, client_name: "UJI A", service_type_code: "managed_service", opty_status_code: "win", estimated_deal_amount: 540000000,
+    client_type_code: "existing", sales_pic_name: "Tyas", last_communication_date: "2026-10-01", bante_score: 4, position_name: "Dev", level_code: "senior", headcount_target: 3, price_amount: 15000000 });
+  assert.equal(st(3).status, "error");
+  for (const x of ["x", "Budi S.", "kemarin", "High", "C-Level", "2-3", "Rupiah"]) assert.ok(st(3).issues.some((i) => i.includes(x)), x);
+  assert.equal(st(4).status, "skip");
+  assert.equal(st(5).status, "update");
+  assert.deepEqual(st(5).changes, [{ field: "price_amount", old: "15000000", new: "20000000" }], "only stated, different values; blanks don't clear");
+  assert.equal(st(6).status, "error");
+  assert.match(st(6).issues.join(), /lebih dari sekali/);
+  assert.equal(st(8).status, "skip", "no Opty No but the same client, position and PIC: not created twice");
+  assert.ok(plan.distinct.some((d) => d.raw === "x" && d.code === null));
+  const mapped = m.planImport({ kind: "ot", headers, rows: [rows[1]], columns: cols, dateOrder: "dmy", pics: ["Tyas"], existing: [],
+    values: { sales_qualified: { x: "true" }, sales_pic_name: { [m.valueKey("Budi S.")]: m.KEEP }, level_code: { [m.valueKey("C-Level")]: "vp" } } });
+  assert.deepEqual(mapped.rows[0].issues.filter((i) => /belum dipetakan/.test(i)), [], "the person's value choices resolve the rest");
+
+  // A saved V1 mapping still reads; column choices belong to one tab.
+  assert.deepEqual(m.readConfig('{"Nama Klien ":"client_name"}', "Pipeline").columns, { "Nama Klien ": "client_name" });
+  const v2 = JSON.stringify({ v: 2, tab: "Pipeline", columns: { A: "client_name" }, values: { level_code: { sr: "senior" } }, dateOrder: "mdy" });
+  assert.deepEqual(m.readConfig(v2, "Lebar"), { v: 2, tab: "Lebar", columns: {}, values: { level_code: { sr: "senior" } }, dateOrder: "mdy" });
+});
+
+test("QA 2026-10-09 sheet push: only mapped cells of rows found by key, the sheet's own spelling, nothing cleared", async () => {
+  const m = await import("../src/features/sales-v2/sheet-import");
+  const headers = ["Opty No", "Client Name", "Status", "Price", "Catatan tim"];
+  const columns = { "Opty No": "opty_no", "Client Name": "client_name", Status: "opty_status_code", Price: "price_amount", "Catatan tim": "" };
+  const rows = [["OPTY-1", "PT A", "WIN", 15000000, "jangan diubah"], ["OPTY-2", "PT B", "Closed Lost", "", "x"]];
+  const push = m.planPush({ kind: "ot", headers, rows, columns, values: {}, dateOrder: "dmy", pics: [], records: [
+    { id: "1", key: "OPTY-1", values: { client_name: "PT A", opty_status_code: "win", price_amount: 15000000 } },
+    { id: "2", key: "OPTY-2", values: { client_name: "=HYPERLINK(1)", opty_status_code: "win", price_amount: null } },
+    { id: "3", key: "OPTY-3", values: { client_name: "PT C", opty_status_code: "dropped" } },
+  ] });
+  assert.deepEqual(push.cells, [
+    { row: 3, col: 1, old: "PT B", value: "'=HYPERLINK(1)" },
+    { row: 3, col: 2, old: "Closed Lost", value: "WIN" },
+  ]);
+  assert.deepEqual(push.append, [["OPTY-3", "PT C", "Closed Lost", ""]], "only up to the last mapped column");
+  assert.equal(m.planPush({ kind: "ot", headers, rows, columns: { "Client Name": "client_name" }, values: {}, dateOrder: "dmy", pics: [], records: [] }).keyMissing, true);
+  const actions = read("features/sales-v2/sheet-import-actions.ts");
+  for (const fn of ["importPreview", "importCommit", "pushPreview", "pushCommit", "aiMapColumns"])
+    assert.match(actions, new RegExp(`export async function ${fn}\\([^\\n]*\\{\\n  await requireActor\\(\\);\\n  await requireSalesSheetSync\\(\\);`), fn);
+  assert.equal((actions.match(/await requireDivisionAccess\("sales", "full"\)/g) ?? []).length, 2, "push needs Sales Full");
+  assert.match(actions, /db\.transaction/);
+  assert.match(actions, /tx\.insert\(recordFieldChanges\)/);
+  for (const f of ["app/sales/sheet-sync/actions.ts", "app/sales/opportunity-tracker/sheet-sync/actions.ts"]) assert.doesNotMatch(read(f), /clearSheetRange\(/, `${f}: V1's clearing push is gone`);
+});
