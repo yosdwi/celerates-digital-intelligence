@@ -26,7 +26,7 @@ function timeAgo(date: Date, t: (key: string, values?: Record<string, string | n
   return t("daysAgo", { count: days });
 }
 
-export function NotificationBell() {
+export function NotificationBell({ inline = false }: { inline?: boolean } = {}) {
   const { data: session } = useSession();
   const router = useRouter();
   const t = useTranslations("notifications");
@@ -77,7 +77,7 @@ export function NotificationBell() {
   }
 
   return (
-    <div ref={ref} className="fixed top-4 right-[calc(var(--agent-rail,0px)+68px)] z-40 hidden md:block">
+    <div ref={ref} className={`${inline ? "relative" : "fixed top-4 right-[calc(var(--agent-rail,0px)+68px)] z-40"} hidden md:block`}>
       <button
         onClick={() => { setOpen((v) => !v); if (!open) refresh(); }}
         className="relative flex h-9 w-9 items-center justify-center rounded-full bg-white/75 backdrop-blur-xl border border-white/70 text-slate-600 shadow-[0_1px_2px_rgba(15,23,42,0.04)] hover:shadow-[0_4px_12px_rgba(15,23,42,0.10)] hover:-translate-y-0.5 transition-all duration-200"

@@ -9,7 +9,9 @@ export default withNextIntl({
   // request headers there, so every Server Action (upload evidence included) 403'd. Declare it.
   // Middleware sees a copy of every request body; above this size Next truncates the route's copy too, so it must
   // stay above the Server Action limit.
-  experimental: { serverActions: { bodySizeLimit: "22mb", allowedOrigins: ["ierp.celeratesapps.com"] }, middlewareClientMaxBodySize: "25mb" },
+  // staleTimes: going back to a page seen in the last 30 s is instant (FRONTEND-LOADING-ARCHITECTURE §3); every save
+  // still refreshes or revalidates, so edits show at once.
+  experimental: { serverActions: { bodySizeLimit: "22mb", allowedOrigins: ["ierp.celeratesapps.com"] }, middlewareClientMaxBodySize: "25mb", staleTimes: { dynamic: 30 } },
   async headers() { return [{ source: "/:path*", headers: [
     { key: "X-Content-Type-Options", value: "nosniff" },
     { key: "X-Frame-Options", value: "DENY" },

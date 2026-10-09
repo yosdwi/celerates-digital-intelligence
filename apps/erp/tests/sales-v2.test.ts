@@ -77,10 +77,10 @@ test("V2 renders with Crisp components, not look-alikes", () => {
   assert.doesNotMatch(ws, /TrackerViewTabs|@\/components\/view-toggle/);
 });
 
-test("Crisp styles are scoped to the V2 route and layered; base.css is never loaded", () => {
+test("Crisp styles are layered (the app's own styles win) and base.css is never loaded; the app shell uses them too (QA 2026-10-09)", () => {
   assert.match(read("app/sales/v2/layout.tsx"), /@crisp-ui-kit\/crisp\/styles\.layered\.css/);
-  assert.doesNotMatch(read("app/layout.tsx"), /crisp/);
-  assert.doesNotMatch(read("app/sales/v2/layout.tsx"), /base\.css"/);
+  assert.match(read("app/layout.tsx"), /import "@crisp-ui-kit\/crisp\/styles\.layered\.css";/);
+  for (const f of ["app/layout.tsx", "app/sales/v2/layout.tsx"]) assert.doesNotMatch(read(f), /base\.css"|crisp\/styles\.css"/, f);
 });
 
 test("density: no oversized page chrome in V2", () => {
@@ -219,7 +219,7 @@ test("V2 toolbar: every column by default, New and Sheet Sync (a dialog) at the 
   const ws = read("features/sales-v2/workspace.tsx");
   assert.match(ws, /<SheetSyncButton\b/);
   assert.doesNotMatch(ws, /href="\/sales\/opportunity-tracker\/sheet-sync"/);
-  assert.match(read("app/sales/v2/sales-v2.css"), /--crisp-bg-brand-solid: #194667/);
+  assert.match(read("app/crisp-theme.css"), /--crisp-bg-brand-solid: #194667/);
 });
 
 // ── PQ Tracker V2 (contract §14) ────────────────────────────────────────────────────────────────────────────
@@ -509,7 +509,7 @@ test("QA page 6: toolbar menus scroll inside, float clearly, the page never scro
   const css = read("app/sales/v2/sales-v2.css");
   // Crisp's TableToolbar menus (not its Popover / Menu) were the ones running off the screen (seen at 1366 × 768).
   assert.match(css, /\.crisp-tabletoolbar-menu:not\(:has\(\.crisp-tabletoolbar-menu\)\) \{ max-height: min\(70dvh, 520px\); overflow-y: auto;/);
-  assert.match(css, /--crisp-ring-popover: rgb\(15 23 42 \/ 0\.12\);/);
+  assert.match(read("app/crisp-theme.css"), /--crisp-ring-popover: rgb\(15 23 42 \/ 0\.12\);/);
   assert.match(read("components/agent/agent-panel.tsx"), /intro && !open && !panelOpen && !pathname\.startsWith\("\/sales\/v2\/"\)/);
   const ws = read("features/sales-v2/record-workspace.tsx");
   assert.match(ws, /md:h-dvh md:overflow-hidden" data-sales-v2>/);
@@ -830,4 +830,18 @@ test("QA 2026-10-09 sheet push: only mapped cells of rows found by key, the shee
   assert.match(actions, /db\.transaction/);
   assert.match(actions, /tx\.insert\(recordFieldChanges\)/);
   for (const f of ["app/sales/sheet-sync/actions.ts", "app/sales/opportunity-tracker/sheet-sync/actions.ts"]) assert.doesNotMatch(read(f), /clearSheetRange\(/, `${f}: V1's clearing push is gone`);
+});
+
+test("QA 2026-10-09 app shell: view preferences parse safely; layout renders the chosen shell; loading skeletons exist", async () => {
+  const { parseUiPrefs, serializeUiPrefs, DEFAULT_UI_PREFS } = await import("../src/lib/ui-preferences");
+  assert.deepEqual(parseUiPrefs(undefined), DEFAULT_UI_PREFS);
+  assert.deepEqual(parseUiPrefs("shell=classic;sidebar=dark;look=hybrid"), { shell: "classic", sidebar: "dark", look: "hybrid" });
+  assert.deepEqual(parseUiPrefs("shell=<script>;sidebar=purple;x=1"), DEFAULT_UI_PREFS, "unknown values fall back");
+  assert.equal(serializeUiPrefs({ shell: "crisp", sidebar: "light", look: "v1" }), "shell=crisp;sidebar=light;look=v1");
+  const layout = read("app/layout.tsx");
+  assert.match(layout, /prefs\.shell === "crisp" \? \(/);
+  assert.match(layout, /<ErpShell prefs=\{prefs\}>\{children\}<\/ErpShell>/);
+  assert.match(read("app/ui-preferences-actions.ts"), /export async function setUiPreference[^\n]*\{\n  await requireActor\(\);\n  if \(!isUiPref\(key, value\)\) return;/);
+  for (const f of ["app/loading.tsx", "app/sales/v2/loading.tsx", "app/sales/v2/opportunity-tracker/[id]/loading.tsx"]) assert.match(read(f), /Skeleton/, f);
+  assert.match(read("components/erp-shell.tsx"), /commandItems=\{commandItems\}/);
 });

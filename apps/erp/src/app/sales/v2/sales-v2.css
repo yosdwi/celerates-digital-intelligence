@@ -1,24 +1,7 @@
 /* Sales V2 visual layer (docs/design/SALES-V2-CRISP-UX-CONTRACT.md §12). Unlayered, so it wins over Crisp's
    @layer crisp-components; every rule is scoped to V2 markup or to Crisp classes, which only V2 renders. */
 
-/* Crisp asks for VK Sans first, which is never loaded; use the ERP's own font (Inter, globals.css --font-sans). */
-/* ERP brand instead of Crisp's cyan: navy for primary actions, checkboxes and selection fills; the ERP accent blue
-   for links, soft brand text and focus rings (globals.css --color-brand-*, --color-j-accent). */
-:root {
-  --crisp-font-sans: var(--font-sans);
-  --crisp-bg-brand-solid: #194667;
-  --crisp-bg-brand-solid-pressed: #123650;
-  --crisp-bg-brand-contrast: #123650;
-  --crisp-fg-brand-contrast: #194667;
-  --crisp-fg-brand-soft: #2356e8;
-  --crisp-ring-brand-soft: #dce8ef;
-  --crisp-stroke-focus-ring: #2356e8;
-  /* Menus and popovers float clearly over a dense white table (Crisp's ring is transparent, its shadow faint). */
-  --crisp-ring-popover: rgb(15 23 42 / 0.12);
-  --crisp-shadow-popover1: rgb(15 23 42 / 0.06);
-  --crisp-shadow-popover2: rgb(15 23 42 / 0.18);
-  --crisp-shadow-popover3: rgb(15 23 42 / 0.22);
-}
+/* Crisp tokens for the ERP brand live in app/crisp-theme.css (loaded by the root layout for the app shell too). */
 
 /* Table header: V1's violet header row (bg-violet-50, violet-700, uppercase, semibold; QA 2026-10-08); the whole cell
    is the Excel-style menu button. */
@@ -127,3 +110,32 @@
 
 /* The toolbar's Filter while it shows the table's header ▼ (record-workspace.tsx, QA page 8). */
 [data-sales-v2] .crisp-tabletoolbar-tool[aria-pressed="true"] { background: #e8eefd; color: #1a43b8; border-style: solid; border-color: #9db4f5; }
+
+/* ── "Hybrid" page look (preference look=hybrid, QA 2026-10-09; docs/audit/SALES-V2-UX-AUDIT-2026-10-09.md §4 B) ───
+   Crisp's own neutral header and density; smaller summary cards; the coloured Kanban stays. Switched back from the
+   workspace menu, so every rule is under html[data-look="hybrid"]. */
+html[data-look="hybrid"] [data-sales-v2] .crisp-table thead th {
+  background: var(--crisp-bg-surface, #fff); color: #475569; font-size: 12.5px; font-weight: 500; text-transform: none; letter-spacing: 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+html[data-look="hybrid"] [data-sales-v2] .crisp-table thead th:hover { background: #f8fafc; }
+html[data-look="hybrid"] [data-sales-v2] [data-header-filter][data-active] { color: #194667; }
+html[data-look="hybrid"] [data-sales-v2] td:has([data-sales-v2-frozen]), html[data-look="hybrid"] [data-sales-v2] th:has([data-sales-v2-frozen-head]) { border-inline-end-color: #e5e7eb; }
+@media (min-width: 768px) and (max-width: 1599px) {
+  html[data-look="hybrid"] {
+    --crisp-text-xs: 11px; --crisp-text-sm: 12px; --crisp-text-md: 13px; --crisp-text-lg: 14px; --crisp-text-xl: 16px;
+    --crisp-size-row: 28px; --crisp-size-tableRow: 36px; --crisp-size-tableHeader: 40px; --crisp-size-header: 48px; --crisp-size-chip: 22px; --crisp-size-icon: 16px;
+    --crisp-space-0-5: 2px; --crisp-space-1: 4px; --crisp-space-1-5: 6px; --crisp-space-2: 8px; --crisp-space-2-5: 10px;
+    --crisp-space-3: 12px; --crisp-space-3-5: 14px; --crisp-space-4: 16px; --crisp-space-5: 20px; --crisp-space-6: 24px; --crisp-space-8: 32px;
+  }
+}
+/* Summary cards: one slim row, label and number side by side; gentler shadow. */
+html[data-look="hybrid"] [data-sales-v2-kpi] > button { border-radius: 8px; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08) !important; }
+html[data-look="hybrid"] [data-sales-v2-kpi] > button[aria-pressed="true"] { box-shadow: 0 0 0 2px #fff, 0 0 0 3px #194667 !important; }
+html[data-look="hybrid"] [data-sales-v2-kpi] > button > span[aria-hidden] { display: none; }
+html[data-look="hybrid"] [data-sales-v2-kpi] .crisp-statcard { display: flex; flex-direction: row; align-items: baseline; justify-content: space-between; gap: 8px; padding-block: 5px; }
+html[data-look="hybrid"] [data-sales-v2-kpi] .crisp-statcard span[class*="text-[1.125rem]"] { font-size: 15px; line-height: 20px; }
+/* View toggle and dialogs in the brand navy, without V1's violet glow or the tinted dialog header. */
+html[data-look="hybrid"] [data-sales-v2] .crisp-viewtoggle-tile[data-active] { background-image: none; background: #194667; box-shadow: none; }
+html[data-look="hybrid"] .crisp-dialog-backdrop { background: rgb(15 23 42 / 0.32); backdrop-filter: none; }
+html[data-look="hybrid"] [data-sales-v2-dialog] .crisp-dialog-header { background: #fff; box-shadow: none; border-bottom: 1px solid #eef0f3; }
