@@ -63,6 +63,14 @@ export function ErpShell({ prefs, children }: { prefs: UiPrefs; children: React.
   }, []);
   useEffect(() => { if (!commandOpen) setQuery(""); }, [commandOpen]);
 
+  const special = SPECIAL_PAGES[pathname];
+  const crumbs: { icon: React.ComponentType<{ className?: string }>; text: string }[] = pathname === "/"
+    ? [{ icon: Home, text: t("home") }]
+    : special ? [special]
+    : [active ? { icon: active.icon, text: label(active.label) } : null, current ? { icon: PAGE_ICON[current.href] ?? Dot, text: label(current.label) } : null].filter((c) => c !== null);
+  // Remembered for Beranda's "Terakhir dibuka" (this browser only).
+  const where = crumbs.map((c) => c.text).join(" / ");
+  useEffect(() => { if (pathname !== "/" && where) rememberPage(pathname, where); }, [pathname, where]);
   if (status !== "authenticated") return <main className="min-h-screen">{children}</main>;
 
   const commandItems: CommandItem[] = [
@@ -76,14 +84,6 @@ export function ErpShell({ prefs, children }: { prefs: UiPrefs; children: React.
     // Records the person may read (governed catalog search, /api/search); the query is a keyword so the list keeps them.
     ...records.map((r) => ({ id: `rec:${r.type}:${r.id}`, label: r.label, icon: FileText, group: "Record", secondary: r.type_label, keywords: [query], onSelect: () => go(r.href) })),
   ];
-  const special = SPECIAL_PAGES[pathname];
-  const crumbs: { icon: React.ComponentType<{ className?: string }>; text: string }[] = pathname === "/"
-    ? [{ icon: Home, text: t("home") }]
-    : special ? [special]
-    : [active ? { icon: active.icon, text: label(active.label) } : null, current ? { icon: PAGE_ICON[current.href] ?? Dot, text: label(current.label) } : null].filter((c) => c !== null);
-  // Remembered for Beranda's "Terakhir dibuka" (this browser only).
-  const where = crumbs.map((c) => c.text).join(" / ");
-  useEffect(() => { if (pathname !== "/" && where) rememberPage(pathname, where); }, [pathname, where]);
 
   return (
     <ShellContext.Provider value="crisp">

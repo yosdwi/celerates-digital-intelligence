@@ -848,6 +848,9 @@ test("QA 2026-10-09 app shell: view preferences parse safely; layout renders the
   assert.match(shell, /<Command open=\{commandOpen\}[^>]*items=\{commandItems\}/);
   assert.match(shell, /\{pathname !== "\/" && <Button size="sm" intent="ghost" onClick=\{\(\) => openAgent\(\)\}>/, "header: Tanya Agent, except on Beranda (QA page 22)");
   assert.doesNotMatch(shell, /AI Assistant/, "sidebar: no AI Assistant card (QA page 22)");
+  // No hook after the signed-out early return (React #310 took the whole shell down in qa23).
+  const afterReturn = shell.slice(shell.indexOf('if (status !== "authenticated") return <main'), shell.indexOf("  return (\n    <ShellContext.Provider"));
+  assert.doesNotMatch(afterReturn, /\buse[A-Z]\w*\(/, "ErpShell: hooks before the early return");
   assert.match(read("features/home/home-ask.tsx"), /openAgent\(\{ ask: q\.trim\(\), full: true \}\)/, "Beranda asks full page");
   assert.match(read("app/crisp-theme.css"), /\[data-erp-shell-main\]:has\(> \[data-agent-slot\] > \*\)/);
   assert.match(read("app/api/presence/route.ts"), /if \(!user\?\.id\) return NextResponse\.json\(\{ error: "unauthorized" \}, \{ status: 401 \}\)/, "presence: signed-in only");
