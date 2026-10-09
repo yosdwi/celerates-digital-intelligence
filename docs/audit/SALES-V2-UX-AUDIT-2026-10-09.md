@@ -92,3 +92,49 @@ first screen, or in the activity timeline.
    - In the same visual language as the workspaces.
    - Built around pipeline insight: deals to follow up, weighted forecast, Win and Drop.
 6. **Keyboard:** `Ctrl/Cmd+K` to search records and run actions; ↑/↓ in the panel.
+
+## 4. Design foundation: element by element (added after the Product Owner's Attio screenshots)
+
+The Product Owner's question is about the foundation (surfaces, type, spacing, panels, how things appear), not one
+feature.
+
+Measured on the pilot (OT table with the panel open, 1440×900). The Attio values are estimated from the screenshots
+the Product Owner shared. The Crisp defaults come from `@crisp-ui-kit/crisp` `tokens.css`; Crisp's source says its
+components were "measured live on app.attio.com".
+
+| Element | Attio (screenshot) | Crisp default | Celerates Sales V2 today | Where ours comes from |
+|---|---|---|---|---|
+| App shell | Light sidebar (same family as the page, hairline divider, ~260 px); Quick Actions ⌘K and search at its top; Favorites and Records groups | `AppShell` + `Sidebar`: light, 275 px, floats below 865 px | **Dark navy sidebar** (210 px) listing all 14 ERP modules, with Sales as a sub-tree | ERP's own `components/sidebar.tsx`, not Crisp |
+| Page header | One 48 px bar: icon + page name, actions on the right (Share, Ask Attio) | `HeaderBar`, 48 px | Title + subtitle; language flags, bell and avatar float at the top right | ERP header widgets plus V2 workspace header |
+| Above the list | View selector ("Top companies ▾"), then one line of sort and filter chips. **No stat cards.** | `ListPage`, `StatList` (quiet numbers) | **Five saturated gradient KPI cards** (63 px, ring and glow) | `sales-v2.css` "V1 gradients" (QA 2026-10-08) |
+| Table header | Sentence case, about 14 px, dark grey, a small grey icon per column, white background | Sentence case, neutral, 40 px | **9.6 px UPPERCASE violet `#6d28d9` on lavender `#f5f3ff`**, 36 px | `sales-v2.css` "V1's violet header row" (QA 2026-10-08) |
+| Rows | About 38 px, 14 px text, hairline column dividers, a checkbox column | 36 px, 13 px | 32 px, 13 px | Laptop density override (`sales-v2.css`: text 12/13 px, row 32 px below 1600 px) |
+| Status | Dot + text ("● Strong"); tags as light outlined pills | Tag palette | Filled pastel chips (red, green, violet…) | Crisp tags, used for every status |
+| Colour | Almost monochrome; colour only in logos, status dots and the primary button | Neutral, one brand accent | Navy primary, **violet** view toggle and header, **gradient** cards, tinted Kanban columns, **pink/violet** login | Mixed V1 palettes |
+| Footer | Count + "Add calculation" per column | `ColumnCalc` | "307 dari 307" in the toolbar | — |
+| Record preview | Peek panel over the list: toolbar (close, ↑ ↓, counter, open), identity, Highlights grid, Activity, sections | `RecordPanel` (the same, measured from Attio) | `RecordPanel`, matching Attio | Already Crisp |
+| Assistant | "Ask Attio" button in the header bar opens a full page or panel | — | Floating "Celerates Agent" pill over the content | ERP `AgentPanel` |
+| Dialogs | Plain white, light shadow | Crisp `Dialog` | Brand header band, blurred and darkened backdrop | `sales-v2.css` |
+| Loading and motion | Instant feel (local data) | — | No skeletons, no route loading, about 0.3–0.7 s frozen per navigation | Section 2C |
+
+**Cause:** the kit we already use *is* the Attio foundation. The difference comes from three layers on top of it:
+1. **The ERP shell:** dark sidebar and floating header widgets, which are not Crisp.
+2. **The V1 look restored in `sales-v2.css` at the QA of 2026-10-08:** violet header, gradient cards, violet toggle,
+   tinted Kanban and branded dialogs. This was done because the Product Owner then asked for the Celerates theme and
+   the V1 look.
+3. **A laptop density override** that makes text and rows smaller than Attio.
+
+**Options:**
+- **A. Attio-clean with a Celerates accent (recommended).**
+  - Drop the V1 visual layer and use Crisp's defaults.
+  - Navy `#194667` becomes the only accent: primary buttons, active states and focus.
+  - The status colours stay, as dot + text or soft tags.
+  - Stat cards become one quiet `StatList` row.
+  - Keep Crisp's default density (13/14 px, 36 px rows).
+- **B. Hybrid.** Neutral table header and density as in A, but keep the KPI cards (smaller) and the coloured Kanban.
+- **C. Keep the current look**; fix only the overlaps and the loading.
+
+**Shell (all modules, since the sidebar is global):**
+- Move to Crisp `AppShell` + `Sidebar` + `HeaderBar`: a light sidebar with ⌘K search on top, modules as groups, a
+  48 px header bar, and the Agent as a header button.
+- Or keep the dark sidebar and change only the page area.
