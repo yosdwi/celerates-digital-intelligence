@@ -259,7 +259,7 @@ def transcribe_audio(file: UploadFile = File(...), user=Depends(delegated_actor)
     return {"text": text[:300], **meta}
 
 
-FORMS = Literal["opportunity", "pq", "extension", "account", "contact", "opportunity_update"]
+FORMS = Literal["opportunity", "pq", "extension", "account", "contact", "opportunity_update", "sheet_columns"]
 
 
 class ExtractRequest(Strict):
@@ -337,6 +337,11 @@ Keys:
 - position_name, level_code (one of {CODES["level"]}), headcount_target, estimated_duration_months: only if changed
 - price_amount, price_period_code (one of {CODES["period"]}): only if a new rate was agreed or asked
 - dropped_reason: one Indonesian sentence, only with opty_status_code dropped""",
+    "sheet_columns": """You match the columns of a sales team's spreadsheet to the fields of the ERP it is imported into.
+The text lists FIELDS (key: label) and COLUMNS (column name: a few example values). Use the names and the examples:
+dates, amounts, people's names and status words tell what a column holds. Reply as
+{"mapping": {"<column name exactly as written>": "<field key>"}}. Include only columns you are confident about, use
+each field key at most once, and never invent a column name or a field key.""",
 }
 MAX_DOC = 8 * 1024 * 1024
 
