@@ -153,7 +153,9 @@ export function startWorkflowScheduler() {
       const due = await db.select().from(workflows).where(and(eq(workflows.enabled, true), lte(workflows.next_run_at, new Date())));
       for (const wf of due) {
         const next = scheduleFor(wf.template, wf.config, true);
-        const claimed = await db.update(workflows).set({ next_run_at: next }).where(and(eq(workflows.id, wf.id), eq(workflows.next_run_at, wf.next_run_at!))).returning({ id: workflows.id });
+        // Claim atomically: only the update that still finds the run due wins (no equality on timestamps, whose
+        // microseconds JavaScript can't carry).
+        const claimed = await db.update(workflows).set({ next_run_at: next }).where(and(eq(workflows.id, wf.id), eq(workflows.enabled, true), lte(workflows.next_run_at, sql`now()`))).returning({ id: workflows.id });
         if (claimed.length) await runWorkflow(wf.id, "schedule").catch(() => { /* recorded on the run */ });
       }
     } catch {

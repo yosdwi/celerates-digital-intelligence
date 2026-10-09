@@ -869,7 +869,7 @@ test("QA 2026-10-09 workflows: schedules in WIB, settings cleaned per template, 
   for (const fn of ["createWorkflow", "updateWorkflow", "setWorkflowEnabled", "runWorkflowNow", "deleteWorkflow"])
     assert.match(actions, new RegExp(`export async function ${fn}\\([^\\n]*\\{\\n  await requireActor\\(\\);\\n  try \\{\\n    (const actor = )?await requireDivisionAccess\\("automation", "full"\\);`), fn);
   const engine = read("lib/workflows/engine.ts");
-  assert.match(engine, /eq\(workflows\.next_run_at, wf\.next_run_at!\)/, "a scheduled run is claimed once");
+  assert.match(engine, /lte\(workflows\.next_run_at, sql`now\(\)`\)\)\)\.returning/, "a scheduled run is claimed once, atomically");
   assert.doesNotMatch(engine, /sendMail|systemTransport|inviteMail/, "workflows send no email during the pilot");
   assert.match(read("instrumentation.ts"), /startWorkflowScheduler\(\)/);
 });
