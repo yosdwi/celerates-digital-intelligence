@@ -827,8 +827,9 @@ test("QA 2026-10-09 sheet push: only mapped cells of rows found by key, the shee
   for (const fn of ["importPreview", "importCommit", "pushPreview", "pushCommit", "aiMapColumns"])
     assert.match(actions, new RegExp(`export async function ${fn}\\([^\\n]*\\{\\n  await requireActor\\(\\);\\n  await requireSalesSheetSync\\(\\);`), fn);
   assert.equal((actions.match(/await requireDivisionAccess\("sales", "full"\)/g) ?? []).length, 2, "push needs Sales Full");
-  assert.match(actions, /db\.transaction/);
-  assert.match(actions, /tx\.insert\(recordFieldChanges\)/);
+  const core = read("features/sales-v2/sheet-import-core.ts");
+  assert.match(core, /db\.transaction/);
+  assert.match(core, /tx\.insert\(recordFieldChanges\)/);
   for (const f of ["app/sales/sheet-sync/actions.ts", "app/sales/opportunity-tracker/sheet-sync/actions.ts"]) assert.doesNotMatch(read(f), /clearSheetRange\(/, `${f}: V1's clearing push is gone`);
 });
 
@@ -847,4 +848,36 @@ test("QA 2026-10-09 app shell: view preferences parse safely; layout renders the
   assert.match(shell, /<Command open=\{commandOpen\}[^>]*items=\{commandItems\}/);
   assert.match(shell, /trailing=\{<Button size="sm" intent="ghost" onClick=\{\(\) => openAgent\(\)\}>/, "header: only Tanya Agent");
   assert.match(shell, /<ProfileMenu prefs=\{prefs\} \/>/);
+});
+
+test("QA 2026-10-09 workflows: schedules in WIB, settings cleaned per template, mutations need Automation Full", async () => {
+  const { nextRun, cleanConfig, templateOf, describeSchedule, TEMPLATES } = await import("../src/lib/workflows/templates");
+  // Friday 2026-10-09 10:00 WIB = 03:00 UTC.
+  const fri10 = new Date("2026-10-09T03:00:00Z");
+  assert.equal(nextRun({ every: "day", at: "09:30", weekdaysOnly: true }, fri10).toISOString(), "2026-10-12T02:30:00.000Z", "after Friday's 09:30 comes Monday's");
+  assert.equal(nextRun({ every: "day", at: "11:00" }, fri10).toISOString(), "2026-10-09T04:00:00.000Z", "later the same day");
+  assert.equal(nextRun({ every: "day", at: "09:30" }, fri10).toISOString(), "2026-10-10T02:30:00.000Z", "Saturday when weekends count");
+  assert.equal(nextRun({ every: "week", weekday: 1, at: "08:00" }, fri10).toISOString(), "2026-10-12T01:00:00.000Z");
+  assert.equal(nextRun({ every: "hours", hours: 6 }, fri10).toISOString(), "2026-10-09T09:00:00.000Z");
+  assert.equal(describeSchedule({ every: "day", at: "09:30", weekdaysOnly: true }), "Setiap hari kerja 09:30");
+  assert.equal(TEMPLATES.length, 4);
+  const t = templateOf("stale_deals")!;
+  assert.deepEqual(cleanConfig(t, { schedule: { every: "day", at: "25:99" }, days: 500, evil: "x" }),
+    { schedule: { every: "day", at: "08:00", weekdaysOnly: true }, days: 14 }, "bad values fall back to the template's, unknown keys dropped");
+  assert.equal(cleanConfig(templateOf("sheet_sync")!, { tracker: "pq", schedule: { every: "hours", hours: 99 } }).schedule.hours, 24);
+  const actions = read("app/automation/workflows/actions.ts");
+  for (const fn of ["createWorkflow", "updateWorkflow", "setWorkflowEnabled", "runWorkflowNow", "deleteWorkflow"])
+    assert.match(actions, new RegExp(`export async function ${fn}\\([^\\n]*\\{\\n  await requireActor\\(\\);\\n  try \\{\\n    (const actor = )?await requireDivisionAccess\\("automation", "full"\\);`), fn);
+  const engine = read("lib/workflows/engine.ts");
+  assert.match(engine, /eq\(workflows\.next_run_at, wf\.next_run_at!\)/, "a scheduled run is claimed once");
+  assert.doesNotMatch(engine, /sendMail|systemTransport|inviteMail/, "workflows send no email during the pilot");
+  assert.match(read("instrumentation.ts"), /startWorkflowScheduler\(\)/);
+});
+
+test("QA doc page 14: a used account is deactivated, not deleted; the audit follows the outcome", () => {
+  const src = read("app/access-management/actions.ts");
+  const del = src.slice(src.indexOf("export async function deleteUser"), src.indexOf("export async function updateUserInfo"));
+  assert.match(del, /db\.transaction/);
+  assert.match(del, /code === "23503"/);
+  assert.ok(del.indexOf('auditAccess("user_delete"') > del.indexOf("db.transaction"), "audit only after the delete succeeded");
 });

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, uuid, text, boolean, integer, bigint, smallint, date, timestamp, check, uniqueIndex, index, doublePrecision, primaryKey, AnyPgColumn } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, boolean, integer, bigint, smallint, date, timestamp, check, uniqueIndex, index, doublePrecision, primaryKey, jsonb, AnyPgColumn } from "drizzle-orm/pg-core";
 
 
 export const leads = pgTable("leads", {
@@ -1333,3 +1333,30 @@ export const mailSyncState = pgTable("mail_sync_state", {
 }, (t) => ({
   pk: primaryKey({ columns: [t.mailbox, t.folder] }),
 }));
+
+/** Workflows (drizzle/0017): a template switched on with its own settings, run on a schedule or by hand. */
+export const workflows = pgTable("workflows", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: text("name").notNull(),
+  template: text("template").notNull(),
+  config: jsonb("config").notNull().default({}),
+  enabled: boolean("enabled").notNull().default(false),
+  owner_user_id: uuid("owner_user_id").references(() => users.id, { onDelete: "set null" }),
+  next_run_at: timestamp("next_run_at", { withTimezone: true }),
+  last_run_at: timestamp("last_run_at", { withTimezone: true }),
+  created_at: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updated_at: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const workflowRuns = pgTable("workflow_runs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  workflow_id: uuid("workflow_id").notNull().references(() => workflows.id, { onDelete: "cascade" }),
+  number: integer("number").notNull(),
+  trigger: text("trigger").notNull(), // schedule | manual
+  status: text("status").notNull(), // running | succeeded | failed
+  started_at: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  finished_at: timestamp("finished_at", { withTimezone: true }),
+  steps: jsonb("steps").notNull().default([]),
+  summary: text("summary"),
+  error: text("error"),
+});

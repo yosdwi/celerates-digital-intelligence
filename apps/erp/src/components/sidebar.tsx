@@ -28,7 +28,7 @@ export const PAGE_ICON: Record<string, LucideIcon> = {
   "/pmo/readiness": ShieldCheck, "/finance": Landmark, "/timesheet": Clock, "/timesheet/converter": ArrowLeftRight, "/attendance": House,
   "/attendance/live": MapPin, "/attendance/history": History, "/attendance/time-off": CalendarOff, "/executive-dashboard": Gauge, "/tasks": KanbanSquare,
   "/files": FolderOpen, "/ttd-online": PenTool, "/feature-requests": Lightbulb, "/school": GraduationCap, "/school/my-learning": GraduationCap,
-  "/automation/reminders": Bot, "/automation/documents": FileText,
+  "/automation/workflows": Workflow, "/automation/reminders": Bot, "/automation/documents": FileText,
 };
 
 export function Sidebar() {

@@ -137,6 +137,7 @@ export const MODULES: ModuleConfig[] = [
   {
     key: "automation", label: "Automasi & Chatbot", icon: Bot, color: "bg-indigo-600", enabled: true,
     basePath: "/automation", subPages: [
+      { href: "/automation/workflows", label: "Workflows" },
       { href: "/automation/reminders", label: "Reminder" },
       { href: "/automation/documents", label: "Document Generator" },
     ],
