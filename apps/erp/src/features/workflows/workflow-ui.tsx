@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { CalendarClock, CheckCircle2, Circle, CircleX, Loader2, Play, Plus, Sparkles, Workflow as WorkflowIcon, Zap } from "lucide-react";
 import { Badge, Button, Callout, Dialog, DialogBody, FlowCanvas, Input, Segmented, Select, Switch } from "@crisp-ui-kit/crisp";
 import { createWorkflow, deleteWorkflow, runWorkflowNow, setWorkflowEnabled, updateWorkflow } from "@/app/automation/workflows/actions";
-import { cleanConfig, describeSchedule, type Schedule, type Step, type Template, type WorkflowConfig } from "@/lib/workflows/templates";
+import { TEMPLATES, cleanConfig, describeSchedule, templateOf, type Schedule, type Step, type Template, type WorkflowConfig } from "@/lib/workflows/templates";
 
 export type WorkflowRow = {
   id: string; name: string; template: string; enabled: boolean; config: unknown; owner: string | null;
@@ -23,7 +23,9 @@ const STATUS: Record<string, { text: string; tone: "success" | "danger" | "brand
 };
 
 // ── List ─────────────────────────────────────────────────────────────────────────────────────────────────────
-export function WorkflowList({ rows, templates, canEdit }: { rows: WorkflowRow[]; templates: Template[]; canEdit: boolean }) {
+// Templates hold functions (steps), so they are imported here rather than passed from the server page.
+export function WorkflowList({ rows, canEdit }: { rows: WorkflowRow[]; canEdit: boolean }) {
+  const templates = TEMPLATES;
   const router = useRouter();
   const [creating, setCreating] = useState<Template | null>(null);
   const [name, setName] = useState("");
@@ -123,7 +125,8 @@ const KIND: Record<Step["kind"], { text: string; Icon: React.ComponentType<{ cla
   trigger: { text: "Pemicu", Icon: CalendarClock }, step: { text: "Langkah", Icon: Zap }, action: { text: "Aksi", Icon: Sparkles },
 };
 
-export function WorkflowDetail({ wf, template, runs, canEdit }: { wf: WorkflowRow; template: Template; runs: RunRow[]; canEdit: boolean }) {
+export function WorkflowDetail({ wf, runs, canEdit }: { wf: WorkflowRow; runs: RunRow[]; canEdit: boolean }) {
+  const template = templateOf(wf.template)!;
   const router = useRouter();
   const [tab, setTab] = useState<"editor" | "runs" | "settings">("editor");
   const [config, setConfig] = useState<WorkflowConfig>(() => cleanConfig(template, wf.config));

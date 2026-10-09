@@ -26,7 +26,7 @@ export default async function WorkflowPage({ params }: { params: Promise<{ id: s
   return (
     <WorkflowDetail
       wf={{ id: row.w.id, name: row.w.name, template: row.w.template, enabled: row.w.enabled, config: row.w.config, owner: row.owner, nextRunAt: row.w.next_run_at?.toISOString() ?? null, lastRun: null }}
-      template={template} runs={data} canEdit={canEdit}
+      runs={data} canEdit={canEdit}
     />
   );
 }

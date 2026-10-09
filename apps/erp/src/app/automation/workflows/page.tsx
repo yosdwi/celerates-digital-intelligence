@@ -4,7 +4,6 @@ import { authOptions } from "@/lib/auth";
 import { db } from "@/db";
 import { users, workflowRuns, workflows } from "@/db/schema";
 import { claimsOf, divisionLevel } from "@/lib/module-access";
-import { TEMPLATES } from "@/lib/workflows/templates";
 import { WorkflowList, type WorkflowRow } from "@/features/workflows/workflow-ui";
 
 export const metadata = { title: "Workflows" };
@@ -23,5 +22,5 @@ export default async function WorkflowsPage() {
     nextRunAt: w.next_run_at?.toISOString() ?? null,
     lastRun: last.get(w.id) ? { status: last.get(w.id)!.status, startedAt: new Date(last.get(w.id)!.started_at).toISOString() } : null,
   }));
-  return <WorkflowList rows={data} templates={TEMPLATES} canEdit={canEdit} />;
+  return <WorkflowList rows={data} canEdit={canEdit} />;
 }
