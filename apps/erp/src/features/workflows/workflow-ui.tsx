@@ -60,11 +60,12 @@ export function WorkflowList({ rows, canEdit }: { rows: WorkflowRow[]; canEdit: 
                     <tr key={w.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60">
                       <td className="px-4 py-2.5">
                         <Link href={`/automation/workflows/${w.id}`} className="font-medium text-slate-900 hover:underline">{w.name}</Link>
-                        <span className="block text-[12px] text-slate-500">{t?.name ?? w.template}</span>
+                        {/* The template only when the name does not already say it (QA page 25). */}
+                        {(t?.name ?? w.template) !== w.name && <span className="block text-[12px] text-slate-500">{t?.name ?? w.template}</span>}
                       </td>
                       <td className="px-4 py-2.5 text-slate-700">{cfg ? describeSchedule(cfg.schedule) : "—"}</td>
                       <td className="px-4 py-2.5">{s ? <span className="inline-flex items-center gap-1.5"><Badge size="small" tone={s.tone}>{s.text}</Badge><span className="text-[12px] text-slate-500">{when(w.lastRun!.startedAt)}</span></span> : <span className="text-slate-400">Belum pernah</span>}</td>
-                      <td className="px-4 py-2.5 text-slate-700">{w.enabled ? when(w.nextRunAt) : "—"}</td>
+                      <td className="px-4 py-2.5 text-slate-700">{w.enabled ? when(w.nextRunAt) : <span className="text-slate-400">Tidak aktif</span>}</td>
                       <td className="px-4 py-2.5 text-slate-700">{w.owner ?? "—"}</td>
                       <td className="px-4 py-2.5">
                         <Switch checked={w.enabled} disabled={!canEdit || pending} aria-label={`Live ${w.name}`}

@@ -281,7 +281,7 @@ export default function AgentThread({
             }
           </ComposerPrimitive.Unstable_TriggerPopoverItems>
         </ComposerPrimitive.Unstable_TriggerPopover>
-        <ComposerPrimitive.Root className="flex items-end gap-2 border-t border-slate-100 p-3">
+        <ComposerPrimitive.Root data-agent-composer-bar className="flex items-end gap-2 border-t border-slate-100 p-3">
           <input
             ref={picker}
             type="file"

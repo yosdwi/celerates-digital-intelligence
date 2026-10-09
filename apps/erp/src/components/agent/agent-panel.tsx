@@ -14,15 +14,13 @@ import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { AlertCircle, ArrowRight, CheckCircle2, ChevronDown, ChevronUp, ClipboardList, ExternalLink, Lightbulb, Mic, RefreshCw, Sparkles, X } from "lucide-react";
-import { operationalContext, type OperationalContextResponse, type OperationalGroup } from "@/lib/operations/policy";
+import { ArrowRight, ExternalLink, Lightbulb, Mic, Sparkles, X } from "lucide-react";
+import { operationalContext, type OperationalContextResponse } from "@/lib/operations/policy";
 import { streamRun, type RunRequest } from "@/lib/agent/ag-ui-client";
 import { applyEvent, newRun, type AgentRun } from "@/lib/agent/run-state";
-import { AttentionGroup } from "./attention";
 import { setRightRail, useRightRail } from "@/lib/right-rail";
 import type { SignalTrend } from "@/lib/operations/reader";
 import { ContextualFeedback } from "./feedback";
-import { FollowUps } from "./follow-ups";
 import type { Command, Suggestion } from "./agent-thread";
 import type { Attachment } from "./attachment-bar";
 
@@ -64,7 +62,6 @@ export function AgentPanel() {
   const [open, setOpen] = useState(false);
   // Ringkasan (Perlu perhatian) is open until the conversation starts; the user can fold or unfold it any time.
   // Folded by default (QA round 2): the drawer leads with the conversation and feedback, not the rule list.
-  const [summaryOpen, setSummaryOpen] = useState(false);
   const [form, setForm] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const [result, setResult] = useState<{ path: string; data?: OperationalContextResponse & { trends?: Record<string, SignalTrend> }; error?: string }>();
@@ -80,7 +77,6 @@ export function AgentPanel() {
   const current = result?.path === pathname ? result : undefined;
   const data = current?.data;
   const attention = data?.groups.filter((g) => g.count > 0) ?? [];
-  const clear = data?.groups.filter((g) => g.count === 0) ?? [];
   const agentContext = agent?.path === pathname ? agent.data : undefined;
   const running = runs.some((r) => r.status === "running");
 
@@ -205,7 +201,7 @@ export function AgentPanel() {
   useEffect(() => {
     const openFromShell = (event: Event) => {
       const detail = (event as CustomEvent<AgentOpenDetail | undefined>).detail;
-      if (detail?.ask || detail?.file || detail?.prefill) {
+      if (detail?.ask || detail?.file || detail?.prefill || detail?.signal) {
         intent.current = detail;
         setIntentTick((n) => n + 1);
       }
@@ -222,8 +218,7 @@ export function AgentPanel() {
       if (running) return;
       const runId = uuid();
       setForm(false);
-      setSummaryOpen(false);
-      setRuns((all) => [...all, newRun(runId, text, skill)]);
+            setRuns((all) => [...all, newRun(runId, text, skill)]);
       const controller = new AbortController();
       inflight.current = controller;
       const update = (fn: (run: AgentRun) => AgentRun) => setRuns((all) => all.map((r) => (r.runId === runId ? fn(r) : r)));
@@ -233,8 +228,6 @@ export function AgentPanel() {
     },
     [pathname, running, threadId],
   );
-  const ask = (group: OperationalGroup) => startRun("explain_signal", { signal_key: group.key }, `Tanyakan: ${group.title}`);
-  const followUp = (group: OperationalGroup) => startRun("follow_up_signal", { signal_key: group.key }, `Tindak lanjuti: ${group.title}`);
   const importFile = async (file: File): Promise<string | null> => {
     const form = new FormData();
     form.append("file", file);
@@ -302,6 +295,12 @@ export function AgentPanel() {
       if (!agentReady) return;
       intent.current = null;
       startRun("ask", { query: pending.ask }, pending.ask);
+    } else if (pending.signal) {
+      // "Perlu perhatian" lives on Beranda now (QA page 25); its Tanyakan / Tindak lanjuti open the Agent here.
+      if (!agentReady) return;
+      const { key, title, follow } = pending.signal;
+      intent.current = null;
+      startRun(follow ? "follow_up_signal" : "explain_signal", { signal_key: key }, `${follow ? "Tindak lanjuti" : "Tanyakan"}: ${title}`);
     } else if (pending.prefill) {
       intent.current = null;
       setPrefill({ text: pending.prefill, tick: Date.now() });
@@ -313,67 +312,7 @@ export function AgentPanel() {
     // importFile is recreated each render; the intent is consumed once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [intentTick, open, running, agentReady, startRun]);
-  const conversing = runs.length > 0;
-  const checkedAt = data ? `${new Date(data.asOf).toLocaleTimeString("id-ID", { timeZone: "Asia/Jakarta", hour: "2-digit", minute: "2-digit" })} WIB` : null;
 
-  // Ringkasan: the proactive part of the Agent. ERP-only data, so it renders at once and without Intelligence.
-  const summary = (
-    <section aria-labelledby="agent-summary-title" data-agent-summary={summaryOpen ? "open" : "folded"} className={summaryOpen ? `min-h-0 overflow-y-auto overscroll-contain border-b border-slate-100 px-4 py-3 ${conversing ? "max-h-[45%] shrink-0" : "flex-1"}` : "shrink-0 border-b border-slate-100 px-4 py-2"}>
-      <div className="flex items-center justify-between gap-2">
-        <button type="button" onClick={() => setSummaryOpen(!summaryOpen)} aria-expanded={summaryOpen} className="inline-flex min-w-0 items-center gap-1.5 text-left text-xs font-semibold text-slate-700">
-          <ClipboardList className="h-3.5 w-3.5 shrink-0 text-brand-600" />
-          <span id="agent-summary-title">Perlu perhatian</span>
-          {data && <span className={`rounded-full px-2 py-0.5 text-[0.6875rem] ${attention.length ? "bg-amber-100 text-amber-900" : "bg-emerald-50 text-emerald-800"}`}>{attention.length ? `${attention.length} kondisi` : "aman"}</span>}
-          {summaryOpen ? <ChevronUp className="h-3.5 w-3.5 shrink-0" /> : <ChevronDown className="h-3.5 w-3.5 shrink-0" />}
-        </button>
-        <button aria-label="Muat ulang ringkasan" disabled={loading} onClick={() => setRefresh((n) => n + 1)} className="inline-flex items-center gap-1.5 rounded-lg p-1.5 text-[0.6875rem] text-brand-600 disabled:opacity-50">
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-          {checkedAt ? `Diperiksa ${checkedAt}` : "Kondisi dari ERP"}
-        </button>
-      </div>
-      {summaryOpen && (
-        <div className="mt-3 space-y-3">
-          {loading && !data && (
-            <p role="status" className="rounded-xl bg-slate-50 p-4 text-sm text-slate-600">
-              Memeriksa kondisi ERP…
-            </p>
-          )}
-          {current?.error && (
-            <div role="alert" className="flex gap-2 rounded-xl bg-amber-50 p-4 text-sm text-amber-900">
-              <AlertCircle className="h-5 w-5 shrink-0" />
-              {current.error}
-            </div>
-          )}
-          {data && (
-            <>
-              {attention.map((group) => (
-                <AttentionGroup key={group.key} group={group} trend={data.trends?.[group.key]} onAsk={agentReady && !running ? ask : undefined} onFollowUp={agentReady && !running ? followUp : undefined} />
-              ))}
-              {!attention.length && data.groups.length > 0 && (
-                <div className="rounded-xl bg-emerald-50 p-4 text-sm text-emerald-900">
-                  <CheckCircle2 className="mb-2 h-5 w-5" />
-                  Tidak ada record yang memenuhi kondisi perhatian yang diperiksa.
-                </div>
-              )}
-              {clear.length > 0 && (
-                <details className="rounded-xl border border-slate-200 p-3 text-xs text-slate-500">
-                  <summary className="cursor-pointer">{clear.length} kondisi lain sudah diperiksa</summary>
-                  <ul className="mt-3 space-y-2">
-                    {clear.map((g) => (
-                      <li key={g.key}>
-                        {g.title}: 0 {g.unit}
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              )}
-            </>
-          )}
-          {agentReady && <FollowUps refresh={refresh + runs.filter((r) => r.status !== "running").length} />}
-        </div>
-      )}
-    </section>
-  );
 
   if (status !== "authenticated") return null;
   const openAgentPanel = () => {
@@ -522,8 +461,7 @@ export function AgentPanel() {
             </div>
           ) : (
             <>
-              {summary}
-              <div className={conversing || !summaryOpen ? "min-h-0 flex-1" : "shrink-0"}>
+              <div className="min-h-0 flex-1">
                 <AgentThread
                   runs={runs}
                   running={running}

@@ -4,13 +4,15 @@
 // person's own identity.
 import Link from "next/link";
 import { and, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
-import { Bell, CalendarClock, FileSignature, Handshake } from "lucide-react";
+import { AlertTriangle, Bell, CalendarClock, FileSignature, Handshake } from "lucide-react";
 import { STAGE_LABEL } from "@/features/sales-v2/model";
-import { db } from "@/db";
+import { db, sql as pg } from "@/db";
+import { readOperationalContext } from "@/lib/operations/reader";
+import type { OperationalActor, OperationalGroup } from "@/lib/operations/policy";
 import { notifications, salesOpportunityTrackers, signatureRequests, timeOffApprovalSteps } from "@/db/schema";
-import { HomeAsk, RecentPages } from "./home-ask";
+import { AskSignal, HomeAsk, HomeFollowUps, RecentPages } from "./home-ask";
 
-type Item = { key: string; icon: React.ComponentType<{ className?: string }>; title: string; meta: string; href: string };
+type Item = { key: string; icon: React.ComponentType<{ className?: string }>; title: string; meta: string; href: string; signal?: OperationalGroup };
 const OPEN_STAGES = ["cv_submission", "solutioning", "proposal_sent", "need_action"];
 
 function greeting(now = new Date()): string {
@@ -19,10 +21,10 @@ function greeting(now = new Date()): string {
 }
 const when = (d: Date) => new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" }).format(d);
 
-export async function HomeDesktop({ userId, name, isOwner, divisions }: { userId: string; name: string; isOwner: boolean; divisions: string[] }) {
+export async function HomeDesktop({ userId, actor, name, isOwner, divisions }: { userId: string; actor: OperationalActor; name: string; isOwner: boolean; divisions: string[] }) {
   const sales = isOwner || divisions.includes("sales");
   const staleBefore = new Date(Date.now() - 14 * 86_400_000).toISOString().slice(0, 10);
-  const [unread, signs, approvals, stale, mine] = await Promise.all([
+  const [unread, signs, approvals, stale, mine, signals] = await Promise.all([
     db.select().from(notifications).where(and(eq(notifications.user_id, userId), eq(notifications.is_read, false))).orderBy(desc(notifications.created_at)).limit(5),
     db.select().from(signatureRequests).where(and(eq(signatureRequests.signer_user_id, userId), eq(signatureRequests.status_code, "pending"))).orderBy(desc(signatureRequests.created_at)).limit(5),
     db.select().from(timeOffApprovalSteps).where(and(eq(timeOffApprovalSteps.approver_user_id, userId), eq(timeOffApprovalSteps.status_code, "pending"))).limit(5),
@@ -39,11 +41,14 @@ export async function HomeDesktop({ userId, name, isOwner, divisions }: { userId
           inArray(salesOpportunityTrackers.opty_status_code, OPEN_STAGES),
         )).orderBy(desc(salesOpportunityTrackers.created_at)).limit(6)
       : Promise.resolve([]),
+    // "Perlu perhatian" (ERP conditions the person may see), moved here from the Agent panel (QA page 25).
+    readOperationalContext(pg, actor, "/").then((c) => c.groups.filter((g) => g.count > 0)).catch(() => [] as OperationalGroup[]),
   ]);
 
   const items: Item[] = [
     ...signs.map((s) => ({ key: `s${s.id}`, icon: FileSignature, title: `Tanda tangani: ${s.document_title}`, meta: when(s.created_at), href: "/ttd-online" })),
     ...approvals.map((a) => ({ key: `a${a.id}`, icon: CalendarClock, title: "Persetujuan cuti menunggu Anda", meta: "Time off", href: "/attendance/time-off" })),
+    ...signals.map((g) => ({ key: `g${g.key}`, icon: AlertTriangle, title: `${g.title}`, meta: `${g.count} ${g.unit}`, href: g.href, signal: g })),
     ...stale.map((t) => ({
       key: `d${t.id}`, icon: Handshake, title: `${t.client_name}: belum ada komunikasi ${t.last_communication_date ? `sejak ${t.last_communication_date}` : "tercatat"}`,
       meta: t.opty_no, href: `/sales/v2/opportunity-tracker?view=table&record=${t.id}`,
@@ -72,17 +77,20 @@ export async function HomeDesktop({ userId, name, isOwner, divisions }: { userId
           {items.length === 0 ? <p className={empty}>Tidak ada yang menunggu Anda.</p> : (
             <ul className={box}>
               {items.map((it) => (
-                <li key={it.key}>
-                  <Link href={it.href} className={row}>
-                    <it.icon className="h-4 w-4 flex-none text-slate-500" />
+                <li key={it.key} className="group flex items-center">
+                  <Link href={it.href} className={`${row} min-w-0 flex-1`}>
+                    <it.icon className={`h-4 w-4 flex-none ${it.signal ? "text-amber-600" : "text-slate-500"}`} />
                     <span className="min-w-0 flex-1 truncate text-slate-800">{it.title}</span>
                     <span className="flex-none text-[12px] text-slate-400">{it.meta}</span>
                   </Link>
+                  {it.signal && <AskSignal signalKey={it.signal.key} title={it.signal.title} />}
                 </li>
               ))}
             </ul>
           )}
         </section>
+
+        <HomeFollowUps />
 
         {sales && (
           <section>

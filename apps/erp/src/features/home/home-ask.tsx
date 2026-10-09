@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowUp, History, Sparkles } from "lucide-react";
 import { openAgent } from "@/components/mobile/events";
 import { RECENT_KEY } from "@/components/erp-shell";
+import { FollowUps } from "@/components/agent/follow-ups";
 
 export function HomeAsk({ suggestions }: { suggestions: string[] }) {
   const [text, setText] = useState("");
@@ -65,4 +66,20 @@ export function RecentPages() {
       )}
     </section>
   );
+}
+
+/** Tanyakan / Tindak lanjuti on a "Perlu perhatian" condition: the Agent answers full page, as from the composer. */
+export function AskSignal({ signalKey, title }: { signalKey: string; title: string }) {
+  const btn = "rounded-md px-2 py-1 text-[12px] font-medium text-[#194667] hover:bg-slate-100";
+  return (
+    <span className="flex flex-none items-center gap-0.5 pr-2">
+      <button type="button" className={btn} onClick={() => openAgent({ full: true, signal: { key: signalKey, title } })}>Tanyakan</button>
+      <button type="button" className={btn} onClick={() => openAgent({ full: true, signal: { key: signalKey, title, follow: true } })}>Tindak lanjuti</button>
+    </span>
+  );
+}
+
+/** The person's running Agent follow-ups (signal → act → outcome); renders nothing when there are none. */
+export function HomeFollowUps() {
+  return <div className="lg:col-span-2 empty:hidden"><FollowUps refresh={0} /></div>;
 }
