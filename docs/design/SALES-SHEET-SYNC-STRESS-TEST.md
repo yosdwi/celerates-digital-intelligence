@@ -1,7 +1,9 @@
 # Sales Google Sheet Sync: stress test and target design
 
-Status: test sheets ready (2026-10-09). The predictions in section 3 come from reading the code and have not been
-observed yet; the Product Owner runs the test in the web app and records what really happens in section 4.
+Status (2026-10-09): first run recorded in section 4. Section 5 is built (commit 5eaf6fc, image salesv2-qa15): automatic
+column matching with AI for the rest, value mapping, preview per row, one transaction with history, and a push that
+only changes mapped cells (Sales Full or Owner). V1's pull and push no longer run. The six UJI rows from the first run
+were deleted after a backup (`celerates_erp-pre-uji-cleanup-20261009T051340Z.dump`), so the second run starts clean.
 
 ## 1. Goal
 
@@ -135,7 +137,13 @@ DELETE FROM opportunities WHERE client_name LIKE 'UJI %';
 Disconnect the test sheets in the dialog ("Putuskan" is for the Google account; re-point the connection at the real
 sheet) before the real team sheet is used.
 
-## 7. Open decisions
+## 7. Decisions
+
+Taken 2026-10-09: build the full flow in section 5 before the pilot; push is limited to Sales Full and Owner and
+changes only mapped cells. Column matching follows enterprise practice: rules first (saved choice, exact, synonyms,
+fuzzy), AI only for what is left, and the person always confirms before anything is written.
+
+Still open:
 
 - Build the full import flow in section 5 before the pilot, or ship a safe subset first? The safe subset would be:
   - unformatted reads;
