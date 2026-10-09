@@ -76,9 +76,9 @@ export const CLIENT_BUILT_IN_VIEWS: StoredView[] = [
   view("sent", "Sudah dikirim", [{ id: "b4", key: "sent", op: "istrue", value: "" }]),
 ];
 
-/** V1's columns, in V1's order, with the client first (V1 groups by it). */
+/** V1's columns, in V1's order. The client is each group's heading (as V1's accordion), so its column starts hidden. */
 export const CLIENT_DEFAULT_SHOWN = [
-  "client", "candidateNo", "name", "position", "level", "wa", "email", "price", "hiringStatus", "clientStatus", "clientNote", "clientUpdatedBy", "clientUpdatedAt",
+  "candidateNo", "name", "position", "level", "wa", "email", "price", "hiringStatus", "clientStatus", "clientNote", "clientUpdatedBy", "clientUpdatedAt",
 ];
 
 /** V1's updateClientSubmissionStatus posts the status and the note together. */

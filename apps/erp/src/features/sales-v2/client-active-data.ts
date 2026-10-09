@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { asc, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { applications, candidates, requisitions } from "@/db/schema";
 import { NO_CLIENT, NOT_SENT, type ClientCandidate } from "./client-active-model";
@@ -10,7 +10,8 @@ export async function loadClientActive(): Promise<ClientCandidate[]> {
     .from(applications)
     .leftJoin(requisitions, eq(applications.requisition_id, requisitions.id))
     .leftJoin(candidates, eq(applications.candidate_id, candidates.id))
-    .orderBy(desc(applications.created_at));
+    // Clients A–Z (V1's group order, no client last), newest application first inside each.
+    .orderBy(sql`${requisitions.client_name} IS NULL`, asc(requisitions.client_name), desc(applications.created_at));
   return rows.map(({ a, c, r }) => ({
     id: a.id,
     candidateNo: c?.candidate_no ?? null,
