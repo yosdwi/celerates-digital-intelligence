@@ -2,7 +2,7 @@
 // Sales pilot sign-in: corporate email/password remains the bootstrap and recovery path.
 // Registered backoffice users can sign in with a discoverable WebAuthn passkey (Face ID / Touch ID / Windows Hello).
 import { useEffect, useState, useTransition } from "react";
-import { signIn } from "next-auth/react";
+import { getSession, signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { Fingerprint, Mail, Lock, Eye, EyeOff, KeyRound } from "lucide-react";
 
@@ -61,6 +61,12 @@ export function LoginForm() {
     window.location.href = "/";
   }
 
+  // The server may have signed this browser in even though the ceremony reported an error here: go in, don't say no.
+  async function passkeyFailed() {
+    if (await getSession().catch(() => null)) window.location.href = "/";
+    else fail("passkey_failed");
+  }
+
   function passkeyLogin() {
     setError(null);
     setNotice(null);
@@ -80,7 +86,7 @@ export function LoginForm() {
             challenge: toBytes(options.publicKey.challenge),
           },
         })) as PublicKeyCredential | null;
-        if (!credential) return fail("passkey_failed");
+        if (!credential) return passkeyFailed();
         const response = credential.response as AuthenticatorAssertionResponse;
         const result = await signIn("passkey", {
           redirect: false,
@@ -91,11 +97,11 @@ export function LoginForm() {
           signature: toB64(response.signature),
           userHandle: toB64(response.userHandle),
         });
-        if (result?.error) return fail("passkey_failed");
+        if (result?.error) return passkeyFailed();
         window.location.href = "/";
       } catch (e) {
         if ((e as DOMException)?.name !== "NotAllowedError") console.warn("[login] passkey", (e as Error).message);
-        fail("passkey_failed");
+        await passkeyFailed();
       }
     });
   }
@@ -155,7 +161,7 @@ export function LoginForm() {
 
   return (
     <div className="space-y-5">
-      {searchParams.get("error") === "AccessDenied" && step === "password" && (
+      {searchParams.get("expired") === "1" && step === "password" && (
         <p className="rounded-xl bg-amber-50 border border-amber-100 px-3 py-2 text-sm text-amber-700">Sesi Anda berakhir. Silakan masuk kembali.</p>
       )}
       {notice && step !== "password" && <p className="rounded-xl bg-violet-50 border border-violet-100 px-3 py-2 text-sm text-violet-700">{notice}</p>}

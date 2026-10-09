@@ -767,3 +767,16 @@ test("nothing sensitive was logged", () => {
   const keyring = readFileSync(keyringFile, "utf8").match(/[0-9a-f]{64}/g)!;
   for (const key of keyring) assert.ok(!all.includes(key), "no key material in logs");
 });
+
+test("QA page 12: sign-in page is bare, says 'expired' only for a refused cookie, and old builds reload", async () => {
+  const mw = readFileSync("src/middleware.ts", "utf8");
+  assert.match(mw, /path === "\/login"[\s\S]{0,300}pass\(req, "x-erp-bare"\)/);
+  assert.match(mw, /token \? "\/login\?expired=1" : "\/login"/);
+  assert.doesNotMatch(mw, /AccessDenied/);
+  assert.match(readFileSync("src/app/login/login-form.tsx", "utf8"), /get\("expired"\) === "1"/);
+  const { isStaleBuild } = await import("../src/lib/stale-build");
+  assert.equal(isStaleBuild({ name: "ChunkLoadError", message: "Loading chunk 123 failed." }), true);
+  assert.equal(isStaleBuild(new Error('Server Action "abc" was not found on the server.')), true);
+  assert.equal(isStaleBuild(new Error("relation does not exist")), false);
+  assert.ok(readFileSync("src/app/global-error.tsx", "utf8").includes("reloadOnce()"));
+});
