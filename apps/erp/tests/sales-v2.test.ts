@@ -97,7 +97,7 @@ test("right rail: the Agent docks and narrows the page; an open record panel rep
   assert.match(agent, /open \|\| panelOpen \? "hidden"/);
   const kit = read("features/sales-v2/record-workspace.tsx");
   assert.match(kit, /openAgent\(\{ prefill \}\)/);
-  assert.match(agent, /setRightRail\(\{ agentOpen: open \}\)/);
+  assert.match(agent, /setRightRail\(\{ agentOpen: open && !full \}\)/);
   assert.match(agent, /setProperty\("--agent-rail"/);
   assert.match(read("components/app-shell.tsx"), /lg:mr-\[var\(--agent-rail,0px\)\]/);
   for (const f of ["user-menu", "notification-bell", "activity-log-link", "language-switcher"])
@@ -846,7 +846,11 @@ test("QA 2026-10-09 app shell: view preferences parse safely; layout renders the
   for (const f of ["app/loading.tsx", "app/sales/v2/loading.tsx", "app/sales/v2/opportunity-tracker/[id]/loading.tsx"]) assert.match(read(f), /Skeleton/, f);
   const shell = read("components/erp-shell.tsx");
   assert.match(shell, /<Command open=\{commandOpen\}[^>]*items=\{commandItems\}/);
-  assert.match(shell, /trailing=\{<Button size="sm" intent="ghost" onClick=\{\(\) => openAgent\(\)\}>/, "header: only Tanya Agent");
+  assert.match(shell, /\{pathname !== "\/" && <Button size="sm" intent="ghost" onClick=\{\(\) => openAgent\(\)\}>/, "header: Tanya Agent, except on Beranda (QA page 22)");
+  assert.doesNotMatch(shell, /AI Assistant/, "sidebar: no AI Assistant card (QA page 22)");
+  assert.match(read("features/home/home-ask.tsx"), /openAgent\(\{ ask: q\.trim\(\), full: true \}\)/, "Beranda asks full page");
+  assert.match(read("app/crisp-theme.css"), /\[data-erp-shell-main\]:has\(> \[data-agent-slot\] > \*\)/);
+  assert.match(read("app/api/presence/route.ts"), /if \(!user\?\.id\) return NextResponse\.json\(\{ error: "unauthorized" \}, \{ status: 401 \}\)/, "presence: signed-in only");
   assert.match(shell, /<ProfileMenu prefs=\{prefs\} \/>/);
 });
 

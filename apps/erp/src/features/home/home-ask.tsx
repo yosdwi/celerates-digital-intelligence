@@ -1,13 +1,15 @@
 "use client";
 // The Home's "Tanya apa saja" box (QA doc page 18, Attio's Home): a question goes to the Agent, which answers with the
-// person's own access. Suggestions follow what the person works on.
-import { useState } from "react";
-import { ArrowUp, Sparkles } from "lucide-react";
+// person's own access, and the conversation fills the page (QA doc page 22). Suggestions follow what the person works on.
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { ArrowUp, History, Sparkles } from "lucide-react";
 import { openAgent } from "@/components/mobile/events";
+import { RECENT_KEY } from "@/components/erp-shell";
 
 export function HomeAsk({ suggestions }: { suggestions: string[] }) {
   const [text, setText] = useState("");
-  const ask = (q: string) => { if (q.trim()) { openAgent({ ask: q.trim() }); setText(""); } };
+  const ask = (q: string) => { if (q.trim()) { openAgent({ ask: q.trim(), full: true }); setText(""); } };
   return (
     <div>
       <form onSubmit={(e) => { e.preventDefault(); ask(text); }} className="rounded-xl border border-slate-200 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.06)] focus-within:border-slate-300">
@@ -35,5 +37,32 @@ export function HomeAsk({ suggestions }: { suggestions: string[] }) {
         ))}
       </div>
     </div>
+  );
+}
+
+/** Pages this browser opened lately (remembered by the shell), like Attio's "Recently viewed". */
+export function RecentPages() {
+  const [pages, setPages] = useState<{ href: string; label: string; at: number }[]>([]);
+  useEffect(() => {
+    try { setPages((JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]") as typeof pages).slice(0, 6)); } catch { /* storage blocked */ }
+  }, []);
+  return (
+    <section>
+      <h2 className="mb-2 text-[13px] font-medium text-slate-500">Terakhir dibuka</h2>
+      {pages.length === 0 ? (
+        <p className="rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center text-[13px] text-slate-500">Halaman yang Anda buka akan muncul di sini.</p>
+      ) : (
+        <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
+          {pages.map((p) => (
+            <li key={p.href}>
+              <Link href={p.href} className="flex items-center gap-3 px-4 py-2.5 text-[13.5px] hover:bg-slate-50">
+                <History className="h-4 w-4 flex-none text-slate-500" />
+                <span className="min-w-0 flex-1 truncate text-slate-800">{p.label}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }

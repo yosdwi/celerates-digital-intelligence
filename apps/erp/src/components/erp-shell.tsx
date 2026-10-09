@@ -4,8 +4,9 @@
 //   - Celerates and Quick Actions (⌘K: pages and actions).
 //   - Beranda and Notifikasi.
 //   - Modul: each module with its icon, its pages indented under a guide line.
-//   - AI Assistant and the person's profile pinned at the bottom.
-// - Header: where you are, and Tanya Agent at the far right, like "Ask Attio".
+//   - The person's profile pinned at the bottom.
+// - Header: where you are (module and page icons), who else is on this page, and Tanya Agent at the far right, like
+//   "Ask Attio". Beranda leaves Tanya Agent out: its own composer asks, and the answer fills the page (QA pages 21–23).
 // The profile menu holds language, sidebar tone, page look, the classic shell and sign-out (lib/ui-preferences). Same
 // modules and access rules as before (lib/module-access).
 import { createContext, useContext, useEffect, useMemo, useRef, useState, useTransition } from "react";
@@ -14,9 +15,9 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { useLocale, useTranslations } from "next-intl";
-import { AppShell, Button, Command, HeaderBar, type CommandItem } from "@crisp-ui-kit/crisp";
+import { AppShell, Avatar, AvatarGroup, Button, Command, HeaderBar, Kbd, type CommandItem } from "@crisp-ui-kit/crisp";
 import {
-  Bell, ChevronRight, Dot, History, Home, KeyRound, LayoutTemplate, LogOut, Moon, PanelLeftClose, Search, Sparkles, Sun, Undo2, UserRound,
+  Bell, ChevronRight, Dot, FileText, History, Home, KeyRound, LayoutTemplate, LogOut, Moon, PanelLeftClose, Search, Sparkles, Sun, Undo2, UserRound,
 } from "lucide-react";
 import { claimsOf, navModules, submoduleFor } from "@/lib/module-access";
 import { NAV_LABEL_KEYS } from "@/lib/nav-i18n";
@@ -46,13 +47,21 @@ export function ErpShell({ prefs, children }: { prefs: UiPrefs; children: React.
   const [commandOpen, setCommandOpen] = useState(false);
   const modules = useMemo(() => (status === "authenticated" ? navModules(claimsOf(session?.user)) : []), [status, session]);
   const go = (href: string) => startNav(() => router.push(href));
+  const [query, setQuery] = useState("");
+  const records = useRecordSearch(commandOpen ? query : "");
+  const viewers = usePresence(status === "authenticated" ? pathname : null);
 
-  // ⌘K / Ctrl+K anywhere opens Quick Actions.
+  // ⌘K / Ctrl+K anywhere opens Quick Actions; "/" outside a text field opens it to search records.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setCommandOpen((o) => !o); } };
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setCommandOpen((o) => !o); return; }
+      const el = e.target as HTMLElement | null;
+      if (e.key === "/" && !e.metaKey && !e.ctrlKey && !el?.closest("input, textarea, select, [contenteditable='true']")) { e.preventDefault(); setCommandOpen(true); }
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+  useEffect(() => { if (!commandOpen) setQuery(""); }, [commandOpen]);
 
   if (status !== "authenticated") return <main className="min-h-screen">{children}</main>;
 
@@ -64,8 +73,17 @@ export function ErpShell({ prefs, children }: { prefs: UiPrefs; children: React.
       id: `${mod.key}:${sub.href}`, label: label(sub.label), icon: PAGE_ICON[sub.href] ?? Dot, group: label(mod.label),
       keywords: [label(mod.label), sub.href], onSelect: () => go(sub.href),
     }))),
+    // Records the person may read (governed catalog search, /api/search); the query is a keyword so the list keeps them.
+    ...records.map((r) => ({ id: `rec:${r.type}:${r.id}`, label: r.label, icon: FileText, group: "Record", secondary: r.type_label, keywords: [query], onSelect: () => go(r.href) })),
   ];
-  const where = pathname === "/" ? t("home") : [active ? label(active.label) : null, current ? label(current.label) : null].filter(Boolean).join(" / ");
+  const special = SPECIAL_PAGES[pathname];
+  const crumbs: { icon: React.ComponentType<{ className?: string }>; text: string }[] = pathname === "/"
+    ? [{ icon: Home, text: t("home") }]
+    : special ? [special]
+    : [active ? { icon: active.icon, text: label(active.label) } : null, current ? { icon: PAGE_ICON[current.href] ?? Dot, text: label(current.label) } : null].filter((c) => c !== null);
+  // Remembered for Beranda's "Terakhir dibuka" (this browser only).
+  const where = crumbs.map((c) => c.text).join(" / ");
+  useEffect(() => { if (pathname !== "/" && where) rememberPage(pathname, where); }, [pathname, where]);
 
   return (
     <ShellContext.Provider value="crisp">
@@ -78,6 +96,7 @@ export function ErpShell({ prefs, children }: { prefs: UiPrefs; children: React.
               prefs={prefs}
               onCollapse={toggle}
               onQuickActions={() => setCommandOpen(true)}
+              onSearch={() => setCommandOpen(true)}
               modules={modules.map(({ config: mod, subPages }) => ({
                 key: mod.key, label: label(mod.label), icon: mod.icon,
                 pages: [...subPages.filter((s) => !s.collab), ...subPages.filter((s) => s.collab)].map((s) => ({ href: s.href, label: label(s.label) })),
@@ -91,17 +110,40 @@ export function ErpShell({ prefs, children }: { prefs: UiPrefs; children: React.
           <div data-erp-shell-header className="relative">
             <HeaderBar
               bordered
-              title={<span className="truncate">{where}</span>}
-              trailing={<Button size="sm" intent="ghost" onClick={() => openAgent()}><Sparkles size={14} /> Tanya Agent</Button>}
+              title={
+                <span className="flex min-w-0 items-center gap-1.5" data-erp-crumbs>
+                  {crumbs.map((c, i) => (
+                    <span key={c.text} className="flex min-w-0 items-center gap-1.5">
+                      {i > 0 && <span className="text-slate-300">/</span>}
+                      <c.icon className="h-4 w-4 flex-none text-slate-500" />
+                      <span className="truncate">{c.text}</span>
+                    </span>
+                  ))}
+                </span>
+              }
+              trailing={
+                <span className="flex items-center gap-3">
+                  {viewers.length > 0 && (
+                    <AvatarGroup max={3} size="sm" aria-label={`Sedang di halaman ini: ${viewers.map((v) => v.name).join(", ")}`}>
+                      {viewers.map((v) => (
+                        <Avatar key={v.id} size="sm" title={v.self ? `${v.name} (Anda)` : v.name} style={{ background: hue(v.id), color: "#fff" }}>{initials(v.name)}</Avatar>
+                      ))}
+                    </AvatarGroup>
+                  )}
+                  {pathname !== "/" && <Button size="sm" intent="ghost" onClick={() => openAgent()}><Sparkles size={14} /> Tanya Agent</Button>}
+                </span>
+              }
             />
             {navigating && <div data-erp-progress aria-hidden />}
           </div>
           <main data-erp-shell-main className="min-w-0 pb-[calc(88px+env(safe-area-inset-bottom))] md:pb-6">
             <MobileContextBar />
+            {/* The Agent fills this slot when opened full page (Beranda); the page beside it is hidden by CSS. */}
+            <div data-agent-slot className="hidden md:contents" />
             {children}
           </main>
         </AppShell>
-        <Command open={commandOpen} onOpenChange={setCommandOpen} items={commandItems} placeholder="Cari halaman atau aksi…" emptyLabel="Tidak ada yang cocok" />
+        <Command open={commandOpen} onOpenChange={setCommandOpen} items={commandItems} query={query} onQueryChange={setQuery} placeholder="Cari halaman, aksi, atau record…" emptyLabel={query.trim().length >= 2 ? "Tidak ada yang cocok" : "Ketik untuk mencari"} />
       </div>
     </ShellContext.Provider>
   );
@@ -109,8 +151,8 @@ export function ErpShell({ prefs, children }: { prefs: UiPrefs; children: React.
 
 type NavModule = { key: string; label: string; icon: React.ComponentType<{ className?: string }>; pages: { href: string; label: string }[] };
 
-function ErpSidebar({ prefs, onCollapse, onQuickActions, modules, activeModule, activeHref, go }: {
-  prefs: UiPrefs; onCollapse: () => void; onQuickActions: () => void; modules: NavModule[]; activeModule: string | null; activeHref: string | null; go: (href: string) => void;
+function ErpSidebar({ prefs, onCollapse, onQuickActions, onSearch, modules, activeModule, activeHref, go }: {
+  prefs: UiPrefs; onCollapse: () => void; onQuickActions: () => void; onSearch: () => void; modules: NavModule[]; activeModule: string | null; activeHref: string | null; go: (href: string) => void;
 }) {
   const t = useTranslations("sidebar");
   // The module you are in is open; others open and close on click, like Attio's "Automations ▸".
@@ -143,11 +185,17 @@ function ErpSidebar({ prefs, onCollapse, onQuickActions, modules, activeModule, 
           <PanelLeftClose className="h-4 w-4" />
         </button>
       </div>
-      <button type="button" onClick={onQuickActions} className="erp-sb-quick">
-        <Search className="h-3.5 w-3.5" />
-        <span>Quick Actions</span>
-        <kbd>Ctrl K</kbd>
-      </button>
+      <div className="erp-sb-quickrow">
+        <button type="button" onClick={onQuickActions} className="erp-sb-quick">
+          <Kbd className="erp-sb-quick-icon">K</Kbd>
+          <span>Quick Actions</span>
+          <Kbd className="erp-sb-kbd">{isMac() ? "⌘K" : "Ctrl K"}</Kbd>
+        </button>
+        <button type="button" onClick={onSearch} className="erp-sb-quick erp-sb-search" aria-label="Cari record" title="Cari record (/)">
+          <Search className="h-3.5 w-3.5" />
+          <Kbd className="erp-sb-kbd">/</Kbd>
+        </button>
+      </div>
 
       <div className="erp-sb-scroll">
         {row("/", t("home"), Home)}
@@ -179,14 +227,71 @@ function ErpSidebar({ prefs, onCollapse, onQuickActions, modules, activeModule, 
       </div>
 
       <div className="erp-sb-foot">
-        <button type="button" onClick={() => openAgent()} className="erp-sb-ai">
-          <span className="flex items-center gap-1.5 font-medium"><Sparkles className="h-3.5 w-3.5" /> AI Assistant <span className="erp-sb-beta">BETA</span></span>
-          <span className="erp-sb-ai-sub">Tanya apa saja tentang pekerjaan Anda.</span>
-        </button>
         <ProfileMenu prefs={prefs} />
       </div>
     </nav>
   );
+}
+
+/** Pages outside the modules, named in the header. */
+const SPECIAL_PAGES: Record<string, { icon: React.ComponentType<{ className?: string }>; text: string }> = {
+  "/notifications": { icon: Bell, text: "Inbox" },
+  "/profile": { icon: UserRound, text: "Profil" },
+  "/activity-log": { icon: History, text: "Log aktivitas" },
+  "/access-management": { icon: KeyRound, text: "Manajemen akses" },
+};
+const isMac = () => typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
+const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("") || "?";
+/** A steady colour per person, so the same face reads the same everywhere. */
+const hue = (id: string) => `hsl(${[...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7)} 45% 45%)`;
+
+export const RECENT_KEY = "celerates.recent";
+function rememberPage(href: string, label: string) {
+  try {
+    const list = (JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]") as { href: string; label: string; at: number }[]).filter((p) => p.href !== href);
+    localStorage.setItem(RECENT_KEY, JSON.stringify([{ href, label, at: Date.now() }, ...list].slice(0, 8)));
+  } catch { /* storage blocked: Beranda shows nothing recent */ }
+}
+
+type RecordHit = { type: string; type_label: string; id: string; label: string; href: string };
+function useRecordSearch(raw: string) {
+  const [hits, setHits] = useState<RecordHit[]>([]);
+  const q = raw.trim();
+  useEffect(() => {
+    if (q.length < 2) { setHits([]); return; }
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      fetch(`/api/search?q=${encodeURIComponent(q)}`, { cache: "no-store", signal: controller.signal })
+        .then((r) => (r.ok ? r.json() : { results: [] }))
+        .then((body: { results?: RecordHit[] }) => setHits((body.results ?? []).slice(0, 8)))
+        .catch(() => {});
+    }, 200);
+    return () => { controller.abort(); window.clearTimeout(timer); };
+  }, [q]);
+  return hits;
+}
+
+type Viewer = { id: string; name: string; self: boolean };
+/** Who has this page open (Attio's avatars, QA page 23): a heartbeat every 20 s while the tab is visible. */
+function usePresence(path: string | null) {
+  const [viewers, setViewers] = useState<Viewer[]>([]);
+  useEffect(() => {
+    setViewers([]);
+    if (!path) return;
+    let alive = true;
+    const beat = () => {
+      if (document.visibilityState !== "visible") return;
+      fetch("/api/presence", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path }), cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : { viewers: [] }))
+        .then((body: { viewers?: Viewer[] }) => { if (alive) setViewers(body.viewers ?? []); })
+        .catch(() => {});
+    };
+    beat();
+    const id = window.setInterval(beat, 20_000);
+    document.addEventListener("visibilitychange", beat);
+    return () => { alive = false; window.clearInterval(id); document.removeEventListener("visibilitychange", beat); };
+  }, [path]);
+  return viewers;
 }
 
 function useUnreadCount() {

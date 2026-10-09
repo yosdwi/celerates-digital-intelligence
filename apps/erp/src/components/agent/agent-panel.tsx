@@ -8,6 +8,7 @@
 //  • Masukan is understood from free text (reviewed drafts); the same contextual Feature Request form stays as a
 //    fallback, always reachable, and is the path when the Agent is not configured.
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { AGENT_OPEN_EVENT, type AgentOpenDetail } from "@/components/mobile/events";
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
@@ -83,14 +84,17 @@ export function AgentPanel() {
   const agentContext = agent?.path === pathname ? agent.data : undefined;
   const running = runs.some((r) => r.status === "running");
 
+  // Full page: opened from the Beranda composer, the conversation fills the shell's main area (QA doc page 22).
+  const [full, setFull] = useState(false);
   useEffect(() => {
     setOpen(false);
     setForm(false);
+    setFull(false);
   }, [pathname]);
   // Right-rail contract: a record preview steps aside while the Agent is open, and the launcher sits left of an open
   // preview instead of on top of it (docs/design/SALES-V2-CRISP-UX-CONTRACT.md §9).
   const rail = useRightRail();
-  useEffect(() => setRightRail({ agentOpen: open }), [open]);
+  useEffect(() => setRightRail({ agentOpen: open && !full }), [open, full]);
   const [width, setWidth] = useState(400);
   const userWidth = useRef<number | null>(null);
   useEffect(() => {
@@ -116,11 +120,11 @@ export function AgentPanel() {
   // Docked on lg+: the app shell and the fixed top-right controls read --agent-rail and move left by the drawer width.
   useEffect(() => {
     const mql = window.matchMedia("(min-width: 1024px)");
-    const apply = () => document.documentElement.style.setProperty("--agent-rail", open && mql.matches ? `${width}px` : "0px");
+    const apply = () => document.documentElement.style.setProperty("--agent-rail", open && !full && mql.matches ? `${width}px` : "0px");
     apply();
     mql.addEventListener("change", apply);
     return () => mql.removeEventListener("change", apply);
-  }, [open, width]);
+  }, [open, full, width]);
   const [intro, setIntro] = useState(false);
   useEffect(() => {
     if (status !== "authenticated") return;
@@ -205,6 +209,7 @@ export function AgentPanel() {
         intent.current = detail;
         setIntentTick((n) => n + 1);
       }
+      setFull(detail?.full === true && !!document.querySelector("[data-agent-slot]"));
       setOpen(true);
       setRefresh((n) => n + 1);
     };
@@ -373,10 +378,13 @@ export function AgentPanel() {
   if (status !== "authenticated") return null;
   const openAgentPanel = () => {
     dismissIntro();
+    setFull(false);
     setOpen(true);
     setRefresh((n) => n + 1);
   };
   const voiceReady = agentReady && agentContext?.capabilities?.voice === true;
+  const slot = full ? document.querySelector("[data-agent-slot]") : null;
+  const portal = (node: React.ReactNode) => (slot ? createPortal(node, slot) : node);
   // A record panel owns the right edge while open; it offers its own "Tanya Agent", so the launcher steps out.
   const panelOpen = rail.panelWidth > 0;
   return (
@@ -444,13 +452,16 @@ export function AgentPanel() {
           </button>
         </section>
       )}
-      {open && (
+      {open && portal(
         <section
           id="celerates-agent"
-          role="dialog"
+          role={full ? "region" : "dialog"}
           aria-labelledby="celerates-agent-title"
+          data-agent-full={full || undefined}
           style={{ "--agent-w": `${width}px` } as React.CSSProperties}
-          className="fixed inset-0 z-50 flex h-[100dvh] w-full flex-col overflow-hidden bg-white sm:inset-y-0 sm:left-auto sm:right-0 sm:z-40 sm:w-[var(--agent-w)] sm:border-l sm:border-slate-200 sm:shadow-[-8px_0_24px_rgba(9,34,54,0.06)] lg:shadow-none"
+          className={full
+            ? "flex h-[calc(100dvh-49px)] w-full flex-col overflow-hidden bg-white [&>*]:mx-auto [&>*]:w-full [&>*]:max-w-[820px]"
+            : "fixed inset-0 z-50 flex h-[100dvh] w-full flex-col overflow-hidden bg-white sm:inset-y-0 sm:left-auto sm:right-0 sm:z-40 sm:w-[var(--agent-w)] sm:border-l sm:border-slate-200 sm:shadow-[-8px_0_24px_rgba(9,34,54,0.06)] lg:shadow-none"}
         >
           {/* Drag the left edge to resize (arrow keys too); the page beside it narrows with it. */}
           <div
@@ -461,6 +472,7 @@ export function AgentPanel() {
             tabIndex={0}
             onPointerDown={startResize}
             onKeyDown={(e) => { if (e.key === "ArrowLeft") resizeTo(width + 16); if (e.key === "ArrowRight") resizeTo(width - 16); }}
+            hidden={full}
             className="absolute inset-y-0 left-0 z-10 hidden w-1.5 cursor-col-resize transition-colors hover:bg-brand-300/60 focus-visible:bg-brand-400/60 focus-visible:outline-none sm:block"
             data-agent-resize
           />
@@ -548,7 +560,7 @@ export function AgentPanel() {
               </p>
             </>
           )}
-        </section>
+        </section>,
       )}
     </>
   );
