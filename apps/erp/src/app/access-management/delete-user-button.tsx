@@ -20,7 +20,7 @@ export function DeleteUserButton({ userId, userName }: { userId: string; userNam
   return (
     <div className="leading-none">
       <button onClick={handleClick} disabled={isPending} className="text-xs font-medium text-red-600 hover:text-red-700 disabled:opacity-50">
-        {isPending ? t("deleting") : t("delete")}
+        {isPending ? t("deleting") : "Hapus permanen"}
       </button>
       {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
     </div>

@@ -248,7 +248,7 @@
     "approve": "Approve",
     "reject": "Reject",
     "converterAccessLabel": "Timesheet Converter Access (Astra)",
-    "confirmDeleteUser": "Are you sure you want to delete user \"{userName}\"? All of their division access will also be deleted. This cannot be undone.",
+    "confirmDeleteUser": "Permanently delete \"{userName}\"? Only possible for an account that was never used. For an account in use, choose Deactivate.",
     "deleting": "Deleting...",
     "delete": "Delete",
     "edit": "Edit",

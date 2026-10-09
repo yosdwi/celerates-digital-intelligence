@@ -14,6 +14,7 @@ import {
 import { useToast } from "@/components/toast-provider";
 import { GRADIENTS, type StatColor } from "@/components/stat-card";
 import { openAgent } from "@/components/mobile/events";
+import { useShell } from "@/components/erp-shell";
 import { setRightRail, useRightRail } from "@/lib/right-rail";
 import { HeaderFilter, type HeaderSpec } from "./header-filter";
 import { KanbanBoard } from "./board-menu";
@@ -204,6 +205,7 @@ export function RecordWorkspace<T extends { id: string }>({
   const params = useSearchParams();
   const { showToast } = useToast();
   const snackbar = useSnackbar();
+  const shell = useShell();
   const state = useMemo(() => parseState(new URLSearchParams(params.toString()), c.fieldKeys), [params, c.fieldKeys]);
 
   // URL is the state. View changes push a history entry (Back undoes them); typing, filters, sort and the preview
@@ -455,7 +457,8 @@ export function RecordWorkspace<T extends { id: string }>({
       {/* md:pr-56 keeps the header clear of the app's fixed top-right controls (language, bell, account). */}
       {/* Density (contract §5, §15): fixed compact sizes like Attio, never zoom; a 1280 × 650 laptop viewport (1366 or
           1920 screens at 125–150 % OS scaling) must show the table without the chrome eating the height. */}
-      <header className="flex items-center justify-between gap-4 px-5 pt-3 pb-2 md:pr-56">
+      {/* In the Crisp shell the header bar already names the page (QA doc page 17); its links move to the toolbar. */}
+      {shell === "classic" && <header className="flex items-center justify-between gap-4 px-5 pt-3 pb-2 md:pr-56">
         <div className="min-w-0">
           <h1 className="text-base font-semibold leading-6 text-slate-900">{c.title}</h1>
           <p className="truncate text-[0.75rem] leading-4 text-slate-500" data-sales-v2-subtitle>{c.subtitle}</p>
@@ -464,7 +467,7 @@ export function RecordWorkspace<T extends { id: string }>({
           {headerEnd}
           {!access.canEdit && <span className="rounded-md bg-slate-100 px-2 py-1 text-[0.75rem] text-slate-600">Mode lihat saja</span>}
         </div>
-      </header>
+      </header>}
 
       {/* Summary cards in V1's gradients (QA 2026-10-08); each card is a built-in view: click to apply, again to clear. */}
       <section aria-label="Ringkasan" className={`mx-5 mb-2 grid grid-cols-2 gap-2 sm:grid-cols-3 ${c.kpis.length > 5 ? "lg:grid-cols-6" : "lg:grid-cols-5"}`} data-sales-v2-kpi>
@@ -549,6 +552,8 @@ export function RecordWorkspace<T extends { id: string }>({
         </div>
         <div className="ml-auto flex items-center gap-1.5">
           {/* Icons with their name on hover keep the toolbar on one line on a laptop (QA 2026-10-08). */}
+          {shell === "crisp" && headerEnd}
+          {shell === "crisp" && !access.canEdit && <span className="rounded-md bg-slate-100 px-2 py-1 text-[0.75rem] text-slate-600">Mode lihat saja</span>}
           <Tooltip content="Riwayat perubahan"><Button size="sm" intent="ghost" aria-label="Riwayat perubahan" onClick={() => setFeedOf({ recordId: null })} data-sales-v2-history-open><History size={14} /></Button></Tooltip>
           {toolbarEnd}
         </div>

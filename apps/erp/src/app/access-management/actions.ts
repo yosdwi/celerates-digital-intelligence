@@ -234,12 +234,22 @@ export async function deleteUser(userId: string): Promise<InviteResult> {
     return { ok: false, error: "Tidak bisa menghapus akun sendiri" };
   }
 
+  // Permanent delete is for an account with no history (e.g. invited by mistake). Anything that has been used is
+  // referenced by logs, timesheets, approvals and more, and must be deactivated instead (QA doc page 14, 2026-10-09).
+  // One transaction: either the account and its own rows go, or nothing changes.
+  try {
+    await db.transaction(async (tx) => {
+      await tx.delete(userAccess).where(eq(userAccess.user_id, userId));
+      await tx.delete(googleTokens).where(eq(googleTokens.user_id, userId));
+      await tx.update(sheetConnections).set({ connected_by_user_id: null }).where(eq(sheetConnections.connected_by_user_id, userId));
+      await tx.delete(users).where(eq(users.id, userId));
+    });
+  } catch (e) {
+    const code = (e as { code?: string; cause?: { code?: string } })?.code ?? (e as { cause?: { code?: string } })?.cause?.code;
+    if (code === "23503") return { ok: false, error: "Akun ini sudah punya riwayat (aktivitas, notifikasi, timesheet, atau lainnya), jadi tidak bisa dihapus permanen. Pakai Nonaktifkan: akses langsung berhenti dan riwayatnya tetap utuh." };
+    return { ok: false, error: "Akun gagal dihapus. Coba lagi atau nonaktifkan saja." };
+  }
   await auditAccess("user_delete", userId);
-  await db.delete(userAccess).where(eq(userAccess.user_id, userId));
-  await db.delete(googleTokens).where(eq(googleTokens.user_id, userId));
-  await db.update(sheetConnections).set({ connected_by_user_id: null }).where(eq(sheetConnections.connected_by_user_id, userId));
-  await db.delete(users).where(eq(users.id, userId));
-
   revalidatePath("/access-management");
   return { ok: true };
 }

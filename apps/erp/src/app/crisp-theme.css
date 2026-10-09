@@ -35,12 +35,57 @@ html[data-shell="crisp"] [data-agent-intro-popup] { display: none !important; }
 @keyframes erp-progress-in { to { opacity: 1; } }
 @keyframes erp-progress { from { transform: translateX(-100%); } to { transform: translateX(260%); } }
 
-/* Dark sidebar (preference): the same Crisp sidebar on the ERP's navy. */
-html[data-sidebar-tone="dark"] .crisp-sidebar {
-  --crisp-bg-sidebar: #0f172a; --crisp-bg-surface: #0f172a; --crisp-bg-raised: #1e293b;
-  --crisp-fg-primary: #e2e8f0; --crisp-fg-muted: #94a3b8; --crisp-border-subtle: #1e293b; --crisp-border-default: #334155;
-  --crisp-ring-neutral: #334155; background: #0f172a; color: #e2e8f0;
+/* ── Sidebar (components/erp-shell.tsx ErpSidebar): Attio's rows, sections and nesting ─────────────────────────── */
+.erp-sb {
+  --sb-bg: #fafafa; --sb-fg: #1f2328; --sb-muted: #6b7280; --sb-icon: #5f6368; --sb-hover: #f0f0f2; --sb-active: #ebebee;
+  --sb-border: #ececef; --sb-guide: #e3e3e8; --sb-card: #ffffff;
+  display: flex; flex-direction: column; height: 100%; width: 100%; background: var(--sb-bg); color: var(--sb-fg);
+  border-right: 1px solid var(--sb-border); font-size: 13.5px;
 }
+html[data-sidebar-tone="dark"] .erp-sb {
+  --sb-bg: #0f172a; --sb-fg: #e2e8f0; --sb-muted: #94a3b8; --sb-icon: #94a3b8; --sb-hover: #1e293b; --sb-active: #1e293b;
+  --sb-border: #1e293b; --sb-guide: #334155; --sb-card: #16213a;
+}
+.erp-sb-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 10px 6px 12px; }
+.erp-sb-brand { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 15px; color: var(--sb-fg); }
+.erp-sb-iconbtn { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 6px; color: var(--sb-icon); }
+.erp-sb-iconbtn:hover { background: var(--sb-hover); }
+.erp-sb-quick {
+  display: flex; align-items: center; gap: 8px; margin: 4px 10px 8px; height: 30px; padding: 0 8px; border-radius: 7px;
+  border: 1px solid var(--sb-border); background: var(--sb-card); color: var(--sb-fg); font-size: 13px;
+}
+.erp-sb-quick:hover { background: var(--sb-hover); }
+.erp-sb-quick kbd { margin-left: auto; font: 500 10.5px/1 var(--font-sans, inherit); color: var(--sb-muted); border: 1px solid var(--sb-border); border-radius: 4px; padding: 3px 4px; }
+.erp-sb-scroll { flex: 1; overflow-y: auto; padding: 0 8px 8px; }
+.erp-sb-row {
+  display: flex; align-items: center; gap: 8px; width: 100%; height: 30px; padding: 0 8px; border-radius: 6px;
+  color: var(--sb-fg); text-align: left; font-size: 13.5px;
+}
+.erp-sb-row:hover { background: var(--sb-hover); }
+.erp-sb-row[aria-current="page"] { background: var(--sb-active); font-weight: 500; }
+.erp-sb-row--module-active { font-weight: 500; }
+.erp-sb-icon { width: 16px; height: 16px; flex: none; color: var(--sb-icon); }
+.erp-sb-chev { width: 14px; height: 14px; margin-left: auto; color: var(--sb-muted); transition: transform 150ms ease; flex: none; }
+.erp-sb-children { margin: 1px 0 4px 15px; padding-left: 8px; border-left: 1px solid var(--sb-guide); }
+.erp-sb-row--nested { height: 28px; font-size: 13px; }
+.erp-sb-section { margin: 14px 8px 4px; font-size: 11.5px; font-weight: 500; color: var(--sb-muted); }
+.erp-sb-count { margin-left: auto; min-width: 18px; padding: 0 5px; border-radius: 999px; background: #194667; color: #fff; font-size: 10.5px; line-height: 18px; text-align: center; }
+.erp-sb-foot { padding: 8px; border-top: 1px solid var(--sb-border); display: grid; gap: 6px; }
+.erp-sb-ai { display: grid; gap: 2px; text-align: left; padding: 8px 10px; border-radius: 8px; background: var(--sb-card); border: 1px solid var(--sb-border); color: var(--sb-fg); font-size: 12.5px; }
+.erp-sb-ai:hover { background: var(--sb-hover); }
+.erp-sb-ai-sub { color: var(--sb-muted); font-size: 11.5px; }
+.erp-sb-beta { margin-left: auto; font-size: 9.5px; font-weight: 600; letter-spacing: 0.04em; color: #194667; background: #e7eef4; border-radius: 4px; padding: 1px 4px; }
+.erp-sb-profile { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 6px; border-radius: 8px; color: var(--sb-fg); }
+.erp-sb-profile:hover { background: var(--sb-hover); }
+.erp-sb-avatar { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; flex: none; border-radius: 999px; background: #194667; color: #fff; font-size: 12px; font-weight: 600; }
+
+/* The shell's header bar names the page: the page's own title, eyebrow and description step aside (QA doc page 17).
+   Page actions stay. */
+html[data-shell="crisp"] [data-page-header-text] { display: none; }
+html[data-shell="crisp"] [data-page-header] { padding-block: 10px; }
+html[data-shell="crisp"] [data-page-header]:not(:has([data-page-header-actions])) { display: none; }
+html[data-shell="crisp"] [data-page-header-actions] { margin-top: 0; }
+html[data-shell="crisp"] .crisp-recordpage-crumbs { visibility: hidden; }
 
 /* ── Motion: panels and dialogs arrive, they don't pop (FRONTEND-LOADING-ARCHITECTURE §3) ──────────────────── */
 @media (prefers-reduced-motion: no-preference) {
@@ -60,5 +105,3 @@ html[data-sidebar-tone="dark"] .crisp-sidebar {
   html[data-shell="crisp"] [data-erp-shell-main]:has([data-sales-v2]) { padding-bottom: 0; overflow: hidden; }
   html[data-shell="crisp"] [data-erp-shell-main] [data-sales-v2][class*="h-dvh"] { height: 100%; margin-bottom: 0; }
 }
-/* Lucide icons default to 24 px and Crisp's sidebar rows don't size them: rows take Attio's 16 px. */
-.crisp-sidebar .crisp-navitem > svg, .crisp-sidebar .crisp-sidebar-row svg { width: 16px; height: 16px; flex: none; }

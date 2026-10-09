@@ -843,5 +843,8 @@ test("QA 2026-10-09 app shell: view preferences parse safely; layout renders the
   assert.match(layout, /<ErpShell prefs=\{prefs\}>\{children\}<\/ErpShell>/);
   assert.match(read("app/ui-preferences-actions.ts"), /export async function setUiPreference[^\n]*\{\n  await requireActor\(\);\n  if \(!isUiPref\(key, value\)\) return;/);
   for (const f of ["app/loading.tsx", "app/sales/v2/loading.tsx", "app/sales/v2/opportunity-tracker/[id]/loading.tsx"]) assert.match(read(f), /Skeleton/, f);
-  assert.match(read("components/erp-shell.tsx"), /commandItems=\{commandItems\}/);
+  const shell = read("components/erp-shell.tsx");
+  assert.match(shell, /<Command open=\{commandOpen\}[^>]*items=\{commandItems\}/);
+  assert.match(shell, /trailing=\{<Button size="sm" intent="ghost" onClick=\{\(\) => openAgent\(\)\}>/, "header: only Tanya Agent");
+  assert.match(shell, /<ProfileMenu prefs=\{prefs\} \/>/);
 });

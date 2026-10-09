@@ -248,7 +248,7 @@
     "approve": "Approve",
     "reject": "Reject",
     "converterAccessLabel": "Akses Timesheet Converter (Astra)",
-    "confirmDeleteUser": "Yakin hapus user \"{userName}\"? Semua akses divisinya juga akan ikut terhapus. Tidak bisa dibatalkan.",
+    "confirmDeleteUser": "Hapus permanen \"{userName}\"? Hanya bisa untuk akun yang belum pernah dipakai. Untuk akun yang sudah dipakai, gunakan Nonaktifkan.",
     "deleting": "Menghapus...",
     "delete": "Hapus",
     "edit": "Edit",
