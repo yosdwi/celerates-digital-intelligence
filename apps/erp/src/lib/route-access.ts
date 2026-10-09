@@ -22,6 +22,7 @@ const ROUTES: [string, RouteGate][] = [
   ["/sales", { kind: "division", divisions: ["sales"] }],
   ["/sales/accounts", { kind: "division", divisions: ["sales", "marketing"] }],
   ["/sales/v2/accounts", { kind: "division", divisions: ["sales", "marketing"] }],
+  ["/sales/v2/client-active", { kind: "division", divisions: ["ta", "sales"] }],
   ["/sales/profitability-tracker", { kind: "division", divisions: ["sales", "tm", "pmo"] }],
   ["/ta", { kind: "division", divisions: ["ta"] }],
   ["/ta/client-active", { kind: "division", divisions: ["ta", "sales"] }],

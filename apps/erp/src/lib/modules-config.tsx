@@ -31,7 +31,7 @@ export const MODULES: ModuleConfig[] = [
       { href: "/sales/v2/opportunity-tracker", label: "Opportunity Tracker", group: "Pipeline", v1: "/sales/opportunity-tracker" },
       { href: "/sales/v2/pq-tracker", label: "PQ Tracker", group: "Pipeline", v1: "/sales" },
       { href: "/sales/v2/accounts", label: "Account (CRM)", v1: "/sales/accounts" },
-      { href: "/ta/client-active", label: "Client Active", collab: true },
+      { href: "/sales/v2/client-active", label: "Client Active", collab: true, v1: "/ta/client-active" },
       { href: "/pmo/overtime-business-trip", label: "Overtime & Business Trip", collab: true, collabColor: "orange" },
       { href: "/sales/profitability-tracker", label: "Profitability Tracker", collab: true },
     ],
@@ -44,7 +44,7 @@ export const MODULES: ModuleConfig[] = [
       { href: "/ta/candidates", label: "Candidate" },
       { href: "/ta/pipeline", label: "Hiring Pipeline" },
       { href: "/ta/onboarding", label: "Onboarding" },
-      { href: "/ta/client-active", label: "Client Active", collab: true },
+      { href: "/sales/v2/client-active", label: "Client Active", collab: true, v1: "/ta/client-active" },
     ],
   },
   {

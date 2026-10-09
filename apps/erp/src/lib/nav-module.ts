@@ -9,7 +9,8 @@ import { moduleForPath } from "./module-access";
 const KEY = "nav-module";
 
 function sharedIn(m: ModuleConfig, pathname: string) {
-  return m.subPages.some((s) => s.collab && (pathname === s.href || pathname.startsWith(s.href + "/")));
+  // A shared Sales V2 page also shares its V1 page (`v1`), so the V1 link keeps you in the module you came from.
+  return m.subPages.some((s) => s.collab && [s.href, s.v1].some((h) => h && (pathname === h || pathname.startsWith(h + "/"))));
 }
 
 /** Pure core of useNavModule: `from` is the module this tab was last in. */

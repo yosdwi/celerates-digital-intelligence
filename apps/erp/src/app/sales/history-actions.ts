@@ -1,21 +1,26 @@
 "use server";
 // "View edit history" (Sales V2, QA 2026-10-08): who changed which field of a Sales record, from what to what.
-// Read access follows the record's page: Sales for Opportunity Tracker and PQ; Sales or Marketing for Account (CRM).
+// Read access follows the record's page: Sales for Opportunity Tracker and PQ; Sales or Marketing for Account (CRM);
+// Sales or TA for Client Active.
 import { requireActor } from "@/lib/actor";
 import { requireDivisionAccess } from "@/lib/require-division-access";
 import { readHistory, readModuleHistory, type HistoryRecordType, type ModuleHistoryFilter } from "@/lib/field-history";
 
-const TYPES: HistoryRecordType[] = ["opportunity_tracker", "commercial_pq", "crm_client"];
+const TYPES: HistoryRecordType[] = ["opportunity_tracker", "commercial_pq", "crm_client", "client_submission"];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const FIELD = /^[a-z_]{1,64}$/;
+
+// Client Active is shared by Sales and TA, so either may read its history.
+const SHARED: Partial<Record<HistoryRecordType, string>> = { crm_client: "marketing", client_submission: "ta" };
 
 async function canRead(recordType: HistoryRecordType) {
   try {
     await requireDivisionAccess("sales", "viewer");
   } catch (err) {
-    if (recordType !== "crm_client") throw err;
-    await requireDivisionAccess("marketing", "viewer");
+    const other = SHARED[recordType];
+    if (!other) throw err;
+    await requireDivisionAccess(other, "viewer");
   }
 }
 

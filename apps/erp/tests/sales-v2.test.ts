@@ -11,6 +11,8 @@ import {
 } from "../src/features/sales-v2/model";
 import { PQ_DEFAULT_SHOWN, needsPqNo, pqEditValues, pqFieldValue, withPqStage, type Pq } from "../src/features/sales-v2/pq-model";
 import { ACCOUNT_BUILT_IN_VIEWS, accountFieldValue, accountFormData, accountMatchesSearch, type Account } from "../src/features/sales-v2/account-model";
+import { CLIENT_BUILT_IN_VIEWS, CLIENT_STATUSES, NOT_SENT, clientFieldValue, clientMatchesSearch, clientStatusForm, type ClientCandidate } from "../src/features/sales-v2/client-active-model";
+import { canOpenRoute } from "../src/lib/route-access";
 import { safeSalesReturnPath } from "../src/lib/safe-return";
 import { submoduleFor } from "../src/lib/module-access";
 import { navModuleFor } from "../src/lib/nav-module";
@@ -485,8 +487,11 @@ test("edit history: every Sales update path records its changes; the read is gua
   assert.match(readFileSync(new URL("../drizzle/0014_record_field_changes.sql", import.meta.url), "utf8"), /CREATE TABLE IF NOT EXISTS "record_field_changes"/);
   const action = read("app/sales/history-actions.ts");
   assert.match(action, /requireDivisionAccess\("sales", "viewer"\)/);
-  assert.match(action, /if \(recordType !== "crm_client"\) throw err;\n    await requireDivisionAccess\("marketing", "viewer"\)/);
-  for (const f of ["workspace.tsx", "pq-workspace.tsx", "account-workspace.tsx"]) assert.match(read(`features/sales-v2/${f}`), /recordType: "/, f);
+  assert.match(action, /const SHARED: Partial<Record<HistoryRecordType, string>> = \{ crm_client: "marketing", client_submission: "ta" \};/);
+  assert.match(action, /const other = SHARED\[recordType\];\n    if \(!other\) throw err;\n    await requireDivisionAccess\(other, "viewer"\)/);
+  // Client Active (V1 and V2 share the action): status and note changes are recorded.
+  assert.match(read("app/ta/client-active/actions.ts"), /await recordChanges\("client_submission", applicationId, fieldDiffs\(before, \{ client_submission_status_code: status_code, client_submission_note: note \}\)\);/);
+  for (const f of ["workspace.tsx", "pq-workspace.tsx", "account-workspace.tsx", "client-active-workspace.tsx"]) assert.match(read(`features/sales-v2/${f}`), /recordType: "/, f);
   assert.match(read("features/sales-v2/record-workspace.tsx"), /onViewEditHistory=\{\(id, key\) => setHistoryOf/);
 });
 
@@ -887,4 +892,35 @@ test("QA doc page 14: a used account is deactivated, not deleted; the audit foll
   assert.match(del, /db\.transaction/);
   assert.match(del, /code === "23503"/);
   assert.ok(del.indexOf('auditAccess("user_delete"') > del.indexOf("db.transaction"), "audit only after the delete succeeded");
+});
+
+test("Client Active V2 (QA 2026-10-09): V1's rows, statuses and one action; Sales and TA both open it and stay in their module", () => {
+  const c: ClientCandidate = {
+    id: "a1", candidateNo: "CAN-1", name: "Dimas", wa: "0812", email: "d@x.id", level: "senior", hiringStatus: "user_interview", price: 9000000,
+    clientStatus: NOT_SENT, clientNote: null, clientUpdatedAt: null, clientUpdatedBy: null, client: "PT A", position: "Dev", createdAt: null,
+  };
+  assert.deepEqual(CLIENT_STATUSES.map((s) => s.id), ["not_sent", "sent_to_client", "client_reviewing", "client_interview", "client_accepted", "client_rejected", "on_hold"]);
+  assert.equal(clientFieldValue(c, "clientStatus"), "Belum dikirim");
+  assert.equal(clientFieldValue(c, "hiringStatus"), "User Interview");
+  assert.equal(clientFieldValue(c, "sent"), false);
+  assert.ok(clientMatchesSearch(c, "pt a") && clientMatchesSearch(c, "can-1") && !clientMatchesSearch(c, "zzz"));
+  // A note edit posts the current status; a status edit keeps the note (V1 writes both together).
+  const sent = { ...c, clientStatus: "client_interview", clientNote: "ok" };
+  assert.equal(clientStatusForm(sent, { note: "baru" }).get("client_submission_status_code"), "client_interview");
+  assert.equal(clientStatusForm(sent, { status: "client_accepted" }).get("client_submission_note"), "ok");
+  const notSent = applyFilters([c, sent].map((r) => ({ ...r, clientStatus: clientFieldValue(r, "clientStatus") as string })), CLIENT_BUILT_IN_VIEWS.find((v) => v.id === "not_sent")!.state.filters as never);
+  assert.equal(notSent.length, 1);
+  // Access and navigation: TA and Sales open V2 (as V1); the V1 link keeps the module you came from.
+  for (const d of ["ta", "sales"]) assert.equal(canOpenRoute({ access: [{ divisionKey: d, level: "viewer" }] }, "/sales/v2/client-active"), true, d);
+  assert.equal(canOpenRoute({ access: [{ divisionKey: "hr", level: "full" }] }, "/sales/v2/client-active"), false);
+  assert.equal(submoduleFor("/ta/client-active")?.href, "/sales/v2/client-active");
+  assert.equal(navModuleFor("/sales/v2/client-active", "ta")?.key, "ta");
+  assert.equal(navModuleFor("/ta/client-active", "sales")?.key, "sales");
+  // The page and the action keep V1's authority; the workspace never hides a write behind the board.
+  const page = read("app/sales/v2/client-active/page.tsx");
+  assert.match(page, /canEdit: editor\("sales"\) \|\| editor\("ta"\)/);
+  assert.match(read("app/ta/client-active/actions.ts"), /requireAnyDivisionAccess\(\["ta", "sales"\]\)/);
+  const ws = read("features/sales-v2/client-active-workspace.tsx");
+  assert.match(ws, /groupBy: \(c\) => c\.client/, "grouped by client, as V1");
+  assert.match(ws, /move: \(c, to\) => save\(c, \{ status: to \}\)/);
 });

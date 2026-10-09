@@ -136,6 +136,8 @@ export type WorkspaceConfig<T extends { id: string }> = {
   recordType: HistoryRecordType;
   /** Right-click menu on a table row (QA 2026-10-08): the record's quick actions, only those its user may take. */
   rowMenu?: (o: T, row: RowActions) => ContextMenuOption[];
+  /** Table rows under a heading row per value (Client Active groups candidates by client, as V1 did). */
+  groupBy?: (o: T) => string;
   grid: (o: T) => { label: string; author: React.ReactNode; title: string; excerpt: string; footer: React.ReactNode; date?: string };
   board: {
     stages: readonly { id: string; title: string; accent: string }[];
@@ -585,6 +587,7 @@ export function RecordWorkspace<T extends { id: string }>({
             onColumnsChange={(next) => setShownKeys(next.filter((x) => !x.hidden && x.key !== FROZEN).map((x) => x.key))}
             showViewSettings={false}
             showCount={false}
+            groupBy={c.groupBy}
             stickyFirst
             // A click selects a cell (double-click edits it, Attio-style); the record opens from its name link, the
             // row menu's Buka, or a card (QA 2026-10-08).
