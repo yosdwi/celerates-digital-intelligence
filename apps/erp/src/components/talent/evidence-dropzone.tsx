@@ -104,7 +104,7 @@ export function EvidenceDropzone({
 
   return (
     <div className="flex flex-col gap-1.5" data-evidence-dropzone>
-      <span className="text-[13px] font-semibold">{label}</span>
+      <span className="text-[0.8125rem] font-semibold">{label}</span>
       <input
         ref={input}
         type="file"

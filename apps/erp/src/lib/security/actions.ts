@@ -6,6 +6,7 @@ import { currentClaims, requestMeta, requireActor } from "@/lib/actor";
 import { revealIdentityField, RevealDenied, type IdentityField } from "@/lib/people/identity";
 import { audit } from "./audit";
 import { revokeSession, revokeTrustedBrowser, revokeUserSessions } from "./session";
+import { revokePasskey } from "./passkey";
 
 export type RevealResult = { ok: true; value: string | null } | { ok: false; error: string };
 
@@ -39,6 +40,18 @@ export async function revokeMyTrustedBrowser(id: string): Promise<void> {
   if (!claims) return;
   if (await revokeTrustedBrowser(sql, claims.userId, id, "user_revoked"))
     await audit(sql, { action: "trusted_browser_revoke", decision: "allow", actorUserId: claims.userId, sessionId: claims.sid, resourceType: "auth_trusted_browser", resourceId: id, ...(await requestMeta()) });
+  revalidatePath("/profile");
+}
+
+
+
+/** Revoke one of my own passkeys. The device credential remains local, but the server will no longer accept it. */
+export async function revokeMyPasskey(id: string): Promise<void> {
+  await requireActor();
+  const claims = await currentClaims();
+  if (!claims) return;
+  if (await revokePasskey(sql, claims.userId, id, "user_revoked"))
+    await audit(sql, { action: "passkey_revoke", decision: "allow", actorUserId: claims.userId, sessionId: claims.sid, resourceType: "auth_passkey", resourceId: id, ...(await requestMeta()) });
   revalidatePath("/profile");
 }
 

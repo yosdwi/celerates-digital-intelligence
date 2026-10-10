@@ -8,7 +8,8 @@ import { signOut, useSession } from "next-auth/react";
 import { useLocale, useTranslations } from "next-intl";
 import { Activity, Home, Inbox, LayoutGrid, LogOut, ShieldCheck, Sparkles, UserRound } from "lucide-react";
 import { setLocale } from "@/lib/locale-actions";
-import { isMobileNative, moduleForPath } from "@/lib/module-access";
+import { isMobileNative } from "@/lib/module-access";
+import { useNavModule } from "@/lib/nav-module";
 import { useMobileData } from "./data";
 import { ACCOUNT_OPEN_EVENT, openAgent } from "./events";
 import { ModuleGlyph, ModuleLandingSheet, useModuleLabel, useOpenModules } from "./modules";
@@ -31,14 +32,14 @@ export function MobileTabBar() {
   if (status !== "authenticated" || HIDDEN_ON.some((p) => pathname === p || pathname.startsWith(p + "/"))) return null;
 
   const active = pathname === "/" || pathname === "/search" ? "home" : pathname === "/notifications" || pathname === "/review" || pathname.startsWith("/review/") ? "review" : pathname === "/profile" ? "account" : "modules";
-  const item = "relative flex min-h-[56px] flex-col items-center justify-start gap-1 pt-1 text-[11px]";
+  const item = "relative flex min-h-[56px] flex-col items-center justify-start gap-1 pt-1 text-[0.6875rem]";
   const tone = (key: string) => (active === key ? "font-bold text-j-accent" : "font-semibold text-j-muted");
   return (
     <>
       <nav
         aria-label={t("navLabel")}
         data-mobile-tabbar
-        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-j-line bg-j-surface px-1.5 pb-[env(safe-area-inset-bottom)] pt-2 font-jakarta md:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-j-line bg-j-surface px-1.5 pb-[env(safe-area-inset-bottom)] pt-2 font-sans md:hidden"
       >
         <Link href="/" aria-current={active === "home" ? "page" : undefined} className={`${item} ${tone("home")}`}>
           <Home aria-hidden className="h-6 w-6" strokeWidth={1.9} fill={active === "home" ? "#e8eefd" : "none"} />
@@ -58,7 +59,7 @@ export function MobileTabBar() {
           <Inbox aria-hidden className="h-6 w-6" strokeWidth={1.9} fill={active === "review" ? "#e8eefd" : "none"} />
           {t("tabs.review")}
           {reviewCount > 0 && (
-            <span data-review-badge aria-label={t("review.waiting", { count: reviewCount })} className="absolute left-1/2 top-0 ml-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-j-danger px-1 text-[10px] font-extrabold text-white">
+            <span data-review-badge aria-label={t("review.waiting", { count: reviewCount })} className="absolute left-1/2 top-0 ml-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-j-danger px-1 text-[0.625rem] font-extrabold text-white">
               {reviewCount > 9 ? "9+" : reviewCount}
             </span>
           )}
@@ -115,7 +116,7 @@ function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void })
             </button>
           ))}
         </div>
-        <button type="button" onClick={() => signOut({ callbackUrl: "/login" })} className="flex h-12 items-center justify-center gap-2 rounded-[14px] border border-[#f3c7c2] text-[15px] font-bold text-[#b3261e]">
+        <button type="button" onClick={() => signOut({ callbackUrl: "/login" })} className="flex h-12 items-center justify-center gap-2 rounded-[14px] border border-[#f3c7c2] text-[0.9375rem] font-bold text-[#b3261e]">
           <LogOut aria-hidden className="h-5 w-5" /> {t("logout")}
         </button>
       </div>
@@ -132,22 +133,20 @@ export function MobileContextBar() {
   const { signals } = useMobileData();
   const label = useModuleLabel();
   const [open, setOpen] = useState(false);
-  const current = useMemo(() => {
-    const config = moduleForPath(pathname);
-    return config ? modules.find((m) => m.key === config.key) ?? null : null;
-  }, [pathname, modules]);
+  const config = useNavModule(pathname);
+  const current = useMemo(() => (config ? modules.find((m) => m.key === config.key) ?? null : null), [config, modules]);
   useEffect(() => setOpen(false), [pathname]);
   if (status !== "authenticated" || !current || isMobileNative(pathname)) return null;
   const sub = current.subPages.find((s) => s.href === pathname);
   return (
     <>
-      <div className="sticky top-0 z-20 flex items-center gap-2.5 border-b border-j-line bg-j-surface/95 px-4 py-2 pt-[max(8px,env(safe-area-inset-top))] font-jakarta text-j-ink backdrop-blur md:hidden" data-mobile-context={current.key}>
+      <div className="sticky top-0 z-20 flex items-center gap-2.5 border-b border-j-line bg-j-surface/95 px-4 py-2 pt-[max(8px,env(safe-area-inset-top))] font-sans text-j-ink backdrop-blur md:hidden" data-mobile-context={current.key}>
         <ModuleGlyph module={current} size="sm" />
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="truncate text-sm font-bold">{label(current.config.label)}</span>
           {sub && <span className="truncate text-xs text-j-muted">{label(sub.label)}</span>}
         </span>
-        <button type="button" onClick={() => setOpen(true)} className="h-10 rounded-xl border border-j-line px-3 text-[13px] font-bold text-j-accent">
+        <button type="button" onClick={() => setOpen(true)} className="h-10 rounded-xl border border-j-line px-3 text-[0.8125rem] font-bold text-j-accent">
           {t("submodules")}
         </button>
       </div>

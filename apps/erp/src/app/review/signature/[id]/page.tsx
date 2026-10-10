@@ -60,7 +60,7 @@ export default async function SignatureReviewPage({ params }: { params: Promise<
               ]}
             />
           ) : (
-            <Card className="p-3.5 text-[13px] text-j-muted" data-compensation-withheld>
+            <Card className="p-3.5 text-[0.8125rem] text-j-muted" data-compensation-withheld>
               {t("extension.compensationWithheld")}
             </Card>
           )}

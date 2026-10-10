@@ -194,7 +194,7 @@ export function FeatureRequestsTable({
                       <Avatar name={r.requested_by_name} size="sm" />
                       <div className="min-w-0">
                         {r.requested_by_name}
-                        {r.requested_by_email && <span className="block text-[11px] text-slate-400">{r.requested_by_email}</span>}
+                        {r.requested_by_email && <span className="block text-[0.6875rem] text-slate-400">{r.requested_by_email}</span>}
                       </div>
                     </div>
                   </td>

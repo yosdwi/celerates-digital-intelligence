@@ -46,8 +46,8 @@ export function StatusPanel({
     return (
       <div className="flex flex-col gap-1 items-start">
         {badge}
-        {assignedToName && <span className="text-[11px] text-slate-400">{t("picLabel", { name: assignedToName })}</span>}
-        {resolutionNotes && <span className="text-[11px] text-slate-500 italic max-w-[180px]" title={resolutionNotes}>{resolutionNotes}</span>}
+        {assignedToName && <span className="text-[0.6875rem] text-slate-400">{t("picLabel", { name: assignedToName })}</span>}
+        {resolutionNotes && <span className="text-[0.6875rem] text-slate-500 italic max-w-[180px]" title={resolutionNotes}>{resolutionNotes}</span>}
       </div>
     );
   }
@@ -56,9 +56,9 @@ export function StatusPanel({
     return (
       <div className="flex flex-col gap-1 items-start">
         {badge}
-        {assignedToName && <span className="text-[11px] text-slate-400">{t("picLabel", { name: assignedToName })}</span>}
-        {resolutionNotes && <span className="text-[11px] text-slate-500 italic max-w-[180px]" title={resolutionNotes}>{resolutionNotes}</span>}
-        <button onClick={() => setOpen(true)} className="text-[11px] font-medium text-pink-600 hover:underline">
+        {assignedToName && <span className="text-[0.6875rem] text-slate-400">{t("picLabel", { name: assignedToName })}</span>}
+        {resolutionNotes && <span className="text-[0.6875rem] text-slate-500 italic max-w-[180px]" title={resolutionNotes}>{resolutionNotes}</span>}
+        <button onClick={() => setOpen(true)} className="text-[0.6875rem] font-medium text-pink-600 hover:underline">
           {t("updateStatus")}
         </button>
       </div>
@@ -76,7 +76,7 @@ export function StatusPanel({
       <label className="text-xs">Link backlog / issue<input name="backlog_url" defaultValue={review?.backlog_url ?? ""} className="border rounded p-1 w-full" /></label>
       <label className="text-xs">Rilis yang divalidasi<input name="delivered_release" defaultValue={review?.delivered_release ?? ""} className="border rounded p-1 w-full" /></label>
       <label className="text-xs">Bukti / catatan validasi<textarea name="validation_notes" defaultValue={review?.validation_notes ?? ""} className="border rounded p-1 w-full" /></label>
-      {error && <p className="text-[11px] text-red-600">{error}</p>}
+      {error && <p className="text-[0.6875rem] text-red-600">{error}</p>}
       <div className="flex gap-1.5">
         <button type="submit" disabled={isPending} className="rounded bg-pink-600 px-2 py-1 text-xs font-medium text-white disabled:opacity-50">
           {isPending ? tc("saving") : tc("save")}

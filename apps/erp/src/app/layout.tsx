@@ -1,8 +1,11 @@
 import { headers } from "next/headers";
 import { requireActor } from "@/lib/actor";
 import { requireTalentSession } from "@/lib/talent/actor";
-import "@fontsource-variable/plus-jakarta-sans";
+import "@fontsource-variable/inter";
 import "./globals.css";
+// After globals.css: Crisp's cascade layers must be declared after Tailwind's, or Tailwind's base reset wins over them.
+import "@crisp-ui-kit/crisp/styles.layered.css";
+import "./crisp-theme.css";
 import { getLocale, getMessages, getTimeZone } from "next-intl/server";
 import { Sidebar } from "@/components/sidebar";
 import { Providers } from "./providers";
@@ -11,6 +14,8 @@ import { NotificationBell } from "@/components/notification-bell";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { ActivityLogLink } from "@/components/activity-log-link";
 import { AppShell } from "@/components/app-shell";
+import { ErpShell } from "@/components/erp-shell";
+import { uiPreferences } from "@/lib/ui-preferences";
 import { SidebarCollapseProvider } from "@/components/sidebar-context";
 import { AgentPanel } from "@/components/agent/agent-panel";
 import { MobileDataProvider } from "@/components/mobile/data";
@@ -47,9 +52,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const locale = await getLocale();
   const messages = await getMessages();
   const timeZone = await getTimeZone();
+  const prefs = await uiPreferences();
 
   return (
-    <html lang={locale}>
+    <html lang={locale} data-shell={bare ? undefined : prefs.shell} data-sidebar-tone={prefs.sidebar} data-look={prefs.look}>
       <body className="text-slate-900" suppressHydrationWarning>
       <Providers locale={locale} messages={messages} timeZone={timeZone}>
   {bare ? (
@@ -57,6 +63,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       {children}
       <PwaRegister />
     </main>
+  ) : prefs.shell === "crisp" ? (
+  <SidebarCollapseProvider>
+  <MobileDataProvider>
+    <ErpShell prefs={prefs}>{children}</ErpShell>
+    <AgentPanel />
+    <MobileTabBar />
+    <PwaRegister />
+  </MobileDataProvider>
+  </SidebarCollapseProvider>
   ) : (
   <SidebarCollapseProvider>
   <MobileDataProvider>

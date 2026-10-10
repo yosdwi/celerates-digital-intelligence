@@ -55,9 +55,9 @@ function PendingContractRow({ item, onDone }: { item: PendingContractSetup; onDo
           <span className="font-medium text-slate-900">{item.clientName}</span>{" "}
           <span className="text-slate-400">({item.optyNo})</span>{" "}
           {item.source === "won_direct" ? (
-            <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">Won langsung dari Sales</span>
+            <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[0.625rem] font-semibold text-emerald-700">Won langsung dari Sales</span>
           ) : (
-            <span className="inline-flex items-center rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-semibold text-sky-700">Via TM (talent onboard)</span>
+            <span className="inline-flex items-center rounded-full bg-sky-100 px-2 py-0.5 text-[0.625rem] font-semibold text-sky-700">Via TM (talent onboard)</span>
           )}
           <p className="text-xs text-slate-500">
             {item.candidateName ?? "-"} &middot; {item.positionName ?? "-"}

@@ -12,7 +12,7 @@ import { BottomSheet } from "@/components/mobile/primitives";
 import { buttonClass } from "@/components/mobile/styles";
 import { EvidenceDropzone } from "@/components/talent/evidence-dropzone";
 
-const field = "mt-1 w-full rounded-xl border border-[#d5dbe5] bg-j-surface px-3 py-2.5 text-[15px] font-normal text-j-ink outline-none focus:border-j-accent";
+const field = "mt-1 w-full rounded-xl border border-[#d5dbe5] bg-j-surface px-3 py-2.5 text-[0.9375rem] font-normal text-j-ink outline-none focus:border-j-accent";
 
 export function TalentAccountButton({ name, email }: { name: string; email: string }) {
   const t = useTranslations("talent");
@@ -29,10 +29,10 @@ export function TalentAccountButton({ name, email }: { name: string; email: stri
             <p className="text-sm text-j-muted">{email}</p>
           </div>
           <p className="text-xs text-j-muted">{t("accountNote")}</p>
-          <a href="/me/documents" className="flex h-12 items-center justify-center rounded-[14px] border border-j-line text-[15px] font-bold text-j-ink">
+          <a href="/me/documents" className="flex h-12 items-center justify-center rounded-[14px] border border-j-line text-[0.9375rem] font-bold text-j-ink">
             Dokumen identitas
           </a>
-          <button type="button" onClick={() => signOut({ callbackUrl: "/login" })} className="flex h-12 items-center justify-center gap-2 rounded-[14px] border border-[#f3c7c2] text-[15px] font-bold text-[#b3261e]">
+          <button type="button" onClick={() => signOut({ callbackUrl: "/login" })} className="flex h-12 items-center justify-center gap-2 rounded-[14px] border border-[#f3c7c2] text-[0.9375rem] font-bold text-[#b3261e]">
             <LogOut aria-hidden className="h-5 w-5" /> {t("logout")}
           </button>
         </div>
@@ -138,23 +138,23 @@ export function CorrectionSheet({
         {done ? (
           <div className="flex flex-col items-center gap-2 py-6 text-center" role="status" data-fix-done>
             <CheckCircle2 aria-hidden className="h-10 w-10 text-j-ok" />
-            <p className="text-[15px] font-bold">{done}</p>
+            <p className="text-[0.9375rem] font-bold">{done}</p>
             <p className="text-sm text-j-muted">Perubahan attendance berhasil dikirim.</p>
           </div>
         ) : (
           <form id={formId} onSubmit={(e) => { e.preventDefault(); submit(e.currentTarget); }} className="flex flex-col gap-4 pb-1 md:gap-5">
             <div className="flex flex-col gap-0.5 rounded-[14px] bg-[#f7f9fc] p-3.5 md:p-4">
-              <p className="text-[15px] font-bold capitalize md:text-base">{dateLabel}</p>
+              <p className="text-[0.9375rem] font-bold capitalize md:text-base">{dateLabel}</p>
               <p className="text-sm text-j-muted">{talentT(`gap.${requirement.gap}`)}</p>
             </div>
 
             <fieldset className="flex flex-col gap-2">
-              <legend className="mb-1 text-[13px] font-semibold">Status</legend>
+              <legend className="mb-1 text-[0.8125rem] font-semibold">Status</legend>
               <div className="flex flex-wrap gap-2">
                 {requirement.allowed_actions.map((item) => (
                   <label
                     key={item}
-                    className={`flex min-h-10 cursor-pointer items-center rounded-full border px-4 text-[14px] transition ${action === item ? "border-j-accent bg-j-accent text-white font-bold" : "border-j-line bg-j-surface text-j-ink hover:border-[#aebbd8]"}`}
+                    className={`flex min-h-10 cursor-pointer items-center rounded-full border px-4 text-[0.875rem] transition ${action === item ? "border-j-accent bg-j-accent text-white font-bold" : "border-j-line bg-j-surface text-j-ink hover:border-[#aebbd8]"}`}
                   >
                     <input type="radio" name="action_choice" value={item} checked={action === item} onChange={() => setAction(item)} className="sr-only" />
                     {actionLabel(item)}
@@ -165,20 +165,20 @@ export function CorrectionSheet({
 
             {worked && (
               <div className="grid grid-cols-2 gap-3">
-                <label className="flex min-w-0 flex-col text-[13px] font-semibold">
+                <label className="flex min-w-0 flex-col text-[0.8125rem] font-semibold">
                   {t("checkIn")}
                   {needIn ? (
                     <input type="time" name="check_in" required className={field} />
                   ) : (
-                    <span className="mt-1 flex min-h-11 items-center rounded-xl bg-[#f4f6f9] px-3 text-[15px] font-semibold text-j-muted">{requirement.raw_check_in ?? "—"}</span>
+                    <span className="mt-1 flex min-h-11 items-center rounded-xl bg-[#f4f6f9] px-3 text-[0.9375rem] font-semibold text-j-muted">{requirement.raw_check_in ?? "—"}</span>
                   )}
                 </label>
-                <label className="flex min-w-0 flex-col text-[13px] font-semibold">
+                <label className="flex min-w-0 flex-col text-[0.8125rem] font-semibold">
                   {t("checkOut")}
                   {needOut ? (
                     <input type="time" name="check_out" required className={field} />
                   ) : (
-                    <span className="mt-1 flex min-h-11 items-center rounded-xl bg-[#f4f6f9] px-3 text-[15px] font-semibold text-j-muted">{requirement.raw_check_out ?? "—"}</span>
+                    <span className="mt-1 flex min-h-11 items-center rounded-xl bg-[#f4f6f9] px-3 text-[0.9375rem] font-semibold text-j-muted">{requirement.raw_check_out ?? "—"}</span>
                   )}
                 </label>
               </div>
@@ -186,7 +186,7 @@ export function CorrectionSheet({
 
             <EvidenceDropzone file={evidenceFile} onFileChange={setEvidenceFile} label="Bukti pendukung" disabled={pending} />
 
-            <label className="flex flex-col text-[13px] font-semibold">
+            <label className="flex flex-col text-[0.8125rem] font-semibold">
               {t("note")}
               <textarea name="caption" rows={3} maxLength={500} className={field} />
             </label>

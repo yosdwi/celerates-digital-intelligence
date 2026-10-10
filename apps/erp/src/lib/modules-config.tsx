@@ -1,6 +1,9 @@
 import { Megaphone, TrendingUp, Users, UserCog, Briefcase, FileSpreadsheet, Landmark, Gauge, KanbanSquare, PenTool, Lightbulb, GraduationCap, Clock, Bot, Fingerprint, FolderOpen, LucideIcon } from "lucide-react";
 
-export type SubPage = { href: string; label: string; collab?: boolean; collabColor?: "teal" | "orange" };
+/** `collab`: a page owned by another division, listed here too (shown under "Bersama divisi lain").
+ *  `group`: a small heading shown above the first item of a run with the same group.
+ *  `v1`: for a Sales V2 page, its V1 path; pages under it still count as this entry (sidebar highlight, Agent context). */
+export type SubPage = { href: string; label: string; collab?: boolean; collabColor?: "teal" | "orange"; group?: string; v1?: string };
 export type ModuleConfig = {
   key: string;
   label: string;
@@ -17,19 +20,20 @@ export const MODULES: ModuleConfig[] = [
     basePath: "/marketing", subPages: [
       { href: "/marketing/dashboard", label: "Dashboard" },
       { href: "/marketing", label: "Leads" },
-      { href: "/sales/accounts", label: "Account (CRM)", collab: true },
+      { href: "/sales/v2/accounts", label: "Account (CRM)", collab: true, v1: "/sales/accounts" },
     ],
   },
   {
     key: "sales", label: "Sales", icon: TrendingUp, color: "bg-blue-500", enabled: true,
     basePath: "/sales", subPages: [
       { href: "/sales/dashboard", label: "Dashboard" },
-      { href: "/sales/opportunity-tracker", label: "Opportunity Tracker" },
-      { href: "/sales", label: "PQ Tracker" },
-      { href: "/sales/accounts", label: "Account (CRM)" },
-      { href: "/ta/client-active", label: "Client Active", collab: true },
-      { href: "/pmo/overtime-business-trip", label: "Overtime & Business Trip", collab: true, collabColor: "orange" },
-      { href: "/sales/profitability-tracker", label: "Profitability Tracker", collab: true },
+      // Sales V2 (docs/design/SALES-V2-CRISP-UX-CONTRACT.md); the V1 pages stay at `v1`, linked from V2.
+      { href: "/sales/v2/opportunity-tracker", label: "Opportunity Tracker", group: "Pipeline", v1: "/sales/opportunity-tracker" },
+      { href: "/sales/v2/pq-tracker", label: "PQ Tracker", group: "Pipeline", v1: "/sales" },
+      { href: "/sales/v2/accounts", label: "Account (CRM)", v1: "/sales/accounts" },
+      { href: "/sales/v2/client-active", label: "Client Active", collab: true, v1: "/ta/client-active" },
+      { href: "/sales/v2/overtime-business-trip", label: "Overtime & Business Trip", collab: true, collabColor: "orange", v1: "/pmo/overtime-business-trip" },
+      { href: "/sales/v2/profitability-tracker", label: "Profitability Tracker", collab: true, v1: "/sales/profitability-tracker" },
     ],
   },
   {
@@ -40,7 +44,7 @@ export const MODULES: ModuleConfig[] = [
       { href: "/ta/candidates", label: "Candidate" },
       { href: "/ta/pipeline", label: "Hiring Pipeline" },
       { href: "/ta/onboarding", label: "Onboarding" },
-      { href: "/ta/client-active", label: "Client Active", collab: true },
+      { href: "/sales/v2/client-active", label: "Client Active", collab: true, v1: "/ta/client-active" },
     ],
   },
   {
@@ -52,7 +56,7 @@ export const MODULES: ModuleConfig[] = [
       { href: "/hr/attendance", label: "Attendance Log" },
       { href: "/hr/attendance-settings", label: "Attendance Settings" },
       { href: "/tm/special-notes", label: "Special Notes (TM-HR)", collab: true },
-      { href: "/pmo/overtime-business-trip", label: "Overtime & Business Trip", collab: true, collabColor: "orange" },
+      { href: "/sales/v2/overtime-business-trip", label: "Overtime & Business Trip", collab: true, collabColor: "orange", v1: "/pmo/overtime-business-trip" },
     ],
   },
   {
@@ -64,7 +68,7 @@ export const MODULES: ModuleConfig[] = [
       { href: "/tm/cogs-calculator", label: "COGS Calculator" },
       { href: "/tm/extension-requests", label: "Extension & Increment Request" },
       { href: "/tm/special-notes", label: "Special Notes (TM-HR)", collab: true },
-      { href: "/sales/profitability-tracker", label: "Profitability Tracker", collab: true },
+      { href: "/sales/v2/profitability-tracker", label: "Profitability Tracker", collab: true, v1: "/sales/profitability-tracker" },
     ],
   },
   {
@@ -76,8 +80,8 @@ export const MODULES: ModuleConfig[] = [
       { href: "/pmo/invoices", label: "TM Invoice" },
       { href: "/pmo/readiness", label: "Operational Readiness" },
       { href: "/finance", label: "Dokumen Finance (TM Invoice)", collab: true },
-      { href: "/pmo/overtime-business-trip", label: "Overtime & Business Trip", collab: true, collabColor: "orange" },
-      { href: "/sales/profitability-tracker", label: "Profitability Tracker", collab: true },
+      { href: "/sales/v2/overtime-business-trip", label: "Overtime & Business Trip", collab: true, collabColor: "orange", v1: "/pmo/overtime-business-trip" },
+      { href: "/sales/v2/profitability-tracker", label: "Profitability Tracker", collab: true, v1: "/sales/profitability-tracker" },
     ],
   },
   {
@@ -100,7 +104,7 @@ export const MODULES: ModuleConfig[] = [
     key: "finance", label: "Finance", icon: Landmark, color: "bg-emerald-600", enabled: true,
     basePath: "/finance", subPages: [
       { href: "/finance", label: "Dokumen Finance (TM Invoice)", collab: true },
-      { href: "/pmo/overtime-business-trip", label: "Overtime & Business Trip", collab: true, collabColor: "orange" },
+      { href: "/sales/v2/overtime-business-trip", label: "Overtime & Business Trip", collab: true, collabColor: "orange", v1: "/pmo/overtime-business-trip" },
     ],
   },
   {
@@ -133,6 +137,7 @@ export const MODULES: ModuleConfig[] = [
   {
     key: "automation", label: "Automasi & Chatbot", icon: Bot, color: "bg-indigo-600", enabled: true,
     basePath: "/automation", subPages: [
+      { href: "/automation/workflows", label: "Workflows" },
       { href: "/automation/reminders", label: "Reminder" },
       { href: "/automation/documents", label: "Document Generator" },
     ],

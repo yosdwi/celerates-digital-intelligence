@@ -26,7 +26,7 @@ function timeAgo(date: Date, t: (key: string, values?: Record<string, string | n
   return t("daysAgo", { count: days });
 }
 
-export function NotificationBell() {
+export function NotificationBell({ inline = false }: { inline?: boolean } = {}) {
   const { data: session } = useSession();
   const router = useRouter();
   const t = useTranslations("notifications");
@@ -77,14 +77,14 @@ export function NotificationBell() {
   }
 
   return (
-    <div ref={ref} className="fixed top-4 right-[68px] z-40 hidden md:block">
+    <div ref={ref} className={`${inline ? "relative" : "fixed top-4 right-[calc(var(--agent-rail,0px)+68px)] z-40"} hidden md:block`}>
       <button
         onClick={() => { setOpen((v) => !v); if (!open) refresh(); }}
         className="relative flex h-9 w-9 items-center justify-center rounded-full bg-white/75 backdrop-blur-xl border border-white/70 text-slate-600 shadow-[0_1px_2px_rgba(15,23,42,0.04)] hover:shadow-[0_4px_12px_rgba(15,23,42,0.10)] hover:-translate-y-0.5 transition-all duration-200"
       >
         <Bell className="h-4 w-4" />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">
+          <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[0.625rem] font-semibold text-white">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
@@ -113,7 +113,7 @@ export function NotificationBell() {
                     <div className="min-w-0 flex-1">
                       <p className={`text-sm ${!n.is_read ? "font-semibold text-slate-900" : "font-medium text-slate-700"}`}>{n.title}</p>
                       {n.body && <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{n.body}</p>}
-                      <p className="text-[11px] text-slate-400 mt-1">{timeAgo(n.created_at, t)}</p>
+                      <p className="text-[0.6875rem] text-slate-400 mt-1">{timeAgo(n.created_at, t)}</p>
                     </div>
                   </div>
                 </button>

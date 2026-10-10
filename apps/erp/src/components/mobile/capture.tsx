@@ -13,8 +13,8 @@ import { buttonClass } from "./styles";
 
 const ACCEPT = ".pdf,.docx,.xlsx,.csv,.txt,.md,.png,.jpg,.jpeg";
 const MAX = 20 * 1024 * 1024;
-const fieldClass = "mt-1 w-full rounded-xl border border-[#d5dbe5] bg-j-surface px-3 py-2.5 text-[15px] font-normal text-j-ink outline-none focus:border-j-accent";
-const labelClass = "flex flex-col text-[13px] font-semibold text-j-ink";
+const fieldClass = "mt-1 w-full rounded-xl border border-[#d5dbe5] bg-j-surface px-3 py-2.5 text-[0.9375rem] font-normal text-j-ink outline-none focus:border-j-accent";
+const labelClass = "flex flex-col text-[0.8125rem] font-semibold text-j-ink";
 
 export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const t = useTranslations("mobile.capture");
@@ -107,9 +107,9 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
         {saved ? (
           <div className="flex flex-col items-center gap-2 py-4 text-center" role="status" data-capture-saved={saved.id}>
             <CheckCircle2 aria-hidden className="h-10 w-10 text-j-ok" />
-            <p className="text-[15px] font-bold">{t("savedTitle")}</p>
+            <p className="text-[0.9375rem] font-bold">{t("savedTitle")}</p>
             <p className="text-sm text-j-muted">{t("savedBody")}</p>
-            <Link href={`/files?file=${saved.id}`} className="text-[13px] font-semibold text-j-accent">
+            <Link href={`/files?file=${saved.id}`} className="text-[0.8125rem] font-semibold text-j-accent">
               {t("openInFiles")}
             </Link>
           </div>
@@ -146,7 +146,7 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
                 <span className="truncate text-sm font-semibold">{file.name}</span>
                 <span className="text-xs text-j-muted">{file.size < 1024 * 1024 ? `${Math.max(1, Math.round(file.size / 1024))} KB` : `${(file.size / 1024 / 1024).toFixed(1)} MB`}</span>
               </span>
-              <button type="button" onClick={() => setFile(null)} className="h-11 shrink-0 px-2 text-[13px] font-bold text-j-accent">
+              <button type="button" onClick={() => setFile(null)} className="h-11 shrink-0 px-2 text-[0.8125rem] font-bold text-j-accent">
                 {t("change")}
               </button>
             </div>
@@ -160,7 +160,7 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
                   aria-checked={dest === d}
                   onClick={() => setDest(d)}
                   data-capture-dest={d}
-                  className={`h-11 rounded-xl text-[13px] font-bold ${dest === d ? "bg-j-surface text-j-ink shadow-j-card" : "text-j-muted"}`}
+                  className={`h-11 rounded-xl text-[0.8125rem] font-bold ${dest === d ? "bg-j-surface text-j-ink shadow-j-card" : "text-j-muted"}`}
                 >
                   {t(`dest.${d}`)}
                 </button>

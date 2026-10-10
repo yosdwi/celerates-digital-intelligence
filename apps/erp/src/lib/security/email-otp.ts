@@ -60,7 +60,7 @@ export async function verifyChallenge(
 /** Corporate mailbox domains that may receive codes, plus explicit, audited per-address exceptions. */
 export function mailboxAllowed(email: string): { ok: boolean; exception: boolean } {
   const lower = email.trim().toLowerCase();
-  const domains = (process.env.AUTH_EMAIL_DOMAINS || "celerates.com").split(",").map((d) => d.trim().toLowerCase()).filter(Boolean);
+  const domains = (process.env.AUTH_EMAIL_DOMAINS || "celerates.com,celerates.co.id").split(",").map((d) => d.trim().toLowerCase()).filter(Boolean);
   const exceptions = (process.env.AUTH_EMAIL_EXCEPTIONS || "").split(",").map((d) => d.trim().toLowerCase()).filter(Boolean);
   if (domains.includes(lower.split("@")[1] ?? "")) return { ok: true, exception: false };
   return exceptions.includes(lower) ? { ok: true, exception: true } : { ok: false, exception: false };
@@ -68,6 +68,18 @@ export function mailboxAllowed(email: string): { ok: boolean; exception: boolean
 
 /** Email codes are required unless explicitly switched off for the cutover (AUTH_EMAIL_OTP=off). */
 export const emailOtpRequired = () => process.env.AUTH_EMAIL_OTP !== "off";
+
+/**
+ * Pilot only: synthetic test accounts named in AUTH_OTP_WAIVED_EMAILS (exact addresses) sign in with the password alone.
+ * Never for an Owner, whatever the list says. Remove the variable before the production cut-over (docs/25).
+ */
+export function otpWaived(user: { email: string; is_owner?: boolean }): boolean {
+  if (user.is_owner) return false;
+  const waived = (process.env.AUTH_OTP_WAIVED_EMAILS || "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+  return waived.includes(user.email.trim().toLowerCase());
+}
+
+export const otpRequiredFor = (user: { email: string; is_owner?: boolean }) => emailOtpRequired() && !otpWaived(user);
 
 export function mailConfigured() {
   return Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_FROM && (process.env.SMTP_PASSWORD || process.env.SMTP_PASSWORD_FILE));
@@ -79,10 +91,11 @@ const SUBJECT: Record<OtpPurpose, string> = {
   reset: "Kode atur password Celerates ERP",
 };
 
-async function smtpSend(to: string, code: string, purpose: OtpPurpose): Promise<void> {
+/** The SMTP transport for system mail (codes, invitations). */
+export function systemTransport() {
   if (!mailConfigured()) throw new Error("mail_not_configured");
   const pass = process.env.SMTP_PASSWORD || readFileSync(process.env.SMTP_PASSWORD_FILE!, "utf8").trim();
-  const transport = nodemailer.createTransport({
+  return nodemailer.createTransport({
     host: process.env.SMTP_HOST,
     port: Number(process.env.SMTP_PORT || 587),
     secure: Number(process.env.SMTP_PORT || 587) === 465,
@@ -92,7 +105,10 @@ async function smtpSend(to: string, code: string, purpose: OtpPurpose): Promise<
     logger: false,
     connectionTimeout: 10_000,
   });
-  await transport.sendMail({
+}
+
+async function smtpSend(to: string, code: string, purpose: OtpPurpose): Promise<void> {
+  await systemTransport().sendMail({
     from: process.env.SMTP_FROM,
     to,
     subject: SUBJECT[purpose],

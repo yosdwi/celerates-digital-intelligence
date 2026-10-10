@@ -29,12 +29,12 @@ export function AnswerFeedback({ runId }: { runId: string }) {
 
   if (state === "saved" && (rating === 1 || reason))
     return (
-      <p className="text-[11px] text-slate-500" data-answer-feedback="saved">
+      <p className="text-[0.6875rem] text-slate-500" data-answer-feedback="saved">
         Terima kasih — umpan balik tercatat untuk evaluasi kualitas Agent.
       </p>
     );
   return (
-    <div className="space-y-2 text-[11px] text-slate-500" data-answer-feedback={rating === -1 ? "negative" : "ask"}>
+    <div className="space-y-2 text-[0.6875rem] text-slate-500" data-answer-feedback={rating === -1 ? "negative" : "ask"}>
       <div className="flex items-center gap-2">
         <span>Membantu?</span>
         <button type="button" aria-label="Jawaban membantu" aria-pressed={rating === 1} onClick={() => { setRating(1); void send(1); }} className={`rounded-md p-1 hover:bg-slate-100 ${rating === 1 ? "text-emerald-700" : ""}`}>

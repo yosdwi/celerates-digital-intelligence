@@ -9,8 +9,23 @@ import { markSaved } from "@/lib/saved-flag";
 import { logActivity } from "@/lib/activity-log";
 import { notifyDivision } from "@/lib/notifications";
 import { requireDivisionAccess } from "@/lib/require-division-access";
+import { BILLING_STATUSES, TALENT_PAYMENT_STATUSES } from "./constants";
+import { fieldDiffs, recordChanges } from "@/lib/field-history";
 
 const BASE_PATH = "/pmo/overtime-business-trip";
+/** V2 (Sales V2 workspace); the menu opens it, so notifications link there. */
+const V2_PATH = "/sales/v2/overtime-business-trip";
+
+function revalidate() {
+  revalidatePath(BASE_PATH);
+  revalidatePath(V2_PATH);
+}
+
+/** Update one claim and record each field that changed (the V2 panel's history), whichever page made the change. */
+async function updateTracked(id: string, before: Record<string, unknown>, changes: Record<string, unknown>) {
+  await db.update(overtimeBusinessTripClaims).set({ ...changes, updated_at: new Date() }).where(eq(overtimeBusinessTripClaims.id, id));
+  await recordChanges("ot_claim", id, fieldDiffs(before, changes));
+}
 
 async function generateClaimNo(): Promise<string> {
   const now = new Date();
@@ -81,18 +96,11 @@ export async function createClaim(formData: FormData): Promise<void> {
   });
 
   await logActivity("pmo", "create", `Klaim ${claim_type_code}: ${claim_title} (${claim_no})`, "Overtime & Business Trip");
-  revalidatePath(BASE_PATH);
+  revalidate();
 }
 
-/**
- * PMO edit klaim yang sudah ada -- biasanya karena ada koreksi perhitungan
- * durasi jam lembur/business trip setelah data awal diinput.
- */
-export async function updateClaim(id: string, formData: FormData): Promise<void> {
-  await requireActor();
-
-  await requireDivisionAccess("pmo");
-
+/** Every field the PMO form edits, read from the form (V1's full form and V2's cell edits post the same fields). */
+function claimFields(formData: FormData) {
   const claim_type_code = formData.get("claim_type_code") as string;
   const claim_title = formData.get("claim_title") as string;
   if (!claim_type_code || !claim_title) throw new Error("Tipe klaim dan judul wajib diisi");
@@ -100,7 +108,7 @@ export async function updateClaim(id: string, formData: FormData): Promise<void>
   const get = (name: string) => (formData.get(name) as string) || null;
   const getNum = (name: string) => { const v = formData.get(name) as string; return v ? Number(v) : null; };
 
-  await db.update(overtimeBusinessTripClaims).set({
+  return {
     opportunity_id: get("opportunity_id"),
     employee_id: get("employee_id"),
     claim_type_code,
@@ -127,13 +135,35 @@ export async function updateClaim(id: string, formData: FormData): Promise<void>
     amount_over_bagasi: getNum("amount_over_bagasi"),
     amount_etc: getNum("amount_etc"),
     notes: get("notes"),
-    updated_at: new Date(),
-  }).where(eq(overtimeBusinessTripClaims.id, id));
+  };
+}
 
+async function saveClaim(id: string, formData: FormData) {
+  await requireDivisionAccess("pmo");
+  const changes = claimFields(formData);
+  const [before] = await db.select().from(overtimeBusinessTripClaims).where(eq(overtimeBusinessTripClaims.id, id));
+  if (!before) throw new Error("Klaim tidak ditemukan");
+  await updateTracked(id, before, changes);
   await logActivity("pmo", "update", `Klaim diperbarui: ${id}`, "Overtime & Business Trip");
-  revalidatePath(BASE_PATH);
+  revalidate();
+}
+
+/**
+ * PMO edit klaim yang sudah ada -- biasanya karena ada koreksi perhitungan
+ * durasi jam lembur/business trip setelah data awal diinput.
+ */
+export async function updateClaim(id: string, formData: FormData): Promise<void> {
+  await requireActor();
+  await saveClaim(id, formData);
   await markSaved();
   redirect(BASE_PATH);
+}
+
+/** V2's cell and panel edits: the same write as updateClaim, without leaving the page. */
+export async function updateClaimFields(id: string, formData: FormData): Promise<ClaimActionResult> {
+  await requireActor();
+  try { await saveClaim(id, formData); } catch (e: any) { return { ok: false, error: e.message }; }
+  return { ok: true };
 }
 
 export type ClaimActionResult = { ok: true } | { ok: false; error: string };
@@ -149,13 +179,13 @@ export async function forwardToSales(id: string): Promise<ClaimActionResult> {
   if (!claim) return { ok: false, error: "Klaim tidak ditemukan" };
   if (claim.status_code !== "draft") return { ok: false, error: "Klaim ini sudah diforward sebelumnya" };
 
-  await db.update(overtimeBusinessTripClaims).set({ status_code: "forwarded_to_sales", updated_at: new Date() }).where(eq(overtimeBusinessTripClaims.id, id));
+  await updateTracked(id, claim, { status_code: "forwarded_to_sales" });
 
   const talentLabel = await talentLabelOf(claim);
-  await notifyDivision("sales", "Klaim Overtime/Business Trip Perlu Dikonfirmasi", `${actor.userName} forward klaim "${claim.claim_title}" (${claim.claim_no}) untuk ${talentLabel} -- mohon konfirmasi ke client.`, BASE_PATH);
+  await notifyDivision("sales", "Klaim Overtime/Business Trip Perlu Dikonfirmasi", `${actor.userName} forward klaim "${claim.claim_title}" (${claim.claim_no}) untuk ${talentLabel} -- mohon konfirmasi ke client.`, V2_PATH);
 
   await logActivity("pmo", "update", `Klaim di-forward ke Sales: ${claim.claim_no}`, "Overtime & Business Trip");
-  revalidatePath(BASE_PATH);
+  revalidate();
   return { ok: true };
 }
 
@@ -170,13 +200,13 @@ export async function submitToFinance(id: string): Promise<ClaimActionResult> {
   if (!claim) return { ok: false, error: "Klaim tidak ditemukan" };
   if (claim.status_code !== "forwarded_to_sales") return { ok: false, error: "Klaim ini belum di-forward PMO atau sudah lanjut ke Finance" };
 
-  await db.update(overtimeBusinessTripClaims).set({ status_code: "submitted_to_finance", updated_at: new Date() }).where(eq(overtimeBusinessTripClaims.id, id));
+  await updateTracked(id, claim, { status_code: "submitted_to_finance" });
 
   const talentLabel = await talentLabelOf(claim);
-  await notifyDivision("finance", "Klaim Perlu Diinvoice", `${actor.userName} submit klaim "${claim.claim_title}" (${claim.claim_no}) untuk ${talentLabel} -- siap diinvoice ke client.`, BASE_PATH);
+  await notifyDivision("finance", "Klaim Perlu Diinvoice", `${actor.userName} submit klaim "${claim.claim_title}" (${claim.claim_no}) untuk ${talentLabel} -- siap diinvoice ke client.`, V2_PATH);
 
   await logActivity("sales", "update", `Klaim disubmit ke Finance: ${claim.claim_no}`, "Overtime & Business Trip");
-  revalidatePath(BASE_PATH);
+  revalidate();
   return { ok: true };
 }
 
@@ -195,19 +225,18 @@ export async function markInvoiced(id: string, formData: FormData): Promise<Clai
   if (!claim) return { ok: false, error: "Klaim tidak ditemukan" };
   if (claim.status_code !== "submitted_to_finance") return { ok: false, error: "Klaim ini belum disubmit Sales ke Finance" };
 
-  await db.update(overtimeBusinessTripClaims).set({
+  await updateTracked(id, claim, {
     status_code: "invoiced",
     billing_status_code: "done",
     invoice_no,
     amount_total_billed_to_client: amountRaw ? Number(amountRaw) : claim.amount_total_billed_to_client,
-    updated_at: new Date(),
-  }).where(eq(overtimeBusinessTripClaims.id, id));
+  });
 
   const talentLabel = await talentLabelOf(claim);
-  await notifyDivision("pmo", "Klaim Selesai Diinvoice", `${actor.userName} menandai klaim "${claim.claim_title}" (${claim.claim_no}) untuk ${talentLabel} sudah diinvoice (${invoice_no}).`, BASE_PATH);
+  await notifyDivision("pmo", "Klaim Selesai Diinvoice", `${actor.userName} menandai klaim "${claim.claim_title}" (${claim.claim_no}) untuk ${talentLabel} sudah diinvoice (${invoice_no}).`, V2_PATH);
 
   await logActivity("finance", "update", `Klaim diinvoice: ${claim.claim_no} (${invoice_no})`, "Overtime & Business Trip");
-  revalidatePath(BASE_PATH);
+  revalidate();
   return { ok: true };
 }
 
@@ -215,9 +244,12 @@ export async function updateBillingStatus(id: string, statusCode: string): Promi
   await requireActor();
 
   try { await requireDivisionAccess("finance"); } catch (e: any) { return { ok: false, error: e.message }; }
-  await db.update(overtimeBusinessTripClaims).set({ billing_status_code: statusCode, updated_at: new Date() }).where(eq(overtimeBusinessTripClaims.id, id));
+  if (!BILLING_STATUSES.some(([v]) => v === statusCode)) return { ok: false, error: "Status penagihan tidak dikenal" };
+  const [claim] = await db.select().from(overtimeBusinessTripClaims).where(eq(overtimeBusinessTripClaims.id, id));
+  if (!claim) return { ok: false, error: "Klaim tidak ditemukan" };
+  await updateTracked(id, claim, { billing_status_code: statusCode });
   await logActivity("finance", "update", `Status penagihan diubah jadi ${statusCode}`, "Overtime & Business Trip");
-  revalidatePath(BASE_PATH);
+  revalidate();
   return { ok: true };
 }
 
@@ -231,25 +263,25 @@ export async function updateTalentPayment(id: string, formData: FormData): Promi
   const talent_payment_status_code = formData.get("talent_payment_status_code") as string;
   const amountRaw = formData.get("amount_total_given_to_talent") as string;
   const talent_payment_date = (formData.get("talent_payment_date") as string) || null;
+  if (!TALENT_PAYMENT_STATUSES.some(([v]) => v === talent_payment_status_code)) return { ok: false, error: "Status pencairan tidak dikenal" };
 
   const [claim] = await db.select().from(overtimeBusinessTripClaims).where(eq(overtimeBusinessTripClaims.id, id));
   if (!claim) return { ok: false, error: "Klaim tidak ditemukan" };
 
-  await db.update(overtimeBusinessTripClaims).set({
+  await updateTracked(id, claim, {
     talent_payment_status_code,
     amount_total_given_to_talent: amountRaw ? Number(amountRaw) : claim.amount_total_given_to_talent,
     talent_payment_date,
     pic_2_name: actor.userName,
-    updated_at: new Date(),
-  }).where(eq(overtimeBusinessTripClaims.id, id));
+  });
 
   if (talent_payment_status_code === "done") {
     const talentLabel = await talentLabelOf(claim);
-    await notifyDivision("pmo", "Pencairan Talent Selesai", `${actor.userName} menandai pencairan klaim "${claim.claim_title}" (${claim.claim_no}) untuk ${talentLabel} sudah selesai diberikan.`, BASE_PATH);
+    await notifyDivision("pmo", "Pencairan Talent Selesai", `${actor.userName} menandai pencairan klaim "${claim.claim_title}" (${claim.claim_no}) untuk ${talentLabel} sudah selesai diberikan.`, V2_PATH);
   }
 
   await logActivity("hr", "update", `Status pencairan talent diubah jadi ${talent_payment_status_code}: ${claim.claim_no}`, "Overtime & Business Trip");
-  revalidatePath(BASE_PATH);
+  revalidate();
   return { ok: true };
 }
 
@@ -263,6 +295,6 @@ export async function deleteClaim(id: string): Promise<ClaimActionResult> {
 
   await db.delete(overtimeBusinessTripClaims).where(eq(overtimeBusinessTripClaims.id, id));
   await logActivity("pmo", "delete", `Klaim dihapus: ${claim.claim_no}`, "Overtime & Business Trip");
-  revalidatePath(BASE_PATH);
+  revalidate();
   return { ok: true };
 }

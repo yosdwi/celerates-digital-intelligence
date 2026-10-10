@@ -2,17 +2,18 @@
 // The Agent conversation (ADR-013/017): assistant-ui primitives over our own run store via ExternalStoreRuntime.
 // assistant-ui renders messages/composer only. Run state, transport (AG-UI via ERP BFF) and authority stay ours.
 // One composer for everything: text, push-to-talk, files and send. Loaded lazily when the Agent panel opens.
-import { createContext, useContext, useRef, useState, type DragEvent, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
 import {
   AssistantRuntimeProvider,
   ComposerPrimitive,
   MessagePrimitive,
   ThreadPrimitive,
+  unstable_useSlashCommandAdapter,
   useExternalStoreRuntime,
   type AppendMessage,
   type ThreadMessageLike,
 } from "@assistant-ui/react";
-import { Loader2, Paperclip, SendHorizontal, Sparkles } from "lucide-react";
+import { Loader2, MessageSquarePlus, Paperclip, SendHorizontal, Sparkles } from "lucide-react";
 import { VoiceButton } from "./voice";
 import { toThreadMessages, type AgentAction, type AgentRun, type Evidence, type MappingCardData, type Provenance } from "@/lib/agent/run-state";
 import { EvidenceCard, ProvenanceLine, RunError, RunProgress, ToolTrace } from "./evidence";
@@ -23,7 +24,10 @@ import { SubmissionCard } from "./submission";
 import { AttachmentBar, type Attachment } from "./attachment-bar";
 import type { Submission } from "@/lib/agent/run-state";
 
-export type Suggestion = { label: string; run: () => void };
+/** A chip under the thread: `run` starts a run at once; `fill` puts text in the composer for the user to finish. */
+export type Suggestion = { label: string; run?: () => void; fill?: string };
+/** A "/" command in the composer. `fill` places text for the user to finish; `run` acts at once. */
+export type Command = { id: string; description: string; run?: () => void; fill?: string };
 
 function UserMessage() {
   return (
@@ -115,6 +119,9 @@ export default function AgentThread({
   onDetach,
   onAttachFile,
   voice,
+  autoVoice = false,
+  prefill = null,
+  commands = [],
 }: {
   runs: AgentRun[];
   running: boolean;
@@ -130,6 +137,12 @@ export default function AgentThread({
   attachment: Attachment | null;
   onDetach: () => void;
   onAttachFile?: (file: { id: string; name: string }) => void;
+  /** Start push-to-talk as soon as the composer appears (the user chose "Bicara" before the Agent opened). */
+  autoVoice?: boolean;
+  /** Text to place in the composer; applied again whenever `tick` changes. */
+  prefill?: { text: string; tick: number } | null;
+  /** Panel-level "/" commands; the thread adds /bicara and /lampirkan itself. */
+  commands?: Command[];
 }) {
   const picker = useRef<HTMLInputElement>(null);
   // Set when the composer text came from a transcript; the run is then recorded with modality "voice".
@@ -168,33 +181,53 @@ export default function AgentThread({
       fromVoice.current = false;
     },
   });
+  const fill = (text: string) => {
+    runtime.thread.composer.setText(text);
+    document.querySelector<HTMLTextAreaElement>("[data-agent-composer]")?.focus();
+  };
+  useEffect(() => {
+    if (prefill) fill(prefill.text);
+    // Once per prefill tick.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefill?.tick]);
+  // "/" commands (assistant-ui slash commands, unstable API pinned at 0.15.22). The typed "/xyz" is stripped on
+  // select; a fill is applied on the next tick so the strip cannot overwrite it.
+  const [voiceSignal, setVoiceSignal] = useState(0);
+  const allCommands: Command[] = [
+    ...commands,
+    ...(voice ? [{ id: "bicara", description: "Ceritakan lewat suara", run: () => setVoiceSignal((n) => n + 1) }] : []),
+    { id: "lampirkan", description: "Lampirkan berkas (CSV, XLSX, PDF, DOCX, TXT, MD)", run: () => picker.current?.click() },
+  ];
+  const slash = unstable_useSlashCommandAdapter({
+    commands: allCommands.map((c) => ({
+      id: c.id,
+      label: `/${c.id}`,
+      description: c.description,
+      execute: () => (c.fill != null ? window.setTimeout(() => fill(c.fill!), 0) : c.run?.()),
+    })),
+    removeOnExecute: true,
+  });
+  const transcript = (text: string) => {
+    fromVoice.current = true;
+    runtime.thread.composer.setText(text);
+  };
   return (
     <AssistantRuntimeProvider runtime={runtime}>
       <ThreadPrimitive.Root className={`flex h-full flex-col ${dragging ? "bg-brand-50/60 ring-2 ring-inset ring-brand-300" : ""}`} {...drop}>
         <ThreadPrimitive.Viewport className="flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-4">
           <ThreadPrimitive.Empty>
-            <div className="space-y-3">
-              <p className="text-xs leading-relaxed text-slate-600" data-agent-intro>
-                {enabled
-                  ? "Satu tempat untuk bertanya, meminta tindakan, melampirkan berkas, atau menyampaikan masukan. Jawaban disertai bukti dari ERP dan pengetahuan yang disetujui; perubahan data dan masukan selalu Anda tinjau dulu."
-                  : "Agent belum dikonfigurasi di lingkungan ini. Perlu perhatian dan formulir masukan tetap dapat digunakan."}
+            {enabled ? (
+              <div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center" data-agent-empty>
+                <MessageSquarePlus className="h-7 w-7 text-brand-600" aria-hidden />
+                <p className="text-sm font-semibold text-slate-900">Ada masukan atau kebutuhan fitur?</p>
+                <p className="text-xs text-slate-500">Ceritakan lewat suara atau ketik di bawah.</p>
+                {voice && <VoiceButton hero disabled={running} onTranscript={transcript} onError={setFileError} />}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-500" data-agent-intro>
+                Agent belum aktif di lingkungan ini. Perlu perhatian dan formulir masukan tetap bisa dipakai.
               </p>
-              {enabled && suggestions.length > 0 && (
-                <div className="flex flex-col gap-2" aria-label="Saran">
-                  {suggestions.map((s) => (
-                    <button
-                      key={s.label}
-                      type="button"
-                      onClick={s.run}
-                      className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-left text-xs font-medium text-slate-700 hover:border-brand-300 hover:text-brand-700"
-                    >
-                      <Sparkles className="h-3.5 w-3.5 shrink-0 text-brand-600" />
-                      {s.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            )}
           </ThreadPrimitive.Empty>
           <ActionContext.Provider value={onAction}>
             <AttachFileContext.Provider value={onAttachFile}>
@@ -202,13 +235,53 @@ export default function AgentThread({
             </AttachFileContext.Provider>
           </ActionContext.Provider>
         </ThreadPrimitive.Viewport>
+        {enabled && runs.length === 0 && suggestions.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 px-3 pb-2" aria-label="Saran">
+            {suggestions.map((s) => (
+              <button
+                key={s.label}
+                type="button"
+                onClick={() => (s.fill != null ? fill(s.fill) : s.run?.())}
+                className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left text-xs text-slate-600 hover:border-slate-300 hover:text-slate-900"
+              >
+                <Sparkles className="h-3 w-3 shrink-0 text-slate-400" />
+                <span className="truncate">{s.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
         {attachment && <AttachmentBar attachment={attachment} onDetach={onDetach} />}
         {fileError && (
           <p role="alert" className="mx-3 mb-0 mt-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-900">
             {fileError}
           </p>
         )}
-        <ComposerPrimitive.Root className="flex items-end gap-2 border-t border-slate-100 p-3">
+        <ComposerPrimitive.Unstable_TriggerPopoverRoot>
+        <ComposerPrimitive.Unstable_TriggerPopover
+          char="/"
+          adapter={slash.adapter}
+          aria-label="Perintah"
+          className="mx-3 mb-1 max-h-64 overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-lg"
+          data-agent-commands
+        >
+          <ComposerPrimitive.Unstable_TriggerPopover.Action onExecute={slash.action.onExecute} removeOnExecute />
+          <ComposerPrimitive.Unstable_TriggerPopoverItems>
+            {(items) =>
+              items.map((item, index) => (
+                <ComposerPrimitive.Unstable_TriggerPopoverItem
+                  key={item.id}
+                  item={item}
+                  index={index}
+                  className="flex w-full items-baseline gap-2 rounded-md px-2 py-1.5 text-left text-xs text-slate-700 data-[highlighted]:bg-slate-100"
+                >
+                  <span className="shrink-0 font-mono font-medium text-brand-700">{item.label}</span>
+                  <span className="truncate text-slate-500">{item.description}</span>
+                </ComposerPrimitive.Unstable_TriggerPopoverItem>
+              ))
+            }
+          </ComposerPrimitive.Unstable_TriggerPopoverItems>
+        </ComposerPrimitive.Unstable_TriggerPopover>
+        <ComposerPrimitive.Root data-agent-composer-bar className="flex items-end gap-2 border-t border-slate-100 p-3">
           <input
             ref={picker}
             type="file"
@@ -232,7 +305,8 @@ export default function AgentThread({
           </button>
           <ComposerPrimitive.Input
             aria-label="Pesan untuk Agent"
-            placeholder="Tanya, minta tindakan, atau sampaikan masukan…"
+            data-agent-composer
+            placeholder="Bisa ceritakan masukan Anda? Ketik / untuk perintah"
             rows={1}
             maxLength={1000}
             className="min-h-10 flex-1 resize-none rounded-xl border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 disabled:bg-slate-50"
@@ -240,11 +314,10 @@ export default function AgentThread({
           {/* Push-to-talk fills the composer for review; voice can never send or confirm anything by itself. */}
           {voice && (
             <VoiceButton
+              autoStart={autoVoice}
+              startSignal={voiceSignal}
               disabled={!enabled || running}
-              onTranscript={(text) => {
-                fromVoice.current = true;
-                runtime.thread.composer.setText(text);
-              }}
+              onTranscript={transcript}
               onError={setFileError}
             />
           )}
@@ -255,6 +328,7 @@ export default function AgentThread({
             <SendHorizontal className="h-4 w-4" />
           </ComposerPrimitive.Send>
         </ComposerPrimitive.Root>
+        </ComposerPrimitive.Unstable_TriggerPopoverRoot>
       </ThreadPrimitive.Root>
     </AssistantRuntimeProvider>
   );

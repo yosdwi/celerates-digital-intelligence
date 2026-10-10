@@ -13,6 +13,9 @@ import { Target } from "lucide-react";
 import { AddRecordModal } from "@/components/add-record-modal";
 import { Field, SelectField } from "@/components/form-fields";
 import { LeadPicker } from "@/components/lead-picker";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { claimsOf, divisionLevel } from "@/lib/module-access";
 
 const SERVICE_TYPES = [
   ["outsourcing", "Outsourcing"], ["headhunting", "Headhunting"], ["outplacement", "Outplacement"],
@@ -34,6 +37,10 @@ const PRIORITIES = [["p0", "P0"], ["p1", "P1"], ["p2", "P2"], ["p3", "P3"]] as c
 
 export default async function OpportunityTrackerPage() {
   const t = await getTranslations("sales.opportunityTracker");
+  const session = await getServerSession(authOptions);
+  const salesLevel = divisionLevel(claimsOf(session?.user), "sales");
+  const canEdit = salesLevel === "editor" || salesLevel === "full";
+  const canDelete = salesLevel === "full";
   const [data, converted, leadOptions, positionRows, employeeRows] = await Promise.all([
     db
       .select({
@@ -95,24 +102,8 @@ export default async function OpportunityTrackerPage() {
         title="Opportunity Tracker"
         subtitle={t("subtitle")}
       >
-        <Link
-          href="/sales/opportunity-tracker/sheet-sync"
-          className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-brand-700 transition-colors"
-        >
-          <RefreshCw className="h-3.5 w-3.5" />
-          Google Sheet Sync
-        </Link>
-      </PageHeader>
-
-        <main className="px-8 py-8 space-y-8 max-w-7xl mx-auto">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <StatCard label="Total Opportunity" value={data.length} color="navy" />
-          <StatCard label="Sales Qualified" value={data.filter((d) => d.sales_qualified).length} color="green" />
-          <StatCard label={t("statAlreadyWin")} value={data.filter((d) => d.opty_status_code === "win").length} color="blue" />
-          <StatCard label="Dropped" value={data.filter((d) => d.opty_status_code === "dropped").length} color="red" />
-        </div>
-
-        <div className="flex justify-end gap-2">
+        {canEdit ? (
+          <>
           <AddRecordModal buttonLabel="Add Extension Request" title="Add Extension Request" action={createExtensionRequestFromSales}>
             <div className="sm:col-span-3">
               <SelectField label="Talent yang di-extend" name="employee_id" options={employeeOptions} required />
@@ -173,9 +164,32 @@ export default async function OpportunityTrackerPage() {
               <Field label="Detail Requirement" name="detail_requirement" textarea />
             </div>
           </AddRecordModal>
+          </>
+        ) : (
+          <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-500">
+            Mode lihat saja
+          </span>
+        )}
+        {canEdit && (
+          <Link
+            href="/sales/opportunity-tracker/sheet-sync"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-colors"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Google Sheet Sync
+          </Link>
+        )}
+      </PageHeader>
+
+        <main className="px-8 py-8 space-y-8 max-w-7xl mx-auto">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <StatCard label="Total Opportunity" value={data.length} color="navy" />
+          <StatCard label="Sales Qualified" value={data.filter((d) => d.sales_qualified).length} color="green" />
+          <StatCard label={t("statAlreadyWin")} value={data.filter((d) => d.opty_status_code === "win").length} color="blue" />
+          <StatCard label="Dropped" value={data.filter((d) => d.opty_status_code === "dropped").length} color="red" />
         </div>
 
-        <TrackerViewTabs data={data} convertedIds={convertedIds} />
+        <TrackerViewTabs data={data} convertedIds={convertedIds} canEdit={canEdit} canDelete={canDelete} />
       </main>
     </div>
   );

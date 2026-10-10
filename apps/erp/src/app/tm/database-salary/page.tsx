@@ -102,7 +102,7 @@ export default async function TalentDatabaseSalaryPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     {isCurrent && (
-                      <span className="inline-flex items-center rounded-full whitespace-nowrap bg-emerald-600 px-2 py-0.5 text-[10px] font-semibold text-white shrink-0">{t("current")}</span>
+                      <span className="inline-flex items-center rounded-full whitespace-nowrap bg-emerald-600 px-2 py-0.5 text-[0.625rem] font-semibold text-white shrink-0">{t("current")}</span>
                     )}
                     <p className="text-sm font-semibold text-slate-900 truncate">{r.candidate_name ?? "-"}</p>
                   </div>
@@ -112,11 +112,11 @@ export default async function TalentDatabaseSalaryPage() {
                 </div>
                 <div className="hidden sm:flex items-center gap-6 text-right shrink-0">
                   <div>
-                    <p className="text-[10px] uppercase tracking-wide text-slate-400">Price</p>
+                    <p className="text-[0.625rem] uppercase tracking-wide text-slate-400">Price</p>
                     <p className="text-sm font-medium text-slate-800">{rp(a.price_amount)}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] uppercase tracking-wide text-slate-400">Status</p>
+                    <p className="text-[0.625rem] uppercase tracking-wide text-slate-400">Status</p>
                     <p className={`text-sm font-medium ${isCurrent ? "text-emerald-700" : "text-slate-800"}`}>{a.status_code ?? "-"}</p>
                   </div>
                 </div>
@@ -249,7 +249,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Item({ label, value, strong }: { label: string; value: string | number | null | undefined; strong?: boolean }) {
   return (
     <div>
-      <p className="text-[11px] text-slate-400">{label}</p>
+      <p className="text-[0.6875rem] text-slate-400">{label}</p>
       <p className={`text-sm ${strong ? "font-semibold text-slate-900" : "text-slate-700"}`}>{value ?? "-"}</p>
     </div>
   );

@@ -11,12 +11,13 @@ import {
   requisitions,
   opportunities,
 } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { logActivity } from "@/lib/activity-log";
 import { calculateCogs, COGS_DEFAULTS } from "@/lib/cogs-calculator";
+import { fieldDiffs, recordChanges } from "@/lib/field-history";
 
 export type SyncResult = { ok: true; data: { synced: number; skipped: number } } | { ok: false; error: string };
 
@@ -85,6 +86,11 @@ export async function syncProfitabilityFromTalents(year: number, month: number):
     .leftJoin(candidates, eq(onboardingRequests.candidate_id, candidates.id))
     .leftJoin(requisitions, eq(talentAssignments.requisition_id, requisitions.id))
     .leftJoin(opportunities, eq(talentAssignments.pq_tracker_id, opportunities.id));
+
+  // The period's rows as they are, so a re-sync records what it changed (the V2 panel's history).
+  const existing = await db.select().from(profitabilityEntries)
+    .where(and(eq(profitabilityEntries.period_year, year), eq(profitabilityEntries.period_month, month)));
+  const before = new Map(existing.map((e) => [e.talent_assignment_id, e]));
 
   let synced = 0;
   let skipped = 0;
@@ -163,11 +169,17 @@ export async function syncProfitabilityFromTalents(year: number, month: number):
         target: [profitabilityEntries.talent_assignment_id, profitabilityEntries.period_year, profitabilityEntries.period_month],
         set: values,
       });
+    // Margin % follows from price and margin, so it is not recorded on its own.
+    const old = before.get(r.id);
+    if (old) await recordChanges("profitability_entry", old.id, fieldDiffs(old, {
+      talent_name: talentName, client_name: clientName, role, price_amount: priceAmount, cogs_amount: cogsAmount, margin_amount: marginAmount,
+    }));
 
     synced++;
   }
 
   await logActivity("sales", "create", `Sync Profitability Tracker: ${synced} talent (periode ${month}/${year})`, "Profitability Tracker");
   revalidatePath("/sales/profitability-tracker");
+  revalidatePath("/sales/v2/profitability-tracker");
   return { ok: true, data: { synced, skipped } };
 }

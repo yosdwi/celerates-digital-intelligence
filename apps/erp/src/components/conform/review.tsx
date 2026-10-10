@@ -10,7 +10,7 @@ import { useMobileData } from "@/components/mobile/data";
 import { BottomSheet } from "@/components/mobile/primitives";
 import { buttonClass } from "@/components/mobile/styles";
 
-const field = "mt-1 w-full rounded-xl border border-[#d5dbe5] bg-j-surface px-3 py-2.5 text-[15px] text-j-ink outline-none focus:border-j-accent";
+const field = "mt-1 w-full rounded-xl border border-[#d5dbe5] bg-j-surface px-3 py-2.5 text-[0.9375rem] text-j-ink outline-none focus:border-j-accent";
 const nonce = () => (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}${Math.random()}`).replace(/[^A-Za-z0-9_-]/g, "");
 
 export function CorrectionDecision({ id }: { id: string }) {

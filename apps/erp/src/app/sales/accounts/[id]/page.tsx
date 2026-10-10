@@ -92,7 +92,7 @@ export default async function AccountDetailPage({ params }: { params: Promise<{ 
                           </div>
                         </div>
                         {a.description && <p className="text-xs text-slate-500 mt-1 leading-relaxed">{a.description}</p>}
-                        {a.created_by_name && <p className="text-[11px] text-slate-400 mt-1.5">{t("byLabel")} {a.created_by_name}</p>}
+                        {a.created_by_name && <p className="text-[0.6875rem] text-slate-400 mt-1.5">{t("byLabel")} {a.created_by_name}</p>}
                       </div>
                     );
                   })}
@@ -121,7 +121,7 @@ export default async function AccountDetailPage({ params }: { params: Promise<{ 
                       </div>
                       {c.role_title && <p className="text-xs text-slate-500 mt-0.5">{c.role_title}</p>}
                       {(c.email || c.phone) && (
-                        <p className="text-[11px] text-slate-400 mt-1">{[c.email, c.phone].filter(Boolean).join(" · ")}</p>
+                        <p className="text-[0.6875rem] text-slate-400 mt-1">{[c.email, c.phone].filter(Boolean).join(" · ")}</p>
                       )}
                     </div>
                     <DeleteContactButton contactId={c.id} clientId={id} />
@@ -138,7 +138,7 @@ export default async function AccountDetailPage({ params }: { params: Promise<{ 
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
             <div className="p-5">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-2.5">{t("leadsLabel", { count: history.leads.length })}</p>
+              <p className="text-[0.6875rem] font-bold uppercase tracking-wide text-slate-400 mb-2.5">{t("leadsLabel", { count: history.leads.length })}</p>
               {history.leads.length === 0 ? (
                 <p className="text-xs text-slate-300">{t("noneLabel")}</p>
               ) : (
@@ -153,7 +153,7 @@ export default async function AccountDetailPage({ params }: { params: Promise<{ 
               )}
             </div>
             <div className="p-5">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-2.5">{t("opportunitiesLabel", { count: history.opportunities.length })}</p>
+              <p className="text-[0.6875rem] font-bold uppercase tracking-wide text-slate-400 mb-2.5">{t("opportunitiesLabel", { count: history.opportunities.length })}</p>
               {history.opportunities.length === 0 ? (
                 <p className="text-xs text-slate-300">{t("noneLabel")}</p>
               ) : (
@@ -168,7 +168,7 @@ export default async function AccountDetailPage({ params }: { params: Promise<{ 
               )}
             </div>
             <div className="p-5">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-2.5">{t("contractsLabel", { count: history.contracts.length })}</p>
+              <p className="text-[0.6875rem] font-bold uppercase tracking-wide text-slate-400 mb-2.5">{t("contractsLabel", { count: history.contracts.length })}</p>
               {history.contracts.length === 0 ? (
                 <p className="text-xs text-slate-300">{t("noneLabel")}</p>
               ) : (
@@ -183,7 +183,7 @@ export default async function AccountDetailPage({ params }: { params: Promise<{ 
               )}
             </div>
             <div className="p-5">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-2.5">{t("invoicesLabel", { count: history.invoices.length })}</p>
+              <p className="text-[0.6875rem] font-bold uppercase tracking-wide text-slate-400 mb-2.5">{t("invoicesLabel", { count: history.invoices.length })}</p>
               {history.invoices.length === 0 ? (
                 <p className="text-xs text-slate-300">{t("noneLabel")}</p>
               ) : (

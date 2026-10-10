@@ -10,7 +10,8 @@ import { sql } from "@/db";
 import { checkPassword } from "@/lib/auth";
 import { allowAttempt } from "@/lib/login-throttle";
 import { audit } from "@/lib/security/audit";
-import { emailOtpRequired, issueChallenge, mail, mailboxAllowed, verifyChallenge, type OtpPurpose } from "@/lib/security/email-otp";
+import { issueChallenge, mail, mailboxAllowed, otpRequiredFor, verifyChallenge, type OtpPurpose } from "@/lib/security/email-otp";
+import { revokeAllPasskeys } from "@/lib/security/passkey";
 import {
   clientMeta, createTrustedBrowser, findTrustedBrowser, readCookie, revokeUserSessions, TRUSTED_BROWSER_COOKIE, TRUSTED_BROWSER_SECONDS,
 } from "@/lib/security/session";
@@ -81,7 +82,11 @@ export async function POST(request: Request) {
     case "start": {
       const user = await checkPassword(body.email, body.password, meta);
       if (!user) return json({ error: "invalid_credentials" }, 401);
-      if (user.account_type === "talent" || !emailOtpRequired()) return json({ next: "signin" });
+      if (user.account_type !== "talent" && !mailboxAllowed(user.email).ok) {
+        await audit(sql, { action: "login", decision: "deny", actorUserId: user.id, reason: "mailbox_not_allowed", ipHash: meta.ipHash, device: meta.device });
+        return json({ error: "mailbox_not_allowed" }, 403);
+      }
+      if (user.account_type === "talent" || !otpRequiredFor(user)) return json({ next: "signin" });
       if (await findTrustedBrowser(sql, user.id, readCookie(meta.cookie, TRUSTED_BROWSER_COOKIE))) return json({ next: "signin" });
       const error = await sendCode(user, "login", meta);
       return error ? json({ error }, error === "rate_limited" ? 429 : error === "mail_unavailable" ? 503 : 403) : json({ next: "otp" });
@@ -106,7 +111,8 @@ export async function POST(request: Request) {
       if (!(await checkCode(user, "reset", body.code, meta))) return json({ error: "invalid_code" }, 401);
       await sql`UPDATE users SET password_hash = ${await bcrypt.hash(password, 12)} WHERE id = ${user!.id}`;
       const revoked = await revokeUserSessions(sql, user!.id, "password_reset", { browsers: true });
-      await audit(sql, { action: "password_reset", decision: "allow", actorUserId: user!.id, reason: `sessions_revoked:${revoked}`, ipHash: meta.ipHash, device: meta.device });
+      const revokedPasskeys = await revokeAllPasskeys(sql, user!.id, "password_reset");
+      await audit(sql, { action: "password_reset", decision: "allow", actorUserId: user!.id, reason: `sessions_revoked:${revoked};passkeys_revoked:${revokedPasskeys}`, ipHash: meta.ipHash, device: meta.device });
       // The mailbox was just proven: this browser is trusted for the sign-in that follows.
       const browser = await createTrustedBrowser(sql, user!.id, meta.device);
       return json({ next: "signin" }, 200, { "Set-Cookie": trustCookie(browser.token) });

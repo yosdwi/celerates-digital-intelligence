@@ -25,7 +25,7 @@ export function ReviewList() {
           subtitle={t("reviewSubtitle")}
           action={
             unread > 0 ? (
-              <button type="button" onClick={markAllRead} className="h-11 whitespace-nowrap rounded-xl px-2 text-[13px] font-bold text-j-accent">
+              <button type="button" onClick={markAllRead} className="h-11 whitespace-nowrap rounded-xl px-2 text-[0.8125rem] font-bold text-j-accent">
                 {t("markAllRead")}
               </button>
             ) : undefined
@@ -53,7 +53,7 @@ export function ReviewList() {
                       <span className={`text-sm ${n.is_read ? "font-semibold" : "font-bold"}`}>{n.title}</span>
                       <span className="whitespace-nowrap text-xs text-j-muted">{timeAgo(n.created_at)}</span>
                     </span>
-                    {n.body && <span className="line-clamp-2 text-[13px] text-j-muted">{n.body}</span>}
+                    {n.body && <span className="line-clamp-2 text-[0.8125rem] text-j-muted">{n.body}</span>}
                     {!n.is_read && <span className="sr-only">{t("unreadItem")}</span>}
                   </span>
                 </button>

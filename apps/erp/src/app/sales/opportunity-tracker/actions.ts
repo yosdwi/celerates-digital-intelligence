@@ -3,12 +3,14 @@ import { requireActor } from "@/lib/actor";
 import { db } from "@/db";
 import { salesOpportunityTrackers, requisitions, opportunities } from "@/db/schema";
 import { revalidatePath } from "next/cache";
+import { updateWithHistory } from "@/lib/field-history";
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { logActivity } from "@/lib/activity-log";
 import { requireDivisionAccess } from "@/lib/require-division-access";
 import { generateRequisitionNo, generateOptyNo } from "@/lib/id-generators";
 import { markSaved } from "@/lib/saved-flag";
+import { safeSalesReturnPath } from "@/lib/safe-return";
 
 
 export async function createOpportunityTracker(formData: FormData) {
@@ -64,6 +66,15 @@ export async function createOpportunityTracker(formData: FormData) {
 
 export async function updateOpportunityTracker(id: string, formData: FormData) {
   await requireActor();
+  await saveOpportunityTracker(id, formData);
+  // The "Berhasil disimpan" toast belongs to the redirect (a table edit shows its own state instead).
+  await markSaved();
+  redirect(safeSalesReturnPath(formData.get("return_to")));
+}
+
+/** The edit without the redirect: Sales V2 saves a single field from its table (the form still posts every field). */
+export async function saveOpportunityTracker(id: string, formData: FormData) {
+  await requireActor();
 
   await requireDivisionAccess("sales");
   const client_name = formData.get("client_name") as string;
@@ -86,7 +97,7 @@ export async function updateOpportunityTracker(id: string, formData: FormData) {
   const price_period_code = formData.get("price_period_code") as string;
   const estimated_duration_months = formData.get("estimated_duration_months") as string;
 
-  await db.update(salesOpportunityTrackers).set({
+  await updateWithHistory("opportunity_tracker", salesOpportunityTrackers, id, {
     client_name,
     service_type_code: service_type_code || null,
     requirement_summary: requirement_summary || null,
@@ -106,19 +117,17 @@ export async function updateOpportunityTracker(id: string, formData: FormData) {
     price_amount: price_amount ? Number(price_amount) : null,
     price_period_code: price_period_code || "monthly",
     estimated_duration_months: estimated_duration_months ? Number(estimated_duration_months) : null,
-  }).where(eq(salesOpportunityTrackers.id, id));
+  });
 
   await logActivity("sales", "update", `Opportunity Tracker: ${client_name}`, "Opportunity Tracker");
   revalidatePath("/sales/opportunity-tracker");
-  await markSaved();
-  redirect("/sales/opportunity-tracker");
 }
 
 export async function updateSalesQualified(id: string, sales_qualified: boolean) {
   await requireActor();
 
   await requireDivisionAccess("sales");
-  await db.update(salesOpportunityTrackers).set({ sales_qualified }).where(eq(salesOpportunityTrackers.id, id));
+  await updateWithHistory("opportunity_tracker", salesOpportunityTrackers, id, { sales_qualified });
   await logActivity("sales", "update", `Sales Qualified diubah jadi ${sales_qualified}`, "Opportunity Tracker");
   revalidatePath("/sales/opportunity-tracker");
 }
@@ -127,7 +136,7 @@ export async function updateOptyStatus(id: string, opty_status_code: string) {
   await requireActor();
 
   await requireDivisionAccess("sales");
-  await db.update(salesOpportunityTrackers).set({ opty_status_code }).where(eq(salesOpportunityTrackers.id, id));
+  await updateWithHistory("opportunity_tracker", salesOpportunityTrackers, id, { opty_status_code });
   await logActivity("sales", "update", `Opty Status diubah jadi ${opty_status_code}`, "Opportunity Tracker");
   revalidatePath("/sales/opportunity-tracker");
 }
@@ -167,8 +176,10 @@ export async function convertToRequisition(opportunityTrackerId: string, formDat
 
   await requireDivisionAccess("sales");
   const existing = await db.select().from(requisitions).where(eq(requisitions.opportunity_id, opportunityTrackerId));
+  // Sales V2 sends its own URL so the user lands back in the same view; V1 sends nothing and keeps its list.
+  const returnTo = safeSalesReturnPath(formData.get("return_to"));
   if (existing.length > 0) {
-    redirect("/ta");
+    redirect(returnTo);
   }
   // Tracker dari "Add Extension Request" nggak punya Requisition (cek di atas
   // nggak nangkep dia) tapi PQ Tracker-nya udah ada -- convert lagi bakal
@@ -180,15 +191,22 @@ export async function convertToRequisition(opportunityTrackerId: string, formDat
 
   const [tracker] = await db.select().from(salesOpportunityTrackers).where(eq(salesOpportunityTrackers.id, opportunityTrackerId));
   if (!tracker) throw new Error("Opportunity Tracker tidak ditemukan");
+  if (!tracker.sales_qualified) {
+    throw new Error("Opportunity harus Sales Qualified sebelum diteruskan ke Requisition.");
+  }
 
-  // Kalau TA nggak isi manual di form Convert, pakai data yang udah ada
+  // Kalau Sales tidak mengubah field di form Convert, pakai data yang sudah ada
   // di Opportunity Tracker sebagai default.
   const positionInput = formData.get("position_name") as string;
   const headcountInput = formData.get("headcount_target") as string;
   const priorityInput = formData.get("priority_code") as string;
   const priceInput = formData.get("price_amount") as string;
-  const position_name = positionInput || tracker.position_name || "-";
-  const headcount_target = headcountInput ? Number(headcountInput) : (tracker.headcount_target ?? 1);
+  const position_name = (positionInput || tracker.position_name || "").trim();
+  const headcount_target = headcountInput ? Number(headcountInput) : tracker.headcount_target;
+  if (!position_name) throw new Error("Position wajib diisi sebelum Opportunity diteruskan.");
+  if (!headcount_target || !Number.isInteger(headcount_target) || headcount_target < 1) {
+    throw new Error("Headcount wajib berupa angka minimal 1 sebelum Opportunity diteruskan.");
+  }
   const priority_code = priorityInput || "p2";
   const price_amount = priceInput ? Number(priceInput) : tracker.price_amount;
   // Opty Request Date = tanggal saat sales melakukan convert, bukan input manual.
@@ -199,51 +217,62 @@ export async function convertToRequisition(opportunityTrackerId: string, formDat
 
   const requisition_no = await generateRequisitionNo();
 
-  await db.transaction(async (tx) => {
-    await tx.insert(requisitions).values({
-      requisition_no,
-      opportunity_id: opportunityTrackerId,
-      opty_request_date,
-      client_name: tracker.client_name,
-      position_name,
-      service_type_code: tracker.service_type_code,
-      level_code: tracker.level_code,
-      headcount_target,
-      priority_code,
-      price_amount,
-      estimated_duration_months: tracker.estimated_duration_months,
-      // TA PIC belum ditentukan saat convert -- dulu ini ketimpa nama Sales PIC,
-      // sekarang harus di-set manual oleh tim TA lewat halaman Edit Requisition.
-      ta_pic_name: "Belum Ditentukan",
-      sales_pic_name: tracker.sales_pic_name,
-      notes: tracker.requirement_summary ?? null,
-    });
+  try {
+    await db.transaction(async (tx) => {
+      await tx.insert(requisitions).values({
+        requisition_no,
+        opportunity_id: opportunityTrackerId,
+        opty_request_date,
+        client_name: tracker.client_name,
+        position_name,
+        service_type_code: tracker.service_type_code,
+        level_code: tracker.level_code,
+        headcount_target,
+        priority_code,
+        price_amount,
+        estimated_duration_months: tracker.estimated_duration_months,
+        // TA PIC belum ditentukan saat convert -- dulu ini ketimpa nama Sales PIC,
+        // sekarang harus di-set manual oleh tim TA lewat halaman Edit Requisition.
+        ta_pic_name: "Belum Ditentukan",
+        sales_pic_name: tracker.sales_pic_name,
+        notes: tracker.requirement_summary ?? null,
+      });
 
-    // Semua field ini SEMUA otomatis kecopy dari Opportunity Tracker --
-    // tetap editable belakangan di halaman Edit PQ Tracker kalau ada beda.
-    await tx.insert(opportunities).values({
-      opty_no,
-      opty_request_date,
-      client_name: tracker.client_name,
-      client_type_code: tracker.client_type_code,
-      project_name: position_name,
-      position_name,
-      service_type_code: tracker.service_type_code ?? "outsourcing",
-      level_code: tracker.level_code,
-      headcount_target,
-      priority_code,
-      bant_score: tracker.bante_score,
-      price_amount,
-      estimated_duration_months: tracker.estimated_duration_months,
-      sales_pic_name: tracker.sales_pic_name,
-      pipeline_stage_code: "on_going",
-      opportunity_tracker_id: opportunityTrackerId,
+      // Semua field ini otomatis kecopy dari Opportunity Tracker dan dibuat dalam transaksi yang sama.
+      // DB unique constraints 0013 menjamin retry / double-submit / concurrent request tidak membuat
+      // dua Requisition atau dua PQ Tracker untuk Opportunity Tracker yang sama.
+      await tx.insert(opportunities).values({
+        opty_no,
+        opty_request_date,
+        client_name: tracker.client_name,
+        client_type_code: tracker.client_type_code,
+        project_name: position_name,
+        position_name,
+        service_type_code: tracker.service_type_code ?? "outsourcing",
+        level_code: tracker.level_code,
+        headcount_target,
+        priority_code,
+        bant_score: tracker.bante_score,
+        price_amount,
+        estimated_duration_months: tracker.estimated_duration_months,
+        sales_pic_name: tracker.sales_pic_name,
+        pipeline_stage_code: "on_going",
+        opportunity_tracker_id: opportunityTrackerId,
+      });
     });
-  });
+  } catch (error) {
+    const code = (error as { code?: string })?.code;
+    if (code === "23505") {
+      const [createdReq] = await db.select({ id: requisitions.id }).from(requisitions).where(eq(requisitions.opportunity_id, opportunityTrackerId)).limit(1);
+      const [createdOpty] = await db.select({ id: opportunities.id }).from(opportunities).where(eq(opportunities.opportunity_tracker_id, opportunityTrackerId)).limit(1);
+      if (createdReq && createdOpty) redirect(returnTo);
+    }
+    throw error;
+  }
 
   await logActivity("sales", "create", `${tracker.client_name} — ${position_name} dikonversi jadi Requisition & PQ Tracker`, "Opportunity Tracker");
   revalidatePath("/ta");
   revalidatePath("/sales");
   await markSaved();
-  redirect("/ta");
+  redirect(returnTo);
 }

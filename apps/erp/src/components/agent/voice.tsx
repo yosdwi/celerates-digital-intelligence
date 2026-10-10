@@ -7,7 +7,7 @@ import { Loader2, Mic, Square } from "lucide-react";
 const MAX_MS = 60000;
 const TYPES = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus", "audio/mp4"];
 
-export function VoiceButton({ disabled, onTranscript, onError }: { disabled: boolean; onTranscript: (text: string) => void; onError: (message: string | null) => void }) {
+export function VoiceButton({ disabled, onTranscript, onError, autoStart = false, hero = false, startSignal = 0 }: { disabled: boolean; onTranscript: (text: string) => void; onError: (message: string | null) => void; autoStart?: boolean; hero?: boolean; /** Each change starts recording (the /bicara command). */ startSignal?: number }) {
   const [state, setState] = useState<"idle" | "recording" | "transcribing">("idle");
   const recorder = useRef<MediaRecorder | null>(null);
   const timer = useRef<number | null>(null);
@@ -15,6 +15,18 @@ export function VoiceButton({ disabled, onTranscript, onError }: { disabled: boo
     if (timer.current) window.clearTimeout(timer.current);
     recorder.current?.stream.getTracks().forEach((t) => t.stop());
   }, []);
+
+  // Once, on mount, when the user already pressed "Bicara" in the Agent invitation.
+  useEffect(() => {
+    if (autoStart && !disabled) void start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (startSignal && !disabled && state === "idle") void start();
+    // Only a new signal starts a recording.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startSignal]);
 
   async function start() {
     onError(null);
@@ -54,6 +66,21 @@ export function VoiceButton({ disabled, onTranscript, onError }: { disabled: boo
   }
 
   const label = state === "recording" ? "Berhenti merekam" : state === "transcribing" ? "Mentranskripsi" : "Bicara (tekan untuk merekam)";
+  // The empty Agent's big "Ceritakan lewat suara" button: same recorder, labelled pill.
+  if (hero)
+    return (
+      <button
+        type="button"
+        aria-pressed={state === "recording"}
+        data-agent-voice={state}
+        disabled={disabled || state === "transcribing"}
+        onClick={() => (state === "recording" ? stop() : void start())}
+        className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium disabled:opacity-40 ${state === "recording" ? "animate-pulse border-red-300 bg-red-50 text-red-700" : "border-slate-200 bg-white text-slate-800 shadow-sm hover:border-brand-300"}`}
+      >
+        {state === "transcribing" ? <Loader2 className="h-4 w-4 animate-spin" /> : state === "recording" ? <Square className="h-4 w-4" /> : <Mic className="h-4 w-4 text-brand-600" />}
+        {state === "recording" ? "Berhenti merekam" : state === "transcribing" ? "Mentranskripsi…" : "Ceritakan lewat suara"}
+      </button>
+    );
   return (
     <button
       type="button"

@@ -53,7 +53,7 @@ export function ReviewQueue({ items, initialOpen, conformUnavailable }: { items:
     <MobileScreen label={tm("tabs.review")}>
       <div data-review-queue className="flex flex-col gap-4">
         <ScreenTitle title={tm("tabs.review")} subtitle={items.length ? t("waiting", { count: items.length }) : t("subtitle")} />
-        {conformUnavailable && <Card className="p-3 text-[13px] text-[#8a4b06]" data-conform-unavailable>{t("conformUnavailable")}</Card>}
+        {conformUnavailable && <Card className="p-3 text-[0.8125rem] text-[#8a4b06]" data-conform-unavailable>{t("conformUnavailable")}</Card>}
         {groups.length > 1 && (
           <div role="tablist" aria-label={t("filter")} className="-mx-5 flex gap-2 overflow-x-auto px-5 [scrollbar-width:none]">
             {groups.map((g) => (
@@ -64,7 +64,7 @@ export function ReviewQueue({ items, initialOpen, conformUnavailable }: { items:
                 aria-selected={group === g}
                 data-review-group={g}
                 onClick={() => setGroup(g)}
-                className={`flex h-9 shrink-0 items-center gap-1.5 rounded-xl px-3 text-[13px] ${group === g ? "bg-j-ink font-bold text-white" : "border border-j-line bg-j-surface font-semibold text-j-muted"}`}
+                className={`flex h-9 shrink-0 items-center gap-1.5 rounded-xl px-3 text-[0.8125rem] ${group === g ? "bg-j-ink font-bold text-white" : "border border-j-line bg-j-surface font-semibold text-j-muted"}`}
               >
                 {t("groups." + g)}
                 <span className={group === g ? "text-white/70" : "text-j-faint"}>{counts[g]}</span>
@@ -76,7 +76,7 @@ export function ReviewQueue({ items, initialOpen, conformUnavailable }: { items:
         {shown.length === 0 ? (
           <Card className="flex flex-col items-center gap-2 px-4 py-8 text-center" data-review-empty>
             <CheckCircle2 aria-hidden className="h-8 w-8 text-j-ok" />
-            <p className="text-[15px] font-bold">{t("emptyTitle")}</p>
+            <p className="text-[0.9375rem] font-bold">{t("emptyTitle")}</p>
             <p className="text-sm text-j-muted">{t("emptyBody")}</p>
           </Card>
         ) : (
@@ -93,8 +93,8 @@ export function ReviewQueue({ items, initialOpen, conformUnavailable }: { items:
                       <span className="truncate text-xs font-bold tracking-[0.2px] text-j-muted">{t("kinds." + i.kind)}</span>
                       <StatusPill tone={TONE[i.kind]}>{t("actions." + i.kind)}</StatusPill>
                     </span>
-                    <span className="truncate text-[15px] font-bold">{i.title}</span>
-                    {subtitle(i) && <span className="line-clamp-2 text-[13px] text-j-muted">{subtitle(i)}</span>}
+                    <span className="truncate text-[0.9375rem] font-bold">{i.title}</span>
+                    {subtitle(i) && <span className="line-clamp-2 text-[0.8125rem] text-j-muted">{subtitle(i)}</span>}
                     <span className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-j-muted">
                       {i.requester && (
                         <span className="flex items-center gap-1">
@@ -128,7 +128,7 @@ export function ReviewQueue({ items, initialOpen, conformUnavailable }: { items:
         )}
 
         <section aria-labelledby="review-updates" className="flex flex-col gap-2">
-          <SectionHeader id="review-updates" title={t("updates")} action={<Link href="/notifications" className="text-[13px] font-semibold text-j-accent">{tm("seeAll")}</Link>} />
+          <SectionHeader id="review-updates" title={t("updates")} action={<Link href="/notifications" className="text-[0.8125rem] font-semibold text-j-accent">{tm("seeAll")}</Link>} />
           <Card className="px-3.5 py-1">
             {notifications === null ? (
               <p className="py-3 text-sm text-j-muted">{tm("loading")}</p>
@@ -140,7 +140,7 @@ export function ReviewQueue({ items, initialOpen, conformUnavailable }: { items:
                   <li key={n.id}>
                     <Link href={n.link ?? "/notifications"} className="flex items-center gap-3 py-3">
                       <span className={`h-2 w-2 shrink-0 rounded-full ${n.is_read ? "bg-[#c5ccd8]" : "bg-j-accent"}`} aria-hidden />
-                      <span className="min-w-0 flex-1 truncate text-[13px] leading-snug">{n.title}</span>
+                      <span className="min-w-0 flex-1 truncate text-[0.8125rem] leading-snug">{n.title}</span>
                       <span className="whitespace-nowrap text-xs text-j-muted">{timeAgo(n.created_at)}</span>
                     </Link>
                   </li>

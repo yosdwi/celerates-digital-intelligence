@@ -28,7 +28,7 @@ export function HandoffActionPanel({
         <span className="inline-flex items-center gap-1 text-xs font-medium text-green-600">
           <CheckCircle2 className="h-3.5 w-3.5" /> {t("received")}{receivedByName ? ` · ${receivedByName}` : ""}
         </span>
-        {receivedAt && <span className="text-[10px] text-slate-400">{receivedAt}</span>}
+        {receivedAt && <span className="text-[0.625rem] text-slate-400">{receivedAt}</span>}
       </div>
     );
   }
@@ -39,8 +39,8 @@ export function HandoffActionPanel({
         <span className="inline-flex items-center gap-1 text-xs font-medium text-red-600">
           <RotateCcw className="h-3.5 w-3.5" /> {t("returnedToPmo")}
         </span>
-        {financeNotes && <span className="text-[10px] text-slate-500 line-clamp-2">{financeNotes}</span>}
-        <span className="text-[10px] text-slate-400">{t("waitingPmoResubmit")}</span>
+        {financeNotes && <span className="text-[0.625rem] text-slate-500 line-clamp-2">{financeNotes}</span>}
+        <span className="text-[0.625rem] text-slate-400">{t("waitingPmoResubmit")}</span>
       </div>
     );
   }

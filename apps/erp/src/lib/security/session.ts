@@ -17,7 +17,7 @@ export const TRUSTED_BROWSER_SECONDS = 30 * 86_400;
 const TOUCH_AFTER_MS = 60_000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export type AuthMethod = "password" | "password+email_otp" | "talent_link";
+export type AuthMethod = "password" | "password+email_otp" | "talent_link" | "passkey";
 export type SessionClaims = {
   sid: string;
   userId: string;

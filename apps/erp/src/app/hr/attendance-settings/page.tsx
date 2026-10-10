@@ -54,7 +54,7 @@ export default async function AttendanceSettingsPage() {
               <div key={t.id} className="flex items-center justify-between py-3">
                 <div>
                   <p className="text-sm font-medium text-slate-800">{t.name}</p>
-                  {t.requires_file && <p className="text-[11px] text-slate-400">Wajib upload file</p>}
+                  {t.requires_file && <p className="text-[0.6875rem] text-slate-400">Wajib upload file</p>}
                 </div>
                 <div className="flex items-center gap-3">
                   <LeaveTypeToggle id={t.id} isActive={t.is_active} />

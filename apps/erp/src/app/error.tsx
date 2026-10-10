@@ -1,6 +1,7 @@
 "use client";
 import { useEffect } from "react";
 import { AlertTriangle } from "lucide-react";
+import { isStaleBuild, reloadOnce } from "@/lib/stale-build";
 
 /**
  * Error boundary global -- tanpa ini, kalau sebuah Server Action/halaman
@@ -10,6 +11,7 @@ import { AlertTriangle } from "lucide-react";
  */
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
+    if (isStaleBuild(error) && reloadOnce()) return;
     console.error(error);
   }, [error]);
 

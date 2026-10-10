@@ -101,7 +101,7 @@ function SaveForm({ attachment, onClose, onSaved }: { attachment: Attachment; on
       <div className="grid gap-2 sm:grid-cols-2">
         <ClassFields kinds={kinds} initialKind={KIND_HINT[suffix]} />
       </div>
-      <p className="text-[11px] text-slate-500">Lampiran di percakapan ini tetap milik Anda dan dihapus sesuai retensinya. Company File adalah salinan yang dikelola: kelas aksesnya berlaku untuk semua pembaca.</p>
+      <p className="text-[0.6875rem] text-slate-500">Lampiran di percakapan ini tetap milik Anda dan dihapus sesuai retensinya. Company File adalah salinan yang dikelola: kelas aksesnya berlaku untuk semua pembaca.</p>
       {error && <p role="alert" className="text-xs text-amber-900">{error}</p>}
       <button disabled={pending} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">
         {pending && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Simpan

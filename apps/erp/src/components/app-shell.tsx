@@ -13,7 +13,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <main
       className={
         isAuthenticated
-          ? `${collapsed ? "md:ml-16" : "md:ml-64"} min-h-screen min-w-0 pb-[calc(88px+env(safe-area-inset-bottom))] transition-all duration-200 md:pb-0`
+          ? `${collapsed ? "md:ml-16" : "md:ml-60"} min-h-screen min-w-0 pb-[calc(88px+env(safe-area-inset-bottom))] transition-all duration-200 md:pb-24 lg:mr-[var(--agent-rail,0px)]`
           : "min-h-screen"
       }
     >

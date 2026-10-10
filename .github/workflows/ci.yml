@@ -1,8 +1,28 @@
 name: P0 verification
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'services/intelligence-api/**'
+      - 'apps/web/**'
+      - 'infra/docker-compose.yml'
+      - 'infra/litellm/**'
+      - 'scripts/check-api.py'
+      - '.env.example'
+      - 'uv.lock'
+      - '.github/workflows/ci.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   api:
+    if: github.event_name == 'push' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     services:
       postgres:
         image: pgvector/pgvector:pg16
@@ -29,8 +49,11 @@ jobs:
       - run: uv run --project services/intelligence-api --extra test pytest services/intelligence-api/tests
       - run: uv run --extra test ruff check cdi tests --config pyproject.toml
         working-directory: services/intelligence-api
+
   web:
+    if: github.event_name == 'push' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -39,7 +62,9 @@ jobs:
         working-directory: apps/web
       - name: Verify web proxy survives API address replacement
         run: sh scripts/check-web-proxy.sh
+
   compose:
+    if: github.event_name == 'push' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -47,9 +72,8 @@ jobs:
       - run: cp .env.example .env && docker compose --env-file .env -f infra/docker-compose.yml config --quiet
       - uses: actions/setup-node@v4
         with: {node-version: 22, cache: npm, cache-dependency-path: apps/web/package-lock.json}
-      - run: docker compose --env-file .env -f infra/docker-compose.yml up --build -d
-      - name: Wait for functional API
-        run: timeout 180 bash -c 'until curl -fsS http://localhost:8000/ready; do sleep 3; done'
+      - name: Start stack with bounded readiness wait
+        run: docker compose --env-file .env -f infra/docker-compose.yml up --build -d --wait --wait-timeout 180
       - run: python scripts/check-api.py
       - run: npm ci && npx playwright install --with-deps chromium && npm run test:e2e
         working-directory: apps/web

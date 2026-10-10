@@ -104,23 +104,12 @@ export default async function SalesPage() {
 >
   <Link
     href="/sales/sheet-sync"
-    className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-brand-700 transition-colors"
+    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-colors"
   >
     <RefreshCw className="h-3.5 w-3.5" />
     Google Sheet Sync
   </Link>
-</PageHeader>
-
-<main className="px-8 py-8 space-y-8 max-w-7xl mx-auto">
-  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-    <StatCard label="Total PQ" value={data.length} color="navy" />
-    <StatCard label="Win" value={data.filter((d) => d.pipeline_stage_code === "win").length} color="green" />
-    <StatCard label="On Going" value={data.filter((d) => d.pipeline_stage_code === "on_going").length} color="blue" />
-    <StatCard label={t("statNeedGeneratePq")} value={data.filter((d) => !d.pq_no && d.onboarding_request_id).length} color="amber" />
-  </div>
-
-        <div className="flex justify-end">
-          <AddRecordModal buttonLabel={t("addNew")} title={t("addNew")} action={createOpportunity}>
+          <AddRecordModal buttonLabel="Tambah PQ Baru" title="Tambah PQ Baru" action={createOpportunity}>
             <Field label={t("fields.clientName")} name="client_name" required />
             <SelectField label="Client Type" name="client_type_code" options={CLIENT_TYPES} />
             <Field label={t("fields.projectName")} name="project_name" required />
@@ -159,7 +148,15 @@ export default async function SalesPage() {
               <Field label={t("fields.notes")} name="notes" textarea />
             </div>
           </AddRecordModal>
-        </div>
+</PageHeader>
+
+<main className="px-8 py-8 space-y-8 max-w-7xl mx-auto">
+  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+    <StatCard label="Total PQ" value={data.length} color="navy" />
+    <StatCard label="Win" value={data.filter((d) => d.pipeline_stage_code === "win").length} color="green" />
+    <StatCard label="On Going" value={data.filter((d) => d.pipeline_stage_code === "on_going").length} color="blue" />
+    <StatCard label={t("statNeedGeneratePq")} value={data.filter((d) => !d.pq_no && d.onboarding_request_id).length} color="amber" />
+  </div>
 
         <ExpandableSection title={t("listTitle", { count: data.length })}>
           <OpportunitiesTable data={dataWithAttachments} clients={clientOptions} userOptions={userOptions} />

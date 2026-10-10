@@ -3,12 +3,15 @@ import { useState, useRef, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { setUiPreference } from "@/app/ui-preferences-actions";
 
-export function UserMenu() {
+export function UserMenu({ inline = false }: { inline?: boolean } = {}) {
   const { data: session } = useSession();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const t = useTranslations("userMenu");
+  const router = useRouter();
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -25,7 +28,7 @@ export function UserMenu() {
   const isOwner = (session.user as any).isOwner;
 
   return (
-    <div ref={ref} className="fixed top-4 right-6 z-40 hidden md:block">
+    <div ref={ref} className={`${inline ? "relative" : "fixed top-4 right-[calc(var(--agent-rail,0px)+1.5rem)] z-40"} hidden md:block`}>
       <button
         onClick={() => setOpen((v) => !v)}
         className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-brand-700 text-white text-sm font-medium shadow-[0_4px_10px_rgba(25,70,103,0.35)] hover:shadow-[0_6px_14px_rgba(25,70,103,0.45)] hover:-translate-y-0.5 transition-all duration-200"
@@ -38,7 +41,7 @@ export function UserMenu() {
           <div className="px-4 py-2 border-b border-slate-100">
             <p className="text-sm font-medium text-slate-900 truncate">{name}</p>
             <p className="text-xs text-slate-500 truncate">{session.user.email}</p>
-            {isOwner && <span className="inline-block mt-1 text-[10px] uppercase tracking-wide text-brand-600 font-medium">{t("owner")}</span>}
+            {isOwner && <span className="inline-block mt-1 text-[0.625rem] uppercase tracking-wide text-brand-600 font-medium">{t("owner")}</span>}
           </div>
           <Link href="/profile" className="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50" onClick={() => setOpen(false)}>
             {t("editProfile")}
@@ -47,6 +50,14 @@ export function UserMenu() {
             <Link href="/access-management" className="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50" onClick={() => setOpen(false)}>
               {t("accessManagement")}
             </Link>
+          )}
+          {!inline && (
+            <button
+              onClick={async () => { setOpen(false); await setUiPreference("shell", "crisp"); router.refresh(); }}
+              className="block w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+            >
+              Coba tampilan baru
+            </button>
           )}
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}

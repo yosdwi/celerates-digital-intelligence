@@ -73,7 +73,7 @@ const PROGRESS_STATUS_STYLES: Record<string, string> = {
 function ProgressBadge({ code }: { code: string | null }) {
   const c = code ?? "not_started";
   return (
-    <span className={`inline-flex items-center rounded-full whitespace-nowrap px-2 py-0.5 text-[11px] font-medium ${PROGRESS_STATUS_STYLES[c] ?? "bg-slate-100 text-slate-500"}`}>
+    <span className={`inline-flex items-center rounded-full whitespace-nowrap px-2 py-0.5 text-[0.6875rem] font-medium ${PROGRESS_STATUS_STYLES[c] ?? "bg-slate-100 text-slate-500"}`}>
       {PROGRESS_STATUS_LABELS[c] ?? c}
     </span>
   );
@@ -349,7 +349,7 @@ function StatusFlowCell({
           <ArrowRightCircle className="h-3.5 w-3.5" /> {t("submitToFinance")}
         </button>
       )}
-      {error && <span className="text-[10px] text-red-600">{error}</span>}
+      {error && <span className="text-[0.625rem] text-red-600">{error}</span>}
     </div>
   );
 }
@@ -405,7 +405,7 @@ function InvoiceCell({ row: r, canFinance }: { row: ClaimRow; canFinance: boolea
         </button>
         <button type="button" onClick={() => setOpen(false)} className="rounded px-2 py-1 text-xs text-slate-500 hover:bg-violet-100/70">{tc("cancel")}</button>
       </div>
-      {error && <span className="text-[10px] text-red-600">{error}</span>}
+      {error && <span className="text-[0.625rem] text-red-600">{error}</span>}
     </form>
   );
 }
@@ -417,7 +417,7 @@ function BillingStatusSelect({ row: r }: { row: ClaimRow }) {
       value={r.billing_status_code}
       onChange={(e) => { const v = e.target.value; startTransition(async () => { await updateBillingStatus(r.id, v); }); }}
       disabled={isPending}
-      className={`mt-1 text-[10px] rounded-full whitespace-nowrap px-2 py-0.5 font-medium border-0 ${BILLING_STATUS_STYLES[r.billing_status_code] ?? "bg-slate-100 text-slate-600"}`}
+      className={`mt-1 text-[0.625rem] rounded-full whitespace-nowrap px-2 py-0.5 font-medium border-0 ${BILLING_STATUS_STYLES[r.billing_status_code] ?? "bg-slate-100 text-slate-600"}`}
     >
       {BILLING_STATUSES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
     </select>
@@ -449,7 +449,7 @@ function TalentPaymentCell({ row: r, canHr }: { row: ClaimRow; canHr: boolean })
           {TALENT_PAYMENT_STATUSES.find(([v]) => v === r.talent_payment_status_code)?.[1] ?? r.talent_payment_status_code}
         </span>
         <p className="text-xs text-slate-400 mt-1">{rp(r.amount_total_given_to_talent)}</p>
-        <span className="text-[10px] text-brand-600 hover:underline">{t("updateAction")}</span>
+        <span className="text-[0.625rem] text-brand-600 hover:underline">{t("updateAction")}</span>
       </button>
     );
   }
@@ -477,7 +477,7 @@ function TalentPaymentCell({ row: r, canHr }: { row: ClaimRow; canHr: boolean })
         <button type="submit" disabled={isPending} className="rounded bg-rose-600 px-2 py-1 text-xs font-medium text-white disabled:opacity-50">{tc("save")}</button>
         <button type="button" onClick={() => setOpen(false)} className="rounded px-2 py-1 text-xs text-slate-500 hover:bg-violet-100/70">{tc("cancel")}</button>
       </div>
-      {error && <span className="text-[10px] text-red-600">{error}</span>}
+      {error && <span className="text-[0.625rem] text-red-600">{error}</span>}
     </form>
   );
 }

@@ -13,7 +13,7 @@ export function MobileScreen({ children, className, label, withActions }: { chil
     <div
       aria-label={label}
       className={cx(
-        "min-h-[100dvh] bg-j-bg font-jakarta text-j-ink px-5 pt-[max(20px,env(safe-area-inset-top))] md:min-h-0 md:py-8",
+        "min-h-[100dvh] bg-j-bg font-sans text-j-ink px-5 pt-[max(20px,env(safe-area-inset-top))] md:min-h-0 md:py-8",
         withActions ? "pb-[calc(176px+env(safe-area-inset-bottom))]" : "pb-[calc(104px+env(safe-area-inset-bottom))]",
         className,
       )}
@@ -27,7 +27,7 @@ export function ScreenTitle({ title, subtitle, action }: { title: string; subtit
   return (
     <header className="flex items-end justify-between gap-3">
       <div className="min-w-0">
-        <h1 className="text-[28px] font-extrabold leading-tight tracking-[-0.6px]">{title}</h1>
+        <h1 className="text-[1.75rem] font-extrabold leading-tight tracking-[-0.6px]">{title}</h1>
         {subtitle && <p className="mt-1 text-sm text-j-muted">{subtitle}</p>}
       </div>
       {action}
@@ -67,7 +67,7 @@ const TONES: Record<Tone, string> = {
   danger: "bg-[#fde8e6] text-[#a8261c]",
 };
 export function StatusPill({ tone = "muted", children }: { tone?: Tone; children: React.ReactNode }) {
-  return <span className={cx("inline-flex shrink-0 items-center whitespace-nowrap rounded-lg px-2 py-[3px] text-[11px] font-bold", TONES[tone])}>{children}</span>;
+  return <span className={cx("inline-flex shrink-0 items-center whitespace-nowrap rounded-lg px-2 py-[3px] text-[0.6875rem] font-bold", TONES[tone])}>{children}</span>;
 }
 
 /** A list row card: identifier, title, facts, status. Used for operational lists (never shrunken tables). */
@@ -142,7 +142,7 @@ export function Row({
     <>
       {leading}
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="truncate text-[15px] font-bold">{title}</span>
+        <span className="truncate text-[0.9375rem] font-bold">{title}</span>
         {subtitle && <span className="truncate text-xs text-j-muted">{subtitle}</span>}
       </span>
       {trailing}
@@ -188,7 +188,7 @@ export function StickyActions({ children }: { children: React.ReactNode }) {
   return (
     <div
       data-sticky-actions
-      className="fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] z-20 flex gap-2.5 border-t border-j-line bg-j-surface/95 px-5 py-3 font-jakarta backdrop-blur md:static md:z-auto md:mt-2 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none"
+      className="fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] z-20 flex gap-2.5 border-t border-j-line bg-j-surface/95 px-5 py-3 font-sans backdrop-blur md:static md:z-auto md:mt-2 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none"
     >
       {children}
     </div>
@@ -237,7 +237,7 @@ export function BottomSheet({
       : "md:left-1/2 md:max-w-lg md:-translate-x-1/2";
 
   return (
-    <div className="fixed inset-0 z-50 font-jakarta text-j-ink">
+    <div className="fixed inset-0 z-50 font-sans text-j-ink">
       <button type="button" aria-label="Tutup" tabIndex={-1} onClick={onClose} className="absolute inset-0 h-full w-full bg-[rgba(14,23,38,0.4)]" />
       <div
         ref={panel}
@@ -251,7 +251,7 @@ export function BottomSheet({
       >
         <div className={`mx-auto mt-2.5 h-[5px] w-10 shrink-0 rounded-full bg-[#d5dbe5] ${desktopMode === "side" ? "md:hidden" : ""}`} aria-hidden />
         <div className={`flex shrink-0 items-center justify-between gap-3 px-5 pb-2 pt-3 ${desktopMode === "side" ? "md:px-6 md:pb-3 md:pt-6" : ""}`}>
-          <h2 id={titleId} className="text-[19px] font-extrabold">
+          <h2 id={titleId} className="text-[1.1875rem] font-extrabold">
             {title}
           </h2>
           <button type="button" onClick={onClose} aria-label="Tutup" className="flex h-11 w-11 items-center justify-center rounded-full text-j-muted hover:bg-j-line-soft">

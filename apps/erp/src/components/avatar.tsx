@@ -24,7 +24,7 @@ function initialsOf(name: string): string {
 
 /** Lingkaran inisial gradient -- dipakai di sel nama tabel & kartu grid di semua modul, biar konsisten tanpa perlu foto asli. */
 export function Avatar({ name, size = "md" }: { name: string; size?: "sm" | "md" | "lg" }) {
-  const dims = size === "sm" ? "h-8 w-8 rounded-lg text-[10px]" : size === "lg" ? "h-11 w-11 rounded-xl text-sm" : "h-9 w-9 rounded-lg text-xs";
+  const dims = size === "sm" ? "h-8 w-8 rounded-lg text-[0.625rem]" : size === "lg" ? "h-11 w-11 rounded-xl text-sm" : "h-9 w-9 rounded-lg text-xs";
   return (
     <div
       className={`flex ${dims} shrink-0 items-center justify-center font-bold text-white`}

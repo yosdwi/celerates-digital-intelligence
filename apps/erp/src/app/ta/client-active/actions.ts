@@ -8,6 +8,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { logActivity } from "@/lib/activity-log";
+import { fieldDiffs, recordChanges } from "@/lib/field-history";
 import { notifyAboutClientSubmissionUpdate } from "@/lib/client-submission";
 import { CLIENT_SUBMISSION_LABELS } from "./constants";
 
@@ -26,17 +27,23 @@ export async function updateClientSubmissionStatus(applicationId: string, formDa
   const note = (formData.get("client_submission_note") as string) || null;
   if (!status_code) return { ok: false, error: "Status wajib dipilih" };
 
+  const [before] = await db.select({ client_submission_status_code: applications.client_submission_status_code, client_submission_note: applications.client_submission_note })
+    .from(applications).where(eq(applications.id, applicationId));
+  if (!before) return { ok: false, error: "Kandidat tidak ditemukan" };
   await db.update(applications).set({
     client_submission_status_code: status_code,
     client_submission_note: note,
     client_submission_updated_at: new Date(),
     client_submission_updated_by_name: userName,
   }).where(eq(applications.id, applicationId));
+  // Edit history (Client Active V2 panel and "Riwayat"), whichever page made the change.
+  await recordChanges("client_submission", applicationId, fieldDiffs(before, { client_submission_status_code: status_code, client_submission_note: note }));
 
   await notifyAboutClientSubmissionUpdate(userId, userName, applicationId, status_code, note);
 
   await logActivity("ta", "update", `Client Active: status diubah jadi ${CLIENT_SUBMISSION_LABELS[status_code] ?? status_code}`, "Client Active");
   revalidatePath("/ta/client-active");
+  revalidatePath("/sales/v2/client-active");
   revalidatePath("/ta/pipeline");
   return { ok: true };
 }

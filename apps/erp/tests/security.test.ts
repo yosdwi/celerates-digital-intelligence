@@ -7,7 +7,7 @@ import { readFile, readdir, writeFile } from "node:fs/promises";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { randomBytes } from "node:crypto";
+import { createHash, generateKeyPairSync, randomBytes, sign as signData } from "node:crypto";
 import { PGlite } from "@electric-sql/pglite";
 import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
 // @ts-expect-error no types
@@ -34,7 +34,7 @@ Object.assign(process.env, {
   S3_SECRET_ACCESS_KEY: "S3RVER",
   S3_BUCKET_PREFIX: "erp-sec",
   IDENTITY_KEYRING_FILE: keyringFile,
-  AUTH_EMAIL_DOMAINS: "celerates.com",
+  AUTH_EMAIL_DOMAINS: "celerates.com,celerates.co.id",
   AUTH_EMAIL_EXCEPTIONS: "",
 });
 delete process.env.AUTH_EMAIL_OTP;
@@ -58,6 +58,7 @@ let sql: typeof import("../src/db").sql;
 let S: typeof import("../src/lib/security/session");
 let P: typeof import("../src/lib/security/policy");
 let OTP: typeof import("../src/lib/security/email-otp");
+let PASSKEY: typeof import("../src/lib/security/passkey");
 let ID: typeof import("../src/lib/security/identity-documents");
 let PEOPLE: typeof import("../src/lib/people/identity");
 let KEYS: typeof import("../src/lib/security/keyring");
@@ -83,6 +84,7 @@ before(async () => {
   S = await import("../src/lib/security/session");
   P = await import("../src/lib/security/policy");
   OTP = await import("../src/lib/security/email-otp");
+  PASSKEY = await import("../src/lib/security/passkey");
   ID = await import("../src/lib/security/identity-documents");
   PEOPLE = await import("../src/lib/people/identity");
   KEYS = await import("../src/lib/security/keyring");
@@ -121,7 +123,7 @@ after(async () => {
 });
 
 /** A live session's claims, optionally with a fresh step-up. */
-async function login(key: string, opts: { stepUp?: boolean; method?: "password" | "password+email_otp" | "talent_link" } = {}) {
+async function login(key: string, opts: { stepUp?: boolean; method?: "password" | "password+email_otp" | "talent_link" | "passkey" } = {}) {
   const sid = await S.createSession(sql, { userId: u[key], method: opts.method ?? "password+email_otp", stepUp: opts.stepUp });
   const claims = await S.loadSession(sql, sid);
   assert.ok(claims, `session for ${key}`);
@@ -297,6 +299,7 @@ test("email codes: hashed, single use, expiring, 5 tries, superseded, session-bo
   await assert.rejects(issueRecoveryCode(sql, "talent.a.sec@celerates.com", "x reason"), /No active backoffice/);
 
   assert.deepEqual(OTP.mailboxAllowed("hr.sec@celerates.com"), { ok: true, exception: false });
+  assert.deepEqual(OTP.mailboxAllowed("pilot.sec@celerates.co.id"), { ok: true, exception: false });
   assert.deepEqual(OTP.mailboxAllowed("outside.sec@gmail.com"), { ok: false, exception: false });
   process.env.AUTH_EMAIL_EXCEPTIONS = "outside.sec@gmail.com";
   assert.deepEqual(OTP.mailboxAllowed("Outside.Sec@gmail.com"), { ok: true, exception: true }, "explicit exception");
@@ -305,6 +308,127 @@ test("email codes: hashed, single use, expiring, 5 tries, superseded, session-bo
   const { allowAttempt } = await import("../src/lib/login-throttle");
   for (let i = 0; i < 3; i++) assert.equal(await allowAttempt(sql, "test:k", 3), true);
   assert.equal(await allowAttempt(sql, "test:k", 3), false, "rate limit");
+});
+
+test("passkey: registration verifies attestation; assertion verifies RP/origin/UV/signature and is single-use", async () => {
+  const { publicKey, privateKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
+  const jwk = publicKey.export({ format: "jwk" });
+  assert.ok(jwk.x && jwk.y);
+  const credentialRaw = randomBytes(32);
+  const credentialId = credentialRaw.toString("base64url");
+  const encode = (v: Buffer) => v.toString("base64url");
+  const makeClient = (type: "webauthn.create" | "webauthn.get", challenge: string) =>
+    Buffer.from(JSON.stringify({ type, challenge, origin: "http://localhost:3000", crossOrigin: false }));
+
+  const cborLength = (major: number, n: number) => {
+    if (n < 24) return Buffer.from([(major << 5) | n]);
+    if (n < 256) return Buffer.from([(major << 5) | 24, n]);
+    if (n < 65536) {
+      const out = Buffer.alloc(3);
+      out[0] = (major << 5) | 25;
+      out.writeUInt16BE(n, 1);
+      return out;
+    }
+    throw new Error("test cbor length too large");
+  };
+  const cborInt = (n: number) => cborLength(n >= 0 ? 0 : 1, n >= 0 ? n : -1 - n);
+  const cborBytes = (v: Buffer) => Buffer.concat([cborLength(2, v.length), v]);
+  const cborText = (v: string) => {
+    const raw = Buffer.from(v);
+    return Buffer.concat([cborLength(3, raw.length), raw]);
+  };
+  const cborMap = (pairs: [Buffer, Buffer][]) =>
+    Buffer.concat([cborLength(5, pairs.length), ...pairs.flatMap(([k, v]) => [k, v])]);
+
+  const cose = cborMap([
+    [cborInt(1), cborInt(2)], // kty EC2
+    [cborInt(3), cborInt(-7)], // ES256
+    [cborInt(-1), cborInt(1)], // P-256
+    [cborInt(-2), cborBytes(Buffer.from(jwk.x!, "base64url"))],
+    [cborInt(-3), cborBytes(Buffer.from(jwk.y!, "base64url"))],
+  ]);
+  const rpHash = createHash("sha256").update("localhost").digest();
+  const registrationAuthData = Buffer.alloc(37 + 16 + 2);
+  rpHash.copy(registrationAuthData, 0);
+  registrationAuthData[32] = 0x45; // UP + UV + attested credential data
+  registrationAuthData.writeUInt32BE(0, 33);
+  registrationAuthData.writeUInt16BE(credentialRaw.length, 53);
+  const attestationObject = cborMap([
+    [cborText("fmt"), cborText("none")],
+    [cborText("authData"), cborBytes(Buffer.concat([registrationAuthData, credentialRaw, cose]))],
+    [cborText("attStmt"), cborMap([])],
+  ]);
+
+  const reg = await PASSKEY.issuePasskeyChallenge(sql, { purpose: "register", userId: u.hr });
+  const regClient = makeClient("webauthn.create", reg.challenge);
+  const registrationInput = {
+    userId: u.hr,
+    challengeId: reg.id,
+    credentialId,
+    clientDataJSON: encode(regClient),
+    attestationObject: encode(attestationObject),
+    transports: ["internal"],
+    label: "Synthetic Windows Hello",
+  };
+  const saved = await PASSKEY.registerPasskey(sql, registrationInput);
+  assert.match(saved.id, /^[0-9a-f-]{36}$/i);
+  const [stored] = await sql`SELECT public_key_spki, algorithm, sign_count FROM auth_passkey_credentials WHERE id = ${saved.id}`;
+  assert.equal(stored.algorithm, -7);
+  assert.equal(Number(stored.sign_count), 0);
+  assert.ok(typeof stored.public_key_spki === "string" && stored.public_key_spki.length > 40);
+
+  await assert.rejects(
+    PASSKEY.registerPasskey(sql, registrationInput),
+    /invalid_or_expired_challenge/,
+    "registration challenge is single-use",
+  );
+
+  const loginChallenge = await PASSKEY.issuePasskeyChallenge(sql, { purpose: "login" });
+  const assertionClient = makeClient("webauthn.get", loginChallenge.challenge);
+  const authData = Buffer.alloc(37);
+  rpHash.copy(authData, 0);
+  authData[32] = 0x05; // user present + user verified
+  authData.writeUInt32BE(1, 33);
+  const signed = Buffer.concat([authData, createHash("sha256").update(assertionClient).digest()]);
+  const signature = signData("sha256", signed, privateKey);
+  const user = await PASSKEY.verifyPasskeyAssertion(sql, {
+    challengeId: loginChallenge.id,
+    credentialId,
+    clientDataJSON: encode(assertionClient),
+    authenticatorData: encode(authData),
+    signature: encode(signature),
+    userHandle: Buffer.from(u.hr).toString("base64url"),
+  });
+  assert.equal(user?.id, u.hr);
+
+  assert.equal(await PASSKEY.verifyPasskeyAssertion(sql, {
+    challengeId: loginChallenge.id,
+    credentialId,
+    clientDataJSON: encode(assertionClient),
+    authenticatorData: encode(authData),
+    signature: encode(signature),
+    userHandle: Buffer.from(u.hr).toString("base64url"),
+  }), null, "assertion challenge replay is refused");
+
+  const noUv = await PASSKEY.issuePasskeyChallenge(sql, { purpose: "login" });
+  const noUvClient = makeClient("webauthn.get", noUv.challenge);
+  const noUvAuth = Buffer.from(authData);
+  noUvAuth[32] = 0x01;
+  noUvAuth.writeUInt32BE(2, 33);
+  const noUvSigned = Buffer.concat([noUvAuth, createHash("sha256").update(noUvClient).digest()]);
+  const noUvSig = signData("sha256", noUvSigned, privateKey);
+  assert.equal(await PASSKEY.verifyPasskeyAssertion(sql, {
+    challengeId: noUv.id,
+    credentialId,
+    clientDataJSON: encode(noUvClient),
+    authenticatorData: encode(noUvAuth),
+    signature: encode(noUvSig),
+    userHandle: Buffer.from(u.hr).toString("base64url"),
+  }), null, "user verification is mandatory");
+
+  const session = await login("hr", { method: "passkey", stepUp: true });
+  assert.equal(session.authMethod, "passkey");
+  assert.ok(session.stepUpAt, "passkey login is a fresh strong session");
 });
 
 test("backoffice login: new browser → password → corporate-mailbox code → trusted browser → revocable session; next time no code", async () => {
@@ -395,6 +519,39 @@ test("backoffice login: new browser → password → corporate-mailbox code → 
   assert.ok(logins.some((r) => r.decision === "allow" && r.reason === "password+email_otp"));
   assert.ok((await auditRows("otp_login_verify")).some((r) => r.decision === "deny"));
   assert.ok((await auditRows("password_reset")).length === 1);
+});
+
+test("pilot OTP waiver: listed test accounts sign in with the password alone and it is audited; an Owner or unlisted account never does", async () => {
+  const { POST } = await import("../src/app/api/login/route");
+  const { authOptions } = await import("../src/lib/auth");
+  const otp = await import("../src/lib/security/email-otp");
+  const credentials = authOptions.providers.find((p) => p.id === "credentials") as unknown as { options: { authorize: (c: unknown, r: unknown) => Promise<{ id: string; sid: string } | null> } };
+  const authorize = (email: string) => credentials.options.authorize({ email, password: PASSWORD }, { headers: { cookie: "", "user-agent": "Mozilla/5.0 (Windows NT 10.0) Chrome/130.0", "cf-connecting-ip": "203.0.113.9" } });
+  const start = (email: string) =>
+    POST(new Request("http://localhost:3000/api/login", { method: "POST", headers: { "content-type": "application/json", cookie: "", origin: "http://localhost:3000", "cf-connecting-ip": "203.0.113.9" }, body: JSON.stringify({ action: "start", email, password: PASSWORD }) }));
+  process.env.AUTH_OTP_WAIVED_EMAILS = " HR.sec@celerates.com , owner.sec@celerates.com ";
+  try {
+    assert.equal(otp.otpWaived({ email: "hr.sec@celerates.com" }), true, "exact match, case and spaces ignored");
+    assert.equal(otp.otpWaived({ email: "owner.sec@celerates.com", is_owner: true }), false, "never an Owner, even when listed");
+    assert.equal(otp.otpWaived({ email: "ta.sec@celerates.com" }), false);
+
+    outbox.length = 0;
+    assert.deepEqual(await (await start("hr.sec@celerates.com")).json(), { next: "signin" });
+    assert.equal(outbox.length, 0, "no mailbox code is sent");
+    const user = await authorize("hr.sec@celerates.com");
+    assert.ok(user?.sid, "the password alone opens a session");
+    const [session] = await sql`SELECT auth_method, step_up_at FROM auth_sessions WHERE id = ${user!.sid}`;
+    assert.equal(session.auth_method, "password");
+    assert.equal(session.step_up_at, null, "no step-up: sensitive actions still need a real code or a passkey");
+    const [entry] = await sql`SELECT reason FROM sensitive_access_log WHERE session_id = ${user!.sid} AND action = 'login'`;
+    assert.equal(entry.reason, "password;otp_waived", "the waiver is visible in the audit log");
+
+    assert.deepEqual(await (await start("owner.sec@celerates.com")).json(), { next: "otp" }, "a listed Owner still needs the code");
+    assert.equal(await authorize("owner.sec@celerates.com"), null);
+    assert.equal(await authorize("ta.sec@celerates.com"), null, "an unlisted account still needs the code");
+  } finally {
+    delete process.env.AUTH_OTP_WAIVED_EMAILS;
+  }
 });
 
 test("middleware: a copied cookie is refused on the very next request after its session is revoked", async () => {
@@ -609,4 +766,32 @@ test("nothing sensitive was logged", () => {
   for (const leak of [SYNTHETIC_NIK, MARKER, "1234567890", ...outbox.map((m) => `Kode Anda: ${m.code}`)]) assert.ok(!all.includes(leak), `log contains ${leak}`);
   const keyring = readFileSync(keyringFile, "utf8").match(/[0-9a-f]{64}/g)!;
   for (const key of keyring) assert.ok(!all.includes(key), "no key material in logs");
+});
+
+test("QA page 12: sign-in page is bare, says 'expired' only for a refused cookie, and old builds reload", async () => {
+  const mw = readFileSync("src/middleware.ts", "utf8");
+  assert.match(mw, /path === "\/login"[\s\S]{0,300}pass\(req, "x-erp-bare"\)/);
+  assert.match(mw, /token \? "\/login\?expired=1" : "\/login"/);
+  assert.doesNotMatch(mw, /AccessDenied/);
+  assert.match(readFileSync("src/app/login/login-form.tsx", "utf8"), /get\("expired"\) === "1"/);
+  const { isStaleBuild } = await import("../src/lib/stale-build");
+  assert.equal(isStaleBuild({ name: "ChunkLoadError", message: "Loading chunk 123 failed." }), true);
+  assert.equal(isStaleBuild(new Error('Server Action "abc" was not found on the server.')), true);
+  assert.equal(isStaleBuild(new Error("relation does not exist")), false);
+  assert.ok(readFileSync("src/app/global-error.tsx", "utf8").includes("reloadOnce()"));
+});
+
+test("QA 2026-10-09: invitation email carries no secret, escapes names, and every invite path sends it", async () => {
+  process.env.NEXTAUTH_URL = process.env.NEXTAUTH_URL ?? "https://ierp.example";
+  const { inviteMessage, activationLink } = await import("../src/lib/invite-mail");
+  const m = inviteMessage({ to: "tyas@celerates.co.id", name: "Tyas <b>", inviter: "Owner", access: "Sales · Editor" });
+  assert.ok(m.text.includes(activationLink("tyas@celerates.co.id")));
+  assert.match(activationLink("tyas@celerates.co.id"), /\/login\?aktivasi=tyas%40celerates\.co\.id$/);
+  assert.ok(m.html.includes("Tyas &#60;b&#62;") && !m.html.includes("Tyas <b>"));
+  assert.doesNotMatch(m.text + m.html, /token|password=|code=/i);
+  const actions = readFileSync("src/app/access-management/actions.ts", "utf8");
+  for (const fn of ["inviteUser", "inviteUsersBulk", "resendInvite"]) assert.match(actions, new RegExp(`export async function ${fn}\\([^)]*\\)[^{]*\\{\\n  await requireActor\\(\\);\\n  const owner = await requireOwner\\(\\);`), fn);
+  assert.match(actions, /lines\.length > 50/);
+  assert.match(actions, /u\.password_hash/);
+  assert.match(readFileSync("src/app/login/login-form.tsx", "utf8"), /searchParams\.get\("aktivasi"\)/);
 });

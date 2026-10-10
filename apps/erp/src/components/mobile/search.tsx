@@ -65,7 +65,7 @@ export function MobileSearch({ initialQuery }: { initialQuery: string }) {
   const askAgent = () => openAgent({ ask: q });
 
   return (
-    <div className="min-h-[100dvh] bg-j-bg font-jakarta text-j-ink" data-mobile-search>
+    <div className="min-h-[100dvh] bg-j-bg font-sans text-j-ink" data-mobile-search>
       <div className="mx-auto flex max-w-xl flex-col gap-4 px-5 pb-[calc(104px+env(safe-area-inset-bottom))] pt-[max(12px,env(safe-area-inset-top))]">
         <form
           role="search"
@@ -89,7 +89,7 @@ export function MobileSearch({ initialQuery }: { initialQuery: string }) {
               placeholder={t("placeholder")}
               aria-label={t("placeholder")}
               data-search-input
-              className="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-j-muted [&::-webkit-search-cancel-button]:hidden"
+              className="min-w-0 flex-1 bg-transparent text-[0.9375rem] outline-none placeholder:text-j-muted [&::-webkit-search-cancel-button]:hidden"
             />
             {query && (
               <button type="button" aria-label={t("clear")} onClick={() => { setQuery(""); input.current?.focus(); }} className="flex h-9 w-9 items-center justify-center rounded-full text-j-muted">
@@ -112,7 +112,7 @@ export function MobileSearch({ initialQuery }: { initialQuery: string }) {
               </span>
               <span className="flex min-w-0 flex-1 flex-col">
                 <span className="text-xs font-bold text-j-accent">{t("askAgent")}</span>
-                <span className="truncate text-[15px] font-semibold">“{q}”</span>
+                <span className="truncate text-[0.9375rem] font-semibold">“{q}”</span>
               </span>
             </button>
 
@@ -141,7 +141,7 @@ export function MobileSearch({ initialQuery }: { initialQuery: string }) {
                     <li key={`${r.type}:${r.id}`} data-search-record={r.type}>
                       <button type="button" onClick={() => router.push(r.href)} className="flex min-h-[60px] w-full items-center gap-3 py-2.5 text-left">
                         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                          <span className="truncate text-[15px] font-bold">{r.label}</span>
+                          <span className="truncate text-[0.9375rem] font-bold">{r.label}</span>
                           <span className="truncate text-xs text-j-muted">{t("recordMeta", { type: r.type_label, field: r.matched_field })}</span>
                         </span>
                       </button>
@@ -162,14 +162,14 @@ export function MobileSearch({ initialQuery }: { initialQuery: string }) {
                           <FileText aria-hidden className="h-[18px] w-[18px]" />
                         </span>
                         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                          <span className="truncate text-[15px] font-bold">{f.title}</span>
+                          <span className="truncate text-[0.9375rem] font-bold">{f.title}</span>
                           <span className="line-clamp-1 text-xs text-j-muted">{f.snippet || f.kind}</span>
                         </span>
                       </a>
                     </li>
                   ))}
                 </RowList>
-                <Link href={`/files?q=${encodeURIComponent(q)}`} className="self-start text-[13px] font-semibold text-j-accent">
+                <Link href={`/files?q=${encodeURIComponent(q)}`} className="self-start text-[0.8125rem] font-semibold text-j-accent">
                   {t("allFiles")}
                 </Link>
               </section>

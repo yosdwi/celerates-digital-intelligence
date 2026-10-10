@@ -1527,3 +1527,113 @@ def test_one_agent_routes_feedback_to_reviewed_drafts(monkeypatch):
         assert "knowledge_correction" in [a["args"]["intent"] for a in custom["celerates.actions"][0]["items"]]
         with connect() as conn:
             conn.execute("DELETE FROM agent_eval_cases WHERE id=%s", (case["id"],))
+
+
+def test_extract_opportunity_proposes_form_fields_and_writes_nothing(monkeypatch):
+    import sys
+    import types
+
+    token = mint()
+    asked = []
+
+    def completion(model, messages, **kwargs):
+        asked.append((model, messages[0]["role"], messages[1]["content"], kwargs.get("response_format")))
+        content = '{"client_name": "PT Maju Jaya", "position_name": "Backend Engineer", "headcount_target": 3}'
+        return types.SimpleNamespace(
+            choices=[types.SimpleNamespace(message=types.SimpleNamespace(content=content), finish_reason="stop")],
+            usage=types.SimpleNamespace(total_tokens=42),
+        )
+
+    text = "Halo Celerates, kami PT Maju Jaya butuh 3 Backend Engineer senior untuk 6 bulan."
+    with TestClient(app) as c:
+        assert (
+            c.post(
+                "/api/agent/extract-opportunity", json={"text": text}, headers={"X-ERP-Delegation": token}
+            ).status_code
+            == 503
+        )
+        monkeypatch.setitem(sys.modules, "litellm", types.SimpleNamespace(completion=completion))
+        monkeypatch.setattr(settings(), "generation_mode", "litellm")
+        monkeypatch.setattr(settings(), "agent_model", "openai/agent-test")
+        assert c.post("/api/agent/extract-opportunity", json={"text": text}).status_code == 401
+        assert (
+            c.post(
+                "/api/agent/extract-opportunity", json={"text": "short"}, headers={"X-ERP-Delegation": token}
+            ).status_code
+            == 422
+        )
+        before = one_count("agent_runs")
+        r = c.post("/api/agent/extract-opportunity", json={"text": text}, headers={"X-ERP-Delegation": token})
+        assert r.status_code == 200
+        assert r.json() == {
+            "fields": {"client_name": "PT Maju Jaya", "position_name": "Backend Engineer", "headcount_target": 3},
+            "model": "openai/agent-test",
+        }
+        assert asked == [("openai/agent-test", "system", text, {"type": "json_object"})]
+        assert one_count("agent_runs") == before, "extracting starts no run"
+
+
+def test_extract_form_reads_a_po_file_per_form_and_stores_nothing(monkeypatch):
+    import sys
+    import types
+
+    token = mint()
+    asked = []
+
+    def completion(model, messages, **kwargs):
+        asked.append((messages[0]["content"], messages[1]["content"]))
+        content = '{"po_no": "PO/2026/0042", "client_name": "PT Maju Jaya", "headcount_target": 2}'
+        return types.SimpleNamespace(
+            choices=[types.SimpleNamespace(message=types.SimpleNamespace(content=content), finish_reason="stop")],
+            usage=types.SimpleNamespace(total_tokens=42),
+        )
+
+    monkeypatch.setitem(sys.modules, "litellm", types.SimpleNamespace(completion=completion))
+    monkeypatch.setattr(settings(), "generation_mode", "litellm")
+    monkeypatch.setattr(settings(), "agent_model", "openai/agent-test")
+    po = pdf_bytes(["PURCHASE ORDER PO/2026/0042", "PT Maju Jaya", "2 QA Engineer, 6 bulan"])
+    auth = {"X-ERP-Delegation": token}
+    with TestClient(app) as c:
+        r = c.post(
+            "/api/agent/extract-file",
+            files={"file": ("po.pdf", po, "application/pdf")},
+            data={"form": "pq"},
+            headers=auth,
+        )
+        assert r.status_code == 200
+        assert r.json()["fields"]["po_no"] == "PO/2026/0042"
+        prompt, text = asked[-1]
+        assert "purchase order" in prompt and "PO/2026/0042" in text, "the model reads the document's text"
+        assert (
+            c.post(
+                "/api/agent/extract-file",
+                files={"file": ("po.pdf", b"not a pdf", "application/pdf")},
+                data={"form": "pq"},
+                headers=auth,
+            ).status_code
+            == 422
+        )
+        assert (
+            c.post(
+                "/api/agent/extract-file", files={"file": ("po.pdf", po, "application/pdf")}, data={"form": "pq"}
+            ).status_code
+            == 401
+        )
+        assert (
+            c.post(
+                "/api/agent/extract-file",
+                files={"file": ("po.pdf", po, "application/pdf")},
+                data={"form": "nope"},
+                headers=auth,
+            ).status_code
+            == 422
+        )
+        r = c.post(
+            "/api/agent/extract",
+            json={"form": "contact", "text": "Budi Santoso\nHR Manager\nbudi@majujaya.co.id"},
+            headers=auth,
+        )
+        assert r.status_code == 200 and "signature" in asked[-1][0]
+        assert (
+            c.post("/api/agent/extract", json={"form": "nope", "text": "0123456789"}, headers=auth).status_code == 422
+        )

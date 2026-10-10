@@ -30,18 +30,31 @@ const SESSION_COOKIES = ["__Secure-next-auth.session-token", "next-auth.session-
 // docs/security/02: the cookie only names a session; PostgreSQL decides. This (Edge) middleware asks the Node route
 // /api/session-check on loopback for the live session's claims. Any failure fails closed (no claims).
 type LiveClaims = RouteClaims & { accountType: string; isOwner: boolean };
+// A network failure is retried once; a refusal is not. Either way it is logged (status only, never the cookie), so a
+// sign-out nobody asked for can be traced.
 async function liveClaims(req: NextRequest): Promise<LiveClaims | null> {
-  try {
-    const res = await fetch(`http://127.0.0.1:${process.env.PORT || 3000}/api/session-check`, { headers: { cookie: req.headers.get("cookie") ?? "" }, cache: "no-store" });
-    return res.ok ? ((await res.json()) as LiveClaims) : null;
-  } catch {
-    return null;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const res = await fetch(`http://127.0.0.1:${process.env.PORT || 3000}/api/session-check`, { headers: { cookie: req.headers.get("cookie") ?? "" }, cache: "no-store" });
+      if (res.ok) return (await res.json()) as LiveClaims;
+      console.warn(`[session] check refused status=${res.status}`);
+      return null;
+    } catch (error) {
+      console.warn(`[session] check unreachable attempt=${attempt}`, (error as Error).name);
+    }
   }
+  return null;
 }
 
 export async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
-  if (["/login", "/api/login", "/api/session-check", "/setup", "/api/setup", "/api/health/live", "/api/health/ready", "/logo-celerates.jpg", "/manifest.webmanifest", "/sw.js", "/offline.html"].includes(path) || path.startsWith("/api/auth/") || /^\/icons\/[a-z0-9-]+\.png$/.test(path)) return pass(req);
+  // The sign-in page never sits inside the app frame, and a signed-in browser has no business on it.
+  if (path === "/login") {
+    const signedIn = (await getToken({ req, secret: process.env.NEXTAUTH_SECRET })) ? await liveClaims(req) : null;
+    if (signedIn) return refresh(req, signedIn.accountType === "talent" && !signedIn.isOwner ? "/me" : "/", "Beranda");
+    return pass(req, "x-erp-bare");
+  }
+  if (["/api/login", "/api/passkey/login/options", "/api/session-check", "/setup", "/api/setup", "/api/health/live", "/api/health/ready", "/logo-celerates.jpg", "/manifest.webmanifest", "/sw.js", "/offline.html"].includes(path) || path.startsWith("/api/auth/") || /^\/icons\/[a-z0-9-]+\.png$/.test(path)) return pass(req);
   // Only the versioned machine contract delegates to its own fail-closed auth.
   if (path.startsWith("/api/integration/v1/")) return pass(req);
   // Machine-to-machine endpoints (ConForm → Celerates) authenticate themselves with a service bearer token.
@@ -60,7 +73,7 @@ export async function middleware(req: NextRequest) {
     return refresh(req, "/me", "Kelengkapan Saya");
   }
   if (!claims) {
-    const res = path.startsWith("/api/") ? new NextResponse("Unauthorized", { status: 403 }) : NextResponse.redirect(new URL("/login?error=AccessDenied", req.url));
+    const res = path.startsWith("/api/") ? new NextResponse("Unauthorized", { status: 403 }) : NextResponse.redirect(new URL(token ? "/login?expired=1" : "/login", req.url));
     // A cookie whose session is gone is dropped, so the browser stops presenting it.
     if (token) for (const name of SESSION_COOKIES) res.cookies.set(name, "", { maxAge: 0, path: "/", secure: name.startsWith("__Secure-"), httpOnly: true, sameSite: "lax" });
     return res;

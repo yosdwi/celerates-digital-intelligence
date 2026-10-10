@@ -46,7 +46,8 @@
   --color-j-ok: #0e6b52;
   --color-j-ok-soft: #e1f4ee;
   --color-j-danger: #d23a2e;
-  --font-jakarta: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  /* One UI font for the whole ERP: Inter (SIL OFL, self-hosted via @fontsource-variable/inter), as Sales V2. */
+  --font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --radius-j-card: 18px;
   --radius-j-field: 14px;
   --shadow-j-card: 0 1px 2px rgba(14, 23, 38, 0.04);
@@ -72,8 +73,16 @@
   --grad-navy: linear-gradient(135deg, var(--color-brand-600), var(--color-brand-800));
 }
 
+/* Laptop density (docs/design/SALES-V2-CRISP-UX-CONTRACT.md §15). A laptop at 125–150 % OS scaling gives the browser
+   ~1280–1536 CSS px, so the same UI fills far more of the screen than on a 1920 monitor. Below 1600 px wide every
+   rem-based size (Tailwind type, spacing, widths) steps down 12.5 %, so a laptop shows what the monitor shows. No
+   zoom or transform: layout, viewport units and popover positioning stay exact. Phones (< 768 px) keep 16 px. */
+@media (min-width: 768px) and (max-width: 1599px) {
+  html { font-size: 14px; }
+}
+
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
+  font-family: var(--font-sans);
   background:
     radial-gradient(1100px 560px at 12% -8%, #ede9fe 0%, transparent 60%),
     radial-gradient(900px 500px at 95% 10%, #dbeafe 0%, transparent 55%),
@@ -101,4 +110,25 @@ body {
 @keyframes rise-in {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
+}
+/* Sidebar menu scroll (QA 2026-10-08): a slim 6px rounded thumb, no track, nearly invisible at rest and shown while
+   the pointer is over the menu or it scrolls; a 16px fade at an edge that still has items past it. */
+.sidebar-scroll {
+  --fade-top: #000;
+  --fade-bottom: #000;
+  -webkit-mask-image: linear-gradient(to bottom, var(--fade-top), #000 16px, #000 calc(100% - 16px), var(--fade-bottom));
+  mask-image: linear-gradient(to bottom, var(--fade-top), #000 16px, #000 calc(100% - 16px), var(--fade-bottom));
+}
+.sidebar-scroll[data-fade-top] { --fade-top: transparent; }
+.sidebar-scroll[data-fade-bottom] { --fade-bottom: transparent; }
+.sidebar-scroll::-webkit-scrollbar { width: 6px; }
+.sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+.sidebar-scroll::-webkit-scrollbar-thumb { background: transparent; border-radius: 9999px; }
+.sidebar-scroll:hover::-webkit-scrollbar-thumb, .sidebar-scroll:focus-within::-webkit-scrollbar-thumb { background: rgb(148 163 184 / 0.28); }
+.sidebar-scroll::-webkit-scrollbar-thumb:hover { background: rgb(148 163 184 / 0.5); }
+/* Firefox (no ::-webkit-scrollbar): the standard properties. Chromium ignores the pseudo-elements once these are set,
+   so they apply only where the pseudo-elements are unsupported. */
+@supports not selector(::-webkit-scrollbar) {
+  .sidebar-scroll { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+  .sidebar-scroll:hover, .sidebar-scroll:focus-within { scrollbar-color: rgb(148 163 184 / 0.35) transparent; }
 }

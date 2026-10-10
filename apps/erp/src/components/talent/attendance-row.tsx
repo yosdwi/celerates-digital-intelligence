@@ -17,7 +17,7 @@ export async function AttendanceRow({ day, locale, href }: { day: AttendanceDay;
   const body = (
     <>
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className={`text-[14px] font-semibold ${day.state === "not_required" ? "text-j-muted" : ""}`}>{fmtDate(day.workDate, locale)}</span>
+        <span className={`text-[0.875rem] font-semibold ${day.state === "not_required" ? "text-j-muted" : ""}`}>{fmtDate(day.workDate, locale)}</span>
         <span className="truncate text-xs text-j-muted">
           {times}
           {corrected ? ` · ${t("corrected", { time: [day.correction?.proposed_check_in, day.correction?.proposed_check_out].filter(Boolean).join(" – ") })}` : ""}

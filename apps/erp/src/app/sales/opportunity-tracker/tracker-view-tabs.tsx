@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { ExpandableSection } from "@/components/expandable-section";
 import { OpportunityTrackersTable } from "./opportunity-trackers-table";
@@ -15,9 +16,24 @@ const TABS = [
  * tabel/grid-nya sendiri tidak disentuh sama sekali, cuma ditambah tab
  * "Kanban" sebagai tampilan alternatif baru.
  */
-export function TrackerViewTabs({ data, convertedIds }: { data: Parameters<typeof OpportunityTrackersTable>[0]["data"]; convertedIds: string[] }) {
+export function TrackerViewTabs({
+  data,
+  convertedIds,
+  canEdit,
+  canDelete,
+}: {
+  data: Parameters<typeof OpportunityTrackersTable>[0]["data"];
+  convertedIds: string[];
+  canEdit: boolean;
+  canDelete: boolean;
+}) {
   const t = useTranslations("sales.opportunityTracker");
-  const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("list");
+  // The chosen view lives in the URL (?view=kanban) so Back from an opened record returns to the same view (SALES-UX-002).
+  const [tab, setTabState] = useState<(typeof TABS)[number]["key"]>(useSearchParams().get("view") === "kanban" ? "kanban" : "list");
+  function setTab(next: (typeof TABS)[number]["key"]) {
+    setTabState(next);
+    window.history.replaceState(null, "", next === "kanban" ? "?view=kanban" : window.location.pathname);
+  }
 
   return (
     <div>
@@ -26,6 +42,7 @@ export function TrackerViewTabs({ data, convertedIds }: { data: Parameters<typeo
           <button
             key={tb.key}
             onClick={() => setTab(tb.key)}
+            aria-pressed={tab === tb.key}
             className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all duration-200 ${
               tab === tb.key
                 ? "bg-gradient-to-br from-violet-600 to-violet-400 text-white shadow-[0_4px_10px_-3px_rgba(124,58,237,0.5)]"
@@ -39,11 +56,11 @@ export function TrackerViewTabs({ data, convertedIds }: { data: Parameters<typeo
 
       {tab === "list" ? (
         <ExpandableSection title={t("listTitle", { count: data.length })}>
-          <OpportunityTrackersTable data={data} convertedIds={convertedIds} />
+          <OpportunityTrackersTable data={data} convertedIds={convertedIds} canEdit={canEdit} canDelete={canDelete} />
         </ExpandableSection>
       ) : (
         <div className="rounded-2xl border border-white/70 bg-white/75 backdrop-blur-xl shadow-[0_1px_2px_rgba(15,23,42,0.04),0_16px_32px_-16px_rgba(15,23,42,0.12)] overflow-hidden">
-          <OpportunityKanban data={data} />
+          <OpportunityKanban data={data} canEdit={canEdit} />
         </div>
       )}
     </div>

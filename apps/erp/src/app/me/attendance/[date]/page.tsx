@@ -37,7 +37,7 @@ export default async function TalentRequirementPage({ params, searchParams }: { 
   );
   if (!requirement)
     return (
-      <div className="min-h-[100dvh] bg-j-bg font-jakarta text-j-ink">
+      <div className="min-h-[100dvh] bg-j-bg font-sans text-j-ink">
         <div className="mx-auto flex max-w-xl flex-col gap-4 px-5 pt-[max(16px,env(safe-area-inset-top))]">
           {back}
           <Card className="p-4 text-sm text-j-muted" data-requirement-gone>{unavailable ? t("unavailable") : t("nothingForDate")}</Card>
@@ -47,13 +47,13 @@ export default async function TalentRequirementPage({ params, searchParams }: { 
   const c = requirement.correction;
   const rejected = requirement.state === "needs_action" && c?.status === "rejected";
   return (
-    <div className="min-h-[100dvh] bg-j-bg font-jakarta text-j-ink" data-talent-requirement={date}>
+    <div className="min-h-[100dvh] bg-j-bg font-sans text-j-ink" data-talent-requirement={date}>
       <div className="mx-auto flex max-w-xl flex-col gap-4 px-5 pb-[calc(120px+env(safe-area-inset-bottom))] pt-[max(16px,env(safe-area-inset-top))]">
         <header className="flex flex-col gap-1.5">
           {back}
           <span className="text-xs font-bold uppercase tracking-[0.4px] text-j-muted">{t("attendance")}</span>
-          <h1 className="text-[26px] font-extrabold leading-tight tracking-[-0.5px]">{fmtDate(date, locale)}</h1>
-          <p className="text-[15px] font-semibold text-j-muted">{t(`gap.${requirement.gap}`)}</p>
+          <h1 className="text-[1.625rem] font-extrabold leading-tight tracking-[-0.5px]">{fmtDate(date, locale)}</h1>
+          <p className="text-[0.9375rem] font-semibold text-j-muted">{t(`gap.${requirement.gap}`)}</p>
           <div className="mt-1 flex gap-1.5">
             <StatusPill tone={requirement.state === "needs_action" ? (rejected ? "danger" : "warn") : "accent"}>
               {requirement.state === "needs_action" ? (rejected ? t("rejected") : t("needs")) : t("waiting")}
@@ -61,7 +61,7 @@ export default async function TalentRequirementPage({ params, searchParams }: { 
           </div>
         </header>
         <section className="flex flex-col gap-2" data-record-section="recorded">
-          <h2 className="text-[15px] font-bold">{t("recorded")}</h2>
+          <h2 className="text-[0.9375rem] font-bold">{t("recorded")}</h2>
           <FactRows
             rows={[
               { label: t("fix.checkIn"), value: requirement.raw_check_in ?? t("missing") },
@@ -71,7 +71,7 @@ export default async function TalentRequirementPage({ params, searchParams }: { 
         </section>
         {c && (
           <section className="flex flex-col gap-2" data-record-section="submission">
-            <h2 className="text-[15px] font-bold">{t("yourSubmission")}</h2>
+            <h2 className="text-[0.9375rem] font-bold">{t("yourSubmission")}</h2>
             <FactRows
               rows={[
                 { label: t("submissionStatus"), value: t(`correctionStatus.${c.status ?? "pending"}`) },

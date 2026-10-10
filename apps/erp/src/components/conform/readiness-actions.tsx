@@ -11,8 +11,8 @@ import { bastJobStatus, createCampaign, generateBast, pmoSummaryPreview, sendPmo
 import { BottomSheet, Card, Row, RowList, StatusPill } from "@/components/mobile/primitives";
 import { buttonClass } from "@/components/mobile/styles";
 
-const field = "mt-1 w-full rounded-xl border border-[#d5dbe5] bg-j-surface px-3 py-2.5 text-[15px] font-normal text-j-ink outline-none focus:border-j-accent";
-const label = "flex flex-col text-[13px] font-semibold";
+const field = "mt-1 w-full rounded-xl border border-[#d5dbe5] bg-j-surface px-3 py-2.5 text-[0.9375rem] font-normal text-j-ink outline-none focus:border-j-accent";
+const label = "flex flex-col text-[0.8125rem] font-semibold";
 const nonce = () => (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}${Math.random()}`).replace(/[^A-Za-z0-9_-]/g, "");
 
 type CampaignRow = { id: string; state: string; label: string; counts: Record<string, number> };
@@ -65,7 +65,7 @@ export function ReadinessActions(props: {
 
   return (
     <section className="flex flex-col gap-2" data-record-section="actions">
-      <h2 className="text-[15px] font-bold">{t("actions")}</h2>
+      <h2 className="text-[0.9375rem] font-bold">{t("actions")}</h2>
       <RowList>
         {props.canFull && <Row onClick={() => open("bast")} leading={<FileText aria-hidden className="h-5 w-5 text-j-accent" />} title={t("bast.title")} subtitle={t("bast.subtitle")} />}
         {props.canEdit && <Row onClick={() => open("csv")} leading={<FileDown aria-hidden className="h-5 w-5 text-j-accent" />} title={t("csv.title")} subtitle={t("csv.subtitle")} />}
@@ -104,7 +104,7 @@ export function ReadinessActions(props: {
             type="button"
             disabled={pending}
             onClick={() => start(async () => { const r = await setKillSwitch(!props.killSwitch); if (!r.ok) setError(r.error); router.refresh(); })}
-            className={`h-10 rounded-xl px-3 text-[13px] font-bold ${props.killSwitch ? "border border-j-line text-j-accent" : "bg-[#b3261e] text-white"}`}
+            className={`h-10 rounded-xl px-3 text-[0.8125rem] font-bold ${props.killSwitch ? "border border-j-line text-j-accent" : "bg-[#b3261e] text-white"}`}
           >
             {props.killSwitch ? t("kill.resume") : t("kill.stop")}
           </button>
@@ -184,7 +184,7 @@ export function ReadinessActions(props: {
 
       <BottomSheet open={sheet === "summary"} onClose={() => setSheet(null)} title={t("summaryGroup.title")}>
         <div className="flex flex-col gap-3 pb-2">
-          {summary ? <pre className="whitespace-pre-wrap rounded-xl bg-j-field p-3 font-jakarta text-[13px]" data-summary-preview>{summary.text}</pre> : <p className="text-sm text-j-muted">…</p>}
+          {summary ? <pre className="whitespace-pre-wrap rounded-xl bg-j-field p-3 font-sans text-[0.8125rem]" data-summary-preview>{summary.text}</pre> : <p className="text-sm text-j-muted">…</p>}
           {summary && !summary.groupConfigured && <p className="text-xs text-[#8a4b06]">{t("summaryGroup.noGroup")}</p>}
           {sent && <p role="status" className="text-sm font-semibold text-j-ok" data-summary-sent>{sent}</p>}
           {error && <p role="alert" className="text-sm font-semibold text-[#a8261c]">{error}</p>}

@@ -145,12 +145,15 @@ export function moduleForPath(pathname: string): ModuleConfig | undefined {
 /** The registry submodule a route belongs to (longest matching submodule route), e.g. /pmo/contracts/<id> → A.Contract. */
 export function submoduleFor(pathname: string): { module: string; href: string; label: string } | null {
   const clean = pathname.split(/[?#]/)[0];
-  let best: { module: string; href: string; label: string } | null = null;
+  let best: { module: string; href: string; label: string; len: number } | null = null;
   for (const m of MODULES)
     for (const s of m.subPages)
-      if ((clean === s.href || clean.startsWith(s.href + "/")) && (!best || s.href.length > best.href.length))
-        best = { module: m.key, href: s.href, label: s.label };
-  return best;
+      // A Sales V2 entry also owns its V1 page (`v1`); the longest match wins, so /sales/opportunity-tracker/… stays
+      // Opportunity Tracker while the rest of /sales/… (V1 PQ pages) is PQ Tracker, as before.
+      for (const h of s.v1 ? [s.href, s.v1] : [s.href])
+        if ((clean === h || clean.startsWith(h + "/")) && (!best || h.length > best.len))
+          best = { module: m.key, href: s.href, label: s.label, len: h.length };
+  return best && { module: best.module, href: best.href, label: best.label };
 }
 
 // Routes that render their own full-screen Jernih surface on a phone (MS1 shell pages, MS2 PMO). Other module

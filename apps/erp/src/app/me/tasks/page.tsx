@@ -64,7 +64,7 @@ export default async function TalentTasksPage({ searchParams }: { searchParams: 
       >
         <div className="flex items-start gap-3 p-3.5 md:p-4">
           <span className="flex min-w-0 flex-1 flex-col gap-1">
-            <span className="text-[15px] font-bold leading-snug">{task.title}</span>
+            <span className="text-[0.9375rem] font-bold leading-snug">{task.title}</span>
             <span className="text-xs text-j-muted">{fmtDate(task.work_date, locale)} · {task.task_source}</span>
           </span>
           <StatusPill tone={closed ? "ok" : "accent"}>{task.status || "—"}</StatusPill>
@@ -73,11 +73,11 @@ export default async function TalentTasksPage({ searchParams }: { searchParams: 
         {closed && (
           <div className="flex items-center justify-between gap-3 border-t border-j-line-soft px-3.5 py-3 md:px-4">
             {hasEvidence ? (
-              <span className="flex min-w-0 items-center gap-2 text-[13px] font-semibold text-j-ok">
+              <span className="flex min-w-0 items-center gap-2 text-[0.8125rem] font-semibold text-j-ok">
                 <CheckCircle2 aria-hidden className="h-4 w-4 shrink-0" /> Evidence tersedia
               </span>
             ) : (
-              <span className="flex min-w-0 items-center gap-2 text-[13px] text-j-muted">
+              <span className="flex min-w-0 items-center gap-2 text-[0.8125rem] text-j-muted">
                 <ImageIcon aria-hidden className="h-4 w-4 shrink-0" /> Evidence belum ada
               </span>
             )}

@@ -66,8 +66,8 @@ export function TaskCard({
       <span className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundImage: PRIORITY_ACCENT[task.priority_code] ?? PRIORITY_ACCENT.medium }} />
 
       <div className="flex items-start justify-between gap-2">
-        <span className="text-[10px] font-mono text-slate-400">{task.task_no}</span>
-        <span className={`rounded-full whitespace-nowrap px-2 py-0.5 text-[10px] font-medium ${PRIORITY_STYLES[task.priority_code] ?? PRIORITY_STYLES.medium}`}>
+        <span className="text-[0.625rem] font-mono text-slate-400">{task.task_no}</span>
+        <span className={`rounded-full whitespace-nowrap px-2 py-0.5 text-[0.625rem] font-medium ${PRIORITY_STYLES[task.priority_code] ?? PRIORITY_STYLES.medium}`}>
           {PRIORITY_LABELS[task.priority_code] ?? task.priority_code}
         </span>
       </div>
@@ -80,7 +80,7 @@ export function TaskCard({
       {task.tags && task.tags.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mt-2.5">
           {task.tags.map((tag) => (
-            <span key={tag} className={`rounded-md px-1.5 py-0.5 text-[10px] font-medium ${tagStyle(tag)}`}>{tag}</span>
+            <span key={tag} className={`rounded-md px-1.5 py-0.5 text-[0.625rem] font-medium ${tagStyle(tag)}`}>{tag}</span>
           ))}
         </div>
       )}
@@ -88,17 +88,17 @@ export function TaskCard({
       <div className="flex items-center justify-between mt-3">
         <div className="flex items-center gap-3">
           {task.due_date && (
-            <span className={`text-[11px] ${isOverdue ? "text-red-600 font-medium" : "text-slate-400"}`}>
+            <span className={`text-[0.6875rem] ${isOverdue ? "text-red-600 font-medium" : "text-slate-400"}`}>
               {isOverdue ? "Overdue: " : ""}{task.due_date}
             </span>
           )}
           {!!task.attachmentCount && (
-            <span className="inline-flex items-center gap-1 text-[11px] text-slate-400">
+            <span className="inline-flex items-center gap-1 text-[0.6875rem] text-slate-400">
               <Paperclip className="h-3 w-3" />{task.attachmentCount}
             </span>
           )}
           {!!task.commentCount && (
-            <span className="inline-flex items-center gap-1 text-[11px] text-slate-400">
+            <span className="inline-flex items-center gap-1 text-[0.6875rem] text-slate-400">
               <MessageSquare className="h-3 w-3" />{task.commentCount}
             </span>
           )}

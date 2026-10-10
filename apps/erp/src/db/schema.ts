@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, uuid, text, boolean, integer, bigint, smallint, date, timestamp, check, uniqueIndex, index, doublePrecision, AnyPgColumn } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, boolean, integer, bigint, smallint, date, timestamp, check, uniqueIndex, index, doublePrecision, primaryKey, jsonb, AnyPgColumn } from "drizzle-orm/pg-core";
 
 
 export const leads = pgTable("leads", {
@@ -101,8 +101,8 @@ export const opportunities = pgTable("opportunities", {
   end_date: date("end_date"),
 }, (t) => ({
   uqOptyNo: uniqueIndex("uq_opportunities_opty_no").on(t.opty_no),
+  uqOpportunityTracker: uniqueIndex("uq_opportunities_opportunity_tracker").on(t.opportunity_tracker_id),
   idxLead: index("idx_opportunities_lead").on(t.lead_id),
-  idxOpportunityTracker: index("idx_opportunities_opportunity_tracker").on(t.opportunity_tracker_id),
   idxOnboardingRequest: index("idx_opportunities_onboarding_request").on(t.onboarding_request_id),
 }));
 
@@ -128,7 +128,7 @@ export const requisitions = pgTable("requisitions", {
   created_at: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({
   uqRequisitionNo: uniqueIndex("uq_requisitions_requisition_no").on(t.requisition_no),
-  idxOpportunity: index("idx_requisitions_opportunity").on(t.opportunity_id),
+  uqOpportunity: uniqueIndex("uq_requisitions_opportunity").on(t.opportunity_id),
 }));
 
 export const candidates = pgTable("candidates", {
@@ -1041,6 +1041,16 @@ export const googleTokens = pgTable("google_tokens", {
   uqUser: uniqueIndex("uq_google_tokens_user").on(t.user_id),
 }));
 
+/** A company Google account connected by an Owner for one purpose ("sales_sheets"); refresh token encrypted. */
+export const googleAccounts = pgTable("google_accounts", {
+  purpose: text("purpose").primaryKey(),
+  email: text("email").notNull(),
+  refresh_token_enc: text("refresh_token_enc").notNull(),
+  scopes: text("scopes").notNull(),
+  connected_by_user_id: uuid("connected_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  connected_at: timestamp("connected_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const sheetConnections = pgTable("sheet_connections", {
   id: uuid("id").defaultRandom().primaryKey(),
   division_key: text("division_key").notNull(),
@@ -1219,6 +1229,25 @@ export const automationGeneratedDocuments = pgTable("automation_generated_docume
  * (exact match, bukan FK) ke client_name di leads/opportunities/sales_opportunity_trackers
  * supaya nggak perlu ubah tabel-tabel yang sudah ada sama sekali.
  */
+/**
+ * Field-level edit history (Sales V2 "View edit history", QA 2026-10-08): one row per changed field, written by the
+ * update actions through lib/field-history.ts. `record_type` is the Agent catalog type (opportunity_tracker,
+ * commercial_pq, crm_client); `field` the column name. No foreign keys: history outlives the record and the user.
+ */
+export const recordFieldChanges = pgTable("record_field_changes", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  record_type: text("record_type").notNull(),
+  record_id: uuid("record_id").notNull(),
+  field: text("field").notNull(),
+  old_value: text("old_value"),
+  new_value: text("new_value"),
+  actor_user_id: uuid("actor_user_id"),
+  actor_name: text("actor_name").notNull(),
+  created_at: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  idxRecord: index("idx_record_field_changes_record").on(t.record_type, t.record_id, t.created_at),
+}));
+
 export const crmClients = pgTable("crm_clients", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull(),
@@ -1257,3 +1286,77 @@ export const crmClientActivities = pgTable("crm_client_activities", {
 }, (t) => ({
   idxClient: index("idx_crm_client_activities_client").on(t.client_id),
 }));
+
+/** Mail to and from Account contacts (drizzle/0015): read over IMAP or sent from the ERP (lib/mail). */
+export const crmEmails = pgTable("crm_emails", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  mailbox: text("mailbox").notNull(),
+  message_id: text("message_id").notNull().unique(),
+  thread_key: text("thread_key").notNull(),
+  in_reply_to: text("in_reply_to"),
+  direction: text("direction").notNull(), // in | out
+  from_address: text("from_address").notNull(),
+  from_name: text("from_name"),
+  to_addresses: text("to_addresses").array().notNull().default(sql`'{}'`),
+  cc_addresses: text("cc_addresses").array().notNull().default(sql`'{}'`),
+  subject: text("subject").notNull().default(""),
+  body_text: text("body_text"),
+  snippet: text("snippet"),
+  sent_at: timestamp("sent_at", { withTimezone: true }).notNull(),
+  client_id: uuid("client_id").references(() => crmClients.id, { onDelete: "set null" }),
+  contact_id: uuid("contact_id").references(() => crmClientContacts.id, { onDelete: "set null" }),
+  source: text("source").notNull(), // imap | erp
+  created_by_name: text("created_by_name"),
+  created_at: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  idxClient: index("idx_crm_emails_client").on(t.client_id, t.sent_at),
+  idxThread: index("idx_crm_emails_thread").on(t.thread_key),
+}));
+
+export const crmEmailTemplates = pgTable("crm_email_templates", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: text("name").notNull(),
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
+  created_by_name: text("created_by_name"),
+  created_at: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updated_at: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const mailSyncState = pgTable("mail_sync_state", {
+  mailbox: text("mailbox").notNull(),
+  folder: text("folder").notNull(),
+  uid_validity: bigint("uid_validity", { mode: "number" }),
+  last_uid: bigint("last_uid", { mode: "number" }).notNull().default(0),
+  last_synced_at: timestamp("last_synced_at", { withTimezone: true }),
+  last_error: text("last_error"),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.mailbox, t.folder] }),
+}));
+
+/** Workflows (drizzle/0017): a template switched on with its own settings, run on a schedule or by hand. */
+export const workflows = pgTable("workflows", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: text("name").notNull(),
+  template: text("template").notNull(),
+  config: jsonb("config").notNull().default({}),
+  enabled: boolean("enabled").notNull().default(false),
+  owner_user_id: uuid("owner_user_id").references(() => users.id, { onDelete: "set null" }),
+  next_run_at: timestamp("next_run_at", { withTimezone: true }),
+  last_run_at: timestamp("last_run_at", { withTimezone: true }),
+  created_at: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updated_at: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const workflowRuns = pgTable("workflow_runs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  workflow_id: uuid("workflow_id").notNull().references(() => workflows.id, { onDelete: "cascade" }),
+  number: integer("number").notNull(),
+  trigger: text("trigger").notNull(), // schedule | manual
+  status: text("status").notNull(), // running | succeeded | failed
+  started_at: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  finished_at: timestamp("finished_at", { withTimezone: true }),
+  steps: jsonb("steps").notNull().default([]),
+  summary: text("summary"),
+  error: text("error"),
+});

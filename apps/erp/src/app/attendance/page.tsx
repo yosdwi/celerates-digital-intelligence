@@ -41,7 +41,7 @@ export default async function AttendanceHomePage() {
                   </div>
                   <div className="flex-1">
                     <p className="text-sm font-semibold text-slate-700">{tile.label}</p>
-                    <span className="text-[10px] uppercase tracking-wide text-slate-400 font-medium">Coming Soon</span>
+                    <span className="text-[0.625rem] uppercase tracking-wide text-slate-400 font-medium">Coming Soon</span>
                   </div>
                 </div>
               );

@@ -6,7 +6,7 @@ import { eq, isNotNull, getTableColumns } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { updateOpportunity, deleteOpportunityAttachment } from "../../actions";
 import { OPPORTUNITY_PO_DOC_SOURCE } from "../../constants";
-import { PQ_DOCUMENT_SOURCE } from "../../pq-constants";
+import { DOC_STATUS_OPTIONS, PQ_DOCUMENT_SOURCE, SALES_TYPES } from "../../pq-constants";
 import Link from "next/link";
 import { PicSelect } from "@/components/pic-select";
 import { GeneratePqButton } from "../../generate-pq-button";
@@ -36,22 +36,6 @@ const PRICE_PERIODS = [
 const LEAD_SOURCE_LABELS: Record<string, string> = {
   linkedin: "LinkedIn", ads: "Ads", referral: "Referral", existing: "Existing", website: "Website",
 };
-
-// Sama seperti SALES_TYPES di src/components/opportunity-picker.tsx & PMO
-// (src/app/pmo/contracts/[id]/edit/edit-contract-form.tsx) -- field ini nulis
-// ke project_documents yang sama, jadi daftarnya harus identik.
-const SALES_TYPES = [
-  ["farming", "Farming"], ["new_closing", "New Closing"], ["overtime", "Overtime"],
-  ["business_trip", "Business Trip"], ["other", "Other"], ["medical", "Medical"],
-] as const;
-
-// Sama seperti STATUS_OPTIONS di src/app/pmo/page.tsx -- field ini nulis ke
-// tabel project_documents yang sama dengan Document Tracker PMO, jadi harus
-// pakai daftar status yang identik.
-const DOC_STATUS_OPTIONS = [
-  ["done_softcopy", "Done Softcopy"], ["done_hardcopy", "Done Hardcopy"], ["on_progress", "On Progress"],
-  ["need_fu_hardcopy", "Need FU Hardcopy"], ["need_fu_softcopy", "Need FU Softcopy"], ["none", "None"],
-] as const;
 
 export default async function EditOpportunityPage({ params }: { params: Promise<{ id: string }> }) {
   const t = await getTranslations("sales.pqTracker");

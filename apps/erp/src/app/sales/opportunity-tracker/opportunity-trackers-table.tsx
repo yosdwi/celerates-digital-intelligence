@@ -58,7 +58,17 @@ const VALID_SERVICE_TYPES = new Set(["outsourcing", "headhunting", "outplacement
 const VALID_CLIENT_TYPES = new Set(["existing", "new"]);
 const VALID_LEVELS = new Set(["internship", "entry_level", "junior", "middle", "senior", "lead", "manager", "vp"]);
 
-export function OpportunityTrackersTable({ data, convertedIds }: { data: Tracker[]; convertedIds: string[] }) {
+export function OpportunityTrackersTable({
+  data,
+  convertedIds,
+  canEdit,
+  canDelete,
+}: {
+  data: Tracker[];
+  convertedIds: string[];
+  canEdit: boolean;
+  canDelete: boolean;
+}) {
   const t = useTranslations("sales.opportunityTracker");
   const tc = useTranslations("common");
   const {
@@ -125,27 +135,27 @@ export function OpportunityTrackersTable({ data, convertedIds }: { data: Tracker
 
       {view === "table" && (
       <>
-      <div className="overflow-auto max-h-[480px] group-[.is-expanded]:max-h-none group-[.is-expanded]:flex-1 group-[.is-expanded]:min-h-0">
+      <div className="overflow-auto max-h-[max(360px,calc(100dvh-12rem))] group-[.is-expanded]:max-h-none group-[.is-expanded]:flex-1 group-[.is-expanded]:min-h-0">
         <table className="w-full text-sm">
           <thead className="sticky top-0 z-20">
             <tr className="border-b border-violet-200 bg-violet-50 text-left text-xs font-semibold uppercase tracking-wide text-violet-700">
-              <th className="px-4 py-3 sticky left-0 bg-violet-50 z-10 min-w-[190px]">{t("actionStatus")}</th>
+              <th className="px-4 py-3 md:sticky md:left-0 bg-violet-50 z-10 min-w-[190px]">{t("actionStatus")}</th>
               <SortableTh
                 label="Opty No"
                 sortKey="opty_no"
                 activeSortKey={sortKey}
                 direction={sortDirection}
                 onSort={toggleSort}
-                className="px-4 py-3 sticky left-[190px] bg-violet-50 z-10 min-w-[130px]"
+                className="px-4 py-3 md:sticky md:left-[190px] bg-violet-50 z-10 min-w-[130px]"
               />
-              <th className="px-4 py-3 sticky left-[320px] bg-violet-50 z-10 min-w-[130px]">Leads No</th>
+              <th className="px-4 py-3 md:sticky md:left-[320px] bg-violet-50 z-10 min-w-[130px]">Leads No</th>
               <SortableTh
                 label={t("clientCol")}
                 sortKey="client_name"
                 activeSortKey={sortKey}
                 direction={sortDirection}
                 onSort={toggleSort}
-                className="px-4 py-3 sticky left-[450px] bg-violet-50 z-10 min-w-[130px] border-r border-slate-200"
+                className="px-4 py-3 md:sticky md:left-[450px] bg-violet-50 z-10 min-w-[130px] border-r border-slate-200"
               />
               <th className="px-4 py-3 min-w-[100px]">Client Type</th>
               <th className="px-4 py-3 min-w-[110px]">Service Type</th>
@@ -225,10 +235,10 @@ export function OpportunityTrackersTable({ data, convertedIds }: { data: Tracker
           </div>
         </div>
         <div className="mt-auto pt-3 border-t border-slate-100 flex flex-wrap items-center gap-2">
-          <Link href={`/sales/opportunity-tracker/${row.id}/edit`} className="text-xs font-medium text-slate-600 hover:text-slate-900">{tc("edit")}</Link>
-          <span className="text-slate-300">|</span>
-          <DeleteTrackerButton trackerId={row.id} />
-          {canConvert && (
+          {canEdit && <Link href={`/sales/opportunity-tracker/${row.id}/edit`} className="text-xs font-medium text-slate-600 hover:text-slate-900">{tc("edit")}</Link>}
+          {canEdit && canDelete && <span className="text-slate-300">|</span>}
+          {canDelete && <DeleteTrackerButton trackerId={row.id} />}
+          {canEdit && canConvert && (
             <ConvertToRequisitionButton
               opportunityTrackerId={row.id}
               positionName={row.position_name}
@@ -247,15 +257,18 @@ export function OpportunityTrackersTable({ data, convertedIds }: { data: Tracker
               const canConvert = row.sales_qualified && !isConverted;
               return (
                 <tr key={row.id} className="border-b border-slate-100 last:border-0 hover:bg-violet-50/60">
-                  <td className="px-4 py-3 sticky left-0 bg-white z-0 space-y-1.5">
-                    <div className="flex gap-2 items-center">
-                      <Link href={`/sales/opportunity-tracker/${row.id}/edit`} className="text-xs font-medium text-slate-600 hover:text-slate-900">{tc("edit")}</Link>
-                      <span className="text-slate-300">|</span>
-                      <DeleteTrackerButton trackerId={row.id} />
-                    </div>
-                    <OptyStatusBadge optyStatusCode={row.opty_status_code} />
-                    <OptyStatusSelector id={row.id} currentOptyStatus={row.opty_status_code} currentSalesQualified={row.sales_qualified} />
-                    {canConvert && (
+                  <td className="px-4 py-3 md:sticky md:left-0 bg-white z-0 space-y-1.5">
+                    {(canEdit || canDelete) && (
+                      <div className="flex gap-2 items-center">
+                        {canEdit && <Link href={`/sales/opportunity-tracker/${row.id}/edit`} className="text-xs font-medium text-slate-600 hover:text-slate-900">{tc("edit")}</Link>}
+                        {canEdit && canDelete && <span className="text-slate-300">|</span>}
+                        {canDelete && <DeleteTrackerButton trackerId={row.id} />}
+                      </div>
+                    )}
+                    {/* Editors already see the status in the selector below; the badge repeated it (SALES-UX-004). */}
+                    {!canEdit && <OptyStatusBadge optyStatusCode={row.opty_status_code} />}
+                    {canEdit && <OptyStatusSelector id={row.id} currentOptyStatus={row.opty_status_code} currentSalesQualified={row.sales_qualified} />}
+                    {canEdit && canConvert && (
                       <ConvertToRequisitionButton
                         opportunityTrackerId={row.id}
                         positionName={row.position_name}
@@ -265,9 +278,9 @@ export function OpportunityTrackersTable({ data, convertedIds }: { data: Tracker
                     )}
                     {isConverted && <span className="text-xs text-slate-400 block">{t("alreadyConverted")}</span>}
                   </td>
-                  <td className="px-4 py-3 sticky left-[190px] bg-white z-0 font-mono text-xs text-slate-500">{row.opty_no}</td>
-                  <td className="px-4 py-3 sticky left-[320px] bg-white z-0 font-mono text-xs text-slate-500">{row.lead_no ?? "-"}</td>
-                  <td className="px-4 py-3 sticky left-[450px] bg-white z-0 font-medium text-slate-900 border-r border-slate-200">
+                  <td className="px-4 py-3 md:sticky md:left-[190px] bg-white z-0 font-mono text-xs text-slate-500">{row.opty_no}</td>
+                  <td className="px-4 py-3 md:sticky md:left-[320px] bg-white z-0 font-mono text-xs text-slate-500">{row.lead_no ?? "-"}</td>
+                  <td className="px-4 py-3 md:sticky md:left-[450px] bg-white z-0 font-medium text-slate-900 border-r border-slate-200">
                     <span className="flex items-center gap-2.5">
                       <Avatar name={row.client_name} size="sm" />
                       <span className="flex items-center gap-1.5">{row.client_name} <NewBadge createdAt={row.created_at} /></span>

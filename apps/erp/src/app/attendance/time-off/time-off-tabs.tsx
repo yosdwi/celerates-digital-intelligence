@@ -48,7 +48,7 @@ export function TimeOffTabs({ myRequests, approvals }: { myRequests: RequestRow[
         >
           Approvals
           {approvals.length > 0 && (
-            <span className="ml-1.5 inline-flex items-center justify-center h-4 w-4 rounded-full bg-rose-500 text-[10px] text-white">{approvals.length}</span>
+            <span className="ml-1.5 inline-flex items-center justify-center h-4 w-4 rounded-full bg-rose-500 text-[0.625rem] text-white">{approvals.length}</span>
           )}
         </button>
       </div>
