@@ -12,6 +12,7 @@ import {
 import { PQ_DEFAULT_SHOWN, needsPqNo, pqEditValues, pqFieldValue, withPqStage, type Pq } from "../src/features/sales-v2/pq-model";
 import { ACCOUNT_BUILT_IN_VIEWS, accountFieldValue, accountFormData, accountMatchesSearch, type Account } from "../src/features/sales-v2/account-model";
 import { CLIENT_BUILT_IN_VIEWS, CLIENT_STATUSES, NOT_SENT, clientFieldValue, clientMatchesSearch, clientStatusForm, type ClientCandidate } from "../src/features/sales-v2/client-active-model";
+import { FLOW, OT_BUILT_IN_VIEWS, claimForm, claimMonth, flowMove, nextStep, otFieldValue, otMatchesSearch, parseField, paymentForm, type OtClaim } from "../src/features/sales-v2/ot-claims-model";
 import { PROFIT_BUILT_IN_VIEWS, bandOf, marginBy, parsePeriod, periodKey, profitFieldValue, profitMatchesSearch, shiftPeriod, totals, type ProfitRow } from "../src/features/sales-v2/profitability-model";
 import { canOpenRoute } from "../src/lib/route-access";
 import { safeSalesReturnPath } from "../src/lib/safe-return";
@@ -487,11 +488,11 @@ test("edit history: every Sales update path records its changes; the read is gua
     assert.doesNotMatch(src, new RegExp(`db\\.update\\(${table}\\)`), table);
   assert.match(readFileSync(new URL("../drizzle/0014_record_field_changes.sql", import.meta.url), "utf8"), /CREATE TABLE IF NOT EXISTS "record_field_changes"/);
   const action = read("app/sales/history-actions.ts");
-  assert.match(action, /const SHARED: Partial<Record<HistoryRecordType, string\[\]>> = \{ crm_client: \["marketing"\], client_submission: \["ta"\], profitability_entry: \["tm", "pmo"\] \};/);
+  assert.match(action, /const SHARED: Partial<Record<HistoryRecordType, string\[\]>> = \{ crm_client: \["marketing"\], client_submission: \["ta"\], profitability_entry: \["tm", "pmo"\], ot_claim: \["pmo", "hr", "finance"\] \};/);
   assert.match(action, /await requireAnyDivisionAccess\(\["sales", \.\.\.\(SHARED\[recordType\] \?\? \[\]\)\], "viewer"\)/);
   // Client Active (V1 and V2 share the action): status and note changes are recorded.
   assert.match(read("app/ta/client-active/actions.ts"), /await recordChanges\("client_submission", applicationId, fieldDiffs\(before, \{ client_submission_status_code: status_code, client_submission_note: note \}\)\);/);
-  for (const f of ["workspace.tsx", "pq-workspace.tsx", "account-workspace.tsx", "client-active-workspace.tsx", "profitability-workspace.tsx"]) assert.match(read(`features/sales-v2/${f}`), /recordType: "/, f);
+  for (const f of ["workspace.tsx", "pq-workspace.tsx", "account-workspace.tsx", "client-active-workspace.tsx", "profitability-workspace.tsx", "ot-claims-workspace.tsx"]) assert.match(read(`features/sales-v2/${f}`), /recordType: "/, f);
   assert.match(read("features/sales-v2/record-workspace.tsx"), /onViewEditHistory=\{\(id, key\) => setHistoryOf/);
 });
 
@@ -967,4 +968,62 @@ test("Profitability Tracker V2 (QA 2026-10-10): V1's period, totals, thresholds 
   const kit = read("features/sales-v2/record-workspace.tsx");
   assert.match(kit, /for \(const k of c\.keepParams \?\? \[\]\)/);
   assert.match(kit, /onCardsChange=\{access\.canEdit && !c\.board\.readOnly \? onCardsChange : undefined\}/);
+});
+
+test("Overtime & Business Trip V2 (QA 2026-10-10): V1's flow, forms and division split; PMO, Sales, Finance and HR open it", () => {
+  const c: OtClaim = {
+    id: "c1", claim_no: "OT-202610-0001", opportunity_id: "o1", employee_id: "e1", claim_type_code: "overtime", claim_title: "Lembur rilis",
+    days_count: 2, start_date: "2026-10-03", end_date: "2026-10-04", duration_hours_client: 10, duration_hours_pmo_basic: null, duration_hours_payroll: null,
+    spk_url: null, timesheet_url: "https://x/ts", draft_timesheet_url: null, pq_submit_date: null, pq_status_code: null, po_status_code: "done", cr_status_code: null,
+    pic_1_name: "Pia", pic_2_name: null, amount_given_to_talent_initial: 500000, amount_claim_to_client_total: 1500000, amount_bt_medical_to_client: null,
+    amount_uang_saku_celerates: null, amount_transport: null, amount_over_bagasi: null, amount_etc: null, amount_total_given_to_talent: null,
+    talent_payment_status_code: "pending", talent_payment_date: null, invoice_no: null, amount_total_billed_to_client: null, billing_status_code: "not_started",
+    status_code: "draft", notes: null, created_at: "2026-10-05T00:00:00.000Z", opty_no: "OPTY-1", client_name: "PT A", project_name: "Core", employee_no: "EMP-1", candidate_name: "Dimas",
+  };
+  // V1's flow: one step forward at a time, each by its division; nothing moves back.
+  assert.deepEqual(FLOW, ["draft", "forwarded_to_sales", "submitted_to_finance", "invoiced"]);
+  assert.deepEqual(flowMove("draft", "forwarded_to_sales"), { step: "forward", division: "pmo", label: "Forward ke Sales" });
+  assert.equal((flowMove("forwarded_to_sales", "submitted_to_finance") as { division: string }).division, "sales");
+  assert.equal((flowMove("submitted_to_finance", "invoiced") as { division: string }).division, "finance");
+  assert.ok("error" in flowMove("draft", "invoiced"));
+  assert.ok("error" in flowMove("invoiced", "draft"));
+  assert.equal(nextStep("invoiced"), null);
+  // Labels as V1 shows them; a blank PQ/PO/CR status reads Not Started.
+  assert.equal(otFieldValue(c, "claim_type_code"), "Overtime");
+  assert.equal(otFieldValue(c, "status_code"), "Draft (PMO)");
+  assert.equal(otFieldValue(c, "pq_status_code"), "Not Started");
+  assert.equal(otFieldValue(c, "po_status_code"), "Done");
+  assert.equal(claimMonth(c), "Okt 2026");
+  assert.ok(otMatchesSearch(c, "emp-1") && otMatchesSearch(c, "pt a") && !otMatchesSearch(c, "zzz"));
+  const pending = applyFilters([c, { ...c, id: "c2", talent_payment_status_code: "done" }], OT_BUILT_IN_VIEWS.find((v) => v.id === "payment_pending")!.state.filters as never, otFieldValue as never);
+  assert.deepEqual(pending.map((r) => r.id), ["c1"]);
+  // A cell edit posts V1's whole PMO form with one field changed, so the action keeps every other field.
+  const fd = claimForm(c, "amount_transport", "Rp 250.000");
+  assert.equal(fd.get("amount_transport"), "250000");
+  assert.equal(fd.get("claim_title"), "Lembur rilis");
+  assert.equal(fd.get("employee_id"), "e1");
+  assert.equal(fd.get("pq_status_code"), "");
+  assert.throws(() => parseField("start_date", "3 Okt"), /YYYY-MM-DD/);
+  // HR's form keeps the amount and date when only the status changes.
+  const pay = paymentForm({ ...c, amount_total_given_to_talent: 500000, talent_payment_date: "2026-10-09" }, { status: "done" });
+  assert.deepEqual([pay.get("talent_payment_status_code"), pay.get("amount_total_given_to_talent"), pay.get("talent_payment_date")], ["done", "500000", "2026-10-09"]);
+  // Access and navigation: the four divisions open V2 (as V1); each keeps its module.
+  for (const d of ["pmo", "sales", "hr", "finance"]) assert.equal(canOpenRoute({ access: [{ divisionKey: d, level: "viewer" }] }, "/sales/v2/overtime-business-trip"), true, d);
+  assert.equal(canOpenRoute({ access: [{ divisionKey: "ta", level: "full" }] }, "/sales/v2/overtime-business-trip"), false);
+  assert.equal(submoduleFor("/pmo/overtime-business-trip")?.href, "/sales/v2/overtime-business-trip");
+  for (const d of ["pmo", "hr", "finance"]) assert.equal(navModuleFor("/sales/v2/overtime-business-trip", d)?.key, d);
+  // The V1 actions keep their division checks, record history and stay on the page for V2.
+  const action = read("app/pmo/overtime-business-trip/actions.ts");
+  for (const [fn, division] of [["forwardToSales", "pmo"], ["submitToFinance", "sales"], ["markInvoiced", "finance"], ["updateBillingStatus", "finance"], ["updateTalentPayment", "hr"]]) {
+    assert.match(action, new RegExp(`export async function ${fn}[\\s\\S]*?requireDivisionAccess\\("${division}"\\)`), fn);
+  }
+  assert.match(action, /requireDivisionAccess\("pmo", "full"\)/);
+  assert.match(action, /export async function updateClaimFields\(id: string, formData: FormData\): Promise<ClaimActionResult> \{\n  await requireActor\(\);\n  try \{ await saveClaim\(id, formData\);/);
+  assert.match(action, /await recordChanges\("ot_claim", id, fieldDiffs\(before, changes\)\);/);
+  assert.doesNotMatch(action, /db\.update\(overtimeBusinessTripClaims\)\.set\(\{ (status_code|billing_status_code)/);
+  // The page gives each division only its own step.
+  assert.match(read("app/sales/v2/overtime-business-trip/page.tsx"), /pmoFull: level\("pmo"\) === "full"/);
+  const ws = read("features/sales-v2/ot-claims-workspace.tsx");
+  assert.match(ws, /if \(!roles\[m\.division as keyof Roles\]\) throw new Error/);
+  assert.match(ws, /confirm: new Set\(\["invoiced"\]\)/);
 });

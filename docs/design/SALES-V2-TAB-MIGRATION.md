@@ -75,6 +75,38 @@ Access:
 - Editors of any of the three sync.
 - The Owner opens and syncs.
 
-## Next tabs: parity lists to be written before building
-- Overtime & Business Trip (`/pmo/overtime-business-trip`; PMO-owned, shared with Sales, HR, Finance)
+## Overtime & Business Trip (V2 at `/sales/v2/overtime-business-trip`, V1 `/pmo/overtime-business-trip`)
+
+PMO owns the module; Sales, Finance and HR each act on one step. Flow: PMO drafts, then forwards to Sales. Sales confirms with the client and submits to Finance. Finance invoices. HR pays the talent, independently of the flow.
+
+| V1 | V2 |
+|---|---|
+| Rows: every claim with its opportunity (opty no, client, project) and talent (employee no, name), newest first | Same query (`ot-claims-data.ts`) |
+| Cards: Total Klaim, Draft (PMO), Di Sales, Di Finance, Invoiced, Pencairan Pending | Same six; each is a built-in view |
+| Search: any field | Claim no, title, talent, employee no, opty no, client, project, invoice no, notes |
+| Filters: type, flow status, talent payment status | Same, plus every column in the toolbar and header filters |
+| Sorts: type, title, start date | Every column sorts; statuses in flow order |
+| 34 columns: Aksi, claim month, opty, employee, type, title/talent/client, days, start, end, three durations, SPK, timesheet, draft timesheet, PQ submit date, PQ/PO/CR status, PIC 1, flow status, seven amounts, invoice (no, billed, billing status), talent payment (status, amount), PIC 2, notes, created | Same fields, each its own column. Title, talent and client are separate columns. The ones V1 users scan first are shown by default; the rest are under Kolom |
+| Create (PMO editor): `createClaim` modal with every field | "Klaim baru" dialog with the same action: type, title, opportunity, talent, dates, days, PIC 1, notes. The rest is filled in the table or the panel |
+| Edit (PMO editor): `/pmo/.../[id]/edit` full form (`updateClaim`, redirects to V1) | In-cell and panel edits through `updateClaimFields`, the same write as `updateClaim` without the redirect. The full V1 form stays at "Versi lama" |
+| Delete (PMO full), browser confirm | Row menu and panel, in a confirm dialog; same `deleteClaim` |
+| Forward to Sales (PMO), Submit to Finance (Sales) buttons | Same actions from the panel, the row menu, or a board move to the next step |
+| Input invoice (Finance): invoice no + billed amount (`markInvoiced`) | Same form in a dialog, from the panel or a board move to Invoiced |
+| Billing status select (Finance, once invoiced) | In-cell select and panel (`updateBillingStatus`) |
+| Talent payment (HR): status, amount, date (`updateTalentPayment`) | Same form in a dialog from the panel; status also from its cell |
+| Notifications to the next division on forward, submit, invoice and payment done | Unchanged (inside the actions); their links now open V2 |
+| Pagination 20 rows | Every row |
+| None | Added: board by flow status, saved views, record panel, edit history (`ot_claim`, recorded by the V1 actions, so V1 changes show too) |
+
+V1 rules kept:
+- The flow only moves forward, one step at a time. A board move anywhere else is refused with the reason.
+- A step's button shows only to that step's division. The action checks again on its own.
+
+Access:
+- PMO, Sales, Finance or HR (any level) open the page, as in V1.
+- Each step needs Editor in its division.
+- Deleting needs PMO Full.
+- The Owner can do everything.
+
+## Next tabs: parity lists to be written before building (`/pmo/overtime-business-trip`; PMO-owned, shared with Sales, HR, Finance)
 - Sales Dashboard (`/sales/dashboard`)

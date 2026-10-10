@@ -82,7 +82,7 @@ export function buildJourney(i: JourneyInput): Journey {
   }
   for (const c of i.claims) {
     const age = c.createdAt ? Math.floor((now - new Date(c.createdAt).getTime()) / DAY) : 0;
-    const href = `/pmo/overtime-business-trip/${c.id}`;
+    const href = `/sales/v2/overtime-business-trip?view=table&record=${c.id}`;
     if (c.status === "forwarded_to_sales") actions.push({ key: `claim:${c.id}`, text: `Klaim ${c.no} menunggu diteruskan Sales ke Finance`, owner: "Sales", href });
     else if (c.status === "draft" && age >= 7) actions.push({ key: `claim:${c.id}`, text: `Klaim ${c.no} masih Draft ${age} hari`, owner: "PMO", href });
     else if (c.status === "submitted_to_finance" && age >= 14) actions.push({ key: `claim:${c.id}`, text: `Klaim ${c.no} belum di-invoice (${age} hari)`, owner: "Finance", href });

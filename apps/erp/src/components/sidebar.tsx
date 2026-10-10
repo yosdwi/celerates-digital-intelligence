@@ -20,7 +20,7 @@ import { useSidebarCollapse } from "./sidebar-context";
 export const PAGE_ICON: Record<string, LucideIcon> = {
   "/marketing/dashboard": LayoutDashboard, "/marketing": Target, "/sales/v2/accounts": Building2,
   "/sales/dashboard": LayoutDashboard, "/sales/v2/opportunity-tracker": Handshake, "/sales/v2/pq-tracker": FileText,
-  "/ta/client-active": Building, "/sales/v2/client-active": Building, "/pmo/overtime-business-trip": Plane, "/sales/profitability-tracker": PiggyBank, "/sales/v2/profitability-tracker": PiggyBank,
+  "/ta/client-active": Building, "/sales/v2/client-active": Building, "/pmo/overtime-business-trip": Plane, "/sales/v2/overtime-business-trip": Plane, "/sales/profitability-tracker": PiggyBank, "/sales/v2/profitability-tracker": PiggyBank,
   "/ta/dashboard": LayoutDashboard, "/ta": ClipboardList, "/ta/candidates": UserSearch, "/ta/pipeline": Workflow, "/ta/onboarding": DoorOpen,
   "/hr/dashboard": LayoutDashboard, "/hr": Users, "/hr/extension-requests": Repeat, "/hr/attendance": CalendarCheck, "/hr/attendance-settings": Settings2,
   "/tm/special-notes": StickyNote, "/tm/dashboard": LayoutDashboard, "/tm": BookUser, "/tm/database-salary": Database, "/tm/cogs-calculator": Calculator,

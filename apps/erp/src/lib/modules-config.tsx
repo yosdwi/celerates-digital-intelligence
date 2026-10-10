@@ -32,7 +32,7 @@ export const MODULES: ModuleConfig[] = [
       { href: "/sales/v2/pq-tracker", label: "PQ Tracker", group: "Pipeline", v1: "/sales" },
       { href: "/sales/v2/accounts", label: "Account (CRM)", v1: "/sales/accounts" },
       { href: "/sales/v2/client-active", label: "Client Active", collab: true, v1: "/ta/client-active" },
-      { href: "/pmo/overtime-business-trip", label: "Overtime & Business Trip", collab: true, collabColor: "orange" },
+      { href: "/sales/v2/overtime-business-trip", label: "Overtime & Business Trip", collab: true, collabColor: "orange", v1: "/pmo/overtime-business-trip" },
       { href: "/sales/v2/profitability-tracker", label: "Profitability Tracker", collab: true, v1: "/sales/profitability-tracker" },
     ],
   },
@@ -56,7 +56,7 @@ export const MODULES: ModuleConfig[] = [
       { href: "/hr/attendance", label: "Attendance Log" },
       { href: "/hr/attendance-settings", label: "Attendance Settings" },
       { href: "/tm/special-notes", label: "Special Notes (TM-HR)", collab: true },
-      { href: "/pmo/overtime-business-trip", label: "Overtime & Business Trip", collab: true, collabColor: "orange" },
+      { href: "/sales/v2/overtime-business-trip", label: "Overtime & Business Trip", collab: true, collabColor: "orange", v1: "/pmo/overtime-business-trip" },
     ],
   },
   {
@@ -80,7 +80,7 @@ export const MODULES: ModuleConfig[] = [
       { href: "/pmo/invoices", label: "TM Invoice" },
       { href: "/pmo/readiness", label: "Operational Readiness" },
       { href: "/finance", label: "Dokumen Finance (TM Invoice)", collab: true },
-      { href: "/pmo/overtime-business-trip", label: "Overtime & Business Trip", collab: true, collabColor: "orange" },
+      { href: "/sales/v2/overtime-business-trip", label: "Overtime & Business Trip", collab: true, collabColor: "orange", v1: "/pmo/overtime-business-trip" },
       { href: "/sales/v2/profitability-tracker", label: "Profitability Tracker", collab: true, v1: "/sales/profitability-tracker" },
     ],
   },
@@ -104,7 +104,7 @@ export const MODULES: ModuleConfig[] = [
     key: "finance", label: "Finance", icon: Landmark, color: "bg-emerald-600", enabled: true,
     basePath: "/finance", subPages: [
       { href: "/finance", label: "Dokumen Finance (TM Invoice)", collab: true },
-      { href: "/pmo/overtime-business-trip", label: "Overtime & Business Trip", collab: true, collabColor: "orange" },
+      { href: "/sales/v2/overtime-business-trip", label: "Overtime & Business Trip", collab: true, collabColor: "orange", v1: "/pmo/overtime-business-trip" },
     ],
   },
   {
