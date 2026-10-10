@@ -12,6 +12,7 @@ import {
 import { PQ_DEFAULT_SHOWN, needsPqNo, pqEditValues, pqFieldValue, withPqStage, type Pq } from "../src/features/sales-v2/pq-model";
 import { ACCOUNT_BUILT_IN_VIEWS, accountFieldValue, accountFormData, accountMatchesSearch, type Account } from "../src/features/sales-v2/account-model";
 import { CLIENT_BUILT_IN_VIEWS, CLIENT_STATUSES, NOT_SENT, clientFieldValue, clientMatchesSearch, clientStatusForm, type ClientCandidate } from "../src/features/sales-v2/client-active-model";
+import { PROFIT_BUILT_IN_VIEWS, bandOf, marginBy, parsePeriod, periodKey, profitFieldValue, profitMatchesSearch, shiftPeriod, totals, type ProfitRow } from "../src/features/sales-v2/profitability-model";
 import { canOpenRoute } from "../src/lib/route-access";
 import { safeSalesReturnPath } from "../src/lib/safe-return";
 import { submoduleFor } from "../src/lib/module-access";
@@ -486,12 +487,11 @@ test("edit history: every Sales update path records its changes; the read is gua
     assert.doesNotMatch(src, new RegExp(`db\\.update\\(${table}\\)`), table);
   assert.match(readFileSync(new URL("../drizzle/0014_record_field_changes.sql", import.meta.url), "utf8"), /CREATE TABLE IF NOT EXISTS "record_field_changes"/);
   const action = read("app/sales/history-actions.ts");
-  assert.match(action, /requireDivisionAccess\("sales", "viewer"\)/);
-  assert.match(action, /const SHARED: Partial<Record<HistoryRecordType, string>> = \{ crm_client: "marketing", client_submission: "ta" \};/);
-  assert.match(action, /const other = SHARED\[recordType\];\n    if \(!other\) throw err;\n    await requireDivisionAccess\(other, "viewer"\)/);
+  assert.match(action, /const SHARED: Partial<Record<HistoryRecordType, string\[\]>> = \{ crm_client: \["marketing"\], client_submission: \["ta"\], profitability_entry: \["tm", "pmo"\] \};/);
+  assert.match(action, /await requireAnyDivisionAccess\(\["sales", \.\.\.\(SHARED\[recordType\] \?\? \[\]\)\], "viewer"\)/);
   // Client Active (V1 and V2 share the action): status and note changes are recorded.
   assert.match(read("app/ta/client-active/actions.ts"), /await recordChanges\("client_submission", applicationId, fieldDiffs\(before, \{ client_submission_status_code: status_code, client_submission_note: note \}\)\);/);
-  for (const f of ["workspace.tsx", "pq-workspace.tsx", "account-workspace.tsx", "client-active-workspace.tsx"]) assert.match(read(`features/sales-v2/${f}`), /recordType: "/, f);
+  for (const f of ["workspace.tsx", "pq-workspace.tsx", "account-workspace.tsx", "client-active-workspace.tsx", "profitability-workspace.tsx"]) assert.match(read(`features/sales-v2/${f}`), /recordType: "/, f);
   assert.match(read("features/sales-v2/record-workspace.tsx"), /onViewEditHistory=\{\(id, key\) => setHistoryOf/);
 });
 
@@ -615,7 +615,7 @@ test("Deal 360: steps follow the deal downstream and name the stuck hand-offs wi
   // Placed but never synced: margin is the current step and Sales is asked to sync.
   const unsynced = buildJourney({ ...full, talents: [{ ...full.talents[0], assignment: { status: "on_project", price: 1, marginPercent: null } }] });
   assert.equal(unsynced.steps[5].state, "current");
-  assert.ok(unsynced.actions.some((a) => a.key === "sync" && a.href === "/sales/profitability-tracker"));
+  assert.ok(unsynced.actions.some((a) => a.key === "sync" && a.href === "/sales/v2/profitability-tracker"));
 
   // The panel's ↗ opens this page; Edit stays in the footer.
   const preview = read("features/sales-v2/record-preview.tsx");
@@ -923,4 +923,48 @@ test("Client Active V2 (QA 2026-10-09): V1's rows, statuses and one action; Sale
   const ws = read("features/sales-v2/client-active-workspace.tsx");
   assert.match(ws, /groupBy: \(c\) => c\.client/, "grouped by client, as V1");
   assert.match(ws, /move: \(c, to\) => save\(c, \{ status: to \}\)/);
+});
+
+test("Profitability Tracker V2 (QA 2026-10-10): V1's period, totals, thresholds and sync; Sales, TM and PMO open it", () => {
+  const row = (id: string, client: string, price: number, cogs: number, role: string | null = "Dev"): ProfitRow => ({
+    id, assignmentId: `a${id}`, talent: `T${id}`, client, role, price, cogs, margin: price - cogs, marginPct: price ? ((price - cogs) / price) * 100 : 0,
+    syncedBy: "Sinta", syncedAt: "2026-10-01T00:00:00.000Z", trend: [],
+  });
+  const rows = [row("1", "PT A", 10_000_000, 8_000_000), row("2", "PT A", 10_000_000, 9_000_000), row("3", "PT B", 5_000_000, 6_000_000, null)];
+  // V1's cards: sums, and the average as total margin over total price.
+  assert.deepEqual(totals(rows), { price: 25_000_000, cogs: 23_000_000, margin: 2_000_000, pct: 8 });
+  assert.equal(totals([]).pct, 0);
+  // V1's pill thresholds, and the built-in views built on them.
+  assert.deepEqual(rows.map((r) => bandOf(r.marginPct)), ["healthy", "thin", "loss"]);
+  const low = applyFilters(rows, PROFIT_BUILT_IN_VIEWS.find((v) => v.id === "low")!.state.filters as never, profitFieldValue as never);
+  assert.deepEqual(low.map((r) => r.id), ["2", "3"]);
+  // V1's charts: margin per group in millions, highest first.
+  assert.deepEqual(marginBy(rows, (r) => r.client), [{ label: "PT A", value: 3 }, { label: "PT B", value: -1 }]);
+  assert.deepEqual(marginBy(rows, (r) => r.role ?? "Lainnya", 1), [{ label: "Dev", value: 3 }]);
+  // Period: the URL's, else the current month; shifting crosses years.
+  assert.deepEqual(parsePeriod("2026-01"), { year: 2026, month: 1 });
+  assert.deepEqual(parsePeriod("2026-13", new Date(2026, 9, 10)), { year: 2026, month: 10 });
+  assert.deepEqual(parsePeriod(undefined, new Date(2026, 9, 10)), { year: 2026, month: 10 });
+  assert.equal(periodKey(shiftPeriod({ year: 2026, month: 1 }, -1)), "2025-12");
+  assert.equal(periodKey(shiftPeriod({ year: 2025, month: 12 }, 1)), "2026-01");
+  assert.ok(profitMatchesSearch(rows[0], "pt a") && !profitMatchesSearch(rows[0], "zzz"));
+  // Access and navigation: Sales, TM and PMO open V2 (as V1); each keeps its module.
+  for (const d of ["sales", "tm", "pmo"]) assert.equal(canOpenRoute({ access: [{ divisionKey: d, level: "viewer" }] }, "/sales/v2/profitability-tracker"), true, d);
+  assert.equal(canOpenRoute({ access: [{ divisionKey: "hr", level: "full" }] }, "/sales/v2/profitability-tracker"), false);
+  assert.equal(submoduleFor("/sales/profitability-tracker")?.href, "/sales/v2/profitability-tracker");
+  for (const d of ["tm", "pmo"]) assert.equal(navModuleFor("/sales/v2/profitability-tracker", d)?.key, d);
+  // One write, V1's: the page shows sync to editors of any of the three, the action checks on its own and records re-syncs.
+  assert.match(read("app/sales/v2/profitability-tracker/page.tsx"), /canEdit: \["sales", "tm", "pmo"\]\.some\(editor\)/);
+  const action = read("app/sales/profitability-tracker/actions.ts");
+  assert.match(action, /requireAnyDivisionAccess\(\["sales", "tm", "pmo"\]\)/);
+  assert.match(action, /recordChanges\("profitability_entry", old\.id, fieldDiffs\(old,/);
+  assert.match(action, /revalidatePath\("\/sales\/v2\/profitability-tracker"\)/);
+  const ws = read("features/sales-v2/profitability-workspace.tsx");
+  assert.match(ws, /syncProfitabilityFromTalents\(period\.year, period\.month\)/);
+  assert.match(ws, /readOnly: true/);
+  assert.match(ws, /keepParams: \["period"\]/);
+  // The kit keeps a page's own parameters and never lets a read-only board move.
+  const kit = read("features/sales-v2/record-workspace.tsx");
+  assert.match(kit, /for \(const k of c\.keepParams \?\? \[\]\)/);
+  assert.match(kit, /onCardsChange=\{access\.canEdit && !c\.board\.readOnly \? onCardsChange : undefined\}/);
 });

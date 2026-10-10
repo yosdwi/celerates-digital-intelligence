@@ -24,6 +24,9 @@
 /* The workspace reaches the bottom edge and the Agent launcher floats over its corner: the scroll areas end with room
    for it, so the last row or card can always be scrolled clear. */
 [data-sales-v2] .crisp-table-scroll { padding-bottom: 64px; }
+/* A footer calculation (Profitability's totals) sticks to the box's real bottom, not 64px above it with rows showing
+   underneath: sticky offsets count from inside the padding. */
+[data-sales-v2] .crisp-table-scroll tfoot td { bottom: -64px; }
 
 /* Kanban scrolls as one board, like Jira (QA page 7, 2026-10-08): Crisp's Board scrolls each column on its own and has
    no option for this. The board's row becomes the one scroll box (down and sideways); columns grow with their cards

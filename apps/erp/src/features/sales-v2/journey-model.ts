@@ -87,7 +87,7 @@ export function buildJourney(i: JourneyInput): Journey {
     else if (c.status === "draft" && age >= 7) actions.push({ key: `claim:${c.id}`, text: `Klaim ${c.no} masih Draft ${age} hari`, owner: "PMO", href });
     else if (c.status === "submitted_to_finance" && age >= 14) actions.push({ key: `claim:${c.id}`, text: `Klaim ${c.no} belum di-invoice (${age} hari)`, owner: "Finance", href });
   }
-  if (placed.length > 0 && margins.length === 0) actions.push({ key: "sync", text: "Margin belum dihitung: Sync dari Talents Book di Profitability Tracker", owner: "Sales", href: "/sales/profitability-tracker" });
+  if (placed.length > 0 && margins.length === 0) actions.push({ key: "sync", text: "Margin belum dihitung: Sync dari Talents Book di Profitability Tracker", owner: "Sales", href: "/sales/v2/profitability-tracker" });
 
   const last = [...steps].reverse().find((s) => s.state === "done")!;
   return {

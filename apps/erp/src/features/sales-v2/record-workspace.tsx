@@ -24,7 +24,9 @@ import { parseState, serializeState, type SavedState, type StoredView, type View
 
 export type Access = { canEdit: boolean; canDelete: boolean };
 /** A summary card: V1's gradient colours (components/stat-card.tsx). */
-export type Kpi<T> = { id: string; label: string; color: StatColor; match: (o: T) => boolean };
+/** A count of the records it matches (click: its built-in view of the same id), or, with `value`, a figure over every
+ *  record that is not a view (Profitability's totals). */
+export type Kpi<T> = { id: string; label: string; color: StatColor; match?: (o: T) => boolean; value?: (all: T[]) => string };
 export type PendingMove<T> = { record: T; to: string };
 
 /** A row's Aksi cell asking the panel to open one of its dialogs ("edit", "delete", "convert", …) for a record. */
@@ -138,6 +140,8 @@ export type WorkspaceConfig<T extends { id: string }> = {
   rowMenu?: (o: T, row: RowActions) => ContextMenuOption[];
   /** Table rows under a heading row per value (Client Active groups candidates by client, as V1 did). */
   groupBy?: (o: T) => string;
+  /** URL parameters the page owns (Profitability's `period`), kept when the workspace rewrites its state. */
+  keepParams?: string[];
   grid: (o: T) => { label: string; author: React.ReactNode; title: string; excerpt: string; footer: React.ReactNode; date?: string };
   board: {
     stages: readonly { id: string; title: string; accent: string }[];
@@ -154,6 +158,8 @@ export type WorkspaceConfig<T extends { id: string }> = {
     recordLabel: (o: T) => string;
     cardLabel: (o: T) => string;
     renderCard: (o: T, open: () => void) => React.ReactNode;
+    /** Cards do not move (the stage is computed, as Profitability's margin band). */
+    readOnly?: boolean;
   };
 };
 
@@ -212,11 +218,16 @@ export function RecordWorkspace<T extends { id: string }>({
 
   // URL is the state. View changes push a history entry (Back undoes them); typing, filters, sort and the preview
   // replace it, so Back leaves the page instead of replaying every keystroke.
+  const href = useCallback((s: WorkspaceState) => {
+    const q = new URLSearchParams(serializeState(s));
+    for (const k of c.keepParams ?? []) { const v = params.get(k); if (v) q.set(k, v); }
+    const str = q.toString();
+    return pathname + (str ? `?${str}` : "");
+  }, [pathname, params, c.keepParams]);
   const commit = useCallback((next: Partial<WorkspaceState>, mode: "push" | "replace" = "replace") => {
-    const url = pathname + serializeState({ ...state, ...next });
-    window.history[mode === "push" ? "pushState" : "replaceState"](null, "", url);
-  }, [pathname, state]);
-  const returnTo = pathname + serializeState(state);
+    window.history[mode === "push" ? "pushState" : "replaceState"](null, "", href({ ...state, ...next }));
+  }, [href, state]);
+  const returnTo = href(state);
 
   // Optimistic overrides (stage drag, quick edits in the panel) until the refreshed server data arrives.
   const [overrides, setOverrides] = useState<Record<string, Partial<T>>>({});
@@ -446,7 +457,7 @@ export function RecordWorkspace<T extends { id: string }>({
   }, [c, frozenKeys, valueIndex, state.filters, state.sorts, commit, hideColumn, widths, shownKeys, access.canEdit, filterIcons]);
   const columnsForSettings: TableToolbarColumn[] = useMemo(() => c.columns.filter((x) => !frozenKeys.includes(x.key)).map((x) => ({ key: x.key, label: c.specs[x.key].label })), [c, frozenKeys]);
   const [workspaceRef, workspaceHeight] = useHeight<HTMLDivElement>();
-  const counts = useMemo(() => Object.fromEntries(c.kpis.map((k) => [k.id, all.filter(k.match).length])), [c, all]);
+  const counts = useMemo(() => Object.fromEntries(c.kpis.map((k) => [k.id, k.value ? k.value(all) : all.filter(k.match ?? (() => true)).length])), [c, all]);
   const valuesOf = useCallback((rows: T[]) => distinctValues(c, rows), [c]);
   const empty = <p className="p-6 text-center text-slate-500">Tidak ada {c.noun} yang cocok.</p>;
 
@@ -476,14 +487,14 @@ export function RecordWorkspace<T extends { id: string }>({
         {c.kpis.map((k) => {
           const on = active.id === k.id;
           const g = GRADIENTS[k.color];
+          // A figure (`value`) is not a view, so it is a plain card.
+          const Card = k.match ? "button" : "div";
           return (
-            <button
+            <Card
               key={k.id}
-              type="button"
-              aria-pressed={on}
-              onClick={() => applyView(on ? null : k.id)}
+              {...(k.match ? { type: "button" as const, "aria-pressed": on, onClick: () => applyView(on ? null : k.id) } : {})}
               data-kpi={k.id}
-              className="relative overflow-hidden rounded-xl text-left text-white transition-all duration-200 hover:-translate-y-px focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+              className={`relative overflow-hidden rounded-xl text-left text-white ${k.match ? "transition-all duration-200 hover:-translate-y-px focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900" : ""}`}
               style={{ backgroundImage: g.bg, boxShadow: on ? `0 0 0 2px #fff, 0 0 0 4px ${g.glow.replace(/[\d.]+\)$/, "0.9)")}` : `0 1px 2px rgba(15,23,42,0.08), 0 10px 20px -12px ${g.glow}` }}
             >
               <span aria-hidden className="pointer-events-none absolute -right-6 -top-6 h-16 w-16 rounded-full bg-white/15" />
@@ -492,7 +503,7 @@ export function RecordWorkspace<T extends { id: string }>({
                 label={<span className="text-[0.75rem] font-medium text-white/85">{k.label}</span>}
                 value={<span className="text-[1.125rem] font-extrabold leading-6 tabular-nums text-white">{counts[k.id]}</span>}
               />
-            </button>
+            </Card>
           );
         })}
       </section>
@@ -633,7 +644,7 @@ export function RecordWorkspace<T extends { id: string }>({
             records={records}
             toolbarColumns={toolbarColumns}
             valuesOf={valuesOf}
-            onCardsChange={access.canEdit ? onCardsChange : undefined}
+            onCardsChange={access.canEdit && !c.board.readOnly ? onCardsChange : undefined}
             onOpen={select}
             onClose={closePreview}
           />

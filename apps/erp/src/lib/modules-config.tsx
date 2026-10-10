@@ -33,7 +33,7 @@ export const MODULES: ModuleConfig[] = [
       { href: "/sales/v2/accounts", label: "Account (CRM)", v1: "/sales/accounts" },
       { href: "/sales/v2/client-active", label: "Client Active", collab: true, v1: "/ta/client-active" },
       { href: "/pmo/overtime-business-trip", label: "Overtime & Business Trip", collab: true, collabColor: "orange" },
-      { href: "/sales/profitability-tracker", label: "Profitability Tracker", collab: true },
+      { href: "/sales/v2/profitability-tracker", label: "Profitability Tracker", collab: true, v1: "/sales/profitability-tracker" },
     ],
   },
   {
@@ -68,7 +68,7 @@ export const MODULES: ModuleConfig[] = [
       { href: "/tm/cogs-calculator", label: "COGS Calculator" },
       { href: "/tm/extension-requests", label: "Extension & Increment Request" },
       { href: "/tm/special-notes", label: "Special Notes (TM-HR)", collab: true },
-      { href: "/sales/profitability-tracker", label: "Profitability Tracker", collab: true },
+      { href: "/sales/v2/profitability-tracker", label: "Profitability Tracker", collab: true, v1: "/sales/profitability-tracker" },
     ],
   },
   {
@@ -81,7 +81,7 @@ export const MODULES: ModuleConfig[] = [
       { href: "/pmo/readiness", label: "Operational Readiness" },
       { href: "/finance", label: "Dokumen Finance (TM Invoice)", collab: true },
       { href: "/pmo/overtime-business-trip", label: "Overtime & Business Trip", collab: true, collabColor: "orange" },
-      { href: "/sales/profitability-tracker", label: "Profitability Tracker", collab: true },
+      { href: "/sales/v2/profitability-tracker", label: "Profitability Tracker", collab: true, v1: "/sales/profitability-tracker" },
     ],
   },
   {

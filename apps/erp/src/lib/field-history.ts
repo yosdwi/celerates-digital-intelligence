@@ -7,8 +7,9 @@ import { authOptions } from "@/lib/auth";
 import { db } from "@/db";
 import { crmClients, opportunities, projectDocuments, recordFieldChanges, salesOpportunityTrackers } from "@/db/schema";
 
-/** `client_submission`: an application's Client Active status and note (record id = the application). */
-export type HistoryRecordType = "opportunity_tracker" | "commercial_pq" | "crm_client" | "client_submission";
+/** `client_submission`: an application's Client Active status and note (record id = the application).
+ *  `profitability_entry`: what a re-sync of a period changed in a Profitability Tracker row (record id = the entry). */
+export type HistoryRecordType = "opportunity_tracker" | "commercial_pq" | "crm_client" | "client_submission" | "profitability_entry";
 export type FieldChange = { field: string; old: string | null; new: string | null };
 
 const asText = (v: unknown): string | null => {
